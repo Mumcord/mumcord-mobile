@@ -1,11 +1,16 @@
-# Rust workspace of the mobile apps. The first member, `bridge` (crate mumcord-mobile-bridge),
-# is added by the bridge task; until then the workspace is intentionally empty.
+# Rust workspace of the mobile apps.
 [workspace]
 resolver = "3"
-members = []
+members = ["bridge"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.90"
+rust-version = "1.99"
 license = "AGPL-3.0-only"
 repository = "https://github.com/Mumcord/mumcord-mobile"
+
+[workspace.dependencies]
+# The pinned Mumcord engine. `rev` must be the reference in `engine.lock.toml`; the bridge's
+# build script fails when the two differ. Desktop-only parts stay off (`default-features = false`).
+mumcord-engine = { git = "https://github.com/Mumcord/mumcord", rev = "6d2ac79e26c9ac8260927c95b3ba815ea11e632f", default-features = false }
+mumcord-store = { git = "https://github.com/Mumcord/mumcord", rev = "6d2ac79e26c9ac8260927c95b3ba815ea11e632f" }

@@ -1,5 +1,5 @@
 # Same Rust version as the Mumcord repository (its MSRV, edition 2024), plus the phone targets.
 [toolchain]
-channel = "1.90"
+channel = "1.99.1"
 components = ["clippy", "rustfmt"]
 targets = ["aarch64-linux-android", "x86_64-linux-android", "aarch64-apple-ios", "aarch64-apple-ios-sim"]

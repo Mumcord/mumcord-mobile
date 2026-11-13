@@ -1,0 +1,39 @@
+[package]
+name = "mumcord-mobile-bridge"
+description = "Mobile-friendly interface to the Mumcord engine with Kotlin and Swift bindings (UniFFI)"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "mumcord_mobile"
+crate-type = ["cdylib", "staticlib", "lib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+# The binding generator for Kotlin and Swift. A host tool: never switched on for phone builds.
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+mumcord-engine.workspace = true
+mumcord-store.workspace = true
+thiserror = "2"
+tokio = { version = "1.54", features = ["rt-multi-thread", "sync"] }
+tracing = "0.1"
+# Exact version: the generated Kotlin and Swift code must match the library it was built from.
+uniffi = "=0.32.2"
+
+[target.'cfg(target_os = "android")'.dependencies]
+# Same versions as the engine uses, so there is one verifier and one JNI layer in the library.
+jni = { version = "0.22", default-features = false }
+rustls-platform-verifier = "0.7"
+
+[dev-dependencies]
+tokio = { version = "1.54", features = ["macros", "time"] }

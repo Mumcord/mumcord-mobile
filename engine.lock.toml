@@ -9,5 +9,4 @@
 # desktop translation files and the theme tokens.
 [engine]
 repository = "https://github.com/Mumcord/mumcord"
-# PLACEHOLDER: replace with a real commit hash before the bridge is built.
-rev = "0000000000000000000000000000000000000000"
+rev = "6d2ac79e26c9ac8260927c95b3ba815ea11e632f"
