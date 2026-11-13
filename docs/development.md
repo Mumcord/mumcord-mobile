@@ -1,7 +1,7 @@
 # Development setup
 
 How to get a machine ready to build and test the Mumcord mobile apps. This page covers the
-Android toolchain on Linux; the iOS toolchain needs a Mac and is described once that part exists.
+Android toolchain on Linux; the iOS toolchain needs a Mac and is described in [iOS](#ios) below.
 
 ## What you need beforehand
 
@@ -101,3 +101,29 @@ packages are not removed automatically; delete their folders under `~/Android/Sd
 rm -rf ~/Android/Sdk ~/.local/share/mumcord ~/.android/avd/mumcord-test.avd ~/.android/avd/mumcord-test.ini
 cargo uninstall cargo-ndk
 ```
+
+## iOS
+
+The iOS app can only be built on a Mac. You need:
+
+- Xcode 26 or newer with an iOS simulator runtime (the script uses the simulator "iPhone 17").
+- `rustup`; the Rust version and the iOS targets come from `rust-toolchain.toml`
+  (`rustup toolchain install` in the repository folder).
+- XcodeGen and cmake: `brew install xcodegen cmake`.
+
+```sh
+# Bridge for device and simulator, Swift bindings, MumcordBridge.xcframework, Mumcord.xcodeproj
+scripts/build-ios.sh
+
+# The same, then the unit and UI tests in the simulator
+scripts/build-ios.sh --test
+
+# Another simulator
+IOS_SIMULATOR="iPhone 17 Pro" scripts/build-ios.sh --test
+```
+
+The Xcode project is generated from `ios/project.yml` and not committed; open
+`ios/Mumcord.xcodeproj` after the script ran. Test results land in
+`ios/build/TestResults.xcresult`. CI runs the same script on a macOS runner
+(`.github/workflows/ci-ios.yml`). From the simulator the local test server is reachable as
+`localhost:64738`.
