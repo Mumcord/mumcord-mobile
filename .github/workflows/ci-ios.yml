@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Builds the Rust bridge for iOS, generates the Xcode project and runs the app's unit and UI
+# tests in the simulator.
+name: CI iOS
+
+on:
+  pull_request:
+    paths: &ios-paths
+      - "ios/**"
+      - "bridge/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "engine.lock.toml"
+      - "rust-toolchain.toml"
+      - "scripts/build-ios.sh"
+      - ".github/workflows/ci-ios.yml"
+  push:
+    branches: [main]
+    paths: *ios-paths
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # Must exist in the Xcode of the runner image below.
+  IOS_SIMULATOR: iPhone 17
+
+jobs:
+  ios:
+    name: Build and test in the simulator
+    # A fixed image instead of macos-latest: the Xcode version decides which simulators exist.
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install build tools
+        run: brew install xcodegen cmake
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
+
+      # Version, components and targets come from rust-toolchain.toml.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Build and test
+        run: scripts/build-ios.sh --test 2>&1 | tee "$RUNNER_TEMP/build-ios.log"
+
+      # Proof of what the first screen looks like; never the reason for a red run.
+      - name: Take a screenshot of the first screen
+        continue-on-error: true
+        run: |
+          device="$(xcrun simctl list devices available | grep -F "    ${IOS_SIMULATOR} (" | tail -n 1 | grep -oE '[0-9A-F-]{36}')"
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" ios/build/DerivedData/Build/Products/Debug-iphonesimulator/Mumcord.app
+          xcrun simctl launch "$device" app.mumcord.mobile
+          sleep 5
+          xcrun simctl io "$device" screenshot "$RUNNER_TEMP/first-screen.png"
+
+      - name: Upload test results, log and screenshot
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-test-results
+          path: |
+            ios/build/TestResults.xcresult
+            ${{ runner.temp }}/build-ios.log
+            ${{ runner.temp }}/first-screen.png
+          if-no-files-found: warn
+          retention-days: 14
