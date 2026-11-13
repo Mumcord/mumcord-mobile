@@ -43,7 +43,7 @@ final class KeychainSecureStorage: SecureStorage {
         }
         try check(status, operation: "get")
         guard let secret = result as? Data else {
-            throw SecureStorageError.Failed(message: "Keychain get returned no data")
+            throw SecureStorageError.Failed(detail: "Keychain get returned no data")
         }
         return secret
     }
@@ -72,7 +72,7 @@ final class KeychainSecureStorage: SecureStorage {
         }
         let reason = SecCopyErrorMessageString(status, nil) as String? ?? "unknown error"
         throw SecureStorageError.Failed(
-            message: "Keychain \(operation) failed: \(reason) (\(status))"
+            detail: "Keychain \(operation) failed: \(reason) (\(status))"
         )
     }
 }
