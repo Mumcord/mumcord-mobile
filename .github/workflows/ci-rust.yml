@@ -26,9 +26,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The engine builds Opus from source, which needs cmake.
+      # cmake builds Opus from source; the audio device layer of the engine links ALSA and
+      # PipeWire (bindings generated with libclang), its secret storage links D-Bus.
       - name: Install system packages
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends cmake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev
 
       # Version, components and targets come from rust-toolchain.toml.
       - name: Install the Rust toolchain
