@@ -10,15 +10,15 @@ use mumcord_store::{Error, Result, SecretBackend, SecretBackendError};
 /// A failed secure-storage call (storage locked, access denied, …).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, uniffi::Error)]
 pub enum SecureStorageError {
-    /// `message` is logged, so it must never contain the secret.
-    #[error("{message}")]
-    Failed { message: String },
+    /// `detail` is logged, so it must never contain the secret.
+    #[error("{detail}")]
+    Failed { detail: String },
 }
 
 impl From<uniffi::UnexpectedUniFFICallbackError> for SecureStorageError {
     fn from(error: uniffi::UnexpectedUniFFICallbackError) -> Self {
         Self::Failed {
-            message: error.reason,
+            detail: error.reason,
         }
     }
 }
@@ -81,7 +81,7 @@ mod tests {
         fn check(&self) -> std::result::Result<(), SecureStorageError> {
             if self.locked {
                 return Err(SecureStorageError::Failed {
-                    message: "storage is locked".into(),
+                    detail: "storage is locked".into(),
                 });
             }
             Ok(())

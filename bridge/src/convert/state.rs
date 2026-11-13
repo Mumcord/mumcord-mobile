@@ -78,7 +78,7 @@ mod tests {
             }),
             ConnectionState::Disconnected {
                 error: Some(BridgeError::WrongPassword {
-                    message: "refused".into()
+                    detail: "refused".into()
                 }),
             }
         );

@@ -6,20 +6,20 @@ use crate::error::BridgeError;
 
 impl From<EngineError> for BridgeError {
     fn from(error: EngineError) -> Self {
-        let message = error.message;
+        let detail = error.message;
         match error.kind {
-            ErrorKind::NotConnected => Self::NotConnected { message },
-            ErrorKind::ServerUnreachable => Self::ServerUnreachable { message },
-            ErrorKind::WrongPassword => Self::WrongPassword { message },
-            ErrorKind::NameInUse => Self::NameInUse { message },
-            ErrorKind::CertificateRejected => Self::CertificateRejected { message },
-            ErrorKind::CertificateChanged => Self::CertificateChanged { message },
-            ErrorKind::ServerTooOld => Self::ServerTooOld { message },
-            ErrorKind::InvalidInput => Self::InvalidInput { message },
-            ErrorKind::SecureStorageUnavailable => Self::SecureStorageUnavailable { message },
-            ErrorKind::Io => Self::Io { message },
+            ErrorKind::NotConnected => Self::NotConnected { detail },
+            ErrorKind::ServerUnreachable => Self::ServerUnreachable { detail },
+            ErrorKind::WrongPassword => Self::WrongPassword { detail },
+            ErrorKind::NameInUse => Self::NameInUse { detail },
+            ErrorKind::CertificateRejected => Self::CertificateRejected { detail },
+            ErrorKind::CertificateChanged => Self::CertificateChanged { detail },
+            ErrorKind::ServerTooOld => Self::ServerTooOld { detail },
+            ErrorKind::InvalidInput => Self::InvalidInput { detail },
+            ErrorKind::SecureStorageUnavailable => Self::SecureStorageUnavailable { detail },
+            ErrorKind::Io => Self::Io { detail },
             // Kinds of features the bridge does not offer yet keep their message.
-            _ => Self::Internal { message },
+            _ => Self::Internal { detail },
         }
     }
 }
@@ -43,10 +43,10 @@ mod tests {
             ),
         ];
         for (kind, name) in cases {
-            let error = BridgeError::from(EngineError::new(kind, "detail"));
+            let error = BridgeError::from(EngineError::new(kind, "server said no"));
             let debug = format!("{error:?}");
             assert!(debug.starts_with(name), "{debug}");
-            assert!(debug.contains("detail"), "{debug}");
+            assert!(debug.contains("server said no"), "{debug}");
         }
     }
 
