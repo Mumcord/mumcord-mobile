@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# XcodeGen description of the iOS app. `scripts/build-ios.sh` builds the bridge, generates the
+# Swift bindings and then turns this file into `Mumcord.xcodeproj` (which is not committed).
+#
+# No development team and no signing identity in here: simulator builds are signed locally by
+# Xcode ("Sign to Run Locally"); release signing comes from CI secrets.
+name: Mumcord
+
+options:
+  bundleIdPrefix: app.mumcord
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: YES
+
+targets:
+  # The Swift module `MumcordBridge`: the generated UniFFI bindings plus the Rust library.
+  MumcordBridge:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Bridge/Generated
+    dependencies:
+      # Static Rust library with the C header module `MumcordBridgeFFI`.
+      - framework: Bridge/MumcordBridge.xcframework
+        embed: false
+      # A static Rust library does not carry the list of system frameworks it needs.
+      - sdk: Security.framework
+      - sdk: CoreFoundation.framework
+      - sdk: AudioToolbox.framework
+      - sdk: AVFAudio.framework
+      - sdk: CoreAudio.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile.bridge
+
+  Mumcord:
+    type: application
+    platform: iOS
+    sources:
+      - path: Mumcord
+      - path: Platform
+    dependencies:
+      - target: MumcordBridge
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_CFBundleDisplayName: Mumcord
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+
+  # Runs inside the app: the Keychain is only available to code hosted by an app.
+  MumcordTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/Unit
+    dependencies:
+      - target: Mumcord
+
+  MumcordUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/UI
+    dependencies:
+      - target: Mumcord
+
+schemes:
+  Mumcord:
+    build:
+      targets:
+        Mumcord: all
+        MumcordTests: [test]
+        MumcordUITests: [test]
+    test:
+      targets:
+        - MumcordTests
+        - MumcordUITests
