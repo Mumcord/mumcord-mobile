@@ -1,0 +1,13 @@
+# Pinned Mumcord engine used by this repository.
+#
+# Rule: always an exact reference, never a branch name.
+#   - During development: `rev` = full 40-character commit hash of the Mumcord repository's
+#     milestone work (`feat/mobile-engine` or `milestone/0.9.0`). Leave `tag` unset.
+#   - For a mobile release: `tag` = a Mumcord release tag (e.g. "v0.9.0"). Leave `rev` unset.
+# The bridge's git dependency in the root Cargo.toml must use the same reference. CI and scripts
+# check out the Mumcord repository at this reference into `.engine/` to get `testenv/`, the
+# desktop translation files and the theme tokens.
+[engine]
+repository = "https://github.com/Mumcord/mumcord"
+# PLACEHOLDER: replace with a real commit hash before the bridge is built.
+rev = "0000000000000000000000000000000000000000"

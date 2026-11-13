@@ -1,0 +1,11 @@
+# Rust workspace of the mobile apps. The first member, `bridge` (crate mumcord-mobile-bridge),
+# is added by the bridge task; until then the workspace is intentionally empty.
+[workspace]
+resolver = "3"
+members = []
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.90"
+license = "AGPL-3.0-only"
+repository = "https://github.com/Mumcord/mumcord-mobile"
