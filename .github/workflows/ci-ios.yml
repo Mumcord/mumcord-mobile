@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# Builds the Rust bridge for iOS, generates the Xcode project and runs the app's unit and UI
-# tests in the simulator.
+# Builds the Rust bridge and the app for iOS once, then runs the unit and UI tests in parallel
+# jobs, one per test group. The groups live in scripts/build-ios.sh (group_tests); the job
+# "iOS" at the end is the one name for branch protection.
 name: CI iOS
 
 on:
@@ -38,11 +39,28 @@ env:
   IOS_SIMULATOR: iPhone 17
 
 jobs:
-  ios:
-    name: Build and test in the simulator
+  # Fails at once when a UI test class belongs to no group, and hands the groups to the matrix.
+  groups:
+    name: Test groups
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check that every test class has a group
+        run: scripts/build-ios.sh --check-groups
+
+      - id: list
+        run: echo "matrix=$(scripts/build-ios.sh --list-groups)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build for testing
+    needs: groups
     # A fixed image instead of macos-latest: the Xcode version decides which simulators exist.
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -58,8 +76,58 @@ jobs:
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
-      - name: Build and test
-        run: scripts/build-ios.sh --test 2>&1 | tee "$RUNNER_TEMP/build-ios.log"
+      - name: Build the app and its tests
+        run: scripts/build-ios.sh --build-for-testing 2>&1 | tee "$RUNNER_TEMP/build-ios.log"
+
+      # One archive instead of thousands of files: the artifact upload is much faster, and the
+      # symbolic links inside the frameworks survive.
+      - name: Pack the test products
+        run: tar -C ios/build -czf "$RUNNER_TEMP/Mumcord.xctestproducts.tar.gz" Mumcord.xctestproducts
+
+      - name: Upload the test products
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-test-products
+          path: ${{ runner.temp }}/Mumcord.xctestproducts.tar.gz
+          # Already compressed.
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload the build log
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-build-log
+          path: ${{ runner.temp }}/build-ios.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  test:
+    name: Test ${{ matrix.group }}
+    needs: [groups, build]
+    runs-on: macos-26
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.groups.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download the test products
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ios-test-products
+          path: ${{ runner.temp }}/products
+
+      - name: Unpack the test products
+        run: |
+          mkdir -p ios/build
+          tar -C ios/build -xzf "$RUNNER_TEMP/products/Mumcord.xctestproducts.tar.gz"
+
+      - name: Run the tests
+        run: scripts/build-ios.sh --test-without-building "${{ matrix.group }}" 2>&1 | tee "$RUNNER_TEMP/test-${{ matrix.group }}.log"
 
       # The UI tests attach screenshots of the first screen and of the channels reference screen
       # of the design system in dark and light; never the reason for a red run. The export names
@@ -69,7 +137,7 @@ jobs:
         continue-on-error: true
         run: |
           xcrun xcresulttool export attachments \
-            --path ios/build/TestResults.xcresult --output-path "$RUNNER_TEMP/attachments"
+            --path ios/build/TestResults-${{ matrix.group }}.xcresult --output-path "$RUNNER_TEMP/attachments"
           python3 - "$RUNNER_TEMP/attachments" "$RUNNER_TEMP/screenshots" <<'PY'
           import json, re, shutil, sys
           from pathlib import Path
@@ -88,14 +156,14 @@ jobs:
                   print(f"{exported} -> {name}")
           PY
 
-      - name: Upload test results, log and screenshot
+      - name: Upload test results and log
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ios-test-results
+          name: ios-test-results-${{ matrix.group }}
           path: |
-            ios/build/TestResults.xcresult
-            ${{ runner.temp }}/build-ios.log
+            ios/build/TestResults-${{ matrix.group }}.xcresult
+            ${{ runner.temp }}/test-${{ matrix.group }}.log
             ${{ runner.temp }}/attachments
           if-no-files-found: warn
           retention-days: 14
@@ -105,7 +173,35 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ios-screenshots
+          name: ios-screenshots-${{ matrix.group }}
           path: ${{ runner.temp }}/screenshots
           if-no-files-found: warn
+          retention-days: 14
+
+  # The one name for branch protection: green only when every part is.
+  ios:
+    name: iOS
+    if: always()
+    needs: [groups, build, test]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check the parts
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            [[ "$result" == success ]] || exit 1
+          done
+
+      # All screenshots in one artifact, as before the split.
+      - name: Collect the screenshots
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact/merge@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-screenshots
+          pattern: ios-screenshots-*
+          delete-merged: true
           retention-days: 14

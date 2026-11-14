@@ -195,8 +195,12 @@ The iOS app can only be built on a Mac. You need:
 # Bridge for device and simulator, Swift bindings, MumcordBridge.xcframework, Mumcord.xcodeproj
 scripts/build-ios.sh
 
-# The same, then the unit and UI tests in the simulator
+# The same, then the unit and UI tests in the simulator (all test groups, one after the other)
 scripts/build-ios.sh --test
+
+# The steps CI runs in separate jobs: build once, then run one test group from the products
+scripts/build-ios.sh --build-for-testing
+scripts/build-ios.sh --test-without-building flows
 
 # Another simulator
 IOS_SIMULATOR="iPhone 17 Pro" scripts/build-ios.sh --test
@@ -204,6 +208,25 @@ IOS_SIMULATOR="iPhone 17 Pro" scripts/build-ios.sh --test
 
 The Xcode project is generated from `ios/project.yml` and not committed; open
 `ios/Mumcord.xcodeproj` after the script ran. Test results land in
-`ios/build/TestResults.xcresult`. CI runs the same script on a macOS runner
-(`.github/workflows/ci-ios.yml`). From the simulator the local test server is reachable as
-`localhost:64738`.
+`ios/build/TestResults-<group>.xcresult`. From the simulator the local test server is reachable
+as `localhost:64738`.
+
+CI (`.github/workflows/ci-ios.yml`) runs the same script in parallel jobs: one job builds the
+bridge, the app and the tests once (`--build-for-testing`) and uploads the test products
+(`ios/build/Mumcord.xctestproducts`, packed as one archive); one job per test group downloads them
+and runs `--test-without-building <group>` on a fresh simulator. The job `iOS` needs all parts
+and is the one name for branch protection.
+
+The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced by run time:
+
+| Group | Tests |
+| --- | --- |
+| `flows` | all unit tests (`MumcordTests`), launch test, app flow, chat flow |
+| `app` | app screenshots, voice flow |
+| `voice-chat` | voice screenshots, chat screenshots, design reference |
+
+To add a UI test class, put it in `ios/Tests/UI` and add `MumcordUITests/<ClassName>` to the group
+with the shortest run time in `group_tests`; nothing else changes, the CI matrix is generated
+from the same list. `scripts/build-ios.sh --check-groups` (a CI job that runs first, works on
+any OS) fails when a UI test class is in no group, in two groups, or a listed class does not
+exist. New unit tests need nothing: the whole unit bundle runs in `flows`.
