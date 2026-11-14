@@ -247,3 +247,7 @@
 "link_warning_open" = "Open link";
 "viewer_title" = "Image";
 "viewer_close" = "Close image";
+"session_ended_title" = "Session ended";
+"session_ended_text" = "Mumcord was closed by the system while you were connected to %1$@.";
+"session_ended_reconnect" = "Reconnect";
+"session_ended_close" = "Close";

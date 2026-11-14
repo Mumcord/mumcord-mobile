@@ -65,7 +65,7 @@ group_tests() {
     voice-chat-screens)
       printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests ;;
     chat-flow)
-      printf '%s\n' MumcordUITests/ChatFlowUITests ;;
+      printf '%s\n' MumcordUITests/ChatFlowUITests MumcordUITests/SessionEndedUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
   esac
 }

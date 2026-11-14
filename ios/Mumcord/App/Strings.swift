@@ -261,6 +261,10 @@ enum Strings {
     static var linkWarningOpen: String { text("link_warning_open") }
     static var viewerTitle: String { text("viewer_title") }
     static var viewerClose: String { text("viewer_close") }
+    static var sessionEndedTitle: String { text("session_ended_title") }
+    static func sessionEndedText(_ p1: String) -> String { format("session_ended_text", p1) }
+    static var sessionEndedReconnect: String { text("session_ended_reconnect") }
+    static var sessionEndedClose: String { text("session_ended_close") }
 
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")

@@ -16,6 +16,7 @@ struct AppRoot: View {
                 if phase == .active {
                     model.refreshPings()
                     model.recheckMicrophone()
+                    model.call?.onAppActive()
                 } else {
                     // Hold to talk and hold to whisper work only while the app is on screen
                     // (FR-5.21).
@@ -149,6 +150,12 @@ struct AppContent: View {
             )
         case .invalidLink:
             InvalidLinkSheet(onDismiss: model.dismissOverlay)
+        case .sessionEnded(_, let serverName):
+            SessionEndedSheet(
+                serverName: serverName,
+                onReconnect: model.reconnectAfterSessionEnded,
+                onDismiss: model.dismissOverlay
+            )
         }
     }
 }

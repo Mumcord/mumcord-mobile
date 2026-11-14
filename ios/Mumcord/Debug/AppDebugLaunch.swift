@@ -31,6 +31,7 @@ import MumcordBridge
 ///         chat-link-warning the Chat tab warns about a misleading link
 ///         chat-viewer      the Chat tab shows the picture of Ben's message large
 ///         chat-gifs        the Chat tab shows the GIF favourites
+///         session-ended    the last run was closed in the middle of a session with Nordlicht
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
 ///
@@ -159,7 +160,10 @@ extension AppDebugLaunch {
                 log: AppLog.write
             ),
             localNetwork: localNetworkGateway,
-            openSettings: {}
+            openSettings: {},
+            sessionEnded: options.contains("session-ended")
+                ? SessionEndedNotice(serverId: Mockup.servers[0].id, serverName: Mockup.servers[0].name)
+                : nil
         )
         if options.contains("chat") {
             presetChat(model, store)

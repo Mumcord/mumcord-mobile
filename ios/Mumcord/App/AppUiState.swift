@@ -28,6 +28,8 @@ enum Overlay: Equatable {
     case localNetwork(target: ConnectTarget, serverName: String)
     case link(LinkConfirmState)
     case invalidLink
+    /// The last run was closed in the middle of a session with this server (FR-5.37).
+    case sessionEnded(serverId: Int64, serverName: String)
 }
 
 struct AppUiState: Equatable {

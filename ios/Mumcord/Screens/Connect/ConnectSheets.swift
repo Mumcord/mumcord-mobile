@@ -45,3 +45,21 @@ struct PasswordSheet: View {
         }
     }
 }
+
+/// Shown at the start after the app was closed in the middle of a voice session (FR-5.37).
+/// Reconnecting is offered, never done by itself.
+struct SessionEndedSheet: View {
+    let serverName: String
+    let onReconnect: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        SheetOverlay(title: Strings.sessionEndedTitle, onDismiss: onDismiss) {
+            Paragraph(Strings.sessionEndedText(serverName))
+            MumcordButton(text: Strings.sessionEndedReconnect, fullWidth: true, action: onReconnect)
+                .accessibilityIdentifier("session-ended-reconnect")
+            MumcordButton(text: Strings.sessionEndedClose, style: .secondary, fullWidth: true, action: onDismiss)
+                .accessibilityIdentifier("session-ended-close")
+        }
+    }
+}

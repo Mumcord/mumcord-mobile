@@ -56,23 +56,36 @@ extension AppModel {
     /// The app on the real engine. Created once per process: the engine must exist only once.
     static let live: AppModel = {
         let store = SessionStore(engineFactory: BridgeEngineFactory.make, log: AppLog.write)
+        let voiceSession = SystemVoiceSession(log: AppLog.write)
+        let audio = VoiceAudio(
+            store: store,
+            gateway: SystemMicrophoneGateway(),
+            backend: NativeAudio(),
+            session: voiceSession,
+            scheduler: QueueAudioScheduler(),
+            log: AppLog.write
+        )
+        let call = VoiceCall(
+            store: store,
+            audio: audio,
+            makeCallSystem: CallSystems.make(log: AppLog.write),
+            prepareAudio: { voiceSession.prepare() },
+            markers: SessionMarkerStore(),
+            log: AppLog.write
+        )
+        voiceSession.onSignal = { [weak call] in call?.onAudioSignal($0) }
         return AppModel(
             store: store,
             setupStore: UserDefaultsSetupStore(),
-            microphone: VoiceAudio(
-                store: store,
-                gateway: SystemMicrophoneGateway(),
-                backend: NativeAudio(),
-                session: SystemVoiceSession(log: AppLog.write),
-                scheduler: QueueAudioScheduler(),
-                log: AppLog.write
-            ),
+            microphone: audio,
             localNetwork: SystemLocalNetworkGateway(log: AppLog.write),
             openSettings: {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
-            }
+            },
+            call: call,
+            sessionEnded: call.takeSessionEndedNotice()
         )
     }()
 }

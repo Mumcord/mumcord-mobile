@@ -19,6 +19,8 @@ final class AppModel {
     @ObservationIgnored private let localNetwork: LocalNetworkGateway
     /// Opens the app's page in the system settings.
     @ObservationIgnored let openSettings: () -> Void
+    /// The session as a call of the phone; nil where the app runs without the phone's services.
+    @ObservationIgnored let call: VoiceCall?
     /// The look at a server's address before its connection starts.
     @ObservationIgnored private var addressCheck: Task<Void, Never>?
     /// The microphone level, 0 to 100. An object of its own: it changes up to 20 times a
@@ -43,17 +45,23 @@ final class AppModel {
         setupStore: SetupStore,
         microphone: MicrophoneAccess,
         localNetwork: LocalNetworkGateway,
-        openSettings: @escaping () -> Void
+        openSettings: @escaping () -> Void,
+        call: VoiceCall? = nil,
+        sessionEnded: SessionEndedNotice? = nil
     ) {
         self.store = store
         self.setupStore = setupStore
         self.microphone = microphone
         self.localNetwork = localNetwork
         self.openSettings = openSettings
+        self.call = call
         let chatStore = ChatStore(session: store)
         chat = ChatController(chats: chatStore)
         chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
         local = AppUiState(setupDone: setupStore.firstStartDone)
+        if let sessionEnded {
+            local.overlay = .sessionEnded(serverId: sessionEnded.serverId, serverName: sessionEnded.serverName)
+        }
         let states = store.states()
         Task { [weak self] in
             for await state in states {
@@ -323,6 +331,13 @@ final class AppModel {
         guard case .localNetwork(let target, _) = local.overlay else { return }
         localNetwork.explained = true
         start(target, explained: true)
+    }
+
+    /// Connects again to the server of the session that was cut off.
+    func reconnectAfterSessionEnded() {
+        guard case .sessionEnded(let serverId, _) = local.overlay else { return }
+        dismissOverlay()
+        connect(serverId)
     }
 
     /// Ends the connection, also while it is still being made.

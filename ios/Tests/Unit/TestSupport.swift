@@ -149,7 +149,11 @@ final class PhoneFakes {
 
     /// A model on `store` whose audio, microphone question and local network are these fakes.
     @MainActor
-    func makeModel(store: SessionStore, setupStore: SetupStore) -> AppModel {
+    func makeModel(
+        store: SessionStore,
+        setupStore: SetupStore,
+        sessionEnded: SessionEndedNotice? = nil
+    ) -> AppModel {
         AppModel(
             store: store,
             setupStore: setupStore,
@@ -162,7 +166,8 @@ final class PhoneFakes {
                 log: { _ in }
             ),
             localNetwork: localNetwork,
-            openSettings: { [weak self] in self?.settingsOpened += 1 }
+            openSettings: { [weak self] in self?.settingsOpened += 1 },
+            sessionEnded: sessionEnded
         )
     }
 }
