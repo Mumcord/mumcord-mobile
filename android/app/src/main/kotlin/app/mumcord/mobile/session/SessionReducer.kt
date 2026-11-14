@@ -6,6 +6,19 @@ import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ChannelPasswordState
 import app.mumcord.mobile.bridge.ConnectionState
 
+/**
+ * Folds an event while the app itself gets back into the server ([SessionRepository.reconnectNow]):
+ * the engine's connection is ended and started again, which must look like the reconnect it
+ * is. So the orderly end and the new attempt leave the state as it is ("Reconnecting", with
+ * the last known channels); a failure and everything else are folded as always.
+ */
+fun SessionState.foldResuming(event: BridgeEvent): SessionState {
+    val connection = (event as? BridgeEvent.ConnectionChanged)?.state
+    val hidden = connection is ConnectionState.Connecting ||
+        (connection is ConnectionState.Disconnected && connection.error == null)
+    return if (hidden) this else fold(event)
+}
+
 /** Folds one engine event into the state. Pure, so it can run on any thread and be tested. */
 fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.ConnectionChanged -> when (val connection = event.state) {

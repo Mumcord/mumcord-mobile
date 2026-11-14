@@ -6,6 +6,7 @@ import app.mumcord.mobile.bridge.AudioEndpoints
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.ChatId
+import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.bridge.EngineListener
 import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.MumbleLink
@@ -13,17 +14,23 @@ import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.bridge.VoiceSettings
 import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.bridge.parseMumbleLink
+import app.mumcord.mobile.platform.call.SelfVoice
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The result of a command that the screen which started it reports itself (a form, a sheet). */
 sealed interface Outcome<out T> {
@@ -83,6 +90,27 @@ class SessionRepository(
         checkThreads = checkThreads,
     )
 
+    /**
+     * The password typed for the running connection only (not the saved one). Kept in memory
+     * so that [reconnectNow] can use it again; forgotten when the connection ends, never
+     * stored and never logged.
+     */
+    @Volatile
+    private var sessionPassword: String? = null
+
+    // ----- getting back in by the app itself, see reconnectNow -----
+
+    /** True while the state hides that the connection is ended and started again. */
+    @Volatile
+    private var resuming = false
+    private var resumeJob: Job? = null
+
+    /** What the engine last said about the connection, also what [resuming] hides. */
+    private val connection = MutableStateFlow<ConnectionState?>(null)
+
+    /** How often a server's channels arrived; grows with every connection that got in. */
+    private val synced = MutableStateFlow(0)
+
     private val mutableInputLevel = MutableStateFlow(0)
 
     /** The microphone level for the level meter, 0 to 100, up to 20 times a second. */
@@ -100,7 +128,10 @@ class SessionRepository(
     init {
         scope.launch {
             for (event in events) {
-                mutableState.update { it.fold(event) }
+                if (event is BridgeEvent.ConnectionChanged) connection.value = event.state
+                if (event is BridgeEvent.ServerSynced) synced.update { it + 1 }
+                mutableState.update { if (resuming) it.foldResuming(event) else it.fold(event) }
+                if (!resuming && !mutableState.value.isBusy) sessionPassword = null
             }
         }
     }
@@ -174,6 +205,7 @@ class SessionRepository(
      * that no other connection is alive (one server at a time).
      */
     suspend fun connectServer(serverId: Long, password: String?, channelPath: List<String>) {
+        sessionPassword = password
         // Shown at once: creating the engine on first use takes a moment.
         mutableState.update {
             it.copy(
@@ -200,6 +232,13 @@ class SessionRepository(
     }
 
     suspend fun disconnect() {
+        sessionPassword = null
+        if (resuming) {
+            // Leaving wins over getting back in; what the state hid is shown now.
+            resumeJob?.cancel()
+            resuming = false
+            mutableState.update { it.fold(BridgeEvent.ConnectionChanged(ConnectionState.Disconnected(null))) }
+        }
         val result = call("disconnect") { it.disconnect() }
         if (result is Outcome.Failed) {
             mutableState.update {
@@ -207,6 +246,122 @@ class SessionRepository(
             }
         }
     }
+
+    /**
+     * Gets back into the server at once, for the moment a network is there again while the
+     * engine still waits before its next attempt (FR-5.40). The engine has no command for
+     * that, so the connection is ended and started again: into the channel the user was in,
+     * with the mute and deafen they had, and with the password of this connection. Meanwhile
+     * the state stays "Reconnecting". A running whisper ends.
+     *
+     * Does nothing unless the engine is reconnecting, and never runs twice at a time. When it
+     * does not get in, the connection ends as lost, like the engine's own last attempt.
+     */
+    suspend fun reconnectNow() {
+        val job = synchronized(this) {
+            if (resumeJob?.isActive == true || mutableState.value.phase !is ConnectionPhase.Reconnecting) return
+            scope.launch(start = CoroutineStart.LAZY) { resume() }.also { resumeJob = it }
+        }
+        job.start()
+        job.join()
+    }
+
+    private suspend fun resume() {
+        val before = mutableState.value
+        val serverId = before.activeServerId ?: return
+        val channelPath = before.server?.selfChannelPath().orEmpty()
+        val voice = selfVoice(before)
+        val syncedBefore = synced.value
+        resuming = true
+        try {
+            val back = try {
+                withTimeoutOrNull(RESUME_TIMEOUT_MILLIS) {
+                    engine.call { it.disconnect() }
+                    connection.first { it is ConnectionState.Disconnected }
+                    // Forgotten, so that the end waited for below is the new connection's.
+                    connection.value = null
+                    engine.call { it.connectServer(serverId, sessionPassword, channelPath) }
+                    val end = connection.first { it is ConnectionState.Connected || it is ConnectionState.Disconnected }
+                    if (end is ConnectionState.Connected) {
+                        synced.first { it > syncedBefore }
+                        true
+                    } else {
+                        false
+                    }
+                } ?: false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BridgeException) {
+                // Only the kind: the detail text can contain the server address.
+                log("reconnecting at once failed: ${e.toConnectionError()}")
+                false
+            } catch (e: RuntimeException) {
+                log("reconnecting at once failed: ${e.javaClass.simpleName}")
+                false
+            }
+            if (back) {
+                resuming = false
+                voice?.let { restore(it) }
+            } else {
+                lost()
+            }
+        } finally {
+            resuming = false
+        }
+    }
+
+    /**
+     * The connection could not be got back: it ends as lost, like the engine's own last
+     * attempt. The engine is told to stop while the state still hides its orderly end, which
+     * would otherwise look as if the user had left.
+     */
+    private suspend fun lost() {
+        if (connection.value !is ConnectionState.Disconnected) {
+            call("disconnect") { it.disconnect() }
+            withTimeoutOrNull(STOP_TIMEOUT_MILLIS) { connection.first { it is ConnectionState.Disconnected } }
+        }
+        sessionPassword = null
+        // A failure the engine reported itself is already shown with its own reason.
+        mutableState.update {
+            if (it.phase is ConnectionPhase.Failed) {
+                it
+            } else {
+                it.copy(
+                    phase = ConnectionPhase.Failed(ConnectionError.ServerUnreachable),
+                    certificatePrompt = null,
+                    server = null,
+                )
+            }
+        }
+    }
+
+    /** Puts back the mute and deafen the user had, where the new connection starts otherwise. */
+    private suspend fun restore(voice: SelfVoice) {
+        val now = selfVoice(mutableState.value) ?: return
+        if (now == voice) return
+        if (voice.deafened) {
+            setSelfDeaf(true)
+        } else {
+            if (now.deafened) setSelfDeaf(false)
+            setSelfMute(voice.muted)
+        }
+    }
+
+    /**
+     * Limits the voice bitrate in kbit/s, or lifts the limit with null. The engine does not
+     * keep it across a restart, so it is set again whenever it could have been lost. Never
+     * waits; without an engine there is nothing to limit yet.
+     */
+    fun setBitrateLimit(kbps: UInt?) {
+        engine.now { it.setBitrateLimitKbps(kbps) }
+    }
+
+    /** The voice settings as the engine applies them, or null when they cannot be read. */
+    suspend fun voiceSettings(): VoiceSettings? =
+        when (val settings = call("read voice settings") { it.voiceSettings() }) {
+            is Outcome.Ok -> settings.value
+            is Outcome.Failed -> null
+        }
 
     /** Asks to enter a channel; a refusal arrives as a password question or a denial. */
     suspend fun joinChannel(channelId: UInt, password: String?) {
@@ -322,5 +477,13 @@ class SessionRepository(
         // Only the kind of failure: the detail text can contain the server address.
         log("$command failed: $error (${cause.javaClass.simpleName})")
         return Outcome.Failed(error)
+    }
+
+    private companion object {
+        /** How long ending the connection and getting in again may take together. */
+        const val RESUME_TIMEOUT_MILLIS = 30_000L
+
+        /** How long the engine may take to end a connection it is told to end. */
+        const val STOP_TIMEOUT_MILLIS = 5_000L
     }
 }

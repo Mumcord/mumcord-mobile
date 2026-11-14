@@ -134,7 +134,15 @@ was on the screen in its failure message.
   `input keyevent` while the app is in the background and while the screen is off (the
   debug build's `TestSettings.treatOutputAsHeadset` makes the loudspeaker count as the
   headset; the device log says how long the phone system took to have the call again:
-  "the call was added again after … ms"); a phone call during a session, for
+  "the call was added again after … ms"); a change from Wi-Fi to mobile data and a longer
+  time without any network (the emulator is on mobile data and does not join its simulated
+  Wi-Fi "AndroidWifi" by itself: the test joins it with `cmd wifi connect-network` and
+  switches with `svc wifi` and `svc data`; the host stays reachable as `10.0.2.2` over both,
+  mobile data counts as metered, and the script leaves the emulator on mobile data with no
+  saved Wi-Fi network); "disconnect when alone" with the times shortened to 20 and 15
+  seconds by the debug build's `TestSettings.idleTimes`, while the phone is asleep and
+  forced into Doze (`dumpsys deviceidle force-idle`), which also leaves a picture of the
+  warning notification in `e2e/build/idle-notification.png`; a phone call during a session, for
   which the script plays the phone network through the emulator's console
   (`adb emu gsm call|cancel`; the emulator occasionally loses a call at the moment
   it is answered, also with no app running, so the test then lets the phone ring once more

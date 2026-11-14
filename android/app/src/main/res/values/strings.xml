@@ -175,6 +175,8 @@
     <string name="session_ended_text">Mumcord was closed by the system while you were connected to %1$s.</string>
     <string name="session_ended_reconnect">Reconnect</string>
     <string name="session_ended_close">Close</string>
+    <string name="session_ended_alone_title">Disconnected</string>
+    <string name="session_ended_alone_text">You were alone in a channel on %1$s for 30 minutes, so Mumcord disconnected.</string>
     <string name="denied_title">The server did not allow that</string>
     <string name="denied_title_channel">You cannot join %1$s</string>
     <string name="denied_text">You do not have permission for this.</string>
@@ -364,6 +366,15 @@
     <string name="more_blocked">Blocked people</string>
     <string name="more_sender_only">Show sender only</string>
     <string name="more_sender_only_sub">Notifications say who wrote, not what</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back to More</string>
+    <string name="settings_section_mobile_data">Mobile data</string>
+    <string name="settings_autoplay_streams">Start streams automatically</string>
+    <string name="settings_load_media">Load images and GIFs</string>
+    <string name="settings_reduced_voice">Reduced voice quality</string>
+    <string name="settings_section_battery">Battery</string>
+    <string name="settings_idle_disconnect">Disconnect when alone for 30 minutes</string>
+    <string name="settings_idle_disconnect_sub">You get a notification first</string>
     <string name="blocked_title">Blocked people</string>
     <string name="blocked_back">Back to More</string>
     <string name="blocked_empty">You have not blocked anybody.</string>

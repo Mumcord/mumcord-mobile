@@ -51,6 +51,7 @@ const val DENIED_BANNER_TEST_TAG = "denied-banner"
 const val MORE_DISCONNECT_TEST_TAG = "more-disconnect"
 const val MORE_BLOCKED_TEST_TAG = "more-blocked"
 const val MORE_SENDER_ONLY_TEST_TAG = "more-sender-only"
+const val MORE_SETTINGS_TEST_TAG = "more-settings"
 
 /**
  * The frame of the app while connected: the selected tab's screen, the banners, the whisper
@@ -80,8 +81,10 @@ fun ConnectedShell(
         ConnectedTab.More -> messages.blockedOpen
         else -> false
     }
+    val settings = state.settings.takeIf { state.tab == ConnectedTab.More }
     BackHandler(enabled = state.searching || state.tab != ConnectedTab.Channels) {
         when {
+            settings != null -> actions.closeSettings()
             insideTab -> messagesActions.back()
             state.tab != ConnectedTab.Channels -> actions.selectTab(ConnectedTab.Channels)
             else -> actions.closeSearch()
@@ -115,10 +118,17 @@ fun ConnectedShell(
                         onBack = messagesActions::back,
                     )
                 }
-                ConnectedTab.More -> if (messages.blockedOpen) {
-                    BlockedPeopleScreen(messages, messagesActions, topInsets)
-                } else {
-                    MoreScreen(state.serverName, messages, messagesActions, onDisconnect, topInsets)
+                ConnectedTab.More -> when {
+                    settings != null -> SettingsScreen(settings, actions::changeSettings, actions::closeSettings, topInsets)
+                    messages.blockedOpen -> BlockedPeopleScreen(messages, messagesActions, topInsets)
+                    else -> MoreScreen(
+                        state.serverName,
+                        messages,
+                        messagesActions,
+                        actions::openSettings,
+                        onDisconnect,
+                        topInsets,
+                    )
                 }
             }
         }
@@ -206,13 +216,14 @@ internal fun ConnectedBanners(state: ConnectedUiState, onDismissDenied: () -> Un
 
 /**
  * The More tab: what belongs to messages (the blocked people and what notifications show),
- * and leaving the server.
+ * the settings, and leaving the server.
  */
 @Composable
 private fun MoreScreen(
     serverName: String,
     messages: MessagesUiState,
     messagesActions: MessagesController,
+    onSettings: () -> Unit,
     onDisconnect: () -> Unit,
     topInsets: WindowInsets,
 ) {
@@ -242,6 +253,18 @@ private fun MoreScreen(
                         modifier = Modifier.testTag(MORE_SENDER_ONLY_TEST_TAG),
                     )
                 },
+            )
+        }
+        Spacer(Modifier.height(MumcordSpace.s4))
+        MumcordList {
+            MumcordListRow(
+                title = stringResource(R.string.settings_title),
+                icon = MumcordIcons.Settings,
+                trailing = {
+                    MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted)
+                },
+                onClick = onSettings,
+                modifier = Modifier.testTag(MORE_SETTINGS_TEST_TAG),
             )
         }
         Spacer(Modifier.height(MumcordSpace.s4))

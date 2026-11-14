@@ -15,6 +15,7 @@ import app.mumcord.mobile.platform.call.SessionEndedNotice
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
+import app.mumcord.mobile.session.IdleAccess
 import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
 import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.Outcome
@@ -54,6 +55,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -74,6 +76,7 @@ class AppViewModel(
     sessionEnded: SessionEndedNotice? = null,
     messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(),
     private val outputs: OutputAccess = OutputAccess.None,
+    private val idle: IdleAccess = IdleAccess.Never,
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -82,6 +85,23 @@ class AppViewModel(
         ),
     )
 
+
+    init {
+        // The app disconnected by itself because the user was alone: the next look at the app
+        // says so, where the server list is.
+        viewModelScope.launch {
+            repository.state.map { it.showsServer }.distinctUntilChanged().drop(1).collect { shown ->
+                if (!shown) refreshPings()
+            }
+        }
+        viewModelScope.launch {
+            idle.notice.collect { notice ->
+                if (notice != null) {
+                    local.update { it.copy(overlay = Overlay.SessionEnded(notice.serverId, notice.serverName, alone = true)) }
+                }
+            }
+        }
+    }
 
     /** The connected screens' own state and actions. */
     val connected = ConnectedController(repository, viewModelScope, outputs)
@@ -252,7 +272,11 @@ class AppViewModel(
     // ----- server list -----
 
     /** Asks the servers again for people online and latency; called when the list comes back. */
-    fun refreshPings() = ping(repository.state.value.servers)
+    fun refreshPings() {
+        // While a server is shown nobody sees the list; it is asked again when it comes back.
+        if (repository.state.value.showsServer) return
+        ping(repository.state.value.servers)
+    }
 
     private fun ping(servers: List<SavedServer>) {
         local.update { ui -> ui.copy(pings = ui.pings.filterKeys { id -> servers.any { it.id == id } }) }
@@ -316,7 +340,10 @@ class AppViewModel(
         }
     }
 
-    fun dismissOverlay() = local.update { it.copy(overlay = null) }
+    fun dismissOverlay() {
+        if ((local.value.overlay as? Overlay.SessionEnded)?.alone == true) idle.dismiss()
+        local.update { it.copy(overlay = null) }
+    }
 
     // ----- connecting -----
 
@@ -542,8 +569,10 @@ class AppViewModel(
                     application.voiceCall.takeSessionEndedNotice(),
                     application.messageNotificationSettings,
                     application.voiceOutput,
+                    application.idleDisconnect,
                 ).also {
-                    // Starts with the first screen and then follows the session by itself.
+                    // Start with the first screen and then follow the session by themselves.
+                    application.networkSession
                     application.messageNotifications
                 }
             }

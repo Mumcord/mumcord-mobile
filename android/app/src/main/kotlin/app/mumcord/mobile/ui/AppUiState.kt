@@ -40,8 +40,12 @@ sealed interface Overlay {
 
     data object InvalidLink : Overlay
 
-    /** The system closed the app in the middle of a session with [serverName]; offers to reconnect. */
-    data class SessionEnded(val serverId: Long, val serverName: String) : Overlay
+    /**
+     * A session with [serverName] ended without the user: the system closed the app in the
+     * middle of it, or the app disconnected because the user was [alone] in a channel for too
+     * long (FR-5.42). Offers to reconnect.
+     */
+    data class SessionEnded(val serverId: Long, val serverName: String, val alone: Boolean = false) : Overlay
 
     /** Before the system asks for local network access: why [serverName] needs it. */
     data class LocalNetwork(val target: ConnectTarget, val serverName: String) : Overlay

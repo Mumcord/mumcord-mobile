@@ -2,6 +2,7 @@
 
 package app.mumcord.mobile.e2e
 
+import android.app.Instrumentation
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
@@ -20,7 +21,7 @@ import java.util.regex.Pattern
  * call simulated by the emulator, and what the system knows about the app's service and calls.
  */
 class PhoneSystem {
-    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    val instrumentation: Instrumentation = InstrumentationRegistry.getInstrumentation()
     val device: UiDevice = UiDevice.getInstance(instrumentation)
 
     init {

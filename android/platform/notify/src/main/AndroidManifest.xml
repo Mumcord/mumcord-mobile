@@ -5,4 +5,11 @@
     <!-- Private messages and mentions are announced while connected. The app asks for it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <application>
+        <!-- The "Stay connected" button of the warning before the app disconnects by itself. -->
+        <receiver
+            android:name=".IdleActionReceiver"
+            android:exported="false" />
+    </application>
+
 </manifest>

@@ -349,6 +349,11 @@ class FakeEngine(
     var bitrateLimitKbps: UInt? = null
         private set
 
+    /** The engine does not keep the limit across a restart. */
+    fun forgetBitrateLimit() {
+        bitrateLimitKbps = null
+    }
+
     /** The target of the running whisper, or null when none runs. */
     @Volatile
     var whisperTarget: WhisperTarget? = null

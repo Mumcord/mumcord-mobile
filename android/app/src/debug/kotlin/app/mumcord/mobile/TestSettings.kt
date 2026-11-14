@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile
 
+import app.mumcord.mobile.session.IdleTimes
+
 /**
  * What only the automated tests may change, in debug builds; the product has the same object
  * with fixed values. The end-to-end tests run inside the app and set these directly; nothing
@@ -13,4 +15,11 @@ object TestSettings {
      */
     @Volatile
     var treatOutputAsHeadset: Boolean = false
+
+    /**
+     * How long "disconnect when alone" waits (FR-5.42, AC-5.30): 30 minutes and one minute of
+     * warning unless a test shortens them. Read whenever a wait begins.
+     */
+    @Volatile
+    var idleTimes: IdleTimes = IdleTimes()
 }

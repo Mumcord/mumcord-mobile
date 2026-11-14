@@ -6,22 +6,30 @@ import android.app.Application
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.os.SystemClock
 import android.util.Log
 import app.mumcord.mobile.platform.audio.AndroidFeedbackTones
 import app.mumcord.mobile.platform.audio.AndroidVoiceSession
 import app.mumcord.mobile.platform.audio.AudioController
 import app.mumcord.mobile.platform.audio.NativeAudio
+import app.mumcord.mobile.platform.network.AndroidNetworkMonitor
+import app.mumcord.mobile.platform.network.NetworkMonitor
+import app.mumcord.mobile.platform.notify.AndroidIdleNotifier
 import app.mumcord.mobile.platform.notify.AndroidMessageNotifier
 import app.mumcord.mobile.session.BridgeEngineFactory
 import app.mumcord.mobile.session.EngineCalls
 import app.mumcord.mobile.session.EngineMessageNotificationSettings
+import app.mumcord.mobile.session.IdleDisconnect
+import app.mumcord.mobile.session.MediaPolicy
 import app.mumcord.mobile.session.MessageNotificationCenter
 import app.mumcord.mobile.session.MessageNotificationSettings
+import app.mumcord.mobile.session.NetworkSession
 import app.mumcord.mobile.session.PreferencesStoredSenderOnly
 import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.session.VoiceAudio
 import app.mumcord.mobile.session.VoiceCall
 import app.mumcord.mobile.session.VoiceOutput
+import app.mumcord.mobile.session.loadMedia
 import app.mumcord.mobile.ui.chat.BridgeImageLoader
 import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.connect.AndroidLocalNetworkGateway
@@ -43,6 +51,7 @@ class MumcordApplication : Application() {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             engineDispatcher = EngineCalls.newDispatcher(),
             log = log,
+            mediaPolicy = MediaPolicy { loadMedia(networkMonitor.status.value, sessionRepository.state.value.mobileSettings) },
             checkThreads = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
         )
     }
@@ -106,6 +115,34 @@ class MumcordApplication : Application() {
             outputs = voiceCall.outputs,
             // One thread: the outputs are followed in the order they changed.
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1)),
+        )
+    }
+
+    private val networkMonitor: NetworkMonitor by lazy { AndroidNetworkMonitor(this) }
+
+    /** The bitrate limit on mobile data and getting back in when a network returns. It follows the session by itself too. */
+    val networkSession: NetworkSession by lazy {
+        NetworkSession(sessionRepository, networkMonitor, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+    }
+
+    /** "Disconnect when alone" with its two notifications. It follows the session by itself too. */
+    val idleDisconnect: IdleDisconnect by lazy {
+        IdleDisconnect(
+            repository = sessionRepository,
+            notifier = AndroidIdleNotifier(
+                context = this,
+                open = PendingIntent.getActivity(
+                    this,
+                    0,
+                    Intent(this, MainActivity::class.java).setAction(Intent.ACTION_MAIN),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                ),
+                onStay = { idleDisconnect.stayConnected() },
+            ),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            // Goes on while the phone sleeps.
+            clock = SystemClock::elapsedRealtime,
+            times = { TestSettings.idleTimes },
         )
     }
 

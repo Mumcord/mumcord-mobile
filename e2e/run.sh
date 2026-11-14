@@ -77,7 +77,10 @@ LOCK_PTT_SECONDS=60
 # who else is on the server and what they have to report (see check_peers): "alone" nobody;
 # "peer" a second person who has to hear the app talk; "ptt" the same, and the app may be heard
 # only for as long as hold-to-talk was held; "mute" the same, heard three separate times;
-# "headset" the same as "mute", the gaps being a headset's button;
+# "headset" the same as "mute", the gaps being a headset's button; "network" a second person
+# who has to hear the app before and after it changed from Wi-Fi to mobile data; "gap" nobody,
+# the phone loses every network for a while; "idle" nobody, and the picture of the warning
+# notification is fetched;
 # "whisper" a second person who has to hear the whisper and a third who must hear nothing;
 # "chat" a second person who writes and has to receive what the app wrote, and a third who
 # sends raw markup; "chat-restart" nobody, and the app keeps the data of the scenario before it
@@ -95,6 +98,9 @@ SCENARIOS=(
   "granted granted whisper ${TEST_PACKAGE}.WhisperFlowTest"
   "granted granted alone ${TEST_PACKAGE}.AudioOutputFlowTest#theVoiceViewShowsTheOutputAndTheSheetListsWhatThePhoneOffers"
   "granted granted headset ${TEST_PACKAGE}.AudioOutputFlowTest#aHeadsetsButtonTogglesTheMicrophoneInTheBackgroundAndWithTheScreenOff"
+  "granted granted network ${TEST_PACKAGE}.NetworkFlowTest#switchingFromWifiToMobileDataReconnectsIntoTheSameChannelWithTheSameMuteState"
+  "granted granted gap ${TEST_PACKAGE}.NetworkFlowTest#afterALongerGapTheSessionIsBackAsSoonAsANetworkIs"
+  "granted granted idle ${TEST_PACKAGE}.IdleDisconnectFlowTest"
   "granted granted notify ${TEST_PACKAGE}.NotificationFlowTest#itIsExplainedWithTheFirstSessionThenTheSystemAsksAndAllowingItShowsTheCall"
   "granted granted notify ${TEST_PACKAGE}.NotificationFlowTest#notNowKeepsTheSessionRunningInTheBackground"
   "granted granted alone ${TEST_PACKAGE}.CallNotificationFlowTest"
@@ -115,6 +121,8 @@ VOICE_SPAN_MS=1000
 # stall of either side at the end of the stretch adds to it, so CI allows more (see the
 # workflow); a button that does not stop the voice is heard for seconds longer either way.
 RELEASE_BOUND_MS="${E2E_RELEASE_BOUND_MS:-200}"
+# Where the "idle" scenario leaves its picture of the warning notification on the device.
+IDLE_PICTURE="/data/local/tmp/mumcord-idle-notification.png"
 # The name of the third person, who must not hear a whisper.
 BYSTANDER_NAME="e2e-bystander"
 # Seconds the second person may take to connect to the test server and enter its channel.
@@ -259,7 +267,7 @@ voice_spans() {
 check_peers() {
   local kind="$1" report="$2" spans count held longest lost
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
-  if [[ "${kind}" != "chat" && "${kind}" != "pm" ]]; then
+  if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -313,6 +321,22 @@ check_peers() {
         "$([[ "${kind}" == mute ]] && echo 'mute and deafen' || echo 'headset button')" \
         "${count}" "$(tr '\n' ' ' <<<"${spans}")"
       ((count == 3)) || die "the second person should have heard the app three separate times, see ${peer_log}"
+      ;;
+    network)
+      sed -n 's/^network: /e2e: network change: /p' "${report}" | tr -d '\r'
+      printf 'e2e: network change: the second person heard the app %s times (ms: %s)\n' \
+        "${count}" "$(tr '\n' ' ' <<<"${spans}")"
+      ((count >= 2)) \
+        || die "the second person should have heard the app before and after the network change, see ${peer_log}"
+      ;;
+    gap)
+      sed -n 's/^network: /e2e: network gap: /p' "${report}" | tr -d '\r'
+      ;;
+    idle)
+      sed -n 's/^idle: /e2e: disconnect when alone: /p' "${report}" | tr -d '\r'
+      adb_device pull "${IDLE_PICTURE}" "${OUT_DIR}/idle-notification.png" >/dev/null 2>&1 \
+        || die "the picture of the warning notification is missing"
+      adb_device shell rm -f "${IDLE_PICTURE}"
       ;;
     whisper)
       held="$(sed -n 's/^whisper: held_ms=//p' "${report}" | tr -d '\r')"
@@ -375,6 +399,11 @@ cleanup() {
   stop_phone_network
   stop_messenger
   if [[ -n "${serial}" ]]; then
+    # What the network and idle scenarios change is put back, also after a test that died:
+    # mobile data on, no saved Wi-Fi network, awake and on its normal power state.
+    timeout 20 "${ADB}" -s "${serial}" shell \
+      'svc data enable; svc wifi enable; for id in $(cmd wifi list-networks | grep AndroidWifi | cut -d" " -f1); do cmd wifi forget-network "$id"; done; dumpsys deviceidle unforce; dumpsys battery reset' \
+      >/dev/null 2>&1
     timeout 20 "${ADB}" -s "${serial}" logcat -d >"${OUT_DIR}/logcat.txt" 2>/dev/null
   fi
   if [[ -n "${emulator_pid}" ]]; then
@@ -485,7 +514,7 @@ run_scenario() {
   fi
   local extra=()
   case "${peer}" in
-    alone | notify | chat-restart) ;;
+    alone | notify | chat-restart | gap | idle) ;;
     lockptt)
       extra=(-e lockSeconds "${LOCK_PTT_SECONDS}")
       start_peer "${PEER_LOG}"

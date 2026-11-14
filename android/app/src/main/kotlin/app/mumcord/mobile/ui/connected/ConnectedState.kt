@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.ui.connected
 
+import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.platform.call.OutputState
@@ -159,6 +160,8 @@ data class ConnectedLocal(
     val whisperHeld: Boolean = false,
     /** The choice of the audio output is open. */
     val outputOpen: Boolean = false,
+    /** The settings are open in the More tab. */
+    val settingsOpen: Boolean = false,
 )
 
 /** The sheet over the connected screens. At most one at a time. */
@@ -208,6 +211,8 @@ data class ConnectedUiState(
     /** The voice bar and the full voice view; null while the user's own entry is unknown. */
     val voice: VoiceUiState?,
     val sheet: ConnectedSheet?,
+    /** The phone settings while the settings screen is open in the More tab. */
+    val settings: MobileSettings? = null,
 )
 
 /** The connected screens as a value, or null while no server is shown. */
@@ -275,5 +280,6 @@ fun connectedUiState(
             ?: MicrophoneNotice.None,
         voice = voiceUiState(session, server, local, serverName, microphone, output.current),
         sheet = sheet,
+        settings = session.mobileSettings?.takeIf { local.settingsOpen },
     )
 }

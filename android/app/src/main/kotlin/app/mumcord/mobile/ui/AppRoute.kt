@@ -241,6 +241,7 @@ fun AppContent(
             )
             overlay is Overlay.SessionEnded -> SessionEndedSheet(
                 serverName = overlay.serverName,
+                alone = overlay.alone,
                 onReconnect = viewModel::reconnectAfterSessionEnded,
                 onDismiss = viewModel::dismissOverlay,
                 topInsets = topInsets,

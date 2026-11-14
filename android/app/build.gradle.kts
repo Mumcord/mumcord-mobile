@@ -84,6 +84,7 @@ dependencies {
     implementation(project(":engine"))
     implementation(project(":platform:audio"))
     implementation(project(":platform:call"))
+    implementation(project(":platform:network"))
     implementation(project(":platform:notify"))
     implementation(project(":platform:securestore"))
     implementation(platform(libs.compose.bom))

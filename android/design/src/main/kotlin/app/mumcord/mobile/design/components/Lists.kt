@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,6 +109,7 @@ fun MumcordList(
  * @param leading replaces [icon] with other content, such as an avatar or a server tile.
  * @param trailing content at the end: a value, a chevron, a toggle.
  * @param tall the taller variant for rows with a tile.
+ * @param wrapTitle lets a long title run over several lines instead of cutting it off.
  * @param danger destructive action: title and icon in the danger colour.
  */
 @Composable
@@ -124,6 +126,7 @@ fun MumcordListRow(
     tall: Boolean = false,
     danger: Boolean = false,
     selected: Boolean = false,
+    wrapTitle: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = MumcordTheme.colors
@@ -157,7 +160,12 @@ fun MumcordListRow(
             }
         }
         Column(Modifier.weight(1f)) {
-            LineText(title, MumcordTheme.typography.bodyStrong, if (danger) colors.danger else colors.text)
+            val titleColor = if (danger) colors.danger else colors.text
+            if (wrapTitle) {
+                BasicText(title, style = MumcordTheme.typography.bodyStrong.copy(color = titleColor))
+            } else {
+                LineText(title, MumcordTheme.typography.bodyStrong, titleColor)
+            }
             if (subtitle != null) {
                 if (subtitleEmphasis) {
                     LineText(subtitle, MumcordTheme.typography.small.copy(fontWeight = FontWeight.Medium), colors.text)

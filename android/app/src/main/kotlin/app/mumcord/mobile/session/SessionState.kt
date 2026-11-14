@@ -88,6 +88,23 @@ data class ServerModel(
     /** The channel the user is in, or null while the server has not said. */
     val selfChannelId: UInt?
         get() = people[selfSession]?.channelId
+
+    /**
+     * The names from below the root channel down to the user's own channel, as a connection
+     * takes them to enter that channel; empty in the root channel or while it is unknown.
+     */
+    fun selfChannelPath(): List<String> {
+        val path = ArrayDeque<String>()
+        var channel = selfChannelId?.let(channels::get)
+        // The length bounds the walk should the server ever send a loop.
+        repeat(channels.size) {
+            val current = channel ?: return@repeat
+            val parent = current.parentId ?: return path
+            path.addFirst(current.name)
+            channel = channels[parent]
+        }
+        return path
+    }
 }
 
 /** [wrong] is true after the server refused the typed password, so the sheet can say so. */

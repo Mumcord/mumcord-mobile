@@ -2,6 +2,7 @@
 package app.mumcord.mobile.ui.connected
 
 import app.mumcord.mobile.bridge.DefaultOutput
+import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.bridge.WhisperTarget
@@ -65,6 +66,16 @@ class ConnectedController(
     fun showTab(tab: ConnectedTab) {
         closeVoice()
         mutableLocal.update { it.copy(tab = tab, personSession = null, volumeDraft = null, menuChannelId = null) }
+    }
+
+    /** Opens the settings in the More tab. */
+    fun openSettings() = mutableLocal.update { it.copy(settingsOpen = true) }
+
+    fun closeSettings() = mutableLocal.update { it.copy(settingsOpen = false) }
+
+    /** Saves a changed setting at once; a failure is shown like a refusal. */
+    fun changeSettings(change: (MobileSettings) -> MobileSettings) {
+        scope.launch { report(repository.updateMobileSettings(change)) }
     }
 
     fun toggleCollapsed(channelId: UInt) = mutableLocal.update {
