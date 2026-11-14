@@ -10,7 +10,9 @@ enum CallSystems {
     /// the start of the app: the system wants one call service per process and wants to know
     /// of it before the first call is asked for.
     ///
-    /// The simulator gets none: its call service does not take outgoing calls.
+    /// The simulator gets none. Its call service does take an outgoing call (a test starts
+    /// and ends one there), but it is reported to end such calls by itself after a moment for
+    /// want of a call screen, which would end every session started in a simulator.
     static func make(log: @escaping (String) -> Void) -> CallSystem? {
         #if targetEnvironment(simulator)
         return nil
