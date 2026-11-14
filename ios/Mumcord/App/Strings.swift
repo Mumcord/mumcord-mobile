@@ -148,7 +148,6 @@ enum Strings {
     static var tabChat: String { text("tab_chat") }
     static var tabMessages: String { text("tab_messages") }
     static var tabMore: String { text("tab_more") }
-    static var tabChatEmpty: String { text("tab_chat_empty") }
     static var tabMessagesEmpty: String { text("tab_messages_empty") }
     static func moreDisconnect(_ p1: String) -> String { format("more_disconnect", p1) }
     static func channelsPeopleCount(_ p1: Int) -> String {
@@ -201,6 +200,67 @@ enum Strings {
     static var whisperActive: String { text("whisper_active") }
     static var whisperInactive: String { text("whisper_inactive") }
     static var whisperClose: String { text("whisper_close") }
+
+    static func chatTitle(_ p1: String) -> String { format("chat_title", p1) }
+    static func chatSubtitle(_ p1: Int, _ p2: String) -> String {
+        format(p1 == 1 ? "chat_subtitle.one" : "chat_subtitle.other", p1, p2)
+    }
+    static func chatPlaceholder(_ p1: String) -> String { format("chat_placeholder", p1) }
+    static var chatAddImage: String { text("chat_add_image") }
+    static var chatAddGif: String { text("chat_add_gif") }
+    static var chatSend: String { text("chat_send") }
+    static var chatEmpty: String { text("chat_empty") }
+    static var chatLoading: String { text("chat_loading") }
+    static var chatLoadFailed: String { text("chat_load_failed") }
+    static var chatRetry: String { text("chat_retry") }
+    static var chatLoadingOlder: String { text("chat_loading_older") }
+    static var chatHistoryStart: String { text("chat_history_start") }
+    static var chatDayToday: String { text("chat_day_today") }
+    static var chatDayYesterday: String { text("chat_day_yesterday") }
+    static func chatNewMessages(_ p1: Int) -> String {
+        format(p1 == 1 ? "chat_new_messages.one" : "chat_new_messages.other", p1)
+    }
+    static func chatTabUnread(_ p1: Int) -> String {
+        format(p1 == 1 ? "chat_tab_unread.one" : "chat_tab_unread.other", p1)
+    }
+    static func chatAnnounce(_ p1: String, _ p2: String) -> String { format("chat_announce", p1, p2) }
+    static var chatMentionsYou: String { text("chat_mentions_you") }
+    static var chatReplyAction: String { text("chat_reply_action") }
+    static func chatReplyingTo(_ p1: String) -> String { format("chat_replying_to", p1) }
+    static var chatReplyCancel: String { text("chat_reply_cancel") }
+    static func chatMentionItem(_ p1: String) -> String { format("chat_mention_item", p1) }
+    static var chatImageWord: String { text("chat_image_word") }
+    static var chatGifWord: String { text("chat_gif_word") }
+    static var chatImageOpenAction: String { text("chat_image_open_action") }
+    static var chatGifAddAction: String { text("chat_gif_add_action") }
+    static var chatTruncated: String { text("chat_truncated") }
+    static var chatSending: String { text("chat_sending") }
+    static var chatNotSent: String { text("chat_not_sent") }
+    static var chatRefused: String { text("chat_refused") }
+    static var chatImageRefused: String { text("chat_image_refused") }
+    static var chatDiscard: String { text("chat_discard") }
+    static func chatCharactersLeft(_ p1: Int) -> String {
+        format(p1 == 1 ? "chat_characters_left.one" : "chat_characters_left.other", p1)
+    }
+    static func chatCharactersOver(_ p1: Int) -> String {
+        format(p1 == 1 ? "chat_characters_over.one" : "chat_characters_over.other", p1)
+    }
+    static var chatImageUnreadable: String { text("chat_image_unreadable") }
+    static var chatNoticeDismiss: String { text("chat_notice_dismiss") }
+    static var gifTitle: String { text("gif_title") }
+    static var gifHint: String { text("gif_hint") }
+    static func gifItem(_ p1: Int) -> String { format("gif_item", p1) }
+    static var gifRemove: String { text("gif_remove") }
+    static var gifSaved: String { text("gif_saved") }
+    static var gifNotSaved: String { text("gif_not_saved") }
+    static var imageSourceTitle: String { text("image_source_title") }
+    static var imageSourceLibrary: String { text("image_source_library") }
+    static var imageSourceCamera: String { text("image_source_camera") }
+    static var linkWarningTitle: String { text("link_warning_title") }
+    static var linkWarningText: String { text("link_warning_text") }
+    static var linkWarningOpen: String { text("link_warning_open") }
+    static var viewerTitle: String { text("viewer_title") }
+    static var viewerClose: String { text("viewer_close") }
 
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")

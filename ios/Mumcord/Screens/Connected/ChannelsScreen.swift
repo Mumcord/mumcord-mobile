@@ -156,7 +156,8 @@ extension PersonFlags {
     }
 }
 
-private extension UnsupportedHint {
+extension UnsupportedHint {
+    /// The sentence of the hint; the name in it is untrusted text.
     var text: String {
         switch kind {
         case .fileTransfer: Strings.hintFileTransfer(personName)

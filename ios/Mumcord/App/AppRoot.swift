@@ -22,6 +22,10 @@ struct AppRoot: View {
                     model.releaseHolds()
                 }
             }
+            // A chat behind the lock screen or another app is not being read.
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                model.chat.setResumed(phase == .active)
+            }
     }
 }
 
@@ -51,6 +55,8 @@ struct AppContent: View {
                 sheet(for: overlay)
             } else if let connectedSheet {
                 ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model))
+            } else if uiState.connected != nil {
+                ChatOverlayHost(model: model)
             }
         }
     }
@@ -95,8 +101,11 @@ struct AppContent: View {
                 ConnectedShell(
                     state: connected,
                     actions: ConnectedActions(model: model),
-                    onDisconnect: model.disconnect
-                )
+                    onDisconnect: model.disconnect,
+                    chatBadge: model.chatBadge
+                ) {
+                    ChatTab(model: model)
+                }
             }
         }
     }

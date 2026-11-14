@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import Foundation
 import MumcordBridge
 import Observation
 
@@ -23,6 +24,11 @@ final class AppModel {
     /// The microphone level, 0 to 100. An object of its own: it changes up to 20 times a
     /// second, and only the level meter reads it.
     @ObservationIgnored let inputLevel = InputLevel()
+    /// The chat of the channel the user is in. An object of its own, read only by the chat
+    /// views, so arriving messages do not redraw the other screens.
+    @ObservationIgnored let chat: ChatController
+    /// Gets the pictures of the chat.
+    @ObservationIgnored let chatImages: ChatImageLoader
     /// The last connect, so "Try again" and the password retry keep a link's channel.
     @ObservationIgnored private var lastTarget: ConnectTarget?
 
@@ -44,6 +50,9 @@ final class AppModel {
         self.microphone = microphone
         self.localNetwork = localNetwork
         self.openSettings = openSettings
+        let chatStore = ChatStore(session: store)
+        chat = ChatController(chats: chatStore)
+        chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
         local = AppUiState(setupDone: setupStore.firstStartDone)
         let states = store.states()
         Task { [weak self] in
@@ -94,6 +103,31 @@ final class AppModel {
             closeWhisper()
         }
         if state.phase != previousPhase { askSystemAboutLocalNetwork(state) }
+        syncChat()
+    }
+
+    /// Tells the chat which chat to show (the one of the user's channel) and whether its
+    /// screen is the one on top. Called whenever the connection, the tab or the voice view
+    /// changes.
+    func syncChat() {
+        chat.open(currentChannelChat(session))
+        chat.setShown(session.showsServer && connectedLocal.tab == .chat && !connectedLocal.voiceOpen)
+    }
+
+    /// The Chat tab as a value, or nil while there is no chat to show. Only the chat views
+    /// read it.
+    func chatUiState(calendar: Calendar) -> ChatUiState? {
+        Mumcord.chatUiState(
+            session: session,
+            local: chat.local,
+            serverName: local.activeServerName(session) ?? "",
+            calendar: calendar
+        )
+    }
+
+    /// The number on the Chat tab.
+    var chatBadge: Int {
+        chatTabBadge(unread: chat.unread, session: session, chatTabOpen: connectedLocal.tab == .chat)
     }
 
     /// After a server on a local or private address could not be reached: asks the system

@@ -3,12 +3,15 @@
 import SwiftUI
 
 /// The frame of the app while connected: the selected tab's screen, the banners, the whisper
-/// bar, the voice bar and the bottom tab bar, or the full voice view over all of it. Chat and
-/// Messages are filled by their own tasks.
-struct ConnectedShell: View {
+/// bar, the voice bar and the bottom tab bar, or the full voice view over all of it. `chat` is
+/// the Chat tab, which reads its own state; Messages is filled by its own task.
+struct ConnectedShell<Chat: View>: View {
     let state: ConnectedUiState
     let actions: ConnectedActions
     let onDisconnect: () -> Void
+    /// Unread messages of the current channel's chat, shown on the Chat tab.
+    let chatBadge: Int
+    @ViewBuilder let chat: () -> Chat
 
     var body: some View {
         if let voice = state.voice, voice.open {
@@ -32,7 +35,12 @@ struct ConnectedShell: View {
             MumcordTabBar(
                 tabs: [
                     MumcordTab(icon: MumcordIcons.list, label: Strings.tabChannels),
-                    MumcordTab(icon: MumcordIcons.hash, label: Strings.tabChat),
+                    MumcordTab(
+                        icon: MumcordIcons.hash,
+                        label: Strings.tabChat,
+                        badge: chatBadge > 0 ? String(chatBadge) : nil,
+                        accessibilityLabel: chatBadge > 0 ? Strings.chatTabUnread(chatBadge) : nil
+                    ),
                     MumcordTab(icon: MumcordIcons.messages, label: Strings.tabMessages),
                     MumcordTab(icon: MumcordIcons.more, label: Strings.tabMore),
                 ],
@@ -53,7 +61,7 @@ struct ConnectedShell: View {
         case .channels:
             ChannelsScreen(state: state, actions: actions)
         case .chat:
-            EmptyTabScreen(title: Strings.tabChat, text: Strings.tabChatEmpty)
+            chat()
         case .messages:
             EmptyTabScreen(title: Strings.tabMessages, text: Strings.tabMessagesEmpty)
         case .more:

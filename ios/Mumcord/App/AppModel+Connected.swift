@@ -8,6 +8,7 @@ extension AppModel {
 
     func selectTab(_ tab: ConnectedTab) {
         connectedLocal.tab = tab
+        syncChat()
     }
 
     func toggleCollapsed(_ channelId: UInt32) {

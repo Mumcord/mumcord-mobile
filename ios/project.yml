@@ -89,6 +89,8 @@ targets:
             CFBundleURLSchemes: [mumble]
         # Without this sentence iOS blocks connections to servers on the local network.
         NSLocalNetworkUsageDescription: Mumcord connects to Mumble servers on your local network.
+        # Without this sentence iOS ends the app when the camera opens to take a photo for the chat.
+        NSCameraUsageDescription: Mumcord uses the camera when you take a photo to send in a chat.
         # Without this sentence iOS ends the app when it asks for the microphone.
         NSMicrophoneUsageDescription: Mumcord needs the microphone so that the others can hear you.
     settings:

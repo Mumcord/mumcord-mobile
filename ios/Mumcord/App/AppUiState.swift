@@ -66,6 +66,11 @@ struct AppUiState: Equatable {
 
     /// The name of the server of the current connection, attempt or failure.
     var activeServerName: String? {
+        activeServerName(session)
+    }
+
+    /// The same for a session that is not part of this value.
+    func activeServerName(_ session: SessionState) -> String? {
         session.servers.first { $0.id == session.activeServerId }?.name
     }
 

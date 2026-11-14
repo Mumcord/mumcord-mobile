@@ -15,12 +15,14 @@ final class InputLevel {
 extension AppModel {
     func openVoice() {
         connectedLocal.voiceOpen = true
+        syncChat()
     }
 
     /// Closes the full voice view; its hold-to-talk button goes with it.
     func closeVoice() {
         releaseTalk()
         connectedLocal.voiceOpen = false
+        syncChat()
     }
 
     /// Mutes or unmutes the user. Unmuting also ends a deafen (the engine does that).

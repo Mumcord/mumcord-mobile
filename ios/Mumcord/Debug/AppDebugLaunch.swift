@@ -23,6 +23,14 @@ import MumcordBridge
 ///         mic-declined     the user has put the microphone explanation away with "Not now"
 ///         localnet         Nordlicht is on the local network and that was not explained yet
 ///         localnet-refused Nordlicht is on the local network and iOS refuses access to it
+///         chat             the Lobby chat of the mockup, GIF favourites and a hint
+///         chat-unread      two messages of the Lobby chat have not been read
+///         chat-misleading  the link in Mira's message names another address than it opens
+///         chat-reply       the Chat tab is replying to Anna
+///         chat-mention     the Chat tab shows the `@` suggestions
+///         chat-link-warning the Chat tab warns about a misleading link
+///         chat-viewer      the Chat tab shows the picture of Ben's message large
+///         chat-gifs        the Chat tab shows the GIF favourites
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
 ///
@@ -81,6 +89,22 @@ struct AppDebugLaunch {
             if options.contains("level") {
                 engine.levelOnConnect = 60
             }
+            if options.contains("chat") {
+                var messages = ChatMockup.messages()
+                if options.contains("chat-misleading") {
+                    var run = span("nordlicht.example")
+                    run.link = ChatMockup.misleadingLink
+                    messages[2].content = messageContent(blocks: [.paragraph(spans: [span("Rules: "), run])])
+                }
+                engine.messages = [ChatMockup.lobby: messages]
+                engine.mentionNames = ChatMockup.mentionNames
+                engine.storedGifFavourites = ChatMockup.gifFavourites
+                engine.chatImages = ChatMockup.chatImages()
+                engine.remoteImages = ChatMockup.remoteImages()
+                if options.contains("chat-unread") {
+                    engine.unread = [ChatMockup.lobby: 2]
+                }
+            }
             if options.contains("locks") {
                 engine.channelPasswords = [Mockup.music: "secret"]
                 engine.deniedChannels = [Mockup.afk]
@@ -123,7 +147,7 @@ extension AppDebugLaunch {
     @MainActor
     func makeModel() -> AppModel {
         let store = SessionStore(engineFactory: engineFactory, log: AppLog.write)
-        return AppModel(
+        let model = AppModel(
             store: store,
             setupStore: InMemorySetupStore(firstStartDone: setupDone),
             microphone: VoiceAudio(
@@ -137,6 +161,49 @@ extension AppDebugLaunch {
             localNetwork: localNetworkGateway,
             openSettings: {}
         )
+        if options.contains("chat") {
+            presetChat(model, store)
+        }
+        return model
+    }
+
+    /// Puts the Chat tab into the state the options name once its messages are there, through
+    /// the same calls the screen makes, so screenshot tests reach states that need no typing.
+    @MainActor
+    private func presetChat(_ model: AppModel, _ store: SessionStore) {
+        let options = options
+        Task { @MainActor in
+            _ = await store.first { $0.showsServer }
+            // Nothing in the engine reports hints yet; the mockup shows one.
+            store.showHint(UnsupportedHint(id: 1, personName: "Jonas", kind: .fileTransfer))
+            // The sheets cover the tab bar, so they wait until the test has opened the Chat tab.
+            while model.chat.local.messages.isEmpty || model.connectedLocal.tab != .chat {
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+            let chat = model.chat
+            if options.contains("chat-reply") {
+                chat.startReply(ChatMockup.annaAsks())
+                chat.changeDraft("On it", cursor: 5)
+            }
+            if options.contains("chat-mention") {
+                chat.changeDraft("Thanks @", cursor: 8)
+            }
+            if options.contains("chat-link-warning") {
+                chat.tapLink(ChatMockup.misleadingLink)
+            }
+            if options.contains("chat-viewer") {
+                chat.openViewer(.embedded(
+                    chat: ChatMockup.lobby,
+                    messageId: ChatMockup.mapMessageId,
+                    imageId: ChatMockup.mapImageId,
+                    width: ChatMockup.mapSize.width,
+                    height: ChatMockup.mapSize.height
+                ))
+            }
+            if options.contains("chat-gifs") {
+                chat.openGifs()
+            }
+        }
     }
 }
 
