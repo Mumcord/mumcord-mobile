@@ -110,13 +110,14 @@ jobs:
   emulator:
     name: Emulator tests
     runs-on: ubuntu-24.04
-    # A green run takes about 20 minutes; the rest is room for a cold cache.
-    timeout-minutes: 45
+    # A green run takes about half an hour; the rest is room for a cold cache.
+    timeout-minutes: 60
     env:
       E2E_AVD: mumcord-test
       E2E_BOOT_TIMEOUT: 600
-      # One scenario takes well under a minute here; this only ends one that hangs.
-      E2E_TEST_TIMEOUT: 300
+      # The longest scenario keeps the screen locked for three minutes; this only ends one
+      # that hangs.
+      E2E_TEST_TIMEOUT: 600
       # How much longer than a hold the app may be heard (200 ms on a developer machine). The
       # runner's few cores are shared by the emulator, the test server and the second person,
       # so a stall at the end of the stretch adds to what is measured. Still far below the

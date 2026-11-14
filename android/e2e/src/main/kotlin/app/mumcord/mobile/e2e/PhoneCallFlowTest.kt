@@ -105,6 +105,7 @@ class PhoneCallFlowTest {
         const val RINGING_POLLS = 12
         const val IN_CALL_MILLIS = 5_000L
         const val HEARD_AGAIN_MILLIS = 3_000L
-        const val SPAN_END_MILLIS = 1_500L
+        /** Well over the silence after which the second person reports a stretch as over (0.6 s). */
+        const val SPAN_END_MILLIS = 3_000L
     }
 }

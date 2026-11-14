@@ -30,8 +30,8 @@
 #   E2E_SCENARIO          run only the scenarios whose test name contains this text
 #   E2E_AVD               emulator device to start (default mumcord-test)
 #   E2E_BOOT_TIMEOUT      seconds the emulator may take to boot (default 300)
-#   E2E_TEST_TIMEOUT      seconds one scenario may take (default 300; a scenario takes well
-#                         under a minute, so this only ends one that hangs)
+#   E2E_TEST_TIMEOUT      seconds one scenario may take (default 600; the longest keeps the
+#                         screen locked for three minutes, so this only ends one that hangs)
 #   E2E_RELEASE_BOUND_MS  how much longer than a hold the app may be heard (default 200)
 #
 # Logs of the run land in e2e/build/: the test output (instrument.txt), the device log of all
@@ -43,7 +43,7 @@ set -euo pipefail
 export MUMCORD_PORT_BASE="${MUMCORD_PORT_BASE:-64838}"
 AVD="${E2E_AVD:-mumcord-test}"
 BOOT_TIMEOUT="${E2E_BOOT_TIMEOUT:-300}"
-TEST_TIMEOUT="${E2E_TEST_TIMEOUT:-300}"
+TEST_TIMEOUT="${E2E_TEST_TIMEOUT:-600}"
 
 APP_PACKAGE="app.mumcord.mobile"
 TEST_PACKAGE="app.mumcord.mobile.e2e"

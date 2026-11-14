@@ -103,7 +103,8 @@ e2e/run.sh
 
 It builds the app and the tests, starts the test server and the emulator (without a window),
 installs the app afresh, runs the tests, and stops the server and the emulator again. A run
-takes under a minute once everything is built (the first build takes several minutes). If an
+takes about ten minutes once everything is built (the first build takes several minutes);
+`E2E_SCENARIO=<part of a test name>` runs only the matching scenarios. If an
 emulator is already running, the script uses it and leaves it running. The result is
 `e2e: PASSED` or `e2e: FAILED: …` and a matching exit code. The logs are in `e2e/build/`: the
 test output (`instrument.txt`), the device log (`logcat.txt`), the emulator log, what the other
@@ -121,11 +122,20 @@ was on the screen in its failure message.
   single one with `e2e/run.sh -e class app.mumcord.mobile.e2e.ConnectFlowTest`. The tests skip
   themselves when started without the script (for example by `./gradlew connectedDebugAndroidTest`),
   because they then have no server.
+- **Scenarios:** `e2e/run.sh` runs each test as its own scenario with fresh app data and the
+  permissions it needs: connecting; the local network and the microphone question with the
+  system's own dialogs; voice in both directions, push-to-talk, mute and deafen, and whisper
+  with a second person on the host (`e2e/voice-peer`); the notification question (allowed,
+  and "not now"); the session's notification and its buttons; voice with the app in the
+  background and the screen locked, with voice activity (three minutes) and with
+  push-to-talk (one minute, silent while locked); and a phone call during a session, for
+  which the script plays the phone network through the emulator's console
+  (`adb emu gsm call|cancel`).
 - **Besides the Android toolchain** the machine needs KVM, `git`, Docker with the compose
   plugin, `sqlite3` and `openssl`. No Docker network is created; the server uses Docker's
   built-in bridge.
 - **Settings:** `E2E_AVD` (emulator device, default `mumcord-test`), `E2E_BOOT_TIMEOUT` and
-  `E2E_TEST_TIMEOUT` (seconds, default 300 each; the second is per scenario) and
+  `E2E_TEST_TIMEOUT` (seconds, default 300 and 600; the second is per scenario) and
   `E2E_RELEASE_BOUND_MS` (how much longer than hold-to-talk was held the app may be heard,
   default 200).
 - **Waits and timing:** every wait in the tests has a bound sized for the hosted CI emulator,

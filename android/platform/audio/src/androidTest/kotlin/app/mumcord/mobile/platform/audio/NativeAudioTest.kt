@@ -66,7 +66,7 @@ class NativeAudioTest {
     @Test
     fun aSessionThatStartsRightAfterAnotherEndedStillLeavesTheVoiceMode() {
         val mode = audioManager.mode
-        val session = AndroidVoiceSession(context) { }
+        val session = AndroidVoiceSession(context, log = { })
         repeat(REPETITIONS) {
             session.begin()
             session.end()

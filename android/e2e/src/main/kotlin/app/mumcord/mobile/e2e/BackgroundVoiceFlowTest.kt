@@ -151,6 +151,7 @@ class BackgroundVoiceFlowTest {
         const val DEFAULT_LOCK_SECONDS = 180L
         const val BACKGROUND_MILLIS = 20_000L
         const val HOLD_MILLIS = 4_000L
-        const val SPAN_END_MILLIS = 1_500L
+        /** Well over the silence after which the second person reports a stretch as over (0.6 s). */
+        const val SPAN_END_MILLIS = 3_000L
     }
 }
