@@ -96,6 +96,92 @@ pub struct SavedServer {
     pub identity_id: Option<i64>,
 }
 
+/// An identity: the certificate the user is known by on servers. The certificate and its key
+/// stay in the secure storage and never cross the bridge.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct Identity {
+    pub id: i64,
+    /// Local label the user chose; the certificate is not changed by it.
+    pub label: String,
+    /// Common name inside the certificate.
+    pub common_name: String,
+    /// Certificate hash, 40 hex digits: what a server knows the user by.
+    pub fingerprint: String,
+    /// When the identity was added on this phone, Unix time in milliseconds.
+    pub created_ms: i64,
+    /// Used by every server that names no identity of its own.
+    pub is_default: bool,
+    /// The saved servers that name this identity ([`SavedServer::identity_id`]).
+    pub server_ids: Vec<i64>,
+}
+
+/// Where voice plays when no headset is connected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum DefaultOutput {
+    /// Not chosen yet: the app asks once and saves the answer.
+    Ask,
+    Speaker,
+    Earpiece,
+}
+
+/// The settings only the phone apps have. Saved in the engine's database; the engine attaches
+/// no behaviour to them, the app does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct MobileSettings {
+    /// The user picked a talk mode on the first-start screen. Set by `set_talk_mode` only;
+    /// `set_mobile_settings` never clears it.
+    pub talk_mode_chosen: bool,
+    pub default_output: DefaultOutput,
+    /// On mobile data, streams start by themselves.
+    pub mobile_data_autoplay_streams: bool,
+    /// On mobile data, images and GIFs are loaded.
+    pub mobile_data_load_media: bool,
+    /// On mobile data, voice uses a reduced quality.
+    pub mobile_data_reduced_voice: bool,
+    /// Disconnect after 30 minutes alone in a channel.
+    pub idle_disconnect: bool,
+    /// Notifications show the sender without the message text.
+    pub notify_sender_only: bool,
+    /// Android: look for a newer version once a day.
+    pub update_check: bool,
+}
+
+/// A server of the public server list. Everything in it is untrusted text.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct PublicServer {
+    pub name: String,
+    /// Host name or IP address.
+    pub host: String,
+    pub port: u16,
+    pub country: String,
+    /// Two upper-case letters, or empty.
+    pub country_code: String,
+}
+
+/// Which part of the public server list to return.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct PublicServerQuery {
+    /// Kept when it is part of the name, the host or the country, whatever the case. Empty
+    /// keeps everything.
+    pub search: String,
+    /// Only servers of this country ([`PublicServer::country_code`]); `None` for all.
+    pub country_code: Option<String>,
+    /// How many matches to skip.
+    pub offset: u32,
+    /// Most servers to return; at most 100, more is cut to 100.
+    pub limit: u32,
+    /// Download the list again instead of using the one fetched before.
+    pub refresh: bool,
+}
+
+/// One page of the public server list.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct PublicServerPage {
+    pub servers: Vec<PublicServer>,
+    /// How many servers match the search and the country in all.
+    pub total: u32,
+}
+
 /// What happens to the saved server password.
 #[derive(Clone, PartialEq, Eq, uniffi::Enum)]
 pub enum PasswordInput {
@@ -245,6 +331,11 @@ pub struct Person {
     pub streaming: bool,
     /// Has their camera on. Known for people in the user's own channel only.
     pub camera: bool,
+    /// Blocked by the user (`block_person`); the entry of `blocked_people` with this
+    /// [`Person::session`] lifts it.
+    pub blocked: bool,
+    /// Their app understands chat requests (`send_chat_request`); `false` for other clients.
+    pub supports_chat_requests: bool,
 }
 
 /// Where joining a channel that needs a password stands.
@@ -289,4 +380,7 @@ pub struct BridgeSnapshot {
     pub open_chat: Option<ChatId>,
     /// A whisper or shout is being held (`start_whisper`); normal talking is paused meanwhile.
     pub whispering: bool,
+    /// Every identity, the default one first.
+    pub identities: Vec<Identity>,
+    pub mobile_settings: MobileSettings,
 }

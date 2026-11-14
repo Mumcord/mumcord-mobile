@@ -173,6 +173,8 @@ struct Phone {
     thread: Option<std::thread::JoinHandle<()>>,
     session: u32,
     lobby: u32,
+    /// How it connected, for connecting again.
+    request: ConnectRequest,
 }
 
 fn block_on<T>(future: impl Future<Output = T>) -> T {
@@ -210,6 +212,12 @@ impl Phone {
             thread: None,
             session: 0,
             lobby: 0,
+            request: ConnectRequest {
+                address: String::new(),
+                port: 0,
+                username: String::new(),
+                password: None,
+            },
         };
 
         let request = ConnectRequest {
@@ -223,6 +231,7 @@ impl Phone {
                 .ok()
                 .filter(|password| !password.is_empty()),
         };
+        phone.request = request.clone();
         block_on(phone.engine.connect(request)).expect("connect");
         let fingerprint = phone.wait(0, "the certificate prompt", |e| match e {
             BridgeEvent::CertificatePromptRequired { prompt } => Some(prompt.fingerprint.clone()),
@@ -476,7 +485,45 @@ fn voice_between_phones_through_the_c_audio_functions() {
     assert_eq!(settings.bitrate_limit_kbps, None);
     assert!(settings.noise_suppression && settings.auto_gain);
 
-    // Leaving ends the wish for audio.
+    // A whisper stays with the person it was started for: when they leave the server it is
+    // over, and nobody who comes later can hear it.
+    let to_third = WhisperTarget::Person {
+        session: third.session,
+    };
+    block_on(talker.engine.start_whisper(to_third)).expect("whisper to the third person");
+    third.hears("whisper, the third person");
+    let mark = talker.mark();
+    block_on(third.engine.disconnect()).expect("the third person leaves");
+    let whisper_ended = |e: &BridgeEvent| matches!(e, BridgeEvent::WhisperEnded).then_some(());
+    talker.wait(mark, "the end of the whisper", whisper_ended);
+    assert!(!talker.engine.snapshot().whispering);
+    listener.hears_nothing("the whisper ended with its target");
+
+    // Leaving ends the wish for audio, and a whisper and a held button with it.
+    block_on(talker.engine.start_whisper(whisper)).expect("whisper");
+    talker.engine.set_push_to_talk_pressed(true);
+    listener.hears("whisper with the button held");
+    let mark = talker.mark();
+    block_on(talker.engine.disconnect()).expect("disconnect");
+    talker.wait_audio(mark, false, false);
+    talker.wait(mark, "the end of the whisper", whisper_ended);
+    let left = talker.engine.snapshot();
+    assert_eq!(left.audio, AudioWanted::default());
+    assert!(!left.whispering);
+
+    // Neither carries over to the next connection: the button counts as released there.
+    let mark = talker.mark();
+    block_on(talker.engine.connect(talker.request.clone())).expect("connect again");
+    talker.wait(mark, "the synced server", |e| {
+        matches!(e, BridgeEvent::ServerSynced { .. }).then_some(())
+    });
+    block_on(talker.engine.join_channel(talker.lobby, None)).expect("join Lobby");
+    talker.wait_audio(mark, true, true);
+    assert!(!talker.engine.snapshot().whispering);
+    listener.hears_nothing("connected again, nothing held");
+    talker.engine.set_push_to_talk_pressed(true);
+    listener.hears("push-to-talk on the new connection");
+    talker.engine.set_push_to_talk_pressed(false);
     let mark = talker.mark();
     block_on(talker.engine.disconnect()).expect("disconnect");
     talker.wait_audio(mark, false, false);

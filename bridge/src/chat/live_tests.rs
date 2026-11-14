@@ -258,6 +258,7 @@ async fn live_chat() {
     let channel = alice.channel.clone();
 
     markup_arrives_harmless(&alice, &bob).await;
+    markdown_is_sent_like_the_desktop(&alice, &bob).await;
     replies_and_mentions(&alice, &bob).await;
     images_within_and_above_the_limits(&alice, &bob).await;
     message_requests_flow(&alice, &bob).await;
@@ -340,6 +341,35 @@ async fn live_chat() {
     for name in ["alice", "bob"] {
         let _ = std::fs::remove_dir_all(data_dir(name));
     }
+}
+
+/// Typed Markdown arrives formatted, as the desktop app sends it; typed HTML stays text.
+async fn markdown_is_sent_like_the_desktop(alice: &Client, bob: &Client) {
+    let typed = "hey **there** and *you* `x`\n> quoted\nplain ~~gone~~";
+    let own = alice.say(&alice.channel, typed).await;
+    let (message, _) = bob.next_message();
+    assert_eq!(message.content.blocks, own.content.blocks);
+    let spans = all_spans(&message);
+    assert!(spans.iter().any(|s| s.text == "there" && s.bold));
+    assert!(spans.iter().any(|s| s.text == "you" && s.italic));
+    assert!(spans.iter().any(|s| s.text == "x" && s.code));
+    assert!(spans.iter().any(|s| s.text == "gone" && s.strikethrough));
+    let quoted: Vec<&ContentBlock> = message
+        .content
+        .blocks
+        .iter()
+        .filter(|block| matches!(block, ContentBlock::Quote { .. }))
+        .collect();
+    assert!(
+        matches!(quoted[..], [ContentBlock::Quote { spans }] if spans.iter().any(|s| s.text == "quoted")),
+        "one quote block"
+    );
+    assert!(shown(&message).contains("plain gone"));
+
+    alice.say(&alice.channel, "<b>not bold</b> >_> a_b_c").await;
+    let (message, _) = bob.next_message();
+    assert_eq!(shown(&message), "<b>not bold</b> >_> a_b_c");
+    assert!(all_spans(&message).iter().all(|s| !s.bold && !s.italic));
 }
 
 /// AC-5.17: script and markup from the server are shown harmlessly.

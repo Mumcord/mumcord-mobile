@@ -69,6 +69,7 @@ pub(crate) struct PersonFlags {
     pub(crate) talking: bool,
     pub(crate) streaming: bool,
     pub(crate) camera: bool,
+    pub(crate) blocked: bool,
 }
 
 pub(crate) fn person(user: &UserView, flags: PersonFlags) -> Person {
@@ -87,6 +88,12 @@ pub(crate) fn person(user: &UserView, flags: PersonFlags) -> Person {
         locally_muted: user.local_mute,
         streaming: flags.streaming,
         camera: flags.camera,
+        blocked: flags.blocked,
+        supports_chat_requests: user.mumcord_features.as_ref().is_some_and(|features| {
+            features
+                .iter()
+                .any(|feature| feature == mumcord_engine::pm_rules::FEATURE)
+        }),
     }
 }
 

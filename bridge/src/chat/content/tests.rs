@@ -4,7 +4,7 @@
 //! send them, and after the engine's sanitiser: the model must be harmless in both cases, so it
 //! holds even if the sanitiser missed something.
 
-use mumcord_engine::chat::sanitize_html;
+use mumcord_engine::chat::sanitize_message_html;
 
 use super::*;
 use crate::chat::wire::{SNIPPET_CHARS, capped, quote_html};
@@ -50,7 +50,10 @@ fn image_refs(content: &MessageContent) -> Vec<ImageRef> {
 
 /// The model of a body as a server sent it, and of the same body after the engine's sanitiser.
 fn both(raw: &str) -> [MessageContent; 2] {
-    [parse(raw).content, parse(&sanitize_html(raw)).content]
+    [
+        parse(raw).content,
+        parse(&sanitize_message_html(raw)).content,
+    ]
 }
 
 /// Nothing an app shows or opens may be anything but text and a checked web address.
@@ -474,22 +477,22 @@ fn reads_the_desktop_reply_quote_in_both_forms() {
         html,
         "<blockquote><b>Maya</b>: hi there</blockquote><b>yes</b>"
     );
-    let content = parse(&sanitize_html(&html)).content;
+    let content = parse(&sanitize_message_html(&html)).content;
     assert_eq!(content.reply, Some(capped("Maya", "hi there")));
     assert_eq!(texts(&content), ["yes"]);
     assert!(spans(&content.blocks[0])[0].bold);
 
-    let content = parse(&sanitize_html("&gt; Maya: hi<br>yes")).content;
+    let content = parse(&sanitize_message_html("&gt; Maya: hi<br>yes")).content;
     assert_eq!(content.reply, Some(capped("Maya", "hi")));
     assert_eq!(texts(&content), ["yes"]);
 
     // After a plain-text server turned the line break into a newline.
-    let content = parse(&sanitize_html("> Maya: hi there\nyes")).content;
+    let content = parse(&sanitize_message_html("> Maya: hi there\nyes")).content;
     assert_eq!(content.reply, Some(capped("Maya", "hi there")));
     assert_eq!(texts(&content), ["yes"]);
 
     let escaped = quote_html(&capped("Maya <3", "a & b"), true);
-    let content = parse(&sanitize_html(&format!("{escaped}ok"))).content;
+    let content = parse(&sanitize_message_html(&format!("{escaped}ok"))).content;
     assert_eq!(content.reply, Some(capped("Maya <3", "a & b")));
 }
 
@@ -505,7 +508,11 @@ fn ordinary_quotes_and_messages_are_no_replies() {
         "> Maya: hi",
         "> : hi\nyes",
     ] {
-        assert_eq!(parse(&sanitize_html(raw)).content.reply, None, "{raw}");
+        assert_eq!(
+            parse(&sanitize_message_html(raw)).content.reply,
+            None,
+            "{raw}"
+        );
     }
     let content = parse("<blockquote>a quote</blockquote>and text").content;
     assert!(matches!(content.blocks[0], ContentBlock::Quote { .. }));
@@ -517,7 +524,7 @@ fn a_quote_is_plain_text_with_capped_lengths() {
         "<blockquote><b>Maya</b>: &lt;script&gt;alert(1)&lt;/script&gt;{}</blockquote>ok",
         "x".repeat(500)
     );
-    let content = parse(&sanitize_html(&evil)).content;
+    let content = parse(&sanitize_message_html(&evil)).content;
     let quote = content.reply.clone().expect("a reply");
     assert!(quote.snippet.starts_with("<script>alert(1)</script>"));
     assert_eq!(quote.snippet.chars().count(), SNIPPET_CHARS + 1);

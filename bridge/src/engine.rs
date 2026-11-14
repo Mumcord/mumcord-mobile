@@ -2,9 +2,8 @@
 
 //! Commands in: the one object the apps hold.
 
-use std::collections::HashMap;
 use std::future::Future;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -20,29 +19,62 @@ use crate::chat::SharedChat;
 use crate::convert;
 use crate::error::BridgeError;
 use crate::events::{self, BridgeEvent, Connection, EngineListener, SharedConnection, lock};
+use crate::identities;
+use crate::public_servers::PublicList;
 use crate::storage::{SecureStorage, StorageBackend};
 use crate::types::{
-    AudioEndpoints, BridgeSnapshot, ConnectRequest, EngineConfig, SavedServer, ServerInput,
-    ServerPing, TalkMode, VoiceSettings, WhisperTarget,
+    AudioEndpoints, BridgeSnapshot, ConnectRequest, EngineConfig, Identity, MobileSettings,
+    SavedServer, ServerInput, ServerPing, TalkMode, VoiceSettings, WhisperTarget,
 };
 
-/// The server list as the app last got it, and the way to tell the app about a change.
+/// What is saved on the phone as the app last got it (the server list, the identities, the
+/// phone settings), and the way to tell the app about a change.
 #[derive(Clone)]
-struct ServerList {
+pub(crate) struct Saved {
     servers: Arc<Mutex<Vec<SavedServer>>>,
-    /// Serialises the commands that change the list, so every change is reported in order.
-    gate: Arc<tokio::sync::Mutex<()>>,
+    identities: Arc<Mutex<Vec<Identity>>>,
+    mobile: Arc<Mutex<MobileSettings>>,
+    /// Serialises the commands that change the lists, so every change is reported in order.
+    pub(crate) gate: Arc<tokio::sync::Mutex<()>>,
     events: mpsc::UnboundedSender<BridgeEvent>,
 }
 
-impl ServerList {
-    /// Reads the list again after a change and reports it.
-    async fn refresh(&self, engine: &Engine) -> Result<(), BridgeError> {
+impl Saved {
+    /// Reads the server list again after a change and reports it.
+    pub(crate) async fn refresh(&self, engine: &Engine) -> Result<(), BridgeError> {
         let servers = saved_servers(engine).await?;
         lock(&self.servers).clone_from(&servers);
         // The event thread is gone only while the engine object is being released.
         let _ = self.events.send(BridgeEvent::ServersChanged { servers });
         Ok(())
+    }
+
+    /// Reads the identities again after a change and reports them.
+    pub(crate) async fn refresh_identities(
+        &self,
+        engine: &Engine,
+    ) -> Result<Vec<Identity>, BridgeError> {
+        let identities = identities::list(engine).await?;
+        lock(&self.identities).clone_from(&identities);
+        let _ = self.events.send(BridgeEvent::IdentitiesChanged {
+            identities: identities.clone(),
+        });
+        Ok(identities)
+    }
+
+    pub(crate) fn servers(&self) -> Vec<SavedServer> {
+        lock(&self.servers).clone()
+    }
+
+    /// Takes over the phone settings as they were just saved and reports them when they
+    /// changed.
+    fn set_mobile(&self, settings: MobileSettings) {
+        let changed = std::mem::replace(&mut *lock(&self.mobile), settings) != settings;
+        if changed {
+            let _ = self
+                .events
+                .send(BridgeEvent::MobileSettingsChanged { settings });
+        }
     }
 }
 
@@ -57,7 +89,11 @@ pub struct MumcordEngine {
     pub(crate) engine: Engine,
     pub(crate) connection: SharedConnection,
     pub(crate) chat: SharedChat,
-    servers: ServerList,
+    pub(crate) saved: Saved,
+    /// The engine's folder; identity files pass through a private folder below it.
+    pub(crate) data_dir: PathBuf,
+    /// The public server list as last downloaded.
+    pub(crate) public: PublicList,
     /// Ping answers of the listed servers, kept for a while so a redrawn list does not ask again.
     pings: Arc<ServerQueries>,
     /// Serialises `connect`, so two calls cannot both find the connection free.
@@ -108,12 +144,23 @@ impl MumcordEngine {
         };
         // On a thread of its own: the caller may itself be inside an async runtime, where
         // waiting for the runtime is not allowed.
-        let listed = std::thread::scope(|scope| {
+        let data_dir = PathBuf::from(&config.data_dir);
+        // What an identity import or export left behind when the app was ended in the middle.
+        identities::sweep(&data_dir);
+        let (listed, known) = std::thread::scope(|scope| {
             scope
-                .spawn(|| handle.block_on(saved_servers(&engine)))
+                .spawn(|| {
+                    handle.block_on(async {
+                        Ok::<_, BridgeError>((
+                            saved_servers(&engine).await?,
+                            identities::list(&engine).await?,
+                        ))
+                    })
+                })
                 .join()
         })
         .map_err(|_| BridgeError::internal("reading the server list failed"))??;
+        let mobile = convert::mobile_settings(&engine.settings()?.mobile);
         let connection = SharedConnection::default();
         let chat = SharedChat::default();
         let (stop_events, stop) = oneshot::channel();
@@ -135,11 +182,15 @@ impl MumcordEngine {
             engine,
             connection,
             chat,
-            servers: ServerList {
+            saved: Saved {
                 servers: Arc::new(Mutex::new(listed)),
+                identities: Arc::new(Mutex::new(known)),
+                mobile: Arc::new(Mutex::new(mobile)),
                 gate: Arc::default(),
                 events: own_events,
             },
+            data_dir,
+            public: PublicList::default(),
             pings: Arc::default(),
             connect_gate: Arc::default(),
             capture: Endpoint::leak(capture),
@@ -154,7 +205,7 @@ impl MumcordEngine {
     /// Adds a server to the list. The password goes to the secure storage. The changed list
     /// arrives as [`BridgeEvent::ServersChanged`].
     pub async fn add_server(&self, input: ServerInput) -> Result<SavedServer, BridgeError> {
-        let (engine, list) = (self.engine.clone(), self.servers.clone());
+        let (engine, list) = (self.engine.clone(), self.saved.clone());
         self.run(async move {
             let _gate = list.gate.lock().await;
             let identity = input.identity_id;
@@ -174,7 +225,7 @@ impl MumcordEngine {
         server_id: i64,
         input: ServerInput,
     ) -> Result<SavedServer, BridgeError> {
-        let (engine, list) = (self.engine.clone(), self.servers.clone());
+        let (engine, list) = (self.engine.clone(), self.saved.clone());
         self.run(async move {
             let _gate = list.gate.lock().await;
             let identity = input.identity_id;
@@ -192,7 +243,7 @@ impl MumcordEngine {
 
     /// Removes a server from the list, with its saved password.
     pub async fn remove_server(&self, server_id: i64) -> Result<(), BridgeError> {
-        let (engine, list) = (self.engine.clone(), self.servers.clone());
+        let (engine, list) = (self.engine.clone(), self.saved.clone());
         self.run(async move {
             let _gate = list.gate.lock().await;
             engine.server_remove(server_id).await?;
@@ -203,7 +254,7 @@ impl MumcordEngine {
 
     /// Sets the order of the list; `server_ids` names every saved server once.
     pub async fn reorder_servers(&self, server_ids: Vec<i64>) -> Result<(), BridgeError> {
-        let (engine, list) = (self.engine.clone(), self.servers.clone());
+        let (engine, list) = (self.engine.clone(), self.saved.clone());
         self.run(async move {
             let _gate = list.gate.lock().await;
             engine.servers_reorder(&server_ids)?;
@@ -220,7 +271,9 @@ impl MumcordEngine {
         server_id: i64,
         refresh: bool,
     ) -> Result<Option<ServerPing>, BridgeError> {
-        let target = lock(&self.servers.servers)
+        let target = self
+            .saved
+            .servers()
             .iter()
             .find(|server| server.id == server_id)
             .map(|server| (server.address.clone(), server.port))
@@ -247,10 +300,11 @@ impl MumcordEngine {
         password: Option<String>,
         channel_path: Vec<String>,
     ) -> Result<(), BridgeError> {
-        let (engine, connection, gate) = (
+        let (engine, connection, gate, saved) = (
             self.engine.clone(),
             self.connection.clone(),
             self.connect_gate.clone(),
+            self.saved.clone(),
         );
         self.run(async move {
             let _gate = gate.lock().await;
@@ -262,15 +316,8 @@ impl MumcordEngine {
                 .map(|server| server.username)
                 .ok_or_else(unknown_server)?;
             let channel_path = Some(channel_path).filter(|path| !path.is_empty());
-            start(
-                &engine,
-                &connection,
-                server_id,
-                &username,
-                channel_path,
-                password,
-            )
-            .await
+            let server = (server_id, username.as_str());
+            start(&engine, &connection, &saved, server, channel_path, password).await
         })
         .await
     }
@@ -283,7 +330,7 @@ impl MumcordEngine {
             self.engine.clone(),
             self.connection.clone(),
             self.connect_gate.clone(),
-            self.servers.clone(),
+            self.saved.clone(),
         );
         self.run(async move {
             let _gate = gate.lock().await;
@@ -341,20 +388,46 @@ impl MumcordEngine {
         .await
     }
 
-    /// The saved talk mode. Voice activity until the user has chosen one.
+    /// The saved talk mode. Voice activity until the user has chosen one
+    /// ([`MobileSettings::talk_mode_chosen`]).
     pub async fn talk_mode(&self) -> Result<TalkMode, BridgeError> {
         let engine = self.engine.clone();
         self.run(async move { Ok(convert::talk_mode(engine.settings()?.talk_mode)) })
             .await
     }
 
-    /// Saves the talk mode and applies it at once.
+    /// Saves the talk mode and applies it at once. The talk mode then counts as chosen
+    /// ([`MobileSettings::talk_mode_chosen`], reported as
+    /// [`BridgeEvent::MobileSettingsChanged`]).
     pub async fn set_talk_mode(&self, mode: TalkMode) -> Result<(), BridgeError> {
-        let engine = self.engine.clone();
+        let (engine, saved) = (self.engine.clone(), self.saved.clone());
         self.run(async move {
+            let _gate = saved.gate.lock().await;
             let mut settings = engine.settings()?;
             settings.talk_mode = convert::store_talk_mode(mode);
-            engine.update_settings(settings).await?;
+            settings.mobile.talk_mode_chosen = true;
+            let settings = engine.update_settings(settings).await?;
+            saved.set_mobile(convert::mobile_settings(&settings.mobile));
+            Ok(())
+        })
+        .await
+    }
+
+    /// The phone settings; also part of the snapshot.
+    pub fn mobile_settings(&self) -> MobileSettings {
+        *lock(&self.saved.mobile)
+    }
+
+    /// Saves the phone settings; they arrive as [`BridgeEvent::MobileSettingsChanged`].
+    /// `talk_mode_chosen` is never cleared by it: `set_talk_mode` sets it once.
+    pub async fn set_mobile_settings(&self, settings: MobileSettings) -> Result<(), BridgeError> {
+        let (engine, saved) = (self.engine.clone(), self.saved.clone());
+        self.run(async move {
+            let _gate = saved.gate.lock().await;
+            let mut all = engine.settings()?;
+            all.mobile = convert::store_mobile_settings(settings, &all.mobile);
+            let all = engine.update_settings(all).await?;
+            saved.set_mobile(convert::mobile_settings(&all.mobile));
             Ok(())
         })
         .await
@@ -445,28 +518,16 @@ impl MumcordEngine {
 
     /// Starts a whisper to a person or a shout to a channel: until
     /// [`MumcordEngine::stop_whisper`] the user's voice goes there instead of their own
-    /// channel, in either talk mode (the hold-to-whisper button is the push-to-talk). Fails
-    /// when the user is muted, the target is gone or the server does not allow it.
+    /// channel, in either talk mode (the hold-to-whisper button is the push-to-talk). A whisper
+    /// stays with the person it was started for: when they leave the server, or the connection
+    /// ends, it is over and [`BridgeEvent::WhisperEnded`] arrives. Fails with `InvalidInput`
+    /// when the user is muted, `NotFound` when the target is gone, `PermissionDenied` when the
+    /// server does not allow it and `NotConnected` without voice on the server.
     pub async fn start_whisper(&self, target: WhisperTarget) -> Result<(), BridgeError> {
         let (engine, connection) = (self.engine.clone(), self.connection.clone());
         self.run(async move {
             let server = connected_server(&connection)?;
-            let receivers = match target {
-                WhisperTarget::Person { session } => {
-                    convert::whisper_person(lock(&connection).person_name(session))?
-                }
-                WhisperTarget::Channel { channel_id } => {
-                    let channels: HashMap<_, _> = engine
-                        .snapshot_of(server)
-                        .ok_or_else(BridgeError::not_connected)?
-                        .channels
-                        .into_iter()
-                        .map(|channel| (channel.id, (channel.parent_id, channel.name)))
-                        .collect();
-                    convert::whisper_channel(channel_id, &channels)?
-                }
-            };
-            Ok(engine.whisper_start(&receivers)?)
+            Ok(engine.whisper_start_to(server, &convert::whisper_to(target))?)
         })
         .await
     }
@@ -520,7 +581,7 @@ impl MumcordEngine {
 
     /// The full current state.
     pub fn snapshot(&self) -> BridgeSnapshot {
-        let servers = lock(&self.servers.servers).clone();
+        let servers = self.saved.servers();
         let connected = lock(&self.connection).server;
         // Asked before the connection is locked: the engine must not be called under that lock.
         let synced = connected.and_then(|server| self.engine.snapshot_of(server));
@@ -544,6 +605,8 @@ impl MumcordEngine {
             open_chat,
             whispering: connection.server.is_some()
                 && self.engine.dsp_controls().voice_target() != 0,
+            identities: lock(&self.saved.identities).clone(),
+            mobile_settings: self.mobile_settings(),
         }
     }
 }
@@ -551,6 +614,10 @@ impl MumcordEngine {
 impl MumcordEngine {
     /// Runs a command on the bridge runtime, so the caller's thread is never blocked and the
     /// command finishes even if the caller stops waiting.
+    pub(crate) fn runtime(&self) -> Handle {
+        self.handle.clone()
+    }
+
     pub(crate) async fn run<T: Send + 'static>(
         &self,
         command: impl Future<Output = Result<T, BridgeError>> + Send + 'static,
@@ -593,7 +660,7 @@ fn connected_server(connection: &SharedConnection) -> Result<ServerId, BridgeErr
 async fn connect(
     engine: &Engine,
     connection: &SharedConnection,
-    list: &ServerList,
+    list: &Saved,
     request: ConnectRequest,
 ) -> Result<(), BridgeError> {
     let address = request.address.trim();
@@ -617,31 +684,33 @@ async fn connect(
         server
     };
     // The password is used for this connection only; nothing is saved.
-    start(engine, connection, server, username, None, request.password).await
+    let server = (server, username);
+    start(engine, connection, list, server, None, request.password).await
 }
 
-/// Starts the one connection the bridge allows.
+/// Starts the one connection the bridge allows, to `server` (its id and user name).
 async fn start(
     engine: &Engine,
     connection: &SharedConnection,
-    server: ServerId,
-    username: &str,
+    saved: &Saved,
+    (server, username): (ServerId, &str),
     channel_path: Option<Vec<String>>,
     password: Option<String>,
 ) -> Result<(), BridgeError> {
     if lock(connection).server.is_some() {
         return Err(BridgeError::invalid("already connected to a server"));
     }
-    // First slice only: when there is no identity at all, one is created silently from the
-    // user name. The identity flow of phase 6 (create or bring an identity during setup)
-    // replaces this. A server that names an identity of its own connects with that one.
-    if engine.identity().await?.is_none() {
-        engine.identity_create(username.to_owned(), None).await?;
-    }
-    // A held button of the last connection must not talk or whisper on this one.
-    engine.whisper_stop();
-    engine.dsp_controls().set_ptt_pressed(false);
-    *lock(connection) = Connection::to(server);
+    // Temporary, until both apps create or bring an identity during setup
+    // (`ensure_default_identity`): when there is no identity at all, one is created silently
+    // from the user name. Then this becomes `BridgeError::NoIdentity`. A server that names an
+    // identity of its own connects with that one.
+    identities::ensure_default(engine, saved, username).await?;
+    // Logged without detail: an error text could name a person.
+    let blocked = engine.blocked_users().unwrap_or_else(|_| {
+        tracing::warn!("reading the blocked people failed");
+        Vec::new()
+    });
+    *lock(connection) = Connection::to(server, blocked);
     let started = engine.connect_with_password(server, channel_path, password);
     if started.is_err() {
         lock(connection).server = None;

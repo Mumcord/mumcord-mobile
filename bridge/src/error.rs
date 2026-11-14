@@ -32,6 +32,16 @@ pub enum BridgeError {
     ServerTooOld { detail: String },
     #[error("invalid input: {detail}")]
     InvalidInput { detail: String },
+    /// An identity with the same certificate is already in the list (import of a `.p12`).
+    #[error("identity already exists: {detail}")]
+    DuplicateIdentity { detail: String },
+    /// The last identity cannot be deleted.
+    #[error("the last identity cannot be deleted: {detail}")]
+    LastIdentity { detail: String },
+    /// There is no identity to connect with. Not returned yet: connecting still creates one
+    /// silently (see [`MumcordEngine::ensure_default_identity`](crate::MumcordEngine::ensure_default_identity)).
+    #[error("no identity: {detail}")]
+    NoIdentity { detail: String },
     #[error("secure storage unavailable: {detail}")]
     SecureStorageUnavailable { detail: String },
     #[error("storage error: {detail}")]

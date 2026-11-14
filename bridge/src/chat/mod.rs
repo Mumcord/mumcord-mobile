@@ -29,7 +29,7 @@ pub use types::{
     PrivateMessageSettings, ReplyQuote, SafeLink, SentChatRequest, Span,
 };
 
-use crate::events::{BridgeEvent, SharedConnection, lock};
+use crate::events::{BridgeEvent, Connection, SharedConnection, lock};
 use images::ImageCache;
 
 /// Longest name passed on; Mumble names are much shorter.
@@ -340,19 +340,34 @@ pub(crate) fn message_requests(
     }
 }
 
-/// The blocks of the identity the user is connected with.
+/// The blocks of the identity the user is connected with (of every identity while not
+/// connected), each with the person on the server it covers right now.
 pub(crate) fn blocked_people(
     blocked: &[BlockedUser],
-    own_cert_hash: Option<&str>,
+    connection: &Connection,
 ) -> Vec<BlockedPerson> {
+    let own = connection.own_user();
+    let own_hash = own.and_then(|user| user.cert_hash.as_deref());
+    let session_of = |block: &BlockedUser| {
+        let (server, own, own_hash) = (connection.server?, own?, own_hash?);
+        connection
+            .people()
+            .find(|user| {
+                user.session != own.session
+                    && block.covers(own_hash, server, user.cert_hash.as_deref(), &user.name)
+            })
+            .map(|user| user.session)
+    };
     blocked
         .iter()
-        .filter(|block| own_cert_hash.is_none_or(|own| block.own_cert_hash == own))
+        .filter(|block| own_hash.is_none_or(|own| block.own_cert_hash == own))
         .map(|block| BlockedPerson {
             id: block.id,
             name: clean_name(&block.name),
             server_label: clean_name(&block.server_label),
             blocked_at_ms: block.blocked_at,
+            cert_hash: block.cert_hash.clone(),
+            session: session_of(block),
         })
         .collect()
 }
@@ -493,10 +508,7 @@ pub(crate) async fn handle(
             }]
         }
         EngineEvent::BlockedUsersChanged(blocked) => {
-            let own = lock(connection)
-                .own_user()
-                .and_then(|user| user.cert_hash.clone());
-            let people = blocked_people(&blocked, own.as_deref());
+            let people = blocked_people(&blocked, &lock(connection));
             lock(chat).blocked = blocked;
             vec![BridgeEvent::BlockedPeopleChanged { people }]
         }

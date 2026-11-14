@@ -4,19 +4,14 @@ use mumcord_engine::{EngineError, ErrorKind};
 
 use crate::error::BridgeError;
 
-/// How the engine starts the text of a ban; it has no error kind of its own for it.
-const BANNED_PREFIX: &str = "banned: ";
-
 impl From<EngineError> for BridgeError {
     fn from(error: EngineError) -> Self {
         let detail = error.message;
         match error.kind {
-            ErrorKind::PermissionDenied => match detail.strip_prefix(BANNED_PREFIX) {
-                Some(reason) => Self::Banned {
-                    detail: reason.to_owned(),
-                },
-                None => Self::PermissionDenied { detail },
-            },
+            // Banned while connected; `detail` is the server's reason, possibly empty.
+            ErrorKind::Banned => Self::Banned { detail },
+            ErrorKind::PermissionDenied => Self::PermissionDenied { detail },
+            ErrorKind::DuplicateIdentity => Self::DuplicateIdentity { detail },
             ErrorKind::NotFound => Self::NotFound { detail },
             ErrorKind::NotConnected => Self::NotConnected { detail },
             ErrorKind::ServerUnreachable => Self::ServerUnreachable { detail },
@@ -65,25 +60,49 @@ mod tests {
 
     #[test]
     fn a_ban_is_told_apart_from_other_refusals() {
-        let banned = EngineError::new(ErrorKind::PermissionDenied, "banned: spamming");
+        let banned = EngineError::new(ErrorKind::Banned, "spamming");
         assert_eq!(
             BridgeError::from(banned),
             BridgeError::Banned {
                 detail: "spamming".into()
             }
         );
-        let no_reason = EngineError::new(ErrorKind::PermissionDenied, "banned: ");
+        let no_reason = EngineError::new(ErrorKind::Banned, "");
         assert_eq!(
             BridgeError::from(no_reason),
             BridgeError::Banned {
                 detail: String::new()
             }
         );
-        let kicked = EngineError::new(ErrorKind::PermissionDenied, "kicked: bye");
+        // A refusal is never read as a ban by its text.
+        let kicked = EngineError::new(ErrorKind::PermissionDenied, "banned: bye");
         assert_eq!(
             BridgeError::from(kicked),
             BridgeError::PermissionDenied {
-                detail: "kicked: bye".into()
+                detail: "banned: bye".into()
+            }
+        );
+    }
+
+    #[test]
+    fn giving_up_on_a_server_that_closes_after_login_stays_unreachable() {
+        let detail = "gave up: the server closed the connection right after login, 3 times";
+        let error = BridgeError::from(EngineError::new(ErrorKind::ServerUnreachable, detail));
+        assert_eq!(
+            error,
+            BridgeError::ServerUnreachable {
+                detail: detail.into()
+            }
+        );
+    }
+
+    #[test]
+    fn a_known_certificate_is_a_duplicate_identity() {
+        let error = BridgeError::from(EngineError::new(ErrorKind::DuplicateIdentity, "known"));
+        assert_eq!(
+            error,
+            BridgeError::DuplicateIdentity {
+                detail: "known".into()
             }
         );
     }

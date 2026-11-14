@@ -103,8 +103,10 @@ impl MumcordEngine {
     }
 
     /// Sends text to `chat`: a channel the user may write in, or a person on the server. The
-    /// text is sent as text (markup in it is shown, not interpreted), with line breaks and web
-    /// addresses as links. `reply_to` (the `quote` of the message replied to) makes it a reply
+    /// app hands in the text as typed; it is read as Markdown exactly as the desktop app does
+    /// (`**bold**`, `*italic*`, `` `code` ``, code blocks, lists, `> ` quotes, links), line
+    /// breaks are kept and web addresses become links. HTML in it is shown, not interpreted.
+    /// A server that shows plain text only gets the text as typed. `reply_to` (the `quote` of the message replied to) makes it a reply
     /// every Mumble client can read. Returns the own message; it does not arrive as an event.
     pub async fn send_message(
         &self,
@@ -116,7 +118,7 @@ impl MumcordEngine {
         self.run(async move {
             let server = server_of(&connection)?;
             let allow_html = limits(&engine, server)?.allow_html;
-            let body = wire::text_to_html(&text, allow_html);
+            let body = wire::typed_to_html(&text, allow_html);
             if body.is_empty() {
                 return Err(BridgeError::invalid("empty message"));
             }
@@ -197,17 +199,12 @@ impl MumcordEngine {
                 return Ok(image);
             }
             // No longer kept in memory: read from the stored message again.
-            let id: i64 = message_id.parse().map_err(|_| missing())?;
-            let after = id.checked_add(1).ok_or_else(missing)?.to_string();
             let view = engine
-                .history_load(
+                .history_message(
                     server_of(&connection)?,
                     super::conversation(&chat),
-                    Some(&after),
-                    1,
+                    &message_id,
                 )?
-                .into_iter()
-                .find(|view| view.id == message_id)
                 .ok_or_else(missing)?;
             let parsed = content::parse(&view.body);
             lock(&state).images.put(&message_id, parsed.images);
@@ -340,7 +337,7 @@ impl MumcordEngine {
                 .ok_or_else(|| BridgeError::invalid("not a web address"))?;
             let server = server_of(&connection)?;
             let allow_html = limits(&engine, server)?.allow_html;
-            let html = wire::text_to_html(&link.url, allow_html);
+            let html = wire::address_to_html(&link.url, allow_html);
             let view = send_html(&engine, &connection, server, &chat, &html).await?;
             // Sorting the favourites is a convenience; the message is sent either way.
             if engine.gif_favorite_use(&url).is_err() {
@@ -490,13 +487,8 @@ impl MumcordEngine {
     pub async fn blocked_people(&self) -> Result<Vec<BlockedPerson>, BridgeError> {
         let (engine, connection, _) = self.chat_parts();
         self.run(async move {
-            let own = lock(&connection)
-                .own_user()
-                .and_then(|user| user.cert_hash.clone());
-            Ok(super::blocked_people(
-                &engine.blocked_users()?,
-                own.as_deref(),
-            ))
+            let blocked = engine.blocked_users()?;
+            Ok(super::blocked_people(&blocked, &lock(&connection)))
         })
         .await
     }

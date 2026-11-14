@@ -31,6 +31,9 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 mumcord-audio.workspace = true
 mumcord-engine.workspace = true
 mumcord-store.workspace = true
+# Markdown of typed messages. Exact version: what the user typed must turn into the same message
+# with every build. Only the parser; the HTML is written by `chat::wire`.
+pulldown-cmark = { version = "=0.13.6", default-features = false }
 thiserror = "2"
 tokio = { version = "1.54", features = ["rt-multi-thread", "sync"] }
 tracing = "0.1"

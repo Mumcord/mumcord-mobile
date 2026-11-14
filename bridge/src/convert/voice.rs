@@ -2,15 +2,12 @@
 
 //! Voice: whisper targets, who may be heard, and the audio configuration.
 
-use std::collections::HashMap;
-
 use mumcord_audio::io::ExternalFormat;
-use mumcord_engine::whisper::WhisperDenied;
+use mumcord_engine::whisper::{WhisperDenied, WhisperTo};
 use mumcord_engine::{EchoCancellationMode, UserView};
-use mumcord_store::WhisperReceivers;
 
 use crate::error::BridgeError;
-use crate::types::{AudioConfig, EchoCancellation};
+use crate::types::{AudioConfig, EchoCancellation, WhisperTarget};
 
 /// The layout the engine gets when the app names none: what the engine works in itself.
 const DEFAULT_FORMAT: ExternalFormat = ExternalFormat {
@@ -46,45 +43,18 @@ pub(crate) fn may_send(user: &UserView) -> bool {
     !(user.self_mute || user.self_deaf || user.server_mute || user.server_deaf || user.suppressed)
 }
 
-/// The engine's whisper receivers for one person. The engine finds people by name.
-pub(crate) fn whisper_person(name: Option<String>) -> Result<WhisperReceivers, BridgeError> {
-    let name = name.ok_or_else(|| not_found("unknown person"))?;
-    Ok(WhisperReceivers::People { names: vec![name] })
-}
-
-/// The engine's whisper receivers for the people in one channel. The engine finds a channel by
-/// its names from below the root down; `channels` maps an id to its parent and name.
-pub(crate) fn whisper_channel(
-    channel_id: u32,
-    channels: &HashMap<u32, (Option<u32>, String)>,
-) -> Result<WhisperReceivers, BridgeError> {
-    let mut path = Vec::new();
-    let mut next = Some(channel_id);
-    while let Some(id) = next {
-        let (parent, name) = channels
-            .get(&id)
-            .ok_or_else(|| not_found("unknown channel"))?;
-        // The server's data is untrusted: a loop of parents must not hang the command.
-        if path.len() > channels.len() {
-            return Err(not_found("unknown channel"));
-        }
-        if parent.is_some() {
-            path.push(name.clone());
-        }
-        next = *parent;
-    }
-    path.reverse();
-    Ok(WhisperReceivers::Channel {
-        path,
-        children: false,
-        links: false,
-        group: None,
-    })
-}
-
-fn not_found(detail: &str) -> BridgeError {
-    BridgeError::NotFound {
-        detail: detail.to_owned(),
+/// Who the engine sends a whisper or shout to. People are named by their session, so nobody
+/// else can come to hear it, whatever their name is; a shout reaches the channel itself, not
+/// its sub-channels or linked channels.
+pub(crate) fn whisper_to(target: WhisperTarget) -> WhisperTo {
+    match target {
+        WhisperTarget::Person { session } => WhisperTo::Sessions(vec![session]),
+        WhisperTarget::Channel { channel_id } => WhisperTo::Channel {
+            channel_id,
+            children: false,
+            links: false,
+            group: None,
+        },
     }
 }
 
@@ -93,7 +63,8 @@ impl From<WhisperDenied> for BridgeError {
         let detail = denied.to_string();
         match denied {
             WhisperDenied::NoVoiceServer => Self::NotConnected { detail },
-            WhisperDenied::Muted => Self::InvalidInput { detail },
+            // A name that fits several people; cannot happen with sessions.
+            WhisperDenied::Muted | WhisperDenied::AmbiguousName => Self::InvalidInput { detail },
             WhisperDenied::ServerMuted | WhisperDenied::NoPermission { .. } => {
                 Self::PermissionDenied { detail }
             }
@@ -106,58 +77,25 @@ impl From<WhisperDenied> for BridgeError {
 mod tests {
     use super::*;
 
-    fn channels() -> HashMap<u32, (Option<u32>, String)> {
-        HashMap::from([
-            (0, (None, "Root".to_owned())),
-            (1, (Some(0), "Lobby".to_owned())),
-            (2, (Some(1), "Corner".to_owned())),
-        ])
-    }
-
     #[test]
-    fn a_person_is_whispered_to_by_name() {
+    fn a_person_is_whispered_to_by_their_session() {
         assert_eq!(
-            whisper_person(Some("ada".to_owned())),
-            Ok(WhisperReceivers::People {
-                names: vec!["ada".to_owned()]
-            })
+            whisper_to(WhisperTarget::Person { session: 7 }),
+            WhisperTo::Sessions(vec![7])
         );
-        assert!(matches!(
-            whisper_person(None),
-            Err(BridgeError::NotFound { .. })
-        ));
     }
 
     #[test]
-    fn a_channel_is_shouted_to_by_its_path_below_the_root() {
-        let path_of = |id| match whisper_channel(id, &channels()) {
-            Ok(WhisperReceivers::Channel {
-                path,
+    fn a_shout_reaches_the_channel_itself_only() {
+        assert_eq!(
+            whisper_to(WhisperTarget::Channel { channel_id: 3 }),
+            WhisperTo::Channel {
+                channel_id: 3,
                 children: false,
                 links: false,
                 group: None,
-            }) => path,
-            other => panic!("{other:?}"),
-        };
-        assert_eq!(path_of(2), ["Lobby", "Corner"]);
-        assert_eq!(path_of(1), ["Lobby"]);
-        assert_eq!(path_of(0), [""; 0]);
-        assert!(matches!(
-            whisper_channel(9, &channels()),
-            Err(BridgeError::NotFound { .. })
-        ));
-    }
-
-    #[test]
-    fn a_loop_of_parents_is_refused() {
-        let looped = HashMap::from([
-            (1, (Some(2), "a".to_owned())),
-            (2, (Some(1), "b".to_owned())),
-        ]);
-        assert!(matches!(
-            whisper_channel(1, &looped),
-            Err(BridgeError::NotFound { .. })
-        ));
+            }
+        );
     }
 
     #[test]
@@ -180,6 +118,18 @@ mod tests {
         assert!(matches!(
             kind(WhisperDenied::NobodyHere),
             BridgeError::NotFound { .. }
+        ));
+        assert!(matches!(
+            kind(WhisperDenied::ChannelNotFound),
+            BridgeError::NotFound { .. }
+        ));
+        assert!(matches!(
+            kind(WhisperDenied::ServerMuted),
+            BridgeError::PermissionDenied { .. }
+        ));
+        assert!(matches!(
+            kind(WhisperDenied::AmbiguousName),
+            BridgeError::InvalidInput { .. }
         ));
     }
 

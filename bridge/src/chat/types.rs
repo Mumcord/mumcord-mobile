@@ -239,6 +239,12 @@ pub struct BlockedPerson {
     /// The server the block was set on.
     pub server_label: String,
     pub blocked_at_ms: i64,
+    /// Certificate hash of the blocked person; `None` when they were blocked by name (they had
+    /// no certificate).
+    pub cert_hash: Option<String>,
+    /// The [`Person::session`](crate::Person::session) this block covers on the connected
+    /// server right now; `None` while that person is not there.
+    pub session: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]

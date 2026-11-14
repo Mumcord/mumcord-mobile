@@ -9,4 +9,4 @@
 # desktop translation files and the theme tokens.
 [engine]
 repository = "https://github.com/Mumcord/mumcord"
-rev = "184549ab03ed9a6873bb513a8ef90dfbe43b682d"
+rev = "b258e927e1af54bfd122dfa1976cd90f4f74af74"

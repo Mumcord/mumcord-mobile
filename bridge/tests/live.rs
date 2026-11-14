@@ -13,9 +13,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use mumcord_mobile::{
-    BridgeError, BridgeEvent, CertificatePrompt, ConnectRequest, ConnectionState, EngineConfig,
-    EngineListener, MumcordEngine, PasswordInput, SavedServer, SecureStorage, SecureStorageError,
-    ServerInput, ServerState, TalkMode,
+    BlockedPerson, BridgeError, BridgeEvent, CertificatePrompt, ConnectRequest, ConnectionState,
+    EngineConfig, EngineListener, MumcordEngine, PasswordInput, SavedServer, SecureStorage,
+    SecureStorageError, ServerInput, ServerState, TalkMode,
 };
 
 const WAIT: Duration = Duration::from_secs(20);
@@ -476,4 +476,180 @@ async fn run_server_list() {
     engine.remove_server(second.id).await.expect("remove");
     assert_eq!(wait_servers(&events), std::slice::from_ref(&edited));
     assert_eq!(engine.snapshot().servers, [edited]);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "needs testenv v15 (MUMCORD_LIVE=1)"]
+async fn a_saved_server_connects_with_the_identity_it_names() {
+    if std::env::var("MUMCORD_LIVE").is_ok_and(|v| v == "1") {
+        run_identities().await;
+    } else {
+        eprintln!("skipped: set MUMCORD_LIVE=1 and start testenv/up.sh v15");
+    }
+}
+
+/// Connects a watching engine and returns it with its events.
+async fn watcher(username: &str) -> (Arc<MumcordEngine>, Events) {
+    let (engine, _storage, events) = fresh_engine("bridge-live-identity-watcher");
+    engine.connect(request(username)).await.expect("connect");
+    let prompt = wait_prompt(&events);
+    engine
+        .answer_certificate_prompt(prompt.fingerprint, true)
+        .await
+        .expect("trust");
+    wait_synced(&events);
+    (engine, events)
+}
+
+/// Waits until `name` is on the server, as the watcher sees it, and returns their session.
+/// `earlier` is the session they had on their last connection: late events of it are skipped.
+fn wait_joined(events: &Events, name: &str, earlier: Option<u32>) -> u32 {
+    wait_for(events, "the person joining", |e| match e {
+        BridgeEvent::PersonChanged { person }
+            if person.name == name && Some(person.session) != earlier =>
+        {
+            Some(person.session)
+        }
+        _ => None,
+    })
+}
+
+/// The certificate the server knows the person `session` by, as another person on the server
+/// learns it: blocking them names it. The block is lifted again.
+async fn certificate_seen(watcher: &MumcordEngine, events: &Events, session: u32) -> String {
+    let blocked = watcher.block_person(session).await;
+    // Without the error's text, which could name a person.
+    assert!(
+        blocked.is_ok(),
+        "blocking failed: {:?}",
+        blocked.as_ref().map_err(std::mem::discriminant)
+    );
+    // The person is reported more than once (the block also mutes them): the mark counts.
+    wait_for(events, "the person marked as blocked", |e| match e {
+        BridgeEvent::PersonChanged { person } if person.session == session && person.blocked => {
+            Some(())
+        }
+        _ => None,
+    });
+    let blocked: Vec<BlockedPerson> = wait_for(events, "the block list", |e| match e {
+        BridgeEvent::BlockedPeopleChanged { people } => Some(people),
+        _ => None,
+    });
+    assert_eq!(blocked.len(), 1);
+    assert_eq!(blocked[0].session, Some(session));
+    watcher
+        .unblock_person(blocked[0].id)
+        .await
+        .expect("unblock");
+    wait_for(
+        events,
+        "the person no longer marked as blocked",
+        |e| match e {
+            BridgeEvent::PersonChanged { person }
+                if person.session == session && !person.blocked =>
+            {
+                Some(())
+            }
+            _ => None,
+        },
+    );
+    blocked[0]
+        .cert_hash
+        .clone()
+        .expect("the server knows a certificate")
+}
+
+async fn run_identities() {
+    let tag = std::process::id() & 0xff_ffff;
+    let username = format!("mc-ident-{tag:06x}");
+    let (watching, watcher_events) = watcher(&format!("mc-watch-{tag:06x}")).await;
+
+    // Two identities; the server names the second one, which is not the default.
+    let (phone, _storage, events) = fresh_engine("bridge-live-identity");
+    let main = phone
+        .ensure_default_identity(username.clone())
+        .await
+        .expect("default identity");
+    let second = phone
+        .create_identity(username.clone(), Some("Second".into()))
+        .await
+        .expect("second identity");
+    let password = match std::env::var("SERVER_PASSWORD") {
+        Ok(value) if !value.is_empty() => PasswordInput::Set { value },
+        _ => PasswordInput::Keep,
+    };
+    let mut fields = input("Identity test", &username, password);
+    fields.identity_id = Some(second.id);
+    let server = phone.add_server(fields).await.expect("server");
+    assert_eq!(server.identity_id, Some(second.id));
+    phone
+        .connect_server(server.id, None, Vec::new())
+        .await
+        .expect("connect");
+    let prompt = wait_prompt(&events);
+    phone
+        .answer_certificate_prompt(prompt.fingerprint, true)
+        .await
+        .expect("trust");
+    wait_synced(&events);
+    let first_session = wait_joined(&watcher_events, &username, None);
+    let seen = certificate_seen(&watching, &watcher_events, first_session).await;
+    assert!(
+        seen == second.fingerprint,
+        "the server sees the named identity"
+    );
+    phone.disconnect().await.expect("disconnect");
+    wait_disconnected(&events);
+
+    // Without an identity of its own the server connects with the default one.
+    let fields = input("Identity test", &username, PasswordInput::Keep);
+    let changed = phone
+        .update_server(server.id, fields)
+        .await
+        .expect("back to the default identity");
+    assert_eq!(changed.identity_id, None);
+    phone
+        .connect_server(server.id, None, Vec::new())
+        .await
+        .expect("connect");
+    wait_synced(&events);
+    let session = wait_joined(&watcher_events, &username, Some(first_session));
+    let seen = certificate_seen(&watching, &watcher_events, session).await;
+    assert!(
+        seen == main.fingerprint,
+        "the server sees the default identity"
+    );
+    phone.disconnect().await.expect("disconnect");
+    wait_disconnected(&events);
+
+    // AC-5.20: the exported file, imported on another phone, is the same person to the server.
+    let file = phone
+        .export_identity(main.id, "transfer password".into())
+        .await
+        .expect("export");
+    let (other, _storage, other_events) = fresh_engine("bridge-live-identity-other");
+    let imported = other
+        .import_identity(file, "transfer password".into(), None)
+        .await
+        .expect("import");
+    assert!(imported.fingerprint == main.fingerprint && imported.is_default);
+    let other_name = format!("mc-other-{tag:06x}");
+    other.connect(request(&other_name)).await.expect("connect");
+    let prompt = wait_prompt(&other_events);
+    other
+        .answer_certificate_prompt(prompt.fingerprint, true)
+        .await
+        .expect("trust");
+    wait_synced(&other_events);
+    let session = wait_joined(&watcher_events, &other_name, None);
+    let seen = certificate_seen(&watching, &watcher_events, session).await;
+    assert!(
+        seen == main.fingerprint,
+        "the imported identity is the same person"
+    );
+
+    other.disconnect().await.expect("disconnect");
+    wait_disconnected(&other_events);
+    watching.disconnect().await.expect("disconnect");
+    wait_disconnected(&watcher_events);
 }

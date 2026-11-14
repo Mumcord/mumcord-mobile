@@ -19,6 +19,32 @@
 //! image bytes are fetched on demand, and [`BridgeEvent::ChatNotification`] names the messages
 //! worth a system notification. Names, message text and addresses are never logged.
 //!
+//! # Identities and the transfer from the desktop
+//!
+//! An identity is the certificate the user is known by on servers. Certificate and key live
+//! only in the app's [`SecureStorage`]; the bridge hands out an [`Identity`] (label, common
+//! name, fingerprint, date, default flag) and takes or gives key material only as the bytes of
+//! a password-protected `.p12` file ([`MumcordEngine::import_identity`],
+//! [`MumcordEngine::export_identity`]). The list is part of the snapshot and changes arrive as
+//! [`BridgeEvent::IdentitiesChanged`].
+//!
+//! "Send to your phone" is a [`TransferScan`] ([`MumcordEngine::new_transfer`]): the app feeds
+//! it every QR text the camera sees, then the typed code, shows the [`TransferPreview`] and
+//! imports. The opened transfer never leaves that object.
+//!
+//! Until both apps create or bring an identity during their setup
+//! ([`MumcordEngine::ensure_default_identity`]), connecting creates a default identity silently
+//! when there is none. That shortcut then goes and connecting without an identity fails with
+//! [`BridgeError::NoIdentity`].
+//!
+//! # Phone settings and the public server list
+//!
+//! [`MobileSettings`] are part of the snapshot and arrive as
+//! [`BridgeEvent::MobileSettingsChanged`]: several screens and the platform code (audio route,
+//! notifications, network) read them, so they follow the same rule as all other state instead
+//! of being fetched by each reader. The public server list is read in pages
+//! ([`MumcordEngine::public_servers`]); the engine downloads it only when the app asks.
+//!
 //! # Threads
 //!
 //! The bridge owns one tokio runtime. `async` methods run on it and never block the caller.
@@ -93,7 +119,12 @@ mod convert;
 mod engine;
 mod error;
 mod events;
+mod identities;
+#[cfg(test)]
+mod local_tests;
+mod public_servers;
 mod storage;
+mod transfer;
 mod types;
 
 pub use audio_abi::{
@@ -110,10 +141,15 @@ pub use engine::MumcordEngine;
 pub use error::BridgeError;
 pub use events::{BridgeEvent, EngineListener};
 pub use storage::{SecureStorage, SecureStorageError};
+pub use transfer::{
+    ImportReport, SkippedIdentity, SkippedServer, TransferError, TransferIdentityPreview,
+    TransferPreview, TransferProgress, TransferScan, TransferServerPreview, TransferSkipReason,
+};
 pub use types::{
     AudioConfig, AudioEndpoints, AudioWanted, BridgeSnapshot, CertificatePrompt, Channel,
-    ChannelPasswordState, ChannelPermissions, ConnectRequest, ConnectionState, EchoCancellation,
-    EngineConfig, MumbleLink, PasswordInput, Person, SavedServer, ServerInput, ServerPing,
+    ChannelPasswordState, ChannelPermissions, ConnectRequest, ConnectionState, DefaultOutput,
+    EchoCancellation, EngineConfig, Identity, MobileSettings, MumbleLink, PasswordInput, Person,
+    PublicServer, PublicServerPage, PublicServerQuery, SavedServer, ServerInput, ServerPing,
     ServerState, TalkMode, VoiceSettings, WhisperTarget,
 };
 

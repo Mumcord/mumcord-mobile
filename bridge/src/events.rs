@@ -6,6 +6,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use mumcord_engine::store::BlockedUser;
 use mumcord_engine::{
     Engine, EngineEvent, EventReceiver, ServerId, Snapshot, TaggedEvent, UserView,
 };
@@ -17,8 +18,8 @@ use crate::chat::{
 };
 use crate::convert::{self, PersonFlags};
 use crate::types::{
-    AudioWanted, CertificatePrompt, Channel, ChannelPasswordState, ConnectionState, Person,
-    SavedServer, ServerState,
+    AudioWanted, CertificatePrompt, Channel, ChannelPasswordState, ConnectionState, Identity,
+    MobileSettings, Person, SavedServer, ServerState,
 };
 
 /// A change of the state. Apply it to the last [`BridgeSnapshot`](crate::BridgeSnapshot), or
@@ -100,6 +101,18 @@ pub enum BridgeEvent {
     BlockedPeopleChanged {
         people: Vec<BlockedPerson>,
     },
+    /// The identities after one was created, imported, renamed, deleted or made the default.
+    IdentitiesChanged {
+        identities: Vec<Identity>,
+    },
+    /// The whisper the user held ended without `stop_whisper`: the person it went to left the
+    /// server, or the connection ended. Talking goes to the user's own channel again; the
+    /// whisper bar closes.
+    WhisperEnded,
+    /// The phone settings after `set_mobile_settings` or `set_talk_mode`.
+    MobileSettingsChanged {
+        settings: MobileSettings,
+    },
 }
 
 /// Receives the events; implemented by the app (Kotlin, Swift). Called on one bridge thread, in
@@ -129,6 +142,8 @@ pub(crate) struct Connection {
     pub(crate) audio: AudioWanted,
     /// As last reported to the app.
     input_level: u8,
+    /// The people the user blocked, with every identity; read when the connection starts.
+    pub(crate) blocked: Vec<BlockedUser>,
 }
 
 impl Default for Connection {
@@ -145,15 +160,17 @@ impl Default for Connection {
             voice: false,
             audio: AudioWanted::default(),
             input_level: 0,
+            blocked: Vec::new(),
         }
     }
 }
 
 impl Connection {
     /// A connection to `server` that is about to start.
-    pub(crate) fn to(server: ServerId) -> Self {
+    pub(crate) fn to(server: ServerId, blocked: Vec<BlockedUser>) -> Self {
         Self {
             server: Some(server),
+            blocked,
             ..Self::default()
         }
     }
@@ -167,8 +184,33 @@ impl Connection {
                 talking: self.talking.contains(&session),
                 streaming: self.streaming.contains(&session),
                 camera: self.camera.contains(&session),
+                blocked: self.is_blocked(user),
             },
         )
+    }
+
+    /// Whether a block of the identity the user is connected with covers this person: the rule
+    /// of the engine, which mutes and filters by it.
+    fn is_blocked(&self, user: &UserView) -> bool {
+        let (Some(server), Some(own)) = (self.server, self.own_user()) else {
+            return false;
+        };
+        let Some(own_hash) = own.cert_hash.as_deref() else {
+            return false;
+        };
+        user.session != own.session
+            && self
+                .blocked
+                .iter()
+                .any(|block| block.covers(own_hash, server, user.cert_hash.as_deref(), &user.name))
+    }
+
+    fn blocked_sessions(&self) -> HashSet<u32> {
+        self.people
+            .values()
+            .filter(|user| self.is_blocked(user))
+            .map(|user| user.session)
+            .collect()
     }
 
     /// The user themself, once the server is synced.
@@ -186,11 +228,6 @@ impl Connection {
             .values()
             .find(|user| user.cert_hash.as_deref() == Some(cert_hash))
             .map(|user| user.session)
-    }
-
-    /// The name of a person, as the engine's whisper targets want it.
-    pub(crate) fn person_name(&self, session: u32) -> Option<String> {
-        self.people.get(&session).map(|user| user.name.clone())
     }
 
     /// The platform audio streams the engine needs in the current state.
@@ -270,14 +307,15 @@ pub(crate) fn translate(
     }
     // Talking and the microphone level belong to the voice pipeline, which the engine does not
     // always name a server for; with one connection at a time it can only be this one. The
-    // voice server is named by its own event.
-    let of_voice = matches!(
+    // voice server is named by its own event. The block list belongs to the identity.
+    let unnamed = matches!(
         event,
         EngineEvent::TalkStateChanged { .. }
             | EngineEvent::MicLevel(_)
             | EngineEvent::VoiceServerChanged(_)
+            | EngineEvent::BlockedUsersChanged(_)
     );
-    if server != connection.server && !of_voice {
+    if server != connection.server && !unnamed {
         return Vec::new();
     }
     let mut events = apply(&mut connection, event);
@@ -377,6 +415,13 @@ fn apply(connection: &mut Connection, event: EngineEvent) -> Vec<BridgeEvent> {
                 state: convert::channel_password_state(state),
             })
         }
+        EngineEvent::BlockedUsersChanged(blocked) => {
+            let before = connection.blocked_sessions();
+            connection.blocked = blocked;
+            connection.changed_people(&before, &connection.blocked_sessions())
+        }
+        // The engine has already switched the voice target back.
+        EngineEvent::WhisperEnded => one(BridgeEvent::WhisperEnded),
         // A refusal the engine marks as handled is told through its own event (the channel
         // password).
         EngineEvent::ServerDenied {
@@ -456,7 +501,7 @@ mod tests {
     use super::*;
 
     fn connected_to(server: ServerId) -> SharedConnection {
-        Arc::new(Mutex::new(Connection::to(server)))
+        Arc::new(Mutex::new(Connection::to(server, Vec::new())))
     }
 
     fn prompt_event(server_id: ServerId) -> EngineEvent {
@@ -717,10 +762,7 @@ mod tests {
     fn a_ban_ends_the_connection_as_banned() {
         let connection = connected_to(1);
         let ended = EngineEvent::StateChanged(ConnState::Disconnected {
-            error: Some(EngineError::new(
-                ErrorKind::PermissionDenied,
-                "banned: spamming",
-            )),
+            error: Some(EngineError::new(ErrorKind::Banned, "spamming")),
         });
         assert_eq!(
             translate(&connection, (Some(1), ended)),
@@ -732,6 +774,87 @@ mod tests {
                 }
             }]
         );
+    }
+
+    #[test]
+    fn a_whisper_that_ended_by_itself_is_told() {
+        let connection = synced(user(5));
+        assert_eq!(
+            translate(&connection, (Some(1), EngineEvent::WhisperEnded)),
+            [BridgeEvent::WhisperEnded]
+        );
+        // The whisper of another connection is not this one's.
+        assert_eq!(
+            translate(&connection, (Some(2), EngineEvent::WhisperEnded)),
+            []
+        );
+    }
+
+    fn block(id: i64, own: &str, cert_hash: Option<&str>, name: &str) -> BlockedUser {
+        BlockedUser {
+            id,
+            own_cert_hash: own.to_owned(),
+            cert_hash: cert_hash.map(str::to_owned),
+            name: name.to_owned(),
+            server_id: Some(1),
+            server_label: "Home".to_owned(),
+            blocked_at: 0,
+        }
+    }
+
+    fn with_cert(session: u32, cert_hash: &str) -> UserView {
+        UserView {
+            cert_hash: Some(cert_hash.to_owned()),
+            ..user(session)
+        }
+    }
+
+    #[test]
+    fn a_block_marks_the_person_it_covers_and_only_for_the_identity_that_set_it() {
+        let connection = synced(with_cert(5, "own"));
+        let joined = |user: UserView| person_of(&connection, EngineEvent::UserUpserted(user));
+        assert!(!joined(with_cert(6, "six")).blocked);
+        assert!(!joined(user(7)).blocked);
+        let blocked = |list: Vec<BlockedUser>| {
+            translate(&connection, (None, EngineEvent::BlockedUsersChanged(list)))
+                .into_iter()
+                .map(|event| match event {
+                    BridgeEvent::PersonChanged { person } => (person.session, person.blocked),
+                    other => panic!("unexpected event {other:?}"),
+                })
+                .collect::<Vec<_>>()
+        };
+        // By certificate, and by name for a person without one.
+        let list = vec![
+            block(1, "own", Some("six"), "old name"),
+            block(2, "own", None, "USER7"),
+        ];
+        assert_eq!(blocked(list.clone()), [(6, true), (7, true)]);
+        // Nothing changed: nothing is sent again.
+        assert_eq!(blocked(list), []);
+        // A block of another identity of the user does not count on this connection.
+        assert_eq!(
+            blocked(vec![block(3, "other", Some("six"), "x")]),
+            [(6, false), (7, false)]
+        );
+        // The user is never blocked by a block that fits their own name.
+        assert_eq!(blocked(vec![block(4, "own", None, "user5")]), []);
+        // A person who joins while blocked is marked from the start.
+        lock(&connection).blocked = vec![block(5, "own", Some("eight"), "x")];
+        assert!(joined(with_cert(8, "eight")).blocked);
+    }
+
+    #[test]
+    fn an_app_that_understands_chat_requests_is_told() {
+        let connection = synced(user(5));
+        let joined = |features: Option<Vec<&str>>| {
+            let mut other = user(6);
+            other.mumcord_features = features.map(|f| f.into_iter().map(str::to_owned).collect());
+            person_of(&connection, EngineEvent::UserUpserted(other)).supports_chat_requests
+        };
+        assert!(!joined(None));
+        assert!(!joined(Some(vec!["files"])));
+        assert!(joined(Some(vec!["files", "chat-request"])));
     }
 
     #[test]
