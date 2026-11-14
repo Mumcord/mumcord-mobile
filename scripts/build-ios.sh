@@ -110,6 +110,27 @@ prepare_simulator() {
     log "warning: could not allow the microphone in the simulator"
 }
 
+# Starts the app once and ends it again, so the first UI test does not pay for the first start
+# of the app in a cold simulator (which took up to a minute in CI and made that test run out
+# of time). The app runs against its fake engine and touches nothing. Never a reason to fail.
+warm_up_app() {
+  local app
+  app="$(find "${TEST_PRODUCTS}" -type d -name Mumcord.app -path '*iphonesimulator*' -print -quit 2>/dev/null)"
+  if [[ -z "${app}" ]]; then
+    log "warning: found no app in the test products to warm up"
+    return 0
+  fi
+  log "Warming up the app in the simulator"
+  if xcrun simctl install booted "${app}" &&
+    xcrun simctl launch booted app.mumcord.mobile -mumcordFakeEngine plain -mumcordSetupDone YES >/dev/null; then
+    # Long enough for the first screen of a cold start to be drawn.
+    sleep 15
+    xcrun simctl terminate booted app.mumcord.mobile || true
+  else
+    log "warning: could not warm up the app in the simulator"
+  fi
+}
+
 test_group() {
   local group="$1" bundle="${BUILD_DIR}/TestResults-$1.xcresult" selection=() test
   while IFS= read -r test; do selection+=("-only-testing:${test}"); done < <(group_tests "${group}")
@@ -152,6 +173,7 @@ if [[ "${mode}" == test-without-building ]]; then
   group_tests "${group}" >/dev/null
   command -v xcodebuild >/dev/null || die "'xcodebuild' not found (Xcode)"
   prepare_simulator
+  warm_up_app
   test_group "${group}"
   log "Done"
   exit 0
@@ -208,6 +230,7 @@ fi
 
 if [[ "${mode}" == test ]]; then
   prepare_simulator
+  warm_up_app
   failed=()
   for group in "${TEST_GROUPS[@]}"; do
     test_group "${group}" || failed+=("${group}")

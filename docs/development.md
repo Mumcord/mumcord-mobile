@@ -233,6 +233,9 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `voice-chat-screens` | voice screenshots, chat screenshots |
 | `chat-flow` | chat flow, session-ended notice (the lightest group: the place for new tests) |
 
+Before its tests each group starts the app once in the simulator and ends it again (about 20
+seconds), so the first UI test does not pay for the first start of the app in a cold simulator.
+
 Each group costs about five minutes of simulator start-up on top of its tests, so add a group
 only when the longest one exceeds the others by more than that.
 
@@ -255,7 +258,9 @@ Whether sessions are calls at all is decided in exactly one place, `CallSystems.
 call, the session runs on the app's own audio session instead: voice still works in the
 background (background mode `audio`), but iOS shows no call, has no mute or end button for it,
 and a phone call only pauses the audio on the phone instead of muting and deafening on the server.
-The simulator always takes this path, because its call service does not take outgoing calls.
+The simulator always takes this path: its call service does take an outgoing call (a unit test
+starts and ends one there), but it is reported to end such calls by itself after a moment, which
+would end every session started in a simulator.
 
 Only a real iPhone can show: the call screen and the lock screen, a real phone call holding the
 session, car systems, the recent calls list, and how long iOS keeps the app alive.

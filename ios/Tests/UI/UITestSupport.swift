@@ -60,6 +60,8 @@ extension XCTestCase {
         arguments += ["-mumcordTheme", theme]
         app.launchArguments = arguments
         app.launch()
+        // A cold simulator takes its time; nothing is tapped before the app is on screen.
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 120), "the app did not come on screen")
         return app
     }
 
