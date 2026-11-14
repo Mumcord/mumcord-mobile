@@ -120,9 +120,10 @@ jobs:
       E2E_TEST_TIMEOUT: 600
       # How much longer than a hold the app may be heard (200 ms on a developer machine). The
       # runner's few cores are shared by the emulator, the test server and the second person,
-      # so a stall at the end of the stretch adds to what is measured. Still far below the
-      # seconds a button that does not stop the voice would add.
-      E2E_RELEASE_BOUND_MS: 500
+      # so a stall at the end of the stretch adds to what is measured. Measured here: between
+      # 76 ms shorter and 24 ms longer than the hold. Far below the seconds a button that does
+      # not stop the voice would add.
+      E2E_RELEASE_BOUND_MS: 300
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 

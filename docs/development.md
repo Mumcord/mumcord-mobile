@@ -147,7 +147,7 @@ was on the screen in its failure message.
   machine. The push-to-talk and whisper scenarios compare the time the button was held
   (measured in the emulator) with the stretch of voice the second person played (measured on
   the host): at least half of the hold and at most the hold plus `E2E_RELEASE_BOUND_MS`. CI
-  sets 500 ms, because a stall of the emulator or of the second person at the end of the
+  sets 300 ms, because a stall of the emulator or of the second person at the end of the
   stretch adds to it there; a button that does not stop the voice is heard for seconds longer.
 
 ## Continuous integration
