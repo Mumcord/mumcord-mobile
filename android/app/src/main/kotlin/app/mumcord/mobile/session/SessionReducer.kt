@@ -34,7 +34,8 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
         )
     }
     is BridgeEvent.AudioWantedChanged -> copy(audio = event.audio)
-    // voice phase (task 3.4)
+    // Up to 20 a second: the repository keeps the level in a flow of its own, so that only
+    // the level meter follows it.
     is BridgeEvent.InputLevelChanged -> this
     is BridgeEvent.CertificatePromptRequired -> copy(
         certificatePrompt = CertificatePromptState(

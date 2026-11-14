@@ -22,6 +22,7 @@ import app.mumcord.mobile.design.components.StreamTileSample
 import app.mumcord.mobile.design.components.TabBarSample
 import app.mumcord.mobile.design.components.TalkButtonSample
 import app.mumcord.mobile.design.components.VoiceBarSample
+import app.mumcord.mobile.design.components.VoiceViewSample
 import app.mumcord.mobile.design.tokens.MumcordSpace
 
 /**
@@ -43,6 +44,7 @@ fun ComponentGallery(modifier: Modifier = Modifier) {
         "Hint banner, bottom sheet" to { OverlaysSample() },
         "Hold-to-talk button" to { TalkButtonSample() },
         "Voice bar" to { VoiceBarSample() },
+        "Voice view: person tile, actions, talk mode switch, level meter" to { VoiceViewSample() },
         "Tab bar" to { TabBarSample() },
     )
     Column(

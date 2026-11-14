@@ -182,4 +182,34 @@
         <item quantity="one">%1$d person</item>
         <item quantity="other">%1$d people</item>
     </plurals>
+    <string name="voice_status_connected">%1$s · Voice connected</string>
+    <string name="voice_status_reconnecting">%1$s · Reconnecting…</string>
+    <string name="voice_open">Open voice view</string>
+    <string name="voice_collapse">Collapse voice view</string>
+    <string name="voice_view">Voice view</string>
+    <string name="voice_talking">Talking</string>
+    <string name="voice_not_talking">Not talking</string>
+    <string name="voice_mute">Mute</string>
+    <string name="voice_unmute">Unmute</string>
+    <string name="voice_mute_microphone">Mute microphone</string>
+    <string name="voice_unmute_microphone">Unmute microphone</string>
+    <string name="voice_muted_by_server">Muted by the server</string>
+    <string name="voice_no_microphone">Microphone not allowed</string>
+    <string name="voice_no_microphone_action">Microphone not allowed. Allow the microphone</string>
+    <string name="voice_deafen">Deafen</string>
+    <string name="voice_undeafen">Undeafen</string>
+    <string name="voice_leave">Leave</string>
+    <string name="voice_leave_server">Leave server</string>
+    <string name="voice_talk_mode">Talk mode</string>
+    <string name="voice_hold_to_talk">Hold to talk</string>
+    <string name="voice_person_you">%1$s (you)</string>
+    <string name="voice_level">Microphone level</string>
+    <string name="voice_level_hint">Your microphone opens when you speak.</string>
+    <string name="person_whisper">Whisper to %1$s</string>
+    <string name="channel_shout">Shout to channel</string>
+    <string name="whisper_to_person">Hold to whisper to %1$s</string>
+    <string name="whisper_to_channel">Hold to shout to %1$s</string>
+    <string name="whisper_active">Whispering</string>
+    <string name="whisper_inactive">Not whispering</string>
+    <string name="whisper_close">Close whisper</string>
 </resources>

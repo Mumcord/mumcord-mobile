@@ -206,9 +206,10 @@ class AppFlowTest {
         // Search filters channels and people by name.
         compose.onNodeWithContentDescription("Search channels and people").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("ali")
-        await { exists("Alice") && !exists("<b>Games</b>") }
+        // The voice bar keeps naming the user's channel; its row in the list is what goes.
+        await { exists("Alice") && compose.onAllNodesWithText("<b>Games</b>").fetchSemanticsNodes().size == 1 }
         compose.onNodeWithContentDescription("Close search").performClick()
-        await { exists("<b>Games</b>") }
+        await { compose.onAllNodesWithText("<b>Games</b>").fetchSemanticsNodes().size == 2 }
 
         compose.onNodeWithText("Chat").performClick()
         await { exists("No chat messages yet.") }

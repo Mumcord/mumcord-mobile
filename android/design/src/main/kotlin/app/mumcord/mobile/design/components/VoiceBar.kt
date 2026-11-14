@@ -46,6 +46,8 @@ data class MumcordVoiceBarLabels(
 /**
  * Slim voice bar above the tabs (`.voicebar`): talk indicator, channel name with a status line,
  * and the mute, deafen and leave buttons. Tapping the text opens the full voice screen.
+ * [muteEnabled] is false while the user cannot change the mute themselves (muted by the
+ * server); [MumcordVoiceBarLabels.unmute] then says why.
  */
 @Composable
 fun MumcordVoiceBar(
@@ -60,6 +62,7 @@ fun MumcordVoiceBar(
     onToggleDeafen: () -> Unit,
     onLeave: () -> Unit,
     modifier: Modifier = Modifier,
+    muteEnabled: Boolean = true,
 ) {
     val colors = MumcordTheme.colors
     val shape = RoundedCornerShape(MumcordRadius.bar)
@@ -98,6 +101,7 @@ fun MumcordVoiceBar(
                 contentDescription = if (muted) labels.unmute else labels.mute,
                 onClick = onToggleMute,
                 style = if (muted) MumcordIconButtonStyle.Off else MumcordIconButtonStyle.Tonal,
+                enabled = muteEnabled,
             )
             MumcordIconButton(
                 icon = if (deafened) MumcordIcons.HeadphonesOff else MumcordIcons.Headphones,

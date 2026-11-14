@@ -2,6 +2,7 @@
 package app.mumcord.mobile.ui.connected
 
 import app.mumcord.mobile.bridge.Person
+import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.session.ChannelNode
 import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.SessionState
@@ -147,6 +148,14 @@ data class ConnectedLocal(
     val menuChannelId: UInt? = null,
     /** The channel password being typed. */
     val password: String = "",
+    /** The full voice view covers the screen. */
+    val voiceOpen: Boolean = false,
+    /** The hold-to-talk button is down. */
+    val talkHeld: Boolean = false,
+    /** Who the whisper bar is for, while it is shown. */
+    val whisperTarget: WhisperTarget? = null,
+    /** The hold-to-whisper button is down. */
+    val whisperHeld: Boolean = false,
 )
 
 /** The sheet over the connected screens. At most one at a time. */
@@ -184,6 +193,8 @@ data class ConnectedUiState(
     val hints: List<UnsupportedHint>,
     /** [MicrophoneNotice.Denied] or [MicrophoneNotice.Blocked] while the others cannot hear the user. */
     val microphone: MicrophoneNotice,
+    /** The voice bar and the full voice view; null while the user's own entry is unknown. */
+    val voice: VoiceUiState?,
     val sheet: ConnectedSheet?,
 )
 
@@ -241,6 +252,7 @@ fun connectedUiState(
         hints = session.hints,
         microphone = microphone.takeIf { it == MicrophoneNotice.Denied || it == MicrophoneNotice.Blocked }
             ?: MicrophoneNotice.None,
+        voice = voiceUiState(session, server, local, serverName, microphone),
         sheet = sheet,
     )
 }

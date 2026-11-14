@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.design.theme.tokenShadow
@@ -42,7 +43,8 @@ import app.mumcord.mobile.design.tokens.MumcordSpace
 
 /**
  * Large hold-to-talk button (`.ptt`): round and 208 dp wide, or a 72 dp high bar over the full
- * width when [wide]. [onPressedChange] reports finger down (true) and up (false); [active]
+ * width when [wide] (96 dp with larger text when also [tall], as in the full voice view).
+ * [onPressedChange] reports finger down (true) and up (false); [active]
  * shows the talking state the caller derives from it.
  *
  * Holding is not possible with TalkBack or a switch, so the accessibility action toggles
@@ -57,6 +59,7 @@ fun MumcordTalkButton(
     stateDescription: String,
     modifier: Modifier = Modifier,
     wide: Boolean = false,
+    tall: Boolean = false,
     icon: ImageVector = MumcordIcons.Mic,
 ) {
     val colors = MumcordTheme.colors
@@ -83,7 +86,7 @@ fun MumcordTalkButton(
     }
     Box(
         modifier = modifier
-            .then(if (wide) Modifier.fillMaxWidth().height(72.dp) else Modifier.size(208.dp))
+            .then(if (wide) Modifier.fillMaxWidth().height(if (tall) 96.dp else 72.dp) else Modifier.size(208.dp))
             .then(frame)
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -106,12 +109,16 @@ fun MumcordTalkButton(
         val inner = Modifier.fillMaxSize().background(if (active) colors.talking else colors.bgElevated, CircleShape)
         if (wide) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(MumcordSpace.s2, Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(
+                    if (tall) MumcordSpace.s3 else MumcordSpace.s2,
+                    Alignment.CenterHorizontally,
+                ),
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = inner,
             ) {
-                MumcordIcon(icon, contentDescription = null, tint = content)
-                LineText(label, MumcordTheme.typography.talkButton, content)
+                val style = MumcordTheme.typography.talkButton
+                MumcordIcon(icon, contentDescription = null, tint = content, size = if (tall) MumcordSize.iconLg else MumcordSize.icon)
+                LineText(label, if (tall) style.copy(fontSize = 22.sp) else style, content)
             }
         } else {
             Column(

@@ -73,7 +73,13 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
 
     fun connected(): Boolean = channelNames().size > TestServer.SEEDED_CHANNELS.size
 
-    /** Until the voice bar exists, the More tab is the way to leave a server. */
+    /** Leaves the server with the leave button of the voice bar, which is on every tab. */
+    fun leave() {
+        compose.onNodeWithContentDescription(LEAVE_SERVER).performClick()
+        awaitOrFail("the server list after leaving") { exists(SERVER_CONNECT_TEST_TAG) }
+    }
+
+    /** Leaves the server through the More tab. */
     fun disconnect() {
         compose.onNodeWithText(TAB_MORE).performClick()
         awaitOrFail("the More tab") { exists(MORE_DISCONNECT_TEST_TAG) }
@@ -129,6 +135,7 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
         const val LOBBY = "Lobby"
         const val TIMEOUT_MILLIS = 30_000L
         private const val TAB_MORE = "More"
+        private const val LEAVE_SERVER = "Leave server"
 
         // The labels of the form fields, which is how a screen reader finds them too.
         private const val FIELD_ADDRESS = "Address"

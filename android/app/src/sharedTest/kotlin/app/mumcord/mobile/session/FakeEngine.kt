@@ -33,12 +33,14 @@ data class ConnectCall(val serverId: Long, val password: String?, val channelPat
  * Stands in for the engine and behaves like it: it keeps a server list, answers pings from
  * [pings], and along the connect flow asks the certificate question (when [prompt] is set),
  * delivers [server] once trusted, and reports every end of a connection as an event.
+ * [talkMode] is the saved talk mode it starts with.
  */
 class FakeEngine(
     private val listener: EngineListener,
     private val server: ServerState,
     private val prompt: CertificatePrompt? = null,
     servers: List<SavedServer> = emptyList(),
+    talkMode: TalkMode = TalkMode.VOICE_ACTIVITY,
 ) : MumcordEngineInterface {
     val connectCalls = CopyOnWriteArrayList<ConnectCall>()
     val certificateAnswers = CopyOnWriteArrayList<Pair<String, Boolean>>()
@@ -76,7 +78,7 @@ class FakeEngine(
     private val people = ConcurrentHashMap(server.people.associateBy { it.session })
 
     @Volatile
-    var talkMode = TalkMode.VOICE_ACTIVITY
+    var talkMode = talkMode
         private set
 
     @Volatile
@@ -269,7 +271,11 @@ class FakeEngine(
 
     override fun audioEndpoints(): AudioEndpoints = AudioEndpoints(capture = 0uL, playback = 0uL)
 
+    /** Every press (true) and release (false) of the hold-to-talk button, in order. */
+    val pushToTalkCalls = CopyOnWriteArrayList<Boolean>()
+
     override fun setPushToTalkPressed(pressed: Boolean) {
+        pushToTalkCalls += pressed
         pushToTalkPressed = pressed
     }
 
@@ -307,11 +313,24 @@ class FakeEngine(
         bitrateLimitKbps = kbps
     }
 
+    /** Thrown by the next [startWhisper]. */
+    @Volatile
+    var whisperFailure: BridgeException? = null
+
+    /** Every whisper that started (its target) and ended (null), in order. */
+    val whisperCalls = CopyOnWriteArrayList<WhisperTarget?>()
+
     override suspend fun startWhisper(target: WhisperTarget) {
+        whisperFailure?.let {
+            whisperFailure = null
+            throw it
+        }
+        whisperCalls += target
         whisperTarget = target
     }
 
     override fun stopWhisper() {
+        whisperCalls += null
         whisperTarget = null
     }
 

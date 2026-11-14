@@ -11,6 +11,12 @@
 //!
 //! It ends with exit code 1 and `NOT HEARD` when the phone stays silent for too long, and
 //! otherwise runs until it is stopped. The server's port comes from `MUMCORD_PORT_BASE`.
+//!
+//! Every stretch of voice it hears is also reported when it is over, as `SPAN ms=<length>`, so
+//! that a scenario can check how long the phone was heard (push-to-talk, mute, whisper).
+//!
+//! Arguments: `--name <user name>` for a further person on the server, and `--listen-only`
+//! for one that never talks and never gives up waiting, and only reports what it hears.
 
 use std::collections::HashMap;
 use std::f32::consts::PI;
@@ -42,6 +48,32 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 const LISTEN_TIMEOUT: Duration = Duration::from_secs(240);
 /// The longest the peer keeps talking when nobody stops it.
 const TALK_TIMEOUT: Duration = Duration::from_secs(300);
+/// A stretch of voice is over after this long without a loud block. Longer than the pauses
+/// inside the test signal, so one stretch of talking is reported as one span.
+const SPAN_GAP: Duration = Duration::from_millis(600);
+
+/// How this person was started.
+struct Options {
+    name: String,
+    /// Never talks and never gives up waiting; only reports what it hears.
+    listen_only: bool,
+}
+
+fn options() -> Result<Options, String> {
+    let mut options = Options {
+        name: USER_NAME.into(),
+        listen_only: false,
+    };
+    let mut arguments = std::env::args().skip(1);
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--name" => options.name = arguments.next().ok_or("--name needs a user name")?,
+            "--listen-only" => options.listen_only = true,
+            other => return Err(format!("unknown argument {other}")),
+        }
+    }
+    Ok(options)
+}
 
 /// The identity of this run only; nothing of it is kept.
 #[derive(Default)]
@@ -127,6 +159,7 @@ fn wait_for<T>(
 }
 
 fn run() -> Result<bool, String> {
+    let options = options()?;
     let port = std::env::var("MUMCORD_PORT_BASE")
         .ok()
         .and_then(|port| port.parse().ok())
@@ -157,7 +190,7 @@ fn run() -> Result<bool, String> {
         .block_on(engine.connect(ConnectRequest {
             address: "127.0.0.1".into(),
             port,
-            username: USER_NAME.into(),
+            username: options.name.clone(),
             password: None,
         }))
         .map_err(|error| format!("connecting failed: {error}"))?;
@@ -186,7 +219,7 @@ fn run() -> Result<bool, String> {
         BridgeEvent::AudioWantedChanged { audio } if audio.capture && audio.playback => Some(()),
         _ => None,
     })?;
-    println!("CONNECTED as {USER_NAME} in {CHANNEL}, listening");
+    println!("CONNECTED as {} in {CHANNEL}, listening", options.name);
 
     let handles = engine.audio_endpoints();
     let speech = speech_like(SAMPLE_RATE * 4, 0.5);
@@ -198,6 +231,8 @@ fn run() -> Result<bool, String> {
     let mut loudest = 0.0_f32;
     let mut loud_windows = 0;
     let mut heard_at = None;
+    // The first and the latest loud block of the stretch of voice that is being heard.
+    let mut span: Option<(Instant, Instant)> = None;
     let start = Instant::now();
     let mut next = start;
     loop {
@@ -215,7 +250,18 @@ fn run() -> Result<bool, String> {
         }
         position = (position + BLOCK) % speech.len();
 
-        window_sum += pulled.iter().map(|sample| sample * sample).sum::<f32>();
+        let block_sum = pulled.iter().map(|sample| sample * sample).sum::<f32>();
+        let now = Instant::now();
+        if (block_sum / BLOCK as f32).sqrt() >= HEARD {
+            span = Some((span.map_or(now, |(first, _)| first), now));
+        } else if let Some((first, last)) = span
+            && now.duration_since(last) > SPAN_GAP
+        {
+            // The last loud block counts in full.
+            println!("SPAN ms={}", (last - first).as_millis() + 10);
+            span = None;
+        }
+        window_sum += block_sum;
         window_blocks += 1;
         if window_blocks == WINDOW_BLOCKS {
             let level = (window_sum / (WINDOW_BLOCKS * BLOCK) as f32).sqrt();
@@ -223,7 +269,7 @@ fn run() -> Result<bool, String> {
             window_sum = 0.0;
             window_blocks = 0;
             loud_windows = if level >= HEARD { loud_windows + 1 } else { 0 };
-            if heard_at.is_none() && loud_windows == HEARD_WINDOWS {
+            if heard_at.is_none() && loud_windows == HEARD_WINDOWS && !options.listen_only {
                 println!(
                     "HEARD level={level:.4} for {HEARD_WINDOWS} windows in a row, talking now"
                 );
@@ -232,7 +278,7 @@ fn run() -> Result<bool, String> {
         }
 
         match heard_at {
-            None if start.elapsed() > LISTEN_TIMEOUT => {
+            None if start.elapsed() > LISTEN_TIMEOUT && !options.listen_only => {
                 println!("NOT HEARD loudest={loudest:.4}");
                 return Ok(false);
             }

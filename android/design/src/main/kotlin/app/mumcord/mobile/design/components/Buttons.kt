@@ -32,7 +32,7 @@ import app.mumcord.mobile.design.tokens.MumcordRadius
 import app.mumcord.mobile.design.tokens.MumcordSize
 import app.mumcord.mobile.design.tokens.MumcordSpace
 
-private const val DISABLED_ALPHA = 0.5f
+internal const val DISABLED_ALPHA = 0.5f
 
 enum class MumcordButtonStyle { Primary, Secondary, Danger, Ghost }
 

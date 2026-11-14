@@ -13,6 +13,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.R
+import app.mumcord.mobile.bridge.WhisperTarget
+import app.mumcord.mobile.design.components.MumcordIcon
 import app.mumcord.mobile.design.components.MumcordButton
 import app.mumcord.mobile.design.components.MumcordButtonStyle
 import app.mumcord.mobile.design.components.MumcordList
@@ -23,6 +25,7 @@ import app.mumcord.mobile.design.components.MumcordTextField
 import app.mumcord.mobile.design.components.MumcordToggle
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.theme.MumcordTheme
+import app.mumcord.mobile.design.tokens.MumcordSize
 import app.mumcord.mobile.ui.common.Paragraph
 import app.mumcord.mobile.ui.common.SheetOverlay
 import kotlin.math.roundToInt
@@ -32,6 +35,8 @@ const val CHANNEL_MENU_JOIN_TEST_TAG = "channel-menu-join"
 const val CHANNEL_MENU_FOLD_TEST_TAG = "channel-menu-fold"
 const val PERSON_MUTE_TEST_TAG = "person-mute"
 const val PERSON_SHEET_TEST_TAG = "person-sheet"
+const val PERSON_WHISPER_TEST_TAG = "person-whisper"
+const val CHANNEL_MENU_SHOUT_TEST_TAG = "channel-menu-shout"
 
 /** Draws the sheet that is open over the connected screens. */
 @Composable
@@ -84,7 +89,7 @@ private fun ChannelPasswordSheet(
     }
 }
 
-/** Mockup `06-person-sheet`: the head and the two settings that apply to the user only. */
+/** Mockup `06-person-sheet`: the head, the two settings that apply to the user only, and whisper. */
 @Composable
 private fun PersonSheet(
     sheet: ConnectedSheet.PersonSheet,
@@ -123,10 +128,27 @@ private fun PersonSheet(
                 },
             )
         }
+        // A card of its own, as in the mockup, where it follows "Send private message".
+        MumcordList(horizontalMargin = 0.dp, background = MumcordTheme.colors.bgHover) {
+            MumcordListRow(
+                title = stringResource(R.string.person_whisper, sheet.name),
+                icon = MumcordIcons.Users,
+                trailing = {
+                    MumcordIcon(
+                        MumcordIcons.ChevronRight,
+                        contentDescription = null,
+                        tint = MumcordTheme.colors.textMuted,
+                        size = MumcordSize.iconSm,
+                    )
+                },
+                onClick = { actions.openWhisper(WhisperTarget.Person(sheet.session)) },
+                modifier = Modifier.testTag(PERSON_WHISPER_TEST_TAG),
+            )
+        }
     }
 }
 
-/** What a long press on a channel offers; both actions are also on the row itself. */
+/** What a long press on a channel offers: joining and folding, which are also on the row, and shouting. */
 @Composable
 private fun ChannelMenuSheet(
     sheet: ConnectedSheet.ChannelMenu,
@@ -153,6 +175,13 @@ private fun ChannelMenuSheet(
                     modifier = Modifier.testTag(CHANNEL_MENU_FOLD_TEST_TAG),
                 )
             }
+            MumcordListRow(
+                title = stringResource(R.string.channel_shout),
+                icon = MumcordIcons.Users,
+                divider = sheet.canJoin || sheet.expanded != null,
+                onClick = { actions.openWhisper(WhisperTarget.Channel(sheet.id)) },
+                modifier = Modifier.testTag(CHANNEL_MENU_SHOUT_TEST_TAG),
+            )
         }
     }
 }

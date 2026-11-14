@@ -17,6 +17,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import app.mumcord.mobile.R
 import app.mumcord.mobile.design.components.MumcordAppBar
 import app.mumcord.mobile.design.components.MumcordBanner
@@ -35,8 +37,9 @@ const val MORE_DISCONNECT_TEST_TAG = "more-disconnect"
 const val EMPTY_TAB_TEST_TAG = "empty-tab"
 
 /**
- * The frame of the app while connected: the selected tab's screen, the banners, and the bottom
- * tab bar. Chat and Messages are filled by their own tasks.
+ * The frame of the app while connected: the selected tab's screen, the banners, the whisper
+ * bar, the voice bar and the bottom tab bar; or the full voice view, which covers all of it.
+ * Chat and Messages are filled by their own tasks.
  */
 @Composable
 fun ConnectedShell(
@@ -49,6 +52,13 @@ fun ConnectedShell(
 ) {
     BackHandler(enabled = state.searching || state.tab != ConnectedTab.Channels) {
         if (state.tab != ConnectedTab.Channels) actions.selectTab(ConnectedTab.Channels) else actions.closeSearch()
+    }
+    // Hold to talk and hold to whisper work only while the app is on screen (FR-5.21).
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { actions.releaseHolds() }
+    val voice = state.voice
+    if (voice != null && voice.open) {
+        VoiceScreen(voice, state, actions, onDisconnect, onMicrophone, topInsets, bottomInsets)
+        return
     }
     MumcordScreen {
         Box(Modifier.weight(1f)) {
@@ -65,7 +75,10 @@ fun ConnectedShell(
             }
         }
         ConnectedBanners(state, actions::dismissDenied, onMicrophone)
-        // The voice bar (FR-5.22) goes here, between the banners and the tab bar.
+        if (voice != null) {
+            voice.whisper?.let { WhisperBar(it, actions::setWhisperHeld, actions::closeWhisper) }
+            VoiceBar(voice, actions, onDisconnect, onMicrophone)
+        }
         MumcordTabBar(
             tabs = listOf(
                 MumcordTab(MumcordIcons.List, stringResource(R.string.tab_channels)),
@@ -85,7 +98,7 @@ fun ConnectedShell(
  * visible on every tab.
  */
 @Composable
-private fun ConnectedBanners(state: ConnectedUiState, onDismissDenied: () -> Unit, onMicrophone: () -> Unit) {
+internal fun ConnectedBanners(state: ConnectedUiState, onDismissDenied: () -> Unit, onMicrophone: () -> Unit) {
     val reconnecting = state.reconnecting
     val denied = state.denied
     val microphone = state.microphone

@@ -6,6 +6,7 @@ import app.mumcord.mobile.bridge.AudioWanted
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SavedServer
+import app.mumcord.mobile.bridge.TalkMode
 
 /** Everything the screens need to know about the one connection, as an immutable value. */
 data class SessionState(
@@ -26,6 +27,8 @@ data class SessionState(
     val denied: DeniedAction? = null,
     /** Which of the phone's audio streams the engine wants to run right now. */
     val audio: AudioWanted = AudioWanted(capture = false, playback = false),
+    /** How the user talks; voice activity until the saved choice has been read. */
+    val talkMode: TalkMode = TalkMode.VOICE_ACTIVITY,
     /** Things the app cannot show, newest last; see [withHint]. */
     val hints: List<UnsupportedHint> = emptyList(),
 ) {

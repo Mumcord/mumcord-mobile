@@ -33,3 +33,18 @@ fun mockupServer(): ServerState = serverState(
         person(MOCKUP_JONAS, "Jonas", channelId = MOCKUP_GAMING).copy(selfMuted = true, selfDeafened = true),
     ),
 )
+
+const val MOCKUP_ANNA = 1u
+const val MOCKUP_MIRA = 4u
+
+/**
+ * The server of mockup `03-voice-expanded`: everybody is in the Lobby. Anna, Ben talking, Mira,
+ * Jonas muted and Lea, the user.
+ */
+fun mockupVoiceServer(): ServerState = mockupServer().let { server ->
+    server.copy(
+        people = server.people.map {
+            it.copy(channelId = MOCKUP_LOBBY, streaming = false, selfDeafened = false)
+        },
+    )
+}

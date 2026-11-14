@@ -12,6 +12,7 @@ import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.bridge.parseMumbleLink
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -58,7 +59,15 @@ class SessionRepository(
     // the event, and a single reader keeps them in order.
     private val events = Channel<BridgeEvent>(Channel.UNLIMITED)
     private val engineLock = Mutex()
+
+    // Also read without the lock by the commands that must not wait (the hold buttons).
+    @Volatile
     private var engine: MumcordEngineInterface? = null
+
+    private val mutableInputLevel = MutableStateFlow(0)
+
+    /** The microphone level for the level meter, 0 to 100, up to 20 times a second. */
+    val inputLevel: StateFlow<Int> = mutableInputLevel.asStateFlow()
 
     init {
         scope.launch {
@@ -71,10 +80,11 @@ class SessionRepository(
     /** Reads the saved servers once; later changes arrive as events. A failure can be retried. */
     suspend fun loadServers() {
         if (mutableState.value.serversLoaded) return
-        when (val servers = call("load servers") { it.snapshot().servers }) {
+        when (val servers = call("load servers") { it.snapshot().servers to it.talkMode() }) {
             // An event that arrived in between is newer than the snapshot.
             is Outcome.Ok -> mutableState.update {
-                if (it.serversLoaded) it else it.copy(servers = servers.value, serversLoaded = true)
+                val (saved, talkMode) = servers.value
+                if (it.serversLoaded) it.copy(talkMode = talkMode) else it.copy(servers = saved, serversLoaded = true, talkMode = talkMode)
             }
             is Outcome.Failed -> mutableState.update { it.copy(phase = ConnectionPhase.Failed(servers.error)) }
         }
@@ -96,8 +106,11 @@ class SessionRepository(
             is Outcome.Failed -> null
         }
 
+    /** Saves the talk mode; the engine applies it at once. */
     suspend fun setTalkMode(mode: TalkMode): Outcome<Unit> =
-        call("set talk mode") { it.setTalkMode(mode) }
+        call("set talk mode") { it.setTalkMode(mode) }.also { saved ->
+            if (saved is Outcome.Ok) mutableState.update { it.copy(talkMode = mode) }
+        }
 
     /** The target of a `mumble://` link. Nothing is saved or connected by reading it. */
     fun parseLink(url: String): Outcome<MumbleLink> =
@@ -167,6 +180,49 @@ class SessionRepository(
         report(call("set person mute") { it.setPersonLocalMute(session, muted) })
     }
 
+    /** Mutes or unmutes the user; the new state arrives as a change of their own entry. */
+    suspend fun setSelfMute(muted: Boolean) {
+        report(call("set self mute") { it.setSelfMute(muted) })
+    }
+
+    /** Deafens the user, which also mutes them, or ends it. */
+    suspend fun setSelfDeaf(deafened: Boolean) {
+        report(call("set self deaf") { it.setSelfDeaf(deafened) })
+    }
+
+    /**
+     * The hold-to-talk button went down or up. Never waits, so a release always gets through;
+     * without an engine there is nothing to hold.
+     */
+    fun setPushToTalkPressed(pressed: Boolean) {
+        engine?.setPushToTalkPressed(pressed)
+    }
+
+    /**
+     * Sends the user's voice to [target] instead of their channel until [stopWhisper]. False
+     * when it was refused; the reason is then shown like any other refusal.
+     */
+    suspend fun startWhisper(target: WhisperTarget): Boolean =
+        try {
+            engine().startWhisper(target)
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: BridgeException) {
+            // Only the kind is logged; the text can name a person or a channel.
+            log("start whisper failed: ${e.toConnectionError()}")
+            mutableState.update { it.copy(denied = DeniedAction(channelId = null, detail = e.detail)) }
+            false
+        } catch (e: RuntimeException) {
+            report(failed("start whisper", ConnectionError.Internal, e))
+            false
+        }
+
+    /** Ends the whisper or shout. Never waits, so a release always gets through. */
+    fun stopWhisper() {
+        engine?.stopWhisper()
+    }
+
     /**
      * Where the phone's audio streams exchange their samples with the engine, or null while no
      * engine exists. The handles stay valid for the whole process.
@@ -180,10 +236,11 @@ class SessionRepository(
 
     /** A command of the connected screens that failed in the engine is shown like a refusal. */
     private fun report(outcome: Outcome<Unit>) {
-        if (outcome is Outcome.Failed) {
-            mutableState.update { it.copy(denied = DeniedAction(channelId = null, detail = "")) }
-        }
+        if (outcome is Outcome.Failed) reportFailure()
     }
+
+    /** Shows the neutral refusal, for a command whose failure has no words of its own. */
+    fun reportFailure() = mutableState.update { it.copy(denied = DeniedAction(channelId = null, detail = "")) }
 
     /** Puts a shown error away. */
     fun dismissFailure() {
@@ -218,7 +275,11 @@ class SessionRepository(
             engineFactory.create(
                 object : EngineListener {
                     override fun onEvent(event: BridgeEvent) {
-                        events.trySend(event)
+                        if (event is BridgeEvent.InputLevelChanged) {
+                            mutableInputLevel.value = event.percent.toInt()
+                        } else {
+                            events.trySend(event)
+                        }
                     }
                 },
             )

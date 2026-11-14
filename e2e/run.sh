@@ -11,8 +11,9 @@
 #   5. run the scenarios one after the other, each with fresh app data (no remembered server,
 #      certificate or permission answer) and its own state of the local network and the
 #      microphone permission (granted up front, or not, so that the app has to ask), and report
-#      the result. The voice scenario talks to a second person: e2e/voice-peer, the engine
-#      itself running on this machine.
+#      the result. The voice scenarios talk to a second person (and the whisper scenario to
+#      a third who must hear nothing): e2e/voice-peer, the engine itself running on this
+#      machine. What they heard, and for how long, is the other half of each proof.
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
@@ -49,8 +50,11 @@ MICROPHONE_PERMISSION="android.permission.RECORD_AUDIO"
 # The scenarios: "<local network permission> <microphone permission> <second person> <test>".
 # With "granted" a permission is given up front (most tests need the local network to reach the
 # server on the host, and are not about the microphone); with "ask" the app starts without it
-# and the test goes through the app's explanation and the system's dialog. With "peer" a second
-# person is on the server during the test and has to hear the app talk; "alone" otherwise.
+# and the test goes through the app's explanation and the system's dialog. The third word says
+# who else is on the server and what they have to report (see check_peers): "alone" nobody;
+# "peer" a second person who has to hear the app talk; "ptt" the same, and the app may be heard
+# only for as long as hold-to-talk was held; "mute" the same, heard three separate times;
+# "whisper" a second person who has to hear the whisper and a third who must hear nothing.
 SCENARIOS=(
   "granted granted alone ${TEST_PACKAGE}.ConnectFlowTest"
   "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
@@ -58,7 +62,17 @@ SCENARIOS=(
   "granted ask alone ${TEST_PACKAGE}.MicrophoneFlowTest#itIsExplainedWhenTalkingBecomesPossibleThenTheSystemAsksAndAllowingItLeavesNoNotice"
   "granted ask alone ${TEST_PACKAGE}.MicrophoneFlowTest#refusingItKeepsTheConnectionWithANoticeThatLeadsToTheQuestionAndThenToTheSystemSettings"
   "granted granted peer ${TEST_PACKAGE}.VoiceFlowTest"
+  "granted granted ptt ${TEST_PACKAGE}.PushToTalkFlowTest"
+  "granted granted mute ${TEST_PACKAGE}.MuteDeafenFlowTest"
+  "granted granted whisper ${TEST_PACKAGE}.WhisperFlowTest"
 )
+# A stretch of voice a person heard counts from this length (ms); the engine's own short
+# sounds, like the one for somebody entering the channel, are shorter.
+VOICE_SPAN_MS=1000
+# AC-5.6: after hold-to-talk is released, the app may be heard for at most this much longer.
+RELEASE_BOUND_MS=200
+# The name of the third person, who must not hear a whisper.
+BYSTANDER_NAME="e2e-bystander"
 # Seconds the second person may take to connect to the test server.
 PEER_CONNECT_TIMEOUT=40
 # Port of the emulator this script starts; its adb name follows from it.
@@ -70,6 +84,7 @@ APP_APK="${REPO_ROOT}/android/app/build/outputs/apk/debug/app-debug.apk"
 TEST_APK="${REPO_ROOT}/android/e2e/build/outputs/apk/debug/e2e-debug.apk"
 PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/voice-peer"
 PEER_LOG="${OUT_DIR}/voice-peer.log"
+BYSTANDER_LOG="${OUT_DIR}/voice-bystander.log"
 
 step() {
   printf '\ne2e: %s\n' "$*"
@@ -88,33 +103,82 @@ EMULATOR="${ANDROID_HOME}/emulator/emulator"
 
 serial=""
 emulator_pid=""
-peer_pid=""
+peer_pids=()
 server_started=0
 
 adb_device() {
   "${ADB}" -s "${serial}" "$@"
 }
 
-stop_peer() {
-  [[ -n "${peer_pid}" ]] || return 0
-  kill "${peer_pid}" 2>/dev/null || true
-  # Its exit status is that of being stopped, which is not a failure.
-  wait "${peer_pid}" 2>/dev/null || true
-  peer_pid=""
+stop_peers() {
+  local pid
+  for pid in "${peer_pids[@]}"; do
+    kill "${pid}" 2>/dev/null || true
+    # Its exit status is that of being stopped, which is not a failure.
+    wait "${pid}" 2>/dev/null || true
+  done
+  peer_pids=()
 }
 
-# Starts the second person and waits until it is on the server.
+# Starts another person (e2e/voice-peer with the given arguments), who writes to the log file
+# given first, and waits until they are on the server.
 start_peer() {
-  : >"${PEER_LOG}"
-  "${PEER_BINARY}" >"${PEER_LOG}" 2>&1 &
-  peer_pid=$!
-  local waited=0
-  until grep -q '^CONNECTED' "${PEER_LOG}"; do
-    kill -0 "${peer_pid}" 2>/dev/null || die "the second person ended early, see e2e/build/voice-peer.log"
-    ((waited < PEER_CONNECT_TIMEOUT)) || die "the second person did not connect within ${PEER_CONNECT_TIMEOUT} s"
+  local log="$1" pid waited=0
+  shift
+  : >"${log}"
+  "${PEER_BINARY}" "$@" >"${log}" 2>&1 &
+  pid=$!
+  peer_pids+=("${pid}")
+  until grep -q '^CONNECTED' "${log}"; do
+    kill -0 "${pid}" 2>/dev/null || die "a second person ended early, see ${log#"${REPO_ROOT}/"}"
+    ((waited < PEER_CONNECT_TIMEOUT)) || die "a second person did not connect within ${PEER_CONNECT_TIMEOUT} s"
     sleep 1
     waited=$((waited + 1))
   done
+}
+
+# The lengths (ms) of the stretches of voice a person heard that count as voice, one per line.
+voice_spans() {
+  sed -n 's/^SPAN ms=//p' "$1" | awk -v least="${VOICE_SPAN_MS}" '$1 >= least'
+}
+
+# The other half of the proof: what the other people received from the app.
+check_peers() {
+  local kind="$1" report="$2" spans count held longest
+  spans="$(voice_spans "${PEER_LOG}")"
+  count="$(grep -c . <<<"${spans}" || true)"
+  case "${kind}" in
+    peer)
+      grep '^HEARD' "${PEER_LOG}" || die "the second person did not hear the app, see e2e/build/voice-peer.log"
+      ;;
+    ptt)
+      held="$(sed -n 's/^ptt: held_ms=//p' "${report}" | tr -d '\r')"
+      [[ -n "${held}" ]] || die "the test did not report how long hold-to-talk was held"
+      ((count == 1)) || die "the second person heard the app ${count} times instead of once, see e2e/build/voice-peer.log"
+      printf 'e2e: push-to-talk: held %s ms, heard for %s ms (allowed: at most %s ms longer)\n' \
+        "${held}" "${spans}" "${RELEASE_BOUND_MS}"
+      ((spans <= held + RELEASE_BOUND_MS)) || die "the app was heard longer than hold-to-talk was held"
+      # Heard for most of the hold, so the bound above is not met by sending too little.
+      ((spans >= held / 2)) || die "the app was heard for less than half of the hold"
+      ;;
+    mute)
+      printf 'e2e: mute and deafen: the second person heard the app %s times (ms: %s)\n' \
+        "${count}" "$(tr '\n' ' ' <<<"${spans}")"
+      ((count == 3)) || die "the second person should have heard the app three separate times, see e2e/build/voice-peer.log"
+      ;;
+    whisper)
+      held="$(sed -n 's/^whisper: held_ms=//p' "${report}" | tr -d '\r')"
+      [[ -n "${held}" ]] || die "the test did not report how long the whisper was held"
+      longest="$(sed -n 's/^SPAN ms=//p' "${BYSTANDER_LOG}" | sort -n | tail -n 1)"
+      printf 'e2e: whisper: held %s ms, the person whispered to heard %s ms, the third person at most %s ms\n' \
+        "${held}" "${spans:-0}" "${longest:-0}"
+      ((count == 1)) || die "the person whispered to heard the app ${count} times instead of once, see e2e/build/voice-peer.log"
+      ((spans >= held / 2 && spans <= held + RELEASE_BOUND_MS)) \
+        || die "the whisper was not heard for as long as its button was held"
+      [[ -z "$(voice_spans "${BYSTANDER_LOG}")" ]] \
+        || die "the third person heard the whisper, see e2e/build/voice-bystander.log"
+      ;;
+  esac
 }
 
 cleanup() {
@@ -122,7 +186,7 @@ cleanup() {
   trap - EXIT
   set +e
   step "cleaning up"
-  stop_peer
+  stop_peers
   if [[ -n "${serial}" ]]; then
     timeout 20 "${ADB}" -s "${serial}" logcat -d >"${OUT_DIR}/logcat.txt" 2>/dev/null
   fi
@@ -167,7 +231,7 @@ start_emulator() {
 }
 
 mkdir -p "${OUT_DIR}"
-rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" "${PEER_LOG}"
+rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" "${PEER_LOG}" "${BYSTANDER_LOG}"
 trap cleanup EXIT
 
 step "building the app and the tests"
@@ -212,9 +276,14 @@ run_scenario() {
     adb_device shell pm grant "${APP_PACKAGE}" "${MICROPHONE_PERMISSION}" \
       || die "granting the microphone failed"
   fi
-  if [[ "${peer}" == "peer" ]]; then
-    start_peer
-  fi
+  case "${peer}" in
+    alone) ;;
+    whisper)
+      start_peer "${PEER_LOG}" --listen-only
+      start_peer "${BYSTANDER_LOG}" --name "${BYSTANDER_NAME}" --listen-only
+      ;;
+    *) start_peer "${PEER_LOG}" ;;
+  esac
   timeout "${TEST_TIMEOUT}" "${ADB}" -s "${serial}" shell am instrument -w \
     -e serverHost "${HOST_FROM_EMULATOR}" -e serverPort "${MUMCORD_PORT_BASE}" -e class "${test}" \
     "${@:5}" "${TEST_PACKAGE}/${RUNNER}" | tee "${report}" || status=$?
@@ -227,10 +296,9 @@ run_scenario() {
   if ((status != 0)) || ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "${report}"; then
     die "tests failed, see above and e2e/build/logcat.txt"
   fi
-  if [[ "${peer}" == "peer" ]]; then
-    # The other half of the proof: what the second person received from the app.
-    grep '^HEARD' "${PEER_LOG}" || die "the second person did not hear the app, see e2e/build/voice-peer.log"
-    stop_peer
+  if [[ "${peer}" != "alone" ]]; then
+    check_peers "${peer}" "${report}"
+    stop_peers
   fi
 }
 

@@ -38,3 +38,22 @@ fun BridgeException.toConnectionError(): ConnectionError = when (this) {
     is BridgeException.Io -> ConnectionError.Io
     is BridgeException.Internal -> ConnectionError.Internal
 }
+
+/** The text that came with the failure: the server's own words for a refusal, so untrusted. */
+val BridgeException.detail: String
+    get() = when (this) {
+        is BridgeException.NotConnected -> detail
+        is BridgeException.ServerUnreachable -> detail
+        is BridgeException.WrongPassword -> detail
+        is BridgeException.NameInUse -> detail
+        is BridgeException.CertificateRejected -> detail
+        is BridgeException.CertificateChanged -> detail
+        is BridgeException.ServerTooOld -> detail
+        is BridgeException.Banned -> detail
+        is BridgeException.NotFound -> detail
+        is BridgeException.PermissionDenied -> detail
+        is BridgeException.InvalidInput -> detail
+        is BridgeException.SecureStorageUnavailable -> detail
+        is BridgeException.Io -> detail
+        is BridgeException.Internal -> detail
+    }

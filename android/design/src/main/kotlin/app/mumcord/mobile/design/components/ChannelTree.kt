@@ -189,6 +189,7 @@ enum class MumcordAvatarSize(internal val diameter: Dp, internal val fontSize: I
     Medium(32.dp, 14),
     Large(40.dp, 16),
     Sheet(56.dp, 24),
+    Tile(72.dp, 28),
     ExtraLarge(88.dp, 32),
 }
 
