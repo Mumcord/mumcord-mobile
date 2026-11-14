@@ -54,17 +54,18 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 # (ios/Tests/UI) must be listed in exactly one group, or --check-groups fails. The unit tests are
 # one bundle (MumcordTests) and belong to one group as a whole. Balanced by the measured run
 # times, so the groups finish at about the same time.
-TEST_GROUPS=(flows app voice-chat)
+TEST_GROUPS=(app-screens core voice-chat-screens chat-flow)
 group_tests() {
   case "$1" in
-    flows)
-      printf '%s\n' MumcordTests MumcordUITests/LaunchUITests \
-        MumcordUITests/AppFlowUITests MumcordUITests/ChatFlowUITests ;;
-    app)
-      printf '%s\n' MumcordUITests/AppScreenshotUITests MumcordUITests/VoiceFlowUITests ;;
-    voice-chat)
-      printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests \
-        MumcordUITests/DesignReferenceUITests ;;
+    app-screens)
+      printf '%s\n' MumcordUITests/AppScreenshotUITests MumcordUITests/DesignReferenceUITests \
+        MumcordUITests/LaunchUITests ;;
+    core)
+      printf '%s\n' MumcordTests MumcordUITests/AppFlowUITests MumcordUITests/VoiceFlowUITests ;;
+    voice-chat-screens)
+      printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests ;;
+    chat-flow)
+      printf '%s\n' MumcordUITests/ChatFlowUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
   esac
 }
@@ -103,6 +104,8 @@ prepare_simulator() {
     die "simulator '${SIMULATOR_NAME}' is not installed; pick one from the list above with IOS_SIMULATOR=\"<name>\""
   fi
   xcrun simctl boot "${SIMULATOR_NAME}" 2>/dev/null || true
+  # A cold simulator on a fresh machine takes minutes; wait here, where it shows in the log.
+  xcrun simctl bootstatus "${SIMULATOR_NAME}" -b >/dev/null
   xcrun simctl privacy booted grant microphone app.mumcord.mobile ||
     log "warning: could not allow the microphone in the simulator"
 }

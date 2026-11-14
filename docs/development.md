@@ -221,12 +221,16 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 
 | Group | Tests |
 | --- | --- |
-| `flows` | all unit tests (`MumcordTests`), launch test, app flow, chat flow |
-| `app` | app screenshots, voice flow |
-| `voice-chat` | voice screenshots, chat screenshots, design reference |
+| `app-screens` | app screenshots, design reference, launch test |
+| `core` | all unit tests (`MumcordTests`), app flow, voice flow |
+| `voice-chat-screens` | voice screenshots, chat screenshots |
+| `chat-flow` | chat flow (the lightest group: the place for new tests) |
+
+Each group costs about five minutes of simulator start-up on top of its tests, so add a group
+only when the longest one exceeds the others by more than that.
 
 To add a UI test class, put it in `ios/Tests/UI` and add `MumcordUITests/<ClassName>` to the group
-with the shortest run time in `group_tests`; nothing else changes, the CI matrix is generated
+with the shortest run time (see the Actions run) in `group_tests`; nothing else changes, the CI matrix is generated
 from the same list. `scripts/build-ios.sh --check-groups` (a CI job that runs first, works on
 any OS) fails when a UI test class is in no group, in two groups, or a listed class does not
-exist. New unit tests need nothing: the whole unit bundle runs in `flows`.
+exist. New unit tests need nothing: the whole unit bundle runs in `core`.
