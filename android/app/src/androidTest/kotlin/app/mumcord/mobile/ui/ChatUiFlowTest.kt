@@ -3,6 +3,8 @@
 package app.mumcord.mobile.ui
 
 import android.graphics.drawable.GradientDrawable
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.ComposeTimeoutException
@@ -10,7 +12,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -79,6 +81,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -88,7 +91,19 @@ import org.junit.Test
  */
 class ChatUiFlowTest {
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createAndroidComposeRule<ComponentActivity>()
+
+    /**
+     * The app's activity resizes for the keyboard. The bare activity of this test would move
+     * its whole window up instead, on top of the chat's own room for the keyboard, and push
+     * the messages off the screen whenever the keyboard comes up in time.
+     */
+    @Before
+    fun resizeForTheKeyboardLikeTheApp() {
+        compose.activityRule.scenario.onActivity { activity ->
+            activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
+    }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var engine: FakeEngine
