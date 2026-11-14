@@ -38,6 +38,9 @@
 #   E2E_BOOT_TIMEOUT      seconds the emulator may take to boot (default 300)
 #   E2E_TEST_TIMEOUT      seconds one scenario may take (default 600; the longest keeps the
 #                         screen locked for three minutes, so this only ends one that hangs)
+#   E2E_DROP_FIRST_ANSWER set to 1 for debugging the phone call scenario: the network hangs up
+#                         just before the first answer, so the test has to repeat the call
+#                         (the path for an emulator that loses an answered call by itself)
 #   E2E_RELEASE_BOUND_MS  how much longer than a hold the app may be heard (default 200)
 #
 # Logs of the run land in e2e/build/: the test output (instrument.txt), the device log of all
@@ -251,7 +254,7 @@ voice_spans() {
 
 # The other half of the proof: what the other people received from the app.
 check_peers() {
-  local kind="$1" report="$2" spans count held longest
+  local kind="$1" report="$2" spans count held longest lost
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
   if [[ "${kind}" != "chat" && "${kind}" != "pm" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
@@ -271,9 +274,16 @@ check_peers() {
         || die "the second person did not hear the app for the whole time it was locked, see ${peer_log}"
       ;;
     call)
+      # The emulator sometimes loses a call when it is answered; the test then lets
+      # the phone ring again and says so. The moment on hold in between may or may not be
+      # long enough for the second person to hear it as a gap.
+      lost="$(sed -n 's/^phone: lost_answers=//p' "${report}" | tr -d '\r')"
+      [[ -n "${lost}" ]] || die "the test did not report whether the emulator lost the answered call"
+      ((lost == 0)) || printf 'e2e: phone call: the emulator lost %s answered call(s); the test called again\n' "${lost}"
       printf 'e2e: phone call: the second person heard the app %s times (ms: %s)\n' \
         "${count}" "$(tr '\n' ' ' <<<"${spans}")"
-      ((count == 2)) || die "the second person should have heard the app before and after the phone call, see ${peer_log}"
+      ((count >= 2 && count <= 2 + lost)) \
+        || die "the second person should have heard the app before and after the phone call, see ${peer_log}"
       ;;
     lockptt)
       # How exactly the release is timed is the push-to-talk scenario's business. Here the
@@ -477,6 +487,7 @@ run_scenario() {
       start_peer "${PEER_LOG}"
       ;;
     call)
+      [[ "${E2E_DROP_FIRST_ANSWER:-}" != 1 ]] || extra=(-e dropFirstAnswer true)
       start_phone_network
       start_peer "${PEER_LOG}"
       ;;

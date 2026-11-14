@@ -2,9 +2,11 @@
 
 package app.mumcord.mobile.e2e
 
+import android.util.Log
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.test.platform.app.InstrumentationRegistry
 import app.mumcord.mobile.MainActivity
 import app.mumcord.mobile.platform.audio.AudioProbe
 import app.mumcord.mobile.platform.call.SelfVoice
@@ -64,14 +66,45 @@ class PhoneCallFlowTest {
         assertEquals(before, phone.selfVoice())
 
         // Somebody calls. While the phone only rings, the session is not interrupted.
-        phone.network("call")
-        app.await("the phone to ring") { phone.phoneCallState() == PhoneSystem.PHONE_RINGING }
-        assertTrue("Ringing must not interrupt playback", VoiceChecks.speakerLoudFor(RINGING_POLLS))
-        assertEquals("Ringing must not mute", before, phone.selfVoice())
+        ringWithoutInterruption(before)
 
         // The call is accepted: muted and deafened on the server, still in the channel.
+        if (dropFirstAnswer()) {
+            // Debugging switch: the network hangs up just before the answer, so the answer
+            // finds nothing to accept and the phone falls back to idle, as after a lost answer.
+            phone.network("cancel")
+            app.await("the phone to stop ringing (forced loss)") { phone.phoneCallState() == PhoneSystem.PHONE_IDLE }
+        }
         phone.answerPhoneCall()
-        app.await("the phone call to be accepted") { phone.phoneCallState() == PhoneSystem.PHONE_IN_CALL }
+        var lostAnswers = 0
+        if (!acceptedOrLost()) {
+            // The emulator now and then loses a call at the moment it is answered: its modem
+            // reports no calls, the phone books the call as missed (also when no app is
+            // running), and the modem lets nobody else ring until that call is hung up. The
+            // session was on hold for a moment; once it is back, somebody calls again, once.
+            lostAnswers = 1
+            Log.w(LOG_TAG, "the emulator lost the answered call, calling again")
+            phone.network("cancel")
+            Thread.sleep(HANG_UP_MILLIS)
+            app.await("the previous state after the emulator lost the phone call") { phone.selfVoice() == before }
+            app.await("the second person's voice after the emulator lost the phone call") {
+                VoiceChecks.speakerLoudFor(VoiceChecks.STEADY_POLLS)
+            }
+            app.await("the microphone stream to run again after the emulator lost the phone call") {
+                VoiceChecks.microphoneFramesIn(500) > 0
+            }
+            ringWithoutInterruption(before)
+            phone.answerPhoneCall()
+            if (!acceptedOrLost()) {
+                throw AssertionError(
+                    "The emulator lost the answered phone call twice in a row: its simulated modem " +
+                        "reported no calls after the answer. This is the emulator, not the app " +
+                        "(phone state ${phone.phoneCallState()}, voice ${phone.selfVoice()}).",
+                )
+            }
+        }
+        // e2e/run.sh allows the second person one more stretch of voice for a lost call.
+        VoiceChecks.report("phone: lost_answers=$lostAnswers")
         app.await("the user to be muted and deafened during the phone call") {
             phone.selfVoice() == SelfVoice.Silenced
         }
@@ -100,9 +133,35 @@ class PhoneCallFlowTest {
         assertEquals("The session must not be in the recent calls", 0, phone.recentCallsOfTheSession())
     }
 
+    /** Somebody calls, and for three seconds of ringing nothing about the session changes. */
+    private fun ringWithoutInterruption(before: SelfVoice) {
+        phone.network("call")
+        app.await("the phone to ring") { phone.phoneCallState() == PhoneSystem.PHONE_RINGING }
+        assertTrue("Ringing must not interrupt playback", VoiceChecks.speakerLoudFor(RINGING_POLLS))
+        assertEquals("Ringing must not mute", before, phone.selfVoice())
+    }
+
+    /** True when e2e/run.sh was asked (E2E_DROP_FIRST_ANSWER=1) to lose the first answer on purpose. */
+    private fun dropFirstAnswer(): Boolean =
+        InstrumentationRegistry.getArguments().getString("dropFirstAnswer") == "true"
+
+    /** Waits for the answered call: true once the phone is in it, false when it is gone instead. */
+    private fun acceptedOrLost(): Boolean {
+        var state: Int? = null
+        app.await("the phone call to be accepted") {
+            state = phone.phoneCallState()
+            state == PhoneSystem.PHONE_IN_CALL || state == PhoneSystem.PHONE_IDLE
+        }
+        return state == PhoneSystem.PHONE_IN_CALL
+    }
+
     private companion object {
+        const val LOG_TAG = "MumcordE2E"
+
         /** Three seconds of ringing. */
         const val RINGING_POLLS = 12
+        /** For e2e/run.sh to hang up a call the emulator lost, before the next one. */
+        const val HANG_UP_MILLIS = 2_000L
         const val IN_CALL_MILLIS = 5_000L
         const val HEARD_AGAIN_MILLIS = 3_000L
         /** Well over the silence after which the second person reports a stretch as over (0.6 s). */

@@ -134,6 +134,7 @@ class PhoneSystem {
         private const val POLL_MILLIS = 100L
         private const val IDLE_TIMEOUT_MILLIS = 500L
         private const val LOG_TAG = "MumcordE2E"
+        const val PHONE_IDLE = 0
         const val PHONE_RINGING = 1
         const val PHONE_IN_CALL = 2
         private val CALL_STATE = Regex("""mCallState=(\d)""")

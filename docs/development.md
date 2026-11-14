@@ -130,7 +130,11 @@ was on the screen in its failure message.
   background and the screen locked, with voice activity (three minutes) and with
   push-to-talk (one minute, silent while locked); a phone call during a session, for
   which the script plays the phone network through the emulator's console
-  (`adb emu gsm call|cancel`); and the chat with two more people on the host, `e2e/chat-peer`
+  (`adb emu gsm call|cancel`; the emulator occasionally loses a call at the moment
+  it is answered, also with no app running, so the test then lets the phone ring once more
+  and the run prints "the emulator lost 1 answered call(s)"; `E2E_DROP_FIRST_ANSWER=1`
+  forces that path for debugging); and the chat with two more
+  people on the host, `e2e/chat-peer`
   (writes like the desktop app and reports what it receives) and `e2e/raw-chat.py` (sends
   markup a hostile client might send), followed by a restart of the app that must still show
   the history; and private messages, for which `e2e/chat-peer --private` writes to the phone
