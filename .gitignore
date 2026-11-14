@@ -1,0 +1,49 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Engine checkout used by CI and scripts (see engine.lock.toml)
+/.engine/
+
+# Gradle / Android Studio
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Generated bindings and native libraries
+android/engine/src/main/jniLibs/
+android/engine/src/main/kotlin/app/mumcord/mobile/bridge/
+ios/Bridge/*.xcframework/
+ios/Bridge/Generated/
+
+# Design tokens, icons and fonts generated from design/ (ios/Tools/generate_design.py)
+ios/Mumcord/Design/Generated/
+
+# Xcode (the project is generated from ios/project.yml)
+*.xcodeproj/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.xcarchive
+*.ipa
+*.mobileprovision
+*.p12
+*.cer
+
+# Local environment and secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS
+.DS_Store

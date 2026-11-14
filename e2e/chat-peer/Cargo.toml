@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# The second person of the end-to-end chat test: the bridge itself, run on the host next to
+# the test server. Only e2e/run.sh builds and starts it; it is not part of any app.
+[package]
+name = "mumcord-chat-peer"
+description = "Second chat client for the end-to-end tests of the mobile apps"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "chat-peer"
+path = "src/main.rs"
+
+[dependencies]
+mumcord-mobile-bridge = { path = "../../bridge" }
+tokio = { version = "1.54", features = ["rt"] }

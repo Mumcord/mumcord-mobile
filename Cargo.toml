@@ -1,0 +1,18 @@
+# Rust workspace of the mobile apps.
+[workspace]
+resolver = "3"
+# e2e/voice-peer is the second person of the end-to-end voice test; only e2e/run.sh builds it.
+members = ["bridge", "e2e/chat-peer", "e2e/voice-peer"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+license = "AGPL-3.0-only"
+repository = "https://github.com/Mumcord/mumcord-mobile"
+
+[workspace.dependencies]
+# The pinned Mumcord engine. `rev` must be the reference in `engine.lock.toml`; the bridge's
+# build script fails when the two differ. Desktop-only parts stay off (`default-features = false`).
+mumcord-engine = { git = "https://github.com/Mumcord/mumcord", rev = "184549ab03ed9a6873bb513a8ef90dfbe43b682d", default-features = false }
+mumcord-audio = { git = "https://github.com/Mumcord/mumcord", rev = "184549ab03ed9a6873bb513a8ef90dfbe43b682d" }
+mumcord-store = { git = "https://github.com/Mumcord/mumcord", rev = "184549ab03ed9a6873bb513a8ef90dfbe43b682d" }

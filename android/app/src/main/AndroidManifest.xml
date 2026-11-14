@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Talking to Mumble servers is the app's purpose. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+        Since Android 17 a server on the local network (home or office, private addresses) can
+        only be reached with this permission. The app asks for it, with an explanation, when the
+        user connects to such a server.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!-- The secure storage is left out of every backup and transfer; see the two rule files. -->
+    <application
+        android:name=".MumcordApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- mumble:// links from other apps. The app shows the target and asks before connecting. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mumble" />
+            </intent-filter>
+        </activity>
+        <!--
+            Hands the system camera app the file for a photo the user takes for the chat. Not
+            exported: other apps only reach a file through the one-time grant of that request.
+            The app itself has no CAMERA permission and must not declare one, or Android would
+            demand it for the camera app's capture request too.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+</manifest>

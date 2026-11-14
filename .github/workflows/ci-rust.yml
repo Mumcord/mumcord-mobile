@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Formatting, lints and tests of the Rust workspace (the bridge on top of the Mumcord engine).
+name: CI Rust
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Format, lint and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # cmake builds Opus from source; the audio device layer of the engine links ALSA and
+      # PipeWire (bindings generated with libclang), its secret storage links D-Bus.
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev
+
+      # Version, components and targets come from rust-toolchain.toml.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # The bridge's live test skips itself without MUMCORD_LIVE=1, so no test server is needed.
+      - name: Test
+        run: cargo test --workspace
