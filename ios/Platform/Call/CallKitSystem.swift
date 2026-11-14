@@ -5,16 +5,17 @@ import CallKit
 
 /// The one place that decides whether voice sessions are shown to the phone as calls.
 enum CallSystems {
-    /// Creates the phone's call service, or nil where sessions are no calls to the phone and
-    /// their audio runs as the app's own audio session instead (see `CallSession`).
+    /// The phone's call service, or nil where sessions are no calls to the phone and their
+    /// audio runs as the app's own audio session instead (see `CallSession`). Called once, at
+    /// the start of the app: the system wants one call service per process and wants to know
+    /// of it before the first call is asked for.
     ///
-    /// The simulator gets none: its call service ends an outgoing call by itself after a
-    /// moment because it has no call screen, which would end every session started there.
-    static func make(log: @escaping (String) -> Void) -> (() -> CallSystem)? {
+    /// The simulator gets none: its call service does not take outgoing calls.
+    static func make(log: @escaping (String) -> Void) -> CallSystem? {
         #if targetEnvironment(simulator)
         return nil
         #else
-        return { CallKitSystem(log: log) }
+        return CallKitSystem(log: log)
         #endif
     }
 }

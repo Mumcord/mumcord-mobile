@@ -48,15 +48,10 @@ final class VoiceCallTests: XCTestCase {
             scheduler: QueueAudioScheduler(),
             log: { _ in }
         )
-        var makeCallSystem: (() -> CallSystem)?
-        if callSystem {
-            let system = system
-            makeCallSystem = { system }
-        }
         let call = VoiceCall(
             store: store,
             audio: audio,
-            makeCallSystem: makeCallSystem,
+            callSystem: callSystem ? system : nil,
             prepareAudio: {},
             markers: markers,
             log: { _ in }

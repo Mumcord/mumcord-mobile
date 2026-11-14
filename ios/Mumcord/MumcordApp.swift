@@ -68,7 +68,7 @@ extension AppModel {
         let call = VoiceCall(
             store: store,
             audio: audio,
-            makeCallSystem: CallSystems.make(log: AppLog.write),
+            callSystem: CallSystems.make(log: AppLog.write),
             prepareAudio: { voiceSession.prepare() },
             markers: SessionMarkerStore(),
             log: AppLog.write

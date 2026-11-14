@@ -248,7 +248,7 @@ Whether sessions are calls at all is decided in exactly one place, `CallSystems.
 call, the session runs on the app's own audio session instead: voice still works in the
 background (background mode `audio`), but iOS shows no call, has no mute or end button for it,
 and a phone call only pauses the audio on the phone instead of muting and deafening on the server.
-The simulator always takes this path, because its call service ends outgoing calls by itself.
+The simulator always takes this path, because its call service does not take outgoing calls.
 
 Only a real iPhone can show: the call screen and the lock screen, a real phone call holding the
 session, car systems, the recent calls list, and how long iOS keeps the app alive.

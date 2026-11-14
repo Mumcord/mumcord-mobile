@@ -65,7 +65,8 @@ final class FakeCallSystem: CallSystem {
 /// A voice session as a call of the phone (FR-5.31, FR-5.32), against a faked call service.
 final class CallSessionTests: XCTestCase {
     private let system = FakeCallSystem()
-    private var systemsMade = 0
+    /// The sessions of a test; the call service does not keep its session alive.
+    private var sessions: [CallSession] = []
     private var prepared = 0
     private var muted: [Bool] = []
     private var leaves = 0
@@ -77,15 +78,8 @@ final class CallSessionTests: XCTestCase {
     private let lobby = CallInfo(serverName: "Nordlicht", channelName: "Lobby", muted: false, deafened: false)
 
     private func makeSession(callSystem: Bool = true) -> CallSession {
-        var makeSystem: (() -> CallSystem)?
-        if callSystem {
-            makeSystem = { [unowned self] in
-                self.systemsMade += 1
-                return self.system
-            }
-        }
-        return CallSession(
-            makeSystem: makeSystem,
+        let session = CallSession(
+            system: callSystem ? system : nil,
             prepareAudio: { [unowned self] in self.prepared += 1 },
             onMuted: { [unowned self] in self.muted.append($0) },
             onLeave: { [unowned self] in self.leaves += 1 },
@@ -94,6 +88,8 @@ final class CallSessionTests: XCTestCase {
             after: { [unowned self] seconds, work in self.timers.append((seconds, work)) },
             log: { [unowned self] in self.log.append($0) }
         )
+        sessions.append(session)
+        return session
     }
 
     /// A session whose call the system has taken and given the audio to.
@@ -141,11 +137,10 @@ final class CallSessionTests: XCTestCase {
         XCTAssertEqual(leaves, 0)
     }
 
-    func testTheCallServiceIsCreatedOnceForAllSessions() {
+    func testEverySessionIsACallOfItsOwn() {
         let session = makeRunning()
         session.follow(nil)
         session.follow(lobby)
-        XCTAssertEqual(systemsMade, 1)
         XCTAssertEqual(system.calls.count, 2)
         XCTAssertNotEqual(system.calls[0], system.calls[1])
     }
@@ -246,7 +241,7 @@ final class CallSessionTests: XCTestCase {
         let session = makeSession(callSystem: false)
         session.follow(lobby)
         session.follow(nil)
-        XCTAssertEqual(systemsMade, 0)
+        XCTAssertEqual(system.requests, [])
         XCTAssertEqual(prepared, 0)
         XCTAssertEqual(activations, [])
         XCTAssertEqual(interruptions, [.sessionEnded])

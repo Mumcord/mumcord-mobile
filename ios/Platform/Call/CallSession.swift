@@ -54,7 +54,7 @@ final class CallSession: CallSystemDelegate {
         var running = false
     }
 
-    private let makeSystem: (() -> CallSystem)?
+    private let system: CallSystem?
     private let prepareAudio: () -> Void
     private let onMuted: (Bool) -> Void
     private let onLeave: () -> Void
@@ -63,7 +63,6 @@ final class CallSession: CallSystemDelegate {
     private let after: (TimeInterval, @escaping () -> Void) -> Void
     private let log: (String) -> Void
 
-    private var system: CallSystem?
     private var shown: CallInfo?
     private var call: Call?
     private var held = false
@@ -71,8 +70,7 @@ final class CallSession: CallSystemDelegate {
     private var activated = false
 
     /// - Parameters:
-    ///   - makeSystem: creates the phone's call service when the first session begins (the
-    ///     system wants it only once per process), or nil when sessions are not shown as calls.
+    ///   - system: the phone's call service, or nil when sessions are not shown as calls.
     ///   - prepareAudio: sets the audio session up for voice without starting it.
     ///   - onMuted: the system's mute button asks to mute or unmute.
     ///   - onLeave: the call was ended outside the app; leaves the server.
@@ -80,7 +78,7 @@ final class CallSession: CallSystemDelegate {
     ///   - onActivation: says who starts the audio, see `AudioActivation`.
     ///   - after: runs work on the main thread after some seconds.
     init(
-        makeSystem: (() -> CallSystem)?,
+        system: CallSystem?,
         prepareAudio: @escaping () -> Void,
         onMuted: @escaping (Bool) -> Void,
         onLeave: @escaping () -> Void,
@@ -91,7 +89,8 @@ final class CallSession: CallSystemDelegate {
         },
         log: @escaping (String) -> Void
     ) {
-        self.makeSystem = makeSystem
+        self.system = system
+        system?.delegate = self
         self.prepareAudio = prepareAudio
         self.onMuted = onMuted
         self.onLeave = onLeave
@@ -119,7 +118,7 @@ final class CallSession: CallSystemDelegate {
     }
 
     private func begin(_ first: CallInfo) {
-        guard let system = callSystem() else { return }
+        guard let system else { return }
         let id = UUID()
         call = Call(id: id)
         activated = false
@@ -152,15 +151,6 @@ final class CallSession: CallSystemDelegate {
                 self.onActivation(.own)
             }
         }
-    }
-
-    private func callSystem() -> CallSystem? {
-        if system == nil, let makeSystem {
-            let created = makeSystem()
-            created.delegate = self
-            system = created
-        }
-        return system
     }
 
     private func end() {

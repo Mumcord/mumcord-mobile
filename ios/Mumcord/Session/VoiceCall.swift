@@ -17,14 +17,14 @@ final class VoiceCall {
     private var lastMarkerStep = MarkerStep.keep
 
     /// - Parameters:
-    ///   - makeCallSystem: creates the phone's call service, or nil when sessions are not
-    ///     shown to the phone as calls (`CallSystems.make`).
+    ///   - callSystem: the phone's call service, or nil when sessions are not shown to the
+    ///     phone as calls (`CallSystems.make`).
     ///   - prepareAudio: sets the audio session up for voice without starting it.
     ///   - log: receives short technical messages without personal data.
     init(
         store: SessionStore,
         audio: VoiceAudio,
-        makeCallSystem: (() -> CallSystem)?,
+        callSystem: CallSystem?,
         prepareAudio: @escaping () -> Void,
         markers: SessionMarkerStore,
         log: @escaping @Sendable (String) -> Void
@@ -41,7 +41,7 @@ final class VoiceCall {
         }
         self.interruptions = interruptions
         session = CallSession(
-            makeSystem: makeCallSystem,
+            system: callSystem,
             prepareAudio: prepareAudio,
             onMuted: control.setMuted,
             onLeave: control.leave,

@@ -23,14 +23,18 @@ final class CallKitSystemTests: XCTestCase {
         var log: [String] = []
         let system = CallKitSystem(log: { log.append($0) })
         let call = UUID()
-        let answered = XCTestExpectation(description: "the system answers the request for a call")
         var accepted = false
-        system.start(call, name: "Test") {
-            accepted = $0
-            answered.fulfill()
+        // The system learns of a new call service a moment after it was created.
+        for _ in 0..<3 where !accepted {
+            try await Task.sleep(nanoseconds: 1_000_000_000)
+            let answered = XCTestExpectation(description: "the system answers the request for a call")
+            system.start(call, name: "Test") {
+                accepted = $0
+                answered.fulfill()
+            }
+            let outcome = await XCTWaiter().fulfillment(of: [answered], timeout: 20)
+            try XCTSkipUnless(outcome == .completed, "skipped: the simulator's call service did not answer")
         }
-        let outcome = await XCTWaiter().fulfillment(of: [answered], timeout: 20)
-        try XCTSkipUnless(outcome == .completed, "skipped: the simulator's call service did not answer")
         try XCTSkipUnless(accepted, "skipped: the simulator's call service refused the call: \(log)")
 
         system.rename(call, name: "Test · Renamed")
