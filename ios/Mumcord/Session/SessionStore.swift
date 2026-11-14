@@ -22,6 +22,9 @@ final class SessionStore: @unchecked Sendable {
     private let lock = NSLock()
     private var current = SessionState()
     private var observers: [UUID: AsyncStream<SessionState>.Continuation] = [:]
+    private var levelObservers: [UUID: AsyncStream<Int>.Continuation] = [:]
+    /// The engine once it exists, for the commands that must never wait (a button let go).
+    private var createdEngine: EngineClient?
     private let engine: EngineHolder
     private let log: @Sendable (String) -> Void
     private let linkParser: @Sendable (String) throws -> MumbleLink
@@ -43,7 +46,11 @@ final class SessionStore: @unchecked Sendable {
         engine = EngineHolder(factory: engineFactory, listener: QueueingListener(queue: queue))
         Task.detached { [weak self] in
             for await event in events {
-                self?.update { $0.fold(event) }
+                if case .inputLevelChanged(let percent) = event {
+                    self?.publishInputLevel(Int(percent))
+                } else {
+                    self?.update { $0.fold(event) }
+                }
             }
         }
     }
@@ -78,7 +85,28 @@ final class SessionStore: @unchecked Sendable {
     private func removeObserver(_ id: UUID) {
         lock.lock()
         observers[id] = nil
+        levelObservers[id] = nil
         lock.unlock()
+    }
+
+    /// The microphone level for the level meter, 0 to 100, up to 20 times a second. Only the
+    /// newest value is kept for a reader that is behind.
+    func inputLevels() -> AsyncStream<Int> {
+        let id = UUID()
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            lock.lock()
+            levelObservers[id] = continuation
+            lock.unlock()
+            continuation.onTermination = { [weak self] _ in self?.removeObserver(id) }
+        }
+    }
+
+    private func publishInputLevel(_ percent: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        for observer in levelObservers.values {
+            observer.yield(percent)
+        }
     }
 
     private func update(_ change: (SessionState) -> SessionState) {
@@ -107,6 +135,14 @@ final class SessionStore: @unchecked Sendable {
                 next.servers = servers
                 next.serversLoaded = true
                 return next
+            }
+            // The engine exists now; nothing else reports the talk mode it has saved.
+            if case .ok(let mode) = await call("read talk mode", { try await $0.talkMode() }) {
+                update { state in
+                    var next = state
+                    next.talkMode = mode
+                    return next
+                }
             }
         case .failed(let error):
             update { state in
@@ -138,7 +174,73 @@ final class SessionStore: @unchecked Sendable {
     }
 
     func setTalkMode(_ mode: TalkMode) async -> Outcome<Void> {
-        await call("set talk mode") { try await $0.setTalkMode(mode: mode) }
+        let outcome: Outcome<Void> = await call("set talk mode") { try await $0.setTalkMode(mode: mode) }
+        if case .ok = outcome {
+            update { state in
+                var next = state
+                next.talkMode = mode
+                return next
+            }
+        }
+        return outcome
+    }
+
+    /// Switches the talk mode while connected; a failure is shown like a refusal.
+    func changeTalkMode(_ mode: TalkMode) async {
+        report(await setTalkMode(mode))
+    }
+
+    // MARK: Voice
+
+    /// The engine's handles for the audio threads, or nil while the engine does not exist.
+    func audioEndpoints() -> AudioEndpoints? {
+        engineNow()?.audioEndpoints()
+    }
+
+    /// The hold-to-talk button went down or up. Never waits, so a release always gets through.
+    func setPushToTalkPressed(_ pressed: Bool) {
+        engineNow()?.setPushToTalkPressed(pressed: pressed)
+    }
+
+    func setSelfMute(_ muted: Bool) async {
+        report(await call("set self mute") { try await $0.setSelfMute(muted: muted) })
+    }
+
+    func setSelfDeaf(_ deafened: Bool) async {
+        report(await call("set self deaf") { try await $0.setSelfDeaf(deafened: deafened) })
+    }
+
+    /// Sends the user's voice to `target` instead of their channel until `stopWhisper`. False
+    /// when it was refused; the reason is then shown like any other refusal.
+    func startWhisper(_ target: WhisperTarget) async -> Bool {
+        do {
+            let client = try await engine.get()
+            try await client.startWhisper(target: target)
+            return true
+        } catch let error as BridgeError {
+            // Only the kind is logged; the text can name a person or a channel.
+            log("start whisper failed: \(error.connectionError)")
+            update { state in
+                var next = state
+                next.denied = DeniedAction(channelId: nil, detail: error.detail)
+                return next
+            }
+            return false
+        } catch {
+            report(failed("start whisper", error))
+            return false
+        }
+    }
+
+    /// Ends the whisper or shout. Never waits, so a release always gets through.
+    func stopWhisper() {
+        engineNow()?.stopWhisper()
+    }
+
+    private func engineNow() -> EngineClient? {
+        lock.lock()
+        defer { lock.unlock() }
+        return createdEngine
     }
 
     /// The target of a `mumble://` link. Nothing is saved or connected by reading it.
@@ -268,7 +370,9 @@ final class SessionStore: @unchecked Sendable {
         _ command: (EngineClient) async throws -> Value
     ) async -> Outcome<Value> {
         do {
-            return .ok(try await command(try await engine.get()))
+            let client = try await engine.get()
+            lock.withLock { createdEngine = client }
+            return .ok(try await command(client))
         } catch {
             return failed(name, error)
         }

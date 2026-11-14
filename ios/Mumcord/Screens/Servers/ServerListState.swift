@@ -33,7 +33,7 @@ struct ServerRow: Equatable, Identifiable {
     let highlighted: Bool
 }
 
-func serverRows(session: SessionState, pings: [Int64: PingState]) -> [ServerRow] {
+func serverRows(session: SessionState, pings: [Int64: PingState], checkingServerId: Int64? = nil) -> [ServerRow] {
     session.servers.enumerated().map { index, server in
         ServerRow(
             id: server.id,
@@ -41,7 +41,8 @@ func serverRows(session: SessionState, pings: [Int64: PingState]) -> [ServerRow]
             initials: initials(server.name),
             address: displayAddress(server.address, port: server.port),
             ping: pings[server.id],
-            connecting: session.isBusy && session.activeServerId == server.id,
+            // Looking at the address is already part of connecting.
+            connecting: server.id == checkingServerId || (session.isBusy && session.activeServerId == server.id),
             highlighted: index == 0
         )
     }

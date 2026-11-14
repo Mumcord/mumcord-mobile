@@ -14,6 +14,15 @@ import Observation
 final class AppModel {
     @ObservationIgnored let store: SessionStore
     @ObservationIgnored private let setupStore: SetupStore
+    @ObservationIgnored let microphone: MicrophoneAccess
+    @ObservationIgnored private let localNetwork: LocalNetworkGateway
+    /// Opens the app's page in the system settings.
+    @ObservationIgnored let openSettings: () -> Void
+    /// The look at a server's address before its connection starts.
+    @ObservationIgnored private var addressCheck: Task<Void, Never>?
+    /// The microphone level, 0 to 100. An object of its own: it changes up to 20 times a
+    /// second, and only the level meter reads it.
+    @ObservationIgnored let inputLevel = InputLevel()
     /// The last connect, so "Try again" and the password retry keep a link's channel.
     @ObservationIgnored private var lastTarget: ConnectTarget?
 
@@ -21,16 +30,39 @@ final class AppModel {
     private var local: AppUiState
     private var session = SessionState()
     var connectedLocal = ConnectedLocal()
+    private var microphoneNotice = MicrophoneNotice.none
 
-    init(store: SessionStore, setupStore: SetupStore) {
+    init(
+        store: SessionStore,
+        setupStore: SetupStore,
+        microphone: MicrophoneAccess,
+        localNetwork: LocalNetworkGateway,
+        openSettings: @escaping () -> Void
+    ) {
         self.store = store
         self.setupStore = setupStore
+        self.microphone = microphone
+        self.localNetwork = localNetwork
+        self.openSettings = openSettings
         local = AppUiState(setupDone: setupStore.firstStartDone)
         let states = store.states()
         Task { [weak self] in
             for await state in states {
                 guard let self else { return }
                 self.apply(state)
+            }
+        }
+        let notices = microphone.notices()
+        Task { [weak self] in
+            for await notice in notices {
+                guard let self else { return }
+                self.microphoneNotice = notice
+            }
+        }
+        let levels = store.inputLevels()
+        Task { [inputLevel] in
+            for await percent in levels {
+                inputLevel.percent = percent
             }
         }
         Task { await store.loadServers() }
@@ -42,18 +74,44 @@ final class AppModel {
         merged.connected = connectedUiState(
             session: session,
             local: connectedLocal,
-            serverName: merged.activeServerName ?? ""
+            serverName: merged.activeServerName ?? "",
+            microphone: microphoneNotice
         )
         return merged
     }
 
     private func apply(_ state: SessionState) {
         let serversChanged = state.servers != session.servers
+        let previousPhase = session.phase
         session = state
         if serversChanged { ping(state.servers) }
-        // The end of a connection starts the connected screens afresh.
-        if !state.showsServer, connectedLocal != ConnectedLocal() {
-            connectedLocal = ConnectedLocal()
+        if !state.showsServer {
+            // The end of a connection starts the connected screens afresh.
+            releaseHolds()
+            if connectedLocal != ConnectedLocal() { connectedLocal = ConnectedLocal() }
+        } else if let target = connectedLocal.whisperTarget, state.server?.whisperName(target) == nil {
+            // The whisper bar goes away with the person or channel it is for.
+            closeWhisper()
+        }
+        if state.phase != previousPhase { askSystemAboutLocalNetwork(state) }
+    }
+
+    /// After a server on a local or private address could not be reached: asks the system
+    /// whether it refuses local network access, which is the only moment iOS tells. The error
+    /// is on screen meanwhile; it only becomes more exact.
+    private func askSystemAboutLocalNetwork(_ state: SessionState) {
+        guard state.phase == .failed(.serverUnreachable),
+              let serverId = state.activeServerId,
+              serverId == local.localNetworkSuspectServerId,
+              let server = server(serverId)
+        else { return }
+        Task {
+            guard await localNetwork.accessRefused(host: server.address, port: server.port) else { return }
+            // Only while that failure is still the one on screen.
+            if session.phase == .failed(.serverUnreachable), session.activeServerId == serverId,
+               local.localNetworkSuspectServerId == serverId {
+                local.localNetworkDeniedServerId = serverId
+            }
         }
     }
 
@@ -199,17 +257,44 @@ final class AppModel {
         }
     }
 
-    private func start(_ target: ConnectTarget) {
+    /// Connects, unless the server is on the local network and the user has not been told yet
+    /// that iOS will ask for access to it: then the reason is explained first (FR-5.8).
+    /// `explained` is true when that explanation has just been continued.
+    private func start(_ target: ConnectTarget, explained: Bool = false) {
+        guard let server = server(target.serverId) else { return }
         lastTarget = target
+        addressCheck?.cancel()
         local.overlay = nil
         local.editing = false
-        Task {
+        local.checkingServerId = target.serverId
+        local.localNetworkSuspectServerId = nil
+        local.localNetworkDeniedServerId = nil
+        addressCheck = Task {
+            let check = await localNetwork.check(host: server.address)
+            if Task.isCancelled { return }
+            local.checkingServerId = nil
+            if check.step == .explain && !explained {
+                // An error of an earlier attempt would otherwise stay behind the question.
+                store.dismissFailure()
+                local.overlay = .localNetwork(target: target, serverName: server.name)
+                return
+            }
+            local.localNetworkSuspectServerId = check.suspect ? target.serverId : nil
             await store.connectServer(target.serverId, password: target.password, channelPath: target.channelPath)
         }
     }
 
+    /// The explanation was read: connect, which makes iOS ask for local network access.
+    func continueLocalNetwork() {
+        guard case .localNetwork(let target, _) = local.overlay else { return }
+        localNetwork.explained = true
+        start(target, explained: true)
+    }
+
     /// Ends the connection, also while it is still being made.
     func disconnect() {
+        addressCheck?.cancel()
+        local.checkingServerId = nil
         Task { await store.disconnect() }
     }
 
@@ -248,7 +333,31 @@ final class AppModel {
     }
 
     func dismissError() {
+        local.localNetworkSuspectServerId = nil
+        local.localNetworkDeniedServerId = nil
         store.dismissFailure()
+    }
+
+    // MARK: Microphone
+
+    /// The explanation was put away: the user keeps listening and a notice says so.
+    func microphoneNotNow() {
+        microphone.notNow()
+    }
+
+    /// What the explanation's button and the notice do: lets the system ask, or opens the
+    /// system settings once the system no longer asks.
+    func requestMicrophone() {
+        if microphoneNotice == .blocked {
+            openSettings()
+        } else {
+            microphone.ask()
+        }
+    }
+
+    /// The app is on screen again: the permission may have changed in the system settings.
+    func recheckMicrophone() {
+        microphone.recheck()
     }
 
     // MARK: mumble:// links

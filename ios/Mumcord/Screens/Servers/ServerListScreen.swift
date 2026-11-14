@@ -20,12 +20,13 @@ struct ServerListScreen: View {
     let onRemove: (Int64) -> Void
     let onRetry: () -> Void
     let onDismissError: () -> Void
+    let onOpenSettings: () -> Void
 
     var body: some View {
         MumcordScreen {
             MumcordAppBar(title: Strings.serversTitle, large: true)
             if let failure {
-                FailureBanner(failure: failure, onRetry: onRetry, onDismiss: onDismissError)
+                FailureBanner(failure: failure, onRetry: onRetry, onDismiss: onDismissError, onOpenSettings: onOpenSettings)
             }
             // Nothing to show before the list is read; an empty state would flash by.
             if loaded {
@@ -158,13 +159,24 @@ private struct FailureBanner: View {
     let failure: ConnectFailure
     let onRetry: () -> Void
     let onDismiss: () -> Void
+    let onOpenSettings: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MumcordBanner(text: failure.error.message, title: title, icon: MumcordIcons.alert, tone: .danger)
+            MumcordBanner(text: message, title: title, icon: MumcordIcons.alert, tone: .danger)
             HStack(spacing: MumcordSpace.s2) {
-                MumcordButton(text: retryText, small: true, action: onRetry)
-                    .accessibilityIdentifier("connect-retry")
+                if failure.localNetwork != nil {
+                    // iOS only lets the user change local network access in its settings.
+                    MumcordButton(text: Strings.localNetworkOpenSettings, small: true, action: onOpenSettings)
+                        .accessibilityIdentifier("local-network-settings")
+                }
+                MumcordButton(
+                    text: retryText,
+                    style: failure.localNetwork == nil ? .primary : .secondary,
+                    small: true,
+                    action: onRetry
+                )
+                .accessibilityIdentifier("connect-retry")
                 MumcordButton(text: Strings.errorDismiss, style: .ghost, small: true, action: onDismiss)
             }
             .padding(.horizontal, MumcordSpace.s4)
@@ -184,13 +196,21 @@ private struct FailureBanner: View {
         return Strings.errorTitle
     }
 
+    private var message: String {
+        switch failure.localNetwork {
+        case .denied: Strings.localNetworkDenied
+        case .suspected: Strings.localNetworkSuspected
+        case nil: failure.error.message
+        }
+    }
+
     private var retryText: String {
         // A wrong password is not fixed by trying again: the button asks for it instead.
         failure.error == .wrongPassword && failure.serverName != nil ? Strings.errorEnterPassword : Strings.errorRetry
     }
 
     private func announce() {
-        let spoken: String = title + " " + failure.error.message
+        let spoken: String = title + " " + message
         AccessibilityNotification.Announcement(spoken).post()
     }
 }

@@ -74,8 +74,11 @@ extension SessionState {
             }
         case .actionDenied(let channelId, let detail):
             next.denied = DeniedAction(channelId: channelId, detail: detail)
-        // Voice phase: the audio session and the input level meter are not built yet.
-        case .audioWantedChanged, .inputLevelChanged:
+        case .audioWantedChanged(let audio):
+            next.audio = audio
+        // Up to 20 times a second and only for the level meter: it has its own path in the
+        // store, so that it does not make every screen compare its state.
+        case .inputLevelChanged:
             break
         // Chat phase: messages, unread counts, message requests and blocked people.
         case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,

@@ -37,6 +37,14 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _channelPasswords: [UInt32: String] = [:]
     private var _deniedChannels: Set<UInt32> = []
     private var _talkMode = TalkMode.voiceActivity
+    private var _audioOnConnect = AudioWanted(capture: true, playback: true)
+    private var _pushToTalkCalls: [Bool] = []
+    private var _whisperStarts: [WhisperTarget] = []
+    private var _whisperStops = 0
+    private var _whisperFailure: BridgeError?
+    private var _levelOnConnect: UInt8?
+    /// The user's own mute before a deafen, which comes back when the deafen ends.
+    private var mutedBeforeDeafen = false
     private var people: [UInt32: Person]
     private var connection = ConnectionState.disconnected(error: nil)
     private var storedServers: [SavedServer]
@@ -70,6 +78,30 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     var joinCalls: [(channelId: UInt32, password: String?)] { locked { _joinCalls } }
     var volumeCalls: [(session: UInt32, percent: Int)] { locked { _volumeCalls } }
     var currentTalkMode: TalkMode { locked { _talkMode } }
+    /// Every press (true) and release (false) of the hold-to-talk button, in order.
+    var pushToTalkCalls: [Bool] { locked { _pushToTalkCalls } }
+    var whisperStarts: [WhisperTarget] { locked { _whisperStarts } }
+    var whisperStops: Int { locked { _whisperStops } }
+    /// The talk mode the engine has saved before the app asks for it.
+    var savedTalkMode: TalkMode {
+        get { locked { _talkMode } }
+        set { locked { _talkMode = newValue } }
+    }
+    /// What the engine wants from the phone's audio once connected.
+    var audioOnConnect: AudioWanted {
+        get { locked { _audioOnConnect } }
+        set { locked { _audioOnConnect = newValue } }
+    }
+    /// The microphone level the engine reports once connected.
+    var levelOnConnect: UInt8? {
+        get { locked { _levelOnConnect } }
+        set { locked { _levelOnConnect = newValue } }
+    }
+    /// Thrown by every `startWhisper` while set.
+    var whisperFailure: BridgeError? {
+        get { locked { _whisperFailure } }
+        set { locked { _whisperFailure = newValue } }
+    }
 
     /// What each server answers to a ping; a server without an entry does not answer.
     var pings: [Int64: ServerPing] {
@@ -158,6 +190,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func disconnect() async throws {
         locked { _disconnects += 1 }
+        emit(.audioWantedChanged(audio: AudioWanted(capture: false, playback: false)))
         emit(.connectionChanged(state: .disconnected(error: nil)))
     }
 
@@ -260,6 +293,52 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         }
     }
 
+    func talkMode() async throws -> TalkMode {
+        locked { _talkMode }
+    }
+
+    func audioEndpoints() -> AudioEndpoints {
+        // 0 means "no engine" to the audio functions: a push is dropped, a pull is silence.
+        AudioEndpoints(capture: 0, playback: 0)
+    }
+
+    func setPushToTalkPressed(pressed: Bool) {
+        locked { _pushToTalkCalls.append(pressed) }
+        change(server.selfSession) { $0.talking = pressed }
+    }
+
+    /// As the engine: unmuting also ends a deafen.
+    func setSelfMute(muted: Bool) async throws {
+        change(server.selfSession) {
+            $0.selfMuted = muted
+            if !muted { $0.selfDeafened = false }
+        }
+    }
+
+    /// As the engine: deafening also mutes, and the mute goes back to what it was afterwards.
+    func setSelfDeaf(deafened: Bool) async throws {
+        change(server.selfSession) {
+            if deafened {
+                mutedBeforeDeafen = $0.selfMuted
+                $0.selfMuted = true
+            } else {
+                $0.selfMuted = mutedBeforeDeafen
+            }
+            $0.selfDeafened = deafened
+        }
+    }
+
+    func startWhisper(target: WhisperTarget) async throws {
+        try locked {
+            if let failure = _whisperFailure { throw failure }
+            _whisperStarts.append(target)
+        }
+    }
+
+    func stopWhisper() {
+        locked { _whisperStops += 1 }
+    }
+
     func setTalkMode(mode: TalkMode) async throws {
         try locked {
             if let failure = _talkModeFailure {
@@ -291,6 +370,10 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private func finishConnecting() {
         emit(.connectionChanged(state: .connected))
         emit(.serverSynced(server: server))
+        emit(.audioWantedChanged(audio: audioOnConnect))
+        if let level = levelOnConnect {
+            emit(.inputLevelChanged(percent: level))
+        }
     }
 }
 #endif

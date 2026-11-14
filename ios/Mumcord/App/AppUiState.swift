@@ -24,6 +24,8 @@ enum Overlay: Equatable {
     case confirmRemove(server: SavedServer)
     /// After a wrong or missing server password: type it and try again.
     case enterPassword(target: ConnectTarget, serverName: String, password: String)
+    /// Why iOS will ask for local network access when the connection to `target` starts.
+    case localNetwork(target: ConnectTarget, serverName: String)
     case link(LinkConfirmState)
     case invalidLink
 }
@@ -41,6 +43,13 @@ struct AppUiState: Equatable {
     /// The open add or edit form, or nil.
     var form: ServerFormState?
     var overlay: Overlay?
+    /// The server whose address is being looked at before its connection starts.
+    var checkingServerId: Int64?
+    /// The server on a local or private address that is being connected to: if it cannot be
+    /// reached, missing local network access may be the reason.
+    var localNetworkSuspectServerId: Int64?
+    /// The server that was not reached because the system refuses local network access.
+    var localNetworkDeniedServerId: Int64?
     /// The connected screens, or nil while no server is shown.
     var connected: ConnectedUiState?
 
@@ -51,7 +60,9 @@ struct AppUiState: Equatable {
         return .serverList
     }
 
-    var serverRows: [ServerRow] { Mumcord.serverRows(session: session, pings: pings) }
+    var serverRows: [ServerRow] {
+        Mumcord.serverRows(session: session, pings: pings, checkingServerId: checkingServerId)
+    }
 
     /// The name of the server of the current connection, attempt or failure.
     var activeServerName: String? {
@@ -61,7 +72,15 @@ struct AppUiState: Equatable {
     /// The error to show on the server list, with the server it belongs to.
     var connectFailure: ConnectFailure? {
         guard case .failed(let error) = session.phase else { return nil }
-        return ConnectFailure(error: error, serverName: activeServerName)
+        var hint: LocalNetworkHint?
+        if error == .serverUnreachable, let serverId = session.activeServerId {
+            if serverId == localNetworkDeniedServerId {
+                hint = .denied
+            } else if serverId == localNetworkSuspectServerId {
+                hint = .suspected
+            }
+        }
+        return ConnectFailure(error: error, serverName: activeServerName, localNetwork: hint)
     }
 }
 
@@ -69,4 +88,6 @@ struct AppUiState: Equatable {
 struct ConnectFailure: Equatable {
     let error: ConnectionError
     let serverName: String?
+    /// Set when missing local network access is, or may be, the reason.
+    var localNetwork: LocalNetworkHint?
 }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import MumcordBridge
 import SwiftUI
 
 /// Draws the sheet that is open over the connected screens.
@@ -11,6 +12,8 @@ struct ConnectedSheetHost: View {
         switch sheet {
         case .channelPassword(let channelName, let wrong, let password):
             ChannelPasswordSheet(channelName: channelName, wrong: wrong, password: password, actions: actions)
+        case .microphone:
+            MicrophoneSheet(onContinue: actions.requestMicrophone, onDismiss: actions.microphoneNotNow)
         case .person(let person):
             PersonSheet(person: person, actions: actions)
         case .channelMenu(let id, let name, let expanded, let canJoin):
@@ -45,7 +48,7 @@ private struct ChannelPasswordSheet: View {
     }
 }
 
-/// Mockup `06-person-sheet`: the head and the two settings that apply to the user only.
+/// Mockup `06-person-sheet`: the head, the two settings that apply to the user only, and whisper.
 private struct PersonSheet: View {
     let person: PersonSheetState
     let actions: ConnectedActions
@@ -86,6 +89,23 @@ private struct PersonSheet: View {
                     }
                 )
             }
+            // A card of its own, as in the mockup, where it follows "Send private message".
+            MumcordList(horizontalMargin: 0, background: theme.colors.bgHover) {
+                MumcordListRow(
+                    title: Strings.personWhisper(person.name),
+                    icon: MumcordIcons.users,
+                    action: { actions.openWhisper(.person(session: person.session)) },
+                    trailing: {
+                        MumcordIcon(
+                            icon: MumcordIcons.chevronRight,
+                            label: nil,
+                            tint: theme.colors.textMuted,
+                            size: MumcordSize.iconSm
+                        )
+                    }
+                )
+                .accessibilityIdentifier("person-whisper")
+            }
         }
     }
 }
@@ -119,6 +139,13 @@ private struct ChannelMenuSheet: View {
                     )
                     .accessibilityIdentifier("channel-menu-fold")
                 }
+                MumcordListRow(
+                    title: Strings.channelShout,
+                    icon: MumcordIcons.users,
+                    divider: canJoin || expanded != nil,
+                    action: { actions.openWhisper(.channel(channelId: id)) }
+                )
+                .accessibilityIdentifier("channel-menu-shout")
             }
         }
     }

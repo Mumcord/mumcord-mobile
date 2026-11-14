@@ -169,11 +169,21 @@ struct ConnectedLocal: Equatable {
     var menuChannelId: UInt32?
     /// The channel password being typed.
     var password = ""
+    /// The full voice view covers the screen.
+    var voiceOpen = false
+    /// The hold-to-talk button is down.
+    var talkHeld = false
+    /// Who the whisper bar is for, while it is shown.
+    var whisperTarget: WhisperTarget?
+    /// The hold-to-whisper button is down.
+    var whisperHeld = false
 }
 
 /// The sheet over the connected screens. At most one at a time.
 enum ConnectedSheet: Equatable {
     case channelPassword(channelName: String, wrong: Bool, password: String)
+    /// Why the microphone is needed, before the system asks for it.
+    case microphone
     case person(PersonSheetState)
     /// `expanded` as in `ChannelItem`; `canJoin` is false for the own channel.
     case channelMenu(id: UInt32, name: String, expanded: Bool?, canJoin: Bool)
@@ -204,11 +214,21 @@ struct ConnectedUiState: Equatable {
     let reconnecting: Reconnecting?
     let denied: DeniedBanner?
     let hints: [UnsupportedHint]
+    /// `denied` or `blocked` while the others cannot hear the user, otherwise `none`.
+    let microphone: MicrophoneNotice
+    /// The voice bar and the full voice view, or nil while the server has not said who the
+    /// user is.
+    let voice: VoiceUiState?
     let sheet: ConnectedSheet?
 }
 
 /// The connected screens as a value, or nil while no server is shown.
-func connectedUiState(session: SessionState, local: ConnectedLocal, serverName: String) -> ConnectedUiState? {
+func connectedUiState(
+    session: SessionState,
+    local: ConnectedLocal,
+    serverName: String,
+    microphone: MicrophoneNotice = .none
+) -> ConnectedUiState? {
     guard session.showsServer, let server = session.server else { return nil }
     let rows = channelRows(
         root: server.root,
@@ -224,6 +244,10 @@ func connectedUiState(session: SessionState, local: ConnectedLocal, serverName: 
             wrong: prompt.wrong,
             password: local.password
         )
+    } else if microphone == .explain {
+        // Asked when talking first becomes possible; it closes what the user had open, so
+        // there is never more than one sheet.
+        sheet = .microphone
     } else if let person = local.personSession.flatMap({ server.people[$0] }) {
         sheet = .person(PersonSheetState(
             session: person.session,
@@ -261,6 +285,14 @@ func connectedUiState(session: SessionState, local: ConnectedLocal, serverName: 
             DeniedBanner(channelName: denied.channelId.flatMap { server.channels[$0] }?.name, detail: denied.detail)
         },
         hints: session.hints,
+        microphone: microphone == .denied || microphone == .blocked ? microphone : .none,
+        voice: voiceUiState(
+            session: session,
+            server: server,
+            local: local,
+            serverName: serverName,
+            microphone: microphone
+        ),
         sheet: sheet
     )
 }

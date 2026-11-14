@@ -19,6 +19,10 @@ struct SessionState: Equatable {
     var denied: DeniedAction?
     /// Things the app cannot show, newest last; see `withHint`.
     var hints: [UnsupportedHint] = []
+    /// The saved talk mode; voice activity until the engine has been asked.
+    var talkMode = TalkMode.voiceActivity
+    /// Which of the phone's speaker and microphone the engine needs right now.
+    var audio = AudioWanted(capture: false, playback: false)
 
     /// True once the server's channels are known and the connection is still alive.
     var showsServer: Bool {

@@ -18,7 +18,14 @@ protocol EngineClient: AnyObject, Sendable {
     func joinChannel(channelId: UInt32, password: String?) async throws
     func setPersonVolume(session: UInt32, percent: UInt16) async throws
     func setPersonLocalMute(session: UInt32, muted: Bool) async throws
+    func talkMode() async throws -> TalkMode
     func setTalkMode(mode: TalkMode) async throws
+    func audioEndpoints() -> AudioEndpoints
+    func setPushToTalkPressed(pressed: Bool)
+    func setSelfMute(muted: Bool) async throws
+    func setSelfDeaf(deafened: Bool) async throws
+    func startWhisper(target: WhisperTarget) async throws
+    func stopWhisper()
 }
 
 extension MumcordEngine: EngineClient {

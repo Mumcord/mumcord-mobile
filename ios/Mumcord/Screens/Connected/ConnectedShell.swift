@@ -2,19 +2,33 @@
 
 import SwiftUI
 
-/// The frame of the app while connected: the selected tab's screen, the banners, and the bottom
-/// tab bar. Chat and Messages are filled by their own tasks.
+/// The frame of the app while connected: the selected tab's screen, the banners, the whisper
+/// bar, the voice bar and the bottom tab bar, or the full voice view over all of it. Chat and
+/// Messages are filled by their own tasks.
 struct ConnectedShell: View {
     let state: ConnectedUiState
     let actions: ConnectedActions
     let onDisconnect: () -> Void
 
     var body: some View {
+        if let voice = state.voice, voice.open {
+            VoiceScreen(voice: voice, state: state, actions: actions, onLeave: onDisconnect)
+        } else {
+            tabs
+        }
+    }
+
+    private var tabs: some View {
         MumcordScreen {
             tabScreen
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            ConnectedBanners(reconnecting: state.reconnecting, denied: state.denied, onDismissDenied: actions.dismissDenied)
-            // The voice bar (FR-5.22) goes here, between the banners and the tab bar.
+            ConnectedBanners(state: state, actions: actions)
+            if let voice = state.voice {
+                if let whisper = voice.whisper {
+                    WhisperBar(whisper: whisper, onHeldChange: actions.setWhisperHeld, onClose: actions.closeWhisper)
+                }
+                VoiceBar(voice: voice, actions: actions, onLeave: onDisconnect)
+            }
             MumcordTabBar(
                 tabs: [
                     MumcordTab(icon: MumcordIcons.list, label: Strings.tabChannels),
@@ -48,24 +62,35 @@ struct ConnectedShell: View {
     }
 }
 
-/// A lost connection and the latest refusal by the server, visible on every tab.
-private struct ConnectedBanners: View {
-    let reconnecting: Reconnecting?
-    let denied: DeniedBanner?
-    let onDismissDenied: () -> Void
+/// A lost connection, the microphone that may not be used and the latest refusal by the server,
+/// visible on every tab and in the full voice view.
+struct ConnectedBanners: View {
+    let state: ConnectedUiState
+    let actions: ConnectedActions
+    var horizontalMargin: CGFloat = MumcordSpace.s4
 
     var body: some View {
-        if reconnecting != nil || denied != nil {
+        let reconnecting = state.reconnecting
+        let denied = state.denied
+        if reconnecting != nil || denied != nil || state.microphone != .none {
             VStack(spacing: MumcordSpace.s2) {
                 if let reconnecting {
                     MumcordBanner(
                         text: Strings.channelsReconnecting(reconnecting.attempt, reconnecting.maxAttempts),
                         icon: MumcordIcons.alert,
-                        tone: .warning
+                        tone: .warning,
+                        horizontalMargin: horizontalMargin
+                    )
+                }
+                if state.microphone != .none {
+                    MicrophoneBanner(
+                        blocked: state.microphone == .blocked,
+                        horizontalMargin: horizontalMargin,
+                        action: actions.requestMicrophone
                     )
                 }
                 if let denied {
-                    Button(action: onDismissDenied) {
+                    Button(action: actions.dismissDenied) {
                         MumcordBanner(
                             // The server's own words are shown as plain characters.
                             text: denied.detail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -73,7 +98,8 @@ private struct ConnectedBanners: View {
                                 : denied.detail,
                             title: denied.channelName.map(Strings.deniedTitleChannel) ?? Strings.deniedTitle,
                             icon: MumcordIcons.alert,
-                            tone: .danger
+                            tone: .danger,
+                            horizontalMargin: horizontalMargin
                         )
                         .contentShape(Rectangle())
                     }

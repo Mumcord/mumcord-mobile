@@ -91,6 +91,9 @@ enum Mockup {
     ]
 
     /// What the servers of `servers` answer; Quiet Harbor is offline.
+    /// The address the fake local network counts as "on the Wi-Fi": Nordlicht's.
+    static let localAddress = "nordlicht.example"
+
     static let pings: [Int64: ServerPing] = [
         1: ServerPing(latencyMs: 24, peopleOnline: 5, maxPeople: 50),
         2: ServerPing(latencyMs: 31, peopleOnline: 12, maxPeople: 50),
@@ -128,5 +131,19 @@ func mockupServer() -> ServerState {
             jonas,
         ]
     )
+}
+
+/// The server of mockup `03-voice-expanded`: everybody is in the Lobby. Anna, Ben talking, Mira,
+/// Jonas muted and Lea, the user.
+func mockupVoiceServer() -> ServerState {
+    var server = mockupServer()
+    server.people = server.people.map { person in
+        var moved = person
+        moved.channelId = Mockup.lobby
+        moved.streaming = false
+        moved.selfDeafened = false
+        return moved
+    }
+    return server
 }
 #endif

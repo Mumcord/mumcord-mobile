@@ -2,6 +2,7 @@
 
 import os
 import SwiftUI
+import UIKit
 
 @main
 struct MumcordApp: App {
@@ -22,10 +23,7 @@ struct MumcordApp: App {
             model = nil
             theme = .system
         } else if let launch = AppDebugLaunch.fromLaunchArguments() {
-            model = AppModel(
-                store: SessionStore(engineFactory: launch.engineFactory, log: AppLog.write),
-                setupStore: InMemorySetupStore(firstStartDone: launch.setupDone)
-            )
+            model = launch.makeModel()
             theme = launch.theme
         } else {
             model = .live
@@ -56,10 +54,27 @@ struct MumcordApp: App {
 
 extension AppModel {
     /// The app on the real engine. Created once per process: the engine must exist only once.
-    static let live = AppModel(
-        store: SessionStore(engineFactory: BridgeEngineFactory.make, log: AppLog.write),
-        setupStore: UserDefaultsSetupStore()
-    )
+    static let live: AppModel = {
+        let store = SessionStore(engineFactory: BridgeEngineFactory.make, log: AppLog.write)
+        return AppModel(
+            store: store,
+            setupStore: UserDefaultsSetupStore(),
+            microphone: VoiceAudio(
+                store: store,
+                gateway: SystemMicrophoneGateway(),
+                backend: NativeAudio(),
+                session: SystemVoiceSession(log: AppLog.write),
+                scheduler: QueueAudioScheduler(),
+                log: AppLog.write
+            ),
+            localNetwork: SystemLocalNetworkGateway(log: AppLog.write),
+            openSettings: {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+        )
+    }()
 }
 
 /// The app's technical log. Messages never contain names, addresses or other personal data.

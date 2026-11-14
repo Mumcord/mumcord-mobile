@@ -167,6 +167,8 @@ enum MumcordAvatarSize: CaseIterable {
     case large
     /// The head of the person sheet.
     case sheet
+    /// A person in the full voice view.
+    case tile
     case extraLarge
 
     var diameter: CGFloat {
@@ -175,6 +177,7 @@ enum MumcordAvatarSize: CaseIterable {
         case .medium: 32
         case .large: 40
         case .sheet: 56
+        case .tile: 72
         case .extraLarge: 88
         }
     }
@@ -185,6 +188,7 @@ enum MumcordAvatarSize: CaseIterable {
         case .medium: 14
         case .large: 16
         case .sheet: 24
+        case .tile: 28
         case .extraLarge: 32
         }
     }

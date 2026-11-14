@@ -16,6 +16,8 @@ struct MumcordVoiceBarLabels {
 
 /// Slim voice bar above the tabs (`.voicebar`): talk indicator, channel name with a status
 /// line, and the mute, deafen and leave buttons. Tapping the text opens the full voice screen.
+/// `muteEnabled` is false while the user cannot change the mute themselves (muted by the
+/// server); the button then only shows the state.
 struct MumcordVoiceBar: View {
     let channelName: String
     let status: String
@@ -27,6 +29,7 @@ struct MumcordVoiceBar: View {
     let onToggleMute: () -> Void
     let onToggleDeafen: () -> Void
     let onLeave: () -> Void
+    var muteEnabled = true
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
@@ -55,6 +58,7 @@ struct MumcordVoiceBar: View {
                     style: muted ? .off : .tonal,
                     action: onToggleMute
                 )
+                .disabled(!muteEnabled)
                 MumcordIconButton(
                     icon: deafened ? MumcordIcons.headphonesOff : MumcordIcons.headphones,
                     label: deafened ? labels.undeafen : labels.deafen,

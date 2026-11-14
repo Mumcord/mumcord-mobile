@@ -13,7 +13,14 @@ struct AppRoot: View {
             .mumcordTheme(theme)
             .onOpenURL { model.openLink($0.absoluteString) }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { model.refreshPings() }
+                if phase == .active {
+                    model.refreshPings()
+                    model.recheckMicrophone()
+                } else {
+                    // Hold to talk and hold to whisper work only while the app is on screen
+                    // (FR-5.21).
+                    model.releaseHolds()
+                }
             }
     }
 }
@@ -71,7 +78,8 @@ struct AppContent: View {
                 onEdit: model.openEditServer,
                 onRemove: model.requestRemove,
                 onRetry: model.retry,
-                onDismissError: model.dismissError
+                onDismissError: model.dismissError,
+                onOpenSettings: model.openSettings
             )
         case .serverForm:
             if let form = uiState.form {
@@ -115,6 +123,12 @@ struct AppContent: View {
                 password: password,
                 onPasswordChange: model.changePassword,
                 onConnect: model.submitPassword,
+                onDismiss: model.dismissOverlay
+            )
+        case .localNetwork(_, let serverName):
+            LocalNetworkSheet(
+                serverName: serverName,
+                onContinue: model.continueLocalNetwork,
                 onDismiss: model.dismissOverlay
             )
         case .link(let state):

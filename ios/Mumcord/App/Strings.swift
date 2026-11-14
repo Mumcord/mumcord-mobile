@@ -155,6 +155,53 @@ enum Strings {
         format(p1 == 1 ? "channels_people_count.one" : "channels_people_count.other", p1)
     }
 
+    static var localNetworkTitle: String { text("local_network_title") }
+    static func localNetworkText(_ p1: String) -> String { format("local_network_text", p1) }
+    static var localNetworkContinue: String { text("local_network_continue") }
+    static var localNetworkNotNow: String { text("local_network_not_now") }
+    static var localNetworkDenied: String { text("local_network_denied") }
+    static var localNetworkSuspected: String { text("local_network_suspected") }
+    static var localNetworkOpenSettings: String { text("local_network_open_settings") }
+    static var microphoneTitle: String { text("microphone_title") }
+    static var microphoneText: String { text("microphone_text") }
+    static var microphoneContinue: String { text("microphone_continue") }
+    static var microphoneNotNow: String { text("microphone_not_now") }
+    static var microphoneDeniedTitle: String { text("microphone_denied_title") }
+    static var microphoneDeniedAsk: String { text("microphone_denied_ask") }
+    static var microphoneDeniedSettings: String { text("microphone_denied_settings") }
+    static var microphoneAllow: String { text("microphone_allow") }
+    static var microphoneOpenSettings: String { text("microphone_open_settings") }
+    static func voiceStatusConnected(_ p1: String) -> String { format("voice_status_connected", p1) }
+    static func voiceStatusReconnecting(_ p1: String) -> String { format("voice_status_reconnecting", p1) }
+    static var voiceOpen: String { text("voice_open") }
+    static var voiceCollapse: String { text("voice_collapse") }
+    static var voiceView: String { text("voice_view") }
+    static var voiceTalking: String { text("voice_talking") }
+    static var voiceNotTalking: String { text("voice_not_talking") }
+    static var voiceMute: String { text("voice_mute") }
+    static var voiceUnmute: String { text("voice_unmute") }
+    static var voiceMuteMicrophone: String { text("voice_mute_microphone") }
+    static var voiceUnmuteMicrophone: String { text("voice_unmute_microphone") }
+    static var voiceMutedByServer: String { text("voice_muted_by_server") }
+    static var voiceNoMicrophone: String { text("voice_no_microphone") }
+    static var voiceNoMicrophoneAction: String { text("voice_no_microphone_action") }
+    static var voiceDeafen: String { text("voice_deafen") }
+    static var voiceUndeafen: String { text("voice_undeafen") }
+    static var voiceLeave: String { text("voice_leave") }
+    static var voiceLeaveServer: String { text("voice_leave_server") }
+    static var voiceTalkMode: String { text("voice_talk_mode") }
+    static var voiceHoldToTalk: String { text("voice_hold_to_talk") }
+    static func voicePersonYou(_ p1: String) -> String { format("voice_person_you", p1) }
+    static var voiceLevel: String { text("voice_level") }
+    static var voiceLevelHint: String { text("voice_level_hint") }
+    static func personWhisper(_ p1: String) -> String { format("person_whisper", p1) }
+    static var channelShout: String { text("channel_shout") }
+    static func whisperToPerson(_ p1: String) -> String { format("whisper_to_person", p1) }
+    static func whisperToChannel(_ p1: String) -> String { format("whisper_to_channel", p1) }
+    static var whisperActive: String { text("whisper_active") }
+    static var whisperInactive: String { text("whisper_inactive") }
+    static var whisperClose: String { text("whisper_close") }
+
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }

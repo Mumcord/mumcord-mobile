@@ -39,4 +39,16 @@ extension BridgeError {
         case .Internal: .internalError
         }
     }
+
+    /// The engine's or the server's own words about the failure; untrusted text.
+    var detail: String {
+        switch self {
+        case .NotConnected(let detail), .ServerUnreachable(let detail), .WrongPassword(let detail),
+             .NameInUse(let detail), .CertificateRejected(let detail), .CertificateChanged(let detail),
+             .ServerTooOld(let detail), .Banned(let detail), .NotFound(let detail),
+             .PermissionDenied(let detail), .InvalidInput(let detail),
+             .SecureStorageUnavailable(let detail), .Io(let detail), .Internal(let detail):
+            detail
+        }
+    }
 }
