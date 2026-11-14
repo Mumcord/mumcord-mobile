@@ -105,7 +105,11 @@ It builds the app and the tests, starts the test server and the emulator (withou
 installs the app afresh, runs the tests, and stops the server and the emulator again. A run
 takes under a minute once everything is built (the first build takes several minutes). If an
 emulator is already running, the script uses it and leaves it running. The result is
-`e2e: PASSED` or `e2e: FAILED: …` and a matching exit code; the test output, the app log and the emulator log are in `e2e/build/`.
+`e2e: PASSED` or `e2e: FAILED: …` and a matching exit code. The logs are in `e2e/build/`: the
+test output (`instrument.txt`), the device log (`logcat.txt`), the emulator log, what the other
+people of the voice scenarios reported (`voice-peer-<scenario>.log`) and, for a scenario that
+hung, the screen at that moment (`hung-screen.png`). A test that fails while waiting says what
+was on the screen in its failure message.
 
 - **Test server:** `scripts/testenv.sh up` and `down` start and stop it on their own. It is the
   test environment of the Mumcord repository (a stock `mumble-server` in Docker with the
@@ -121,7 +125,17 @@ emulator is already running, the script uses it and leaves it running. The resul
   plugin, `sqlite3` and `openssl`. No Docker network is created; the server uses Docker's
   built-in bridge.
 - **Settings:** `E2E_AVD` (emulator device, default `mumcord-test`), `E2E_BOOT_TIMEOUT` and
-  `E2E_TEST_TIMEOUT` (seconds, default 300 and 600).
+  `E2E_TEST_TIMEOUT` (seconds, default 300 each; the second is per scenario) and
+  `E2E_RELEASE_BOUND_MS` (how much longer than hold-to-talk was held the app may be heard,
+  default 200).
+- **Waits and timing:** every wait in the tests has a bound sized for the hosted CI emulator,
+  which is several times slower than a developer's (60 s per step, 30 s for a system dialog);
+  a wait ends as soon as what it waits for is there, so the bounds cost nothing on a fast
+  machine. The push-to-talk and whisper scenarios compare the time the button was held
+  (measured in the emulator) with the stretch of voice the second person played (measured on
+  the host): at least half of the hold and at most the hold plus `E2E_RELEASE_BOUND_MS`. CI
+  sets 500 ms, because a stall of the emulator or of the second person at the end of the
+  stretch adds to it there; a button that does not stop the voice is heard for seconds longer.
 
 ## Continuous integration
 
@@ -134,8 +148,10 @@ the versions listed above:
   `scripts/setup-android.sh --no-emulator`. The debug APK and the lint reports are attached to
   the run as artifacts.
 - **Emulator tests:** boots the `mumcord-test` emulator, runs
-  `./gradlew connectedDebugAndroidTest` and then `e2e/run.sh` against the test server in Docker.
-  The contents of `e2e/build/` and the test reports are attached to the run, also when it fails.
+  `./gradlew connectedDebugAndroidTest` and then `e2e/run.sh` against the test server in Docker
+  (also when an instrumented test failed, so one run shows everything that is broken). The
+  contents of `e2e/build/`, the device log of the instrumented tests among them, and the test
+  reports are attached to the run as `emulator-test-logs`, also when it fails.
 
 The Rust build, the Gradle downloads and the toolchain are cached between runs. The emulator
 and its image are not (they are several GB) and are downloaded on every run.

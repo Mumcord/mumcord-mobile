@@ -87,6 +87,11 @@ jobs:
         working-directory: android
         run: ./gradlew --console=plain lint test assembleDebug
 
+      # The second person of the end-to-end voice tests. Built here too, so that it stays in
+      # the Rust cache this job saves and the emulator job only has to link it.
+      - name: Build the voice peer of the end-to-end tests
+        run: cargo build --locked --package mumcord-voice-peer
+
       - name: Upload the debug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -105,11 +110,18 @@ jobs:
   emulator:
     name: Emulator tests
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # A green run takes about 20 minutes; the rest is room for a cold cache.
+    timeout-minutes: 45
     env:
       E2E_AVD: mumcord-test
       E2E_BOOT_TIMEOUT: 600
-      E2E_TEST_TIMEOUT: 900
+      # One scenario takes well under a minute here; this only ends one that hangs.
+      E2E_TEST_TIMEOUT: 300
+      # How much longer than a hold the app may be heard (200 ms on a developer machine). The
+      # runner's few cores are shared by the emulator, the test server and the second person,
+      # so a stall at the end of the stretch adds to what is measured. Still far below the
+      # seconds a button that does not stop the voice would add.
+      E2E_RELEASE_BOUND_MS: 500
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -173,8 +185,13 @@ jobs:
         working-directory: android
         run: ./gradlew --console=plain assembleDebug assembleDebugAndroidTest
 
+      # The second person of the voice scenarios; e2e/run.sh then finds it built.
+      - name: Build the voice peer of the end-to-end tests
+        run: cargo build --locked --package mumcord-voice-peer
+
       # Started here and used by both test steps; e2e/run.sh takes a running emulator as it is.
       - name: Start the emulator
+        id: emulator
         run: |
           mkdir -p e2e/build
           nohup "${ANDROID_HOME}/emulator/emulator" -avd "${E2E_AVD}" -no-window -no-audio \
@@ -198,6 +215,12 @@ jobs:
             waited=$((waited + 5))
           done
           echo "emulator booted after about ${waited} s"
+          # No animations: a system dialog that slides in takes a tap only once it has arrived.
+          for scale in window_animation_scale transition_animation_scale animator_duration_scale; do
+            "${adb}" shell settings put global "${scale}" 0
+          done
+          # Room for the log of all instrumented tests.
+          "${adb}" logcat -G 16M
 
       # The fake-engine tests, the secure-storage tests among them. The end-to-end tests of
       # android/e2e skip themselves here because they have no server.
@@ -205,8 +228,16 @@ jobs:
         working-directory: android
         run: ./gradlew --console=plain connectedDebugAndroidTest
 
-      # The real app with the real engine against the stock Mumble test server in Docker.
+      # e2e/run.sh empties the device log before its own scenarios.
+      - name: Save the device log of the instrumented tests
+        if: ${{ !cancelled() && steps.emulator.outcome == 'success' }}
+        run: timeout 60 "${ANDROID_HOME}/platform-tools/adb" logcat -d > e2e/build/logcat-instrumented.txt || true
+
+      # The real app with the real engine against the stock Mumble test server in Docker. Also
+      # run when an instrumented test failed: the two do not depend on each other, and one run
+      # then shows everything that is broken.
       - name: End-to-end tests
+        if: ${{ !cancelled() && steps.emulator.outcome == 'success' }}
         run: e2e/run.sh
 
       - name: Stop the emulator
