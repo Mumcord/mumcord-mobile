@@ -57,6 +57,13 @@ enum MumcordFonts {
         return CTFontCreateWithFontDescriptor(CTFontDescriptorCreateCopyWithAttributes(base, attributes), size, nil)
     }
 
+    /// The font leaning to the right. The bundled fonts have no italic of their own, so italic
+    /// text is the upright font drawn slanted.
+    static func slanted(_ font: CTFont) -> CTFont {
+        var matrix = CGAffineTransform(a: 1, b: 0, c: 0.2, d: 1, tx: 0, ty: 0)
+        return CTFontCreateCopyWithAttributes(font, 0, &matrix, nil)
+    }
+
     /// The height of one line as the font draws it, before the line height of the style.
     static func naturalLineHeight(_ font: CTFont) -> CGFloat {
         CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)

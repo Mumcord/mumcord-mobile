@@ -93,6 +93,8 @@ struct MumcordIconButton: View {
     var style = MumcordIconButtonStyle.plain
     var large = false
     var iconSize = MumcordSize.icon
+    /// Off for a button that is drawn the same while it cannot be used, such as "Send".
+    var dimsWhenDisabled = true
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
     @Environment(\.isEnabled) private var isEnabled
@@ -112,7 +114,7 @@ struct MumcordIconButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-        .opacity(isEnabled ? 1 : disabledOpacity)
+        .opacity(isEnabled || !dimsWhenDisabled ? 1 : disabledOpacity)
     }
 
     private var background: Color {
