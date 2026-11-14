@@ -90,7 +90,6 @@ final class CallSession: CallSystemDelegate {
         log: @escaping (String) -> Void
     ) {
         self.system = system
-        system?.delegate = self
         self.prepareAudio = prepareAudio
         self.onMuted = onMuted
         self.onLeave = onLeave
@@ -98,6 +97,7 @@ final class CallSession: CallSystemDelegate {
         self.onActivation = onActivation
         self.after = after
         self.log = log
+        system?.delegate = self
     }
 
     /// The session changed; nil while there is none.
