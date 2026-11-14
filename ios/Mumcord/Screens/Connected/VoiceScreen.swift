@@ -30,7 +30,7 @@ struct VoiceScreen: View {
                 CollapseHandle(onClose: actions.closeVoice)
                 VStack(alignment: .leading, spacing: 0) {
                     // The mockup's title is one step larger than the app bar title.
-                    LineText(voice.channelName, style: TextToken.title.with(size: 24, lineHeight: 28.8), color: colors.text)
+                    LineText(voice.channelName, style: TextToken.title.with(size: 24), color: colors.text)
                         .accessibilityAddTraits(.isHeader)
                     LineText(voice.statusLine, style: .small, color: colors.textMuted)
                 }
