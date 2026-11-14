@@ -2,24 +2,27 @@
 
 //! Commands in: the one object the apps hold.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 
-use std::sync::Mutex;
-
+use mumcord_audio::io::{ExternalCapture, ExternalPlayback};
 use mumcord_engine::{
     Engine, PasswordChange, QueryOutcome, SecretStore, ServerFields, ServerId, ServerQueries,
 };
 use tokio::runtime::{Handle, Runtime};
 use tokio::sync::{mpsc, oneshot};
 
+use crate::audio_abi::Endpoint;
 use crate::convert;
 use crate::error::BridgeError;
 use crate::events::{self, BridgeEvent, Connection, EngineListener, SharedConnection, lock};
 use crate::storage::{SecureStorage, StorageBackend};
 use crate::types::{
-    BridgeSnapshot, ConnectRequest, EngineConfig, SavedServer, ServerInput, ServerPing, TalkMode,
+    AudioEndpoints, BridgeSnapshot, ConnectRequest, EngineConfig, SavedServer, ServerInput,
+    ServerPing, TalkMode, VoiceSettings, WhisperTarget,
 };
 
 /// The server list as the app last got it, and the way to tell the app about a change.
@@ -57,6 +60,11 @@ pub struct MumcordEngine {
     pings: Arc<ServerQueries>,
     /// Serialises `connect`, so two calls cannot both find the connection free.
     connect_gate: Arc<tokio::sync::Mutex<()>>,
+    /// The app's ends of the audio, behind the handles of `audio_endpoints`. Emptied on drop.
+    capture: &'static Endpoint<ExternalCapture>,
+    playback: &'static Endpoint<ExternalPlayback>,
+    /// The engine does not tell its runtime bitrate limit; 0 is none.
+    bitrate_limit_kbps: AtomicU32,
     handle: Handle,
     /// Taken on drop.
     runtime: Option<Runtime>,
@@ -81,10 +89,20 @@ impl MumcordEngine {
             .map_err(|e| BridgeError::internal(format!("starting the runtime failed: {e}")))?;
         let handle = runtime.handle().clone();
         let secrets = SecretStore::with_backend(Arc::new(StorageBackend(storage)));
+        let (capture_format, playback_format) = convert::audio_formats(config.audio);
+        let (audio, capture, playback) =
+            mumcord_audio::io::external(capture_format, playback_format)
+                .map_err(|e| BridgeError::invalid(&format!("audio configuration: {e}")))?;
         let (engine, receiver) = {
             // The engine starts its background tasks while it is created.
             let _runtime = runtime.enter();
-            Engine::new(Path::new(&config.data_dir), secrets, handle.clone())?
+            // Phones have no audio devices the engine could open itself.
+            Engine::with_external_audio(
+                Path::new(&config.data_dir),
+                secrets,
+                handle.clone(),
+                audio,
+            )?
         };
         // On a thread of its own: the caller may itself be inside an async runtime, where
         // waiting for the runtime is not allowed.
@@ -116,6 +134,9 @@ impl MumcordEngine {
             },
             pings: Arc::default(),
             connect_gate: Arc::default(),
+            capture: Endpoint::leak(capture),
+            playback: Endpoint::leak(playback),
+            bitrate_limit_kbps: AtomicU32::new(0),
             handle,
             runtime: Some(runtime),
             _stop_events: stop_events,
@@ -331,6 +352,123 @@ impl MumcordEngine {
         .await
     }
 
+    /// The handles the app's audio threads pass to the C functions of
+    /// `bridge/include/mumcord_audio.h`. The same values for the engine object's whole life.
+    pub fn audio_endpoints(&self) -> AudioEndpoints {
+        AudioEndpoints {
+            capture: self.capture.handle(),
+            playback: self.playback.handle(),
+        }
+    }
+
+    /// The hold-to-talk button went down (`true`) or up. Only matters in push-to-talk mode.
+    /// Takes effect at once; safe to call from the main thread.
+    pub fn set_push_to_talk_pressed(&self, pressed: bool) {
+        self.engine.dsp_controls().set_ptt_pressed(pressed);
+    }
+
+    /// Mutes or unmutes the user. Unmuting also ends a deafen. The new state arrives as
+    /// [`BridgeEvent::PersonChanged`] of the user themselves.
+    pub async fn set_self_mute(&self, muted: bool) -> Result<(), BridgeError> {
+        let engine = self.engine.clone();
+        self.run(async move { Ok(engine.set_self_mute(muted)?) })
+            .await
+    }
+
+    /// Deafens the user, which also mutes them, or ends it; the mute then goes back to what it
+    /// was before. The new state arrives as [`BridgeEvent::PersonChanged`] of the user
+    /// themselves.
+    pub async fn set_self_deaf(&self, deafened: bool) -> Result<(), BridgeError> {
+        let engine = self.engine.clone();
+        self.run(async move { Ok(engine.set_self_deaf(deafened)?) })
+            .await
+    }
+
+    /// The voice settings as they apply now.
+    pub async fn voice_settings(&self) -> Result<VoiceSettings, BridgeError> {
+        let engine = self.engine.clone();
+        let limit = self.bitrate_limit_kbps.load(Ordering::Relaxed);
+        self.run(async move {
+            let settings = engine.settings()?;
+            Ok(VoiceSettings {
+                talk_mode: convert::talk_mode(settings.talk_mode),
+                noise_suppression: settings.noise_suppression,
+                auto_gain: settings.auto_gain,
+                echo_cancellation: convert::echo_cancellation(engine.echo_cancellation_mode()),
+                bitrate_limit_kbps: Some(limit).filter(|&kbps| kbps > 0),
+            })
+        })
+        .await
+    }
+
+    /// Saves whether noise suppression runs and applies it at once.
+    pub async fn set_noise_suppression(&self, on: bool) -> Result<(), BridgeError> {
+        let engine = self.engine.clone();
+        self.run(async move {
+            let mut settings = engine.settings()?;
+            settings.noise_suppression = on;
+            engine.update_settings(settings).await?;
+            Ok(())
+        })
+        .await
+    }
+
+    /// Saves whether the automatic gain runs and applies it at once.
+    pub async fn set_auto_gain(&self, on: bool) -> Result<(), BridgeError> {
+        let engine = self.engine.clone();
+        self.run(async move {
+            let mut settings = engine.settings()?;
+            settings.auto_gain = on;
+            engine.update_settings(settings).await?;
+            Ok(())
+        })
+        .await
+    }
+
+    /// Limits the voice bitrate in kbit/s, `None` lifts the limit ("Reduced voice quality": 24
+    /// while on mobile data). Not saved: the app sets it again after a start and whenever the
+    /// network changes. Takes effect within a second; 0 is not a limit.
+    pub fn set_bitrate_limit_kbps(&self, kbps: Option<u32>) {
+        let kbps = kbps.filter(|&kbps| kbps > 0);
+        self.bitrate_limit_kbps
+            .store(kbps.unwrap_or(0), Ordering::Relaxed);
+        self.engine.set_bitrate_limit_kbps(kbps);
+    }
+
+    /// Starts a whisper to a person or a shout to a channel: until
+    /// [`MumcordEngine::stop_whisper`] the user's voice goes there instead of their own
+    /// channel, in either talk mode (the hold-to-whisper button is the push-to-talk). Fails
+    /// when the user is muted, the target is gone or the server does not allow it.
+    pub async fn start_whisper(&self, target: WhisperTarget) -> Result<(), BridgeError> {
+        let (engine, connection) = (self.engine.clone(), self.connection.clone());
+        self.run(async move {
+            let server = connected_server(&connection)?;
+            let receivers = match target {
+                WhisperTarget::Person { session } => {
+                    convert::whisper_person(lock(&connection).person_name(session))?
+                }
+                WhisperTarget::Channel { channel_id } => {
+                    let channels: HashMap<_, _> = engine
+                        .snapshot_of(server)
+                        .ok_or_else(BridgeError::not_connected)?
+                        .channels
+                        .into_iter()
+                        .map(|channel| (channel.id, (channel.parent_id, channel.name)))
+                        .collect();
+                    convert::whisper_channel(channel_id, &channels)?
+                }
+            };
+            Ok(engine.whisper_start(&receivers)?)
+        })
+        .await
+    }
+
+    /// Ends the whisper or shout; talking goes back to the user's own channel. Does nothing
+    /// when none is held.
+    pub fn stop_whisper(&self) {
+        self.engine.whisper_stop();
+    }
+
     /// Answers the pending certificate prompt with that `fingerprint`: `trust = true` saves the
     /// certificate as trusted and goes on connecting, `false` ends the attempt.
     pub async fn answer_certificate_prompt(
@@ -389,6 +527,9 @@ impl MumcordEngine {
             connected_server_id: connection.server,
             certificate_prompt: connection.certificate_prompt.clone(),
             server,
+            audio: connection.audio,
+            whispering: connection.server.is_some()
+                && self.engine.dsp_controls().voice_target() != 0,
         }
     }
 }
@@ -412,6 +553,9 @@ impl Drop for MumcordEngine {
         if let Some(server) = lock(&self.connection).server {
             self.engine.disconnect(server);
         }
+        // From here on the app's audio callbacks find nothing behind their handles.
+        self.capture.close();
+        self.playback.close();
         if let Some(runtime) = self.runtime.take() {
             // The object can be released from any thread, also from inside the runtime, where a
             // blocking shutdown would panic.
@@ -480,6 +624,9 @@ async fn start(
     if engine.identity().await?.is_none() {
         engine.identity_create(username.to_owned(), None).await?;
     }
+    // A held button of the last connection must not talk or whisper on this one.
+    engine.whisper_stop();
+    engine.dsp_controls().set_ptt_pressed(false);
     *lock(connection) = Connection::to(server);
     let started = engine.connect_with_password(server, channel_path, password);
     if started.is_err() {

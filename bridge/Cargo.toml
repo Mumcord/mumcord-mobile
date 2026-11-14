@@ -22,6 +22,7 @@ required-features = ["bindgen"]
 bindgen = ["uniffi/cli"]
 
 [dependencies]
+mumcord-audio.workspace = true
 mumcord-engine.workspace = true
 mumcord-store.workspace = true
 thiserror = "2"

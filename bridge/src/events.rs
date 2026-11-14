@@ -12,8 +12,8 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::convert::{self, PersonFlags};
 use crate::types::{
-    CertificatePrompt, Channel, ChannelPasswordState, ConnectionState, Person, SavedServer,
-    ServerState,
+    AudioWanted, CertificatePrompt, Channel, ChannelPasswordState, ConnectionState, Person,
+    SavedServer, ServerState,
 };
 
 /// A change of the state. Apply it to the last [`BridgeSnapshot`](crate::BridgeSnapshot), or
@@ -62,6 +62,16 @@ pub enum BridgeEvent {
         channel_id: Option<u32>,
         detail: String,
     },
+    /// The engine needs other platform audio streams than before: open or close the microphone
+    /// and the speaker accordingly.
+    AudioWantedChanged {
+        audio: AudioWanted,
+    },
+    /// The microphone level for a level meter, 0–100, after noise suppression and automatic
+    /// gain. Sent while voice is running, at most 20 times a second and only when it changed.
+    InputLevelChanged {
+        percent: u8,
+    },
 }
 
 /// Receives the events; implemented by the app (Kotlin, Swift). Called on one bridge thread, in
@@ -85,6 +95,12 @@ pub(crate) struct Connection {
     talking: HashSet<u32>,
     streaming: HashSet<u32>,
     camera: HashSet<u32>,
+    /// The engine's voice runs on this connection.
+    voice: bool,
+    /// As last reported to the app.
+    pub(crate) audio: AudioWanted,
+    /// As last reported to the app.
+    input_level: u8,
 }
 
 impl Default for Connection {
@@ -98,6 +114,9 @@ impl Default for Connection {
             talking: HashSet::new(),
             streaming: HashSet::new(),
             camera: HashSet::new(),
+            voice: false,
+            audio: AudioWanted::default(),
+            input_level: 0,
         }
     }
 }
@@ -122,6 +141,36 @@ impl Connection {
                 camera: self.camera.contains(&session),
             },
         )
+    }
+
+    /// The name of a person, as the engine's whisper targets want it.
+    pub(crate) fn person_name(&self, session: u32) -> Option<String> {
+        self.people.get(&session).map(|user| user.name.clone())
+    }
+
+    /// The platform audio streams the engine needs in the current state.
+    fn audio_wanted(&self) -> AudioWanted {
+        let own = self.self_session.and_then(|own| self.people.get(&own));
+        AudioWanted {
+            capture: self.voice && own.is_some_and(convert::may_send),
+            playback: self.voice,
+        }
+    }
+
+    /// The events for what the last engine event changed about the audio: the streams wanted,
+    /// and a level meter that goes back to zero when voice ends.
+    fn audio_changes(&mut self) -> Vec<BridgeEvent> {
+        let mut events = Vec::new();
+        let audio = self.audio_wanted();
+        if audio != self.audio {
+            self.audio = audio;
+            events.push(BridgeEvent::AudioWantedChanged { audio });
+        }
+        if !self.voice && self.input_level != 0 {
+            self.input_level = 0;
+            events.push(BridgeEvent::InputLevelChanged { percent: 0 });
+        }
+        events
     }
 
     /// Takes over the engine's full state of the server.
@@ -174,21 +223,51 @@ pub(crate) fn translate(
     if connection.server.is_none() {
         return Vec::new();
     }
-    // Talking belongs to the voice pipeline, which the engine does not always name a server
-    // for; with one connection at a time it can only be this one.
-    let untagged_talk = server.is_none() && matches!(event, EngineEvent::TalkStateChanged { .. });
-    if server != connection.server && !untagged_talk {
+    // Talking and the microphone level belong to the voice pipeline, which the engine does not
+    // always name a server for; with one connection at a time it can only be this one. The
+    // voice server is named by its own event.
+    let of_voice = matches!(
+        event,
+        EngineEvent::TalkStateChanged { .. }
+            | EngineEvent::MicLevel(_)
+            | EngineEvent::VoiceServerChanged(_)
+    );
+    if server != connection.server && !of_voice {
         return Vec::new();
     }
+    let mut events = apply(&mut connection, event);
+    events.extend(connection.audio_changes());
+    events
+}
+
+fn apply(connection: &mut Connection, event: EngineEvent) -> Vec<BridgeEvent> {
     let one = |event| vec![event];
     match event {
+        EngineEvent::VoiceServerChanged(voice) => {
+            connection.voice = voice.is_some() && voice == connection.server;
+            Vec::new()
+        }
+        EngineEvent::MicLevel(level) => {
+            // Rounded to whole percent, so a steady level is not sent again and again.
+            let percent = (level.clamp(0.0, 1.0) * 100.0).round() as u8;
+            if !connection.voice || percent == connection.input_level {
+                return Vec::new();
+            }
+            connection.input_level = percent;
+            one(BridgeEvent::InputLevelChanged { percent })
+        }
         EngineEvent::StateChanged(state) => {
             let state = convert::connection_state(state);
             if !matches!(state, ConnectionState::Connecting) {
                 connection.certificate_prompt = None;
             }
             if matches!(state, ConnectionState::Disconnected { .. }) {
-                *connection = Connection::default();
+                // What was reported about the audio is kept, so its end is reported too.
+                *connection = Connection {
+                    audio: connection.audio,
+                    input_level: connection.input_level,
+                    ..Connection::default()
+                };
             }
             connection.state = state.clone();
             one(BridgeEvent::ConnectionChanged { state })
@@ -345,6 +424,120 @@ mod tests {
         }
     }
 
+    fn devices() -> mumcord_engine::AudioDeviceList {
+        mumcord_engine::AudioDeviceList {
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+        }
+    }
+
+    /// A synced connection to server 1 with the user as session 5, in the state `own`.
+    fn synced(own: UserView) -> SharedConnection {
+        let connection = connected_to(1);
+        {
+            let mut connection = lock(&connection);
+            connection.self_session = Some(own.session);
+            connection.people.insert(own.session, own);
+        }
+        connection
+    }
+
+    fn wanted(capture: bool, playback: bool) -> BridgeEvent {
+        BridgeEvent::AudioWantedChanged {
+            audio: AudioWanted { capture, playback },
+        }
+    }
+
+    #[test]
+    fn audio_is_wanted_while_voice_runs_on_the_connection() {
+        let connection = synced(user(5));
+        let voice = |server| (None, EngineEvent::VoiceServerChanged(server));
+        assert_eq!(translate(&connection, voice(Some(2))), []);
+        assert_eq!(translate(&connection, voice(Some(1))), [wanted(true, true)]);
+        assert_eq!(translate(&connection, voice(Some(1))), []);
+        assert_eq!(translate(&connection, voice(None)), [wanted(false, false)]);
+    }
+
+    #[test]
+    fn the_microphone_is_wanted_only_while_the_user_may_be_heard() {
+        let connection = synced(user(5));
+        translate(
+            &connection,
+            (None, EngineEvent::VoiceServerChanged(Some(1))),
+        );
+        let change = |change: fn(&mut UserView)| {
+            let mut own = user(5);
+            change(&mut own);
+            let events = translate(&connection, (Some(1), EngineEvent::UserUpserted(own)));
+            events[1..].to_vec()
+        };
+        assert_eq!(change(|own| own.self_mute = true), [wanted(false, true)]);
+        assert_eq!(change(|own| own.self_deaf = true), []);
+        assert_eq!(change(|_| {}), [wanted(true, true)]);
+        assert_eq!(change(|own| own.suppressed = true), [wanted(false, true)]);
+        assert_eq!(change(|own| own.server_mute = true), []);
+        // Somebody else muting themselves changes nothing.
+        let mut other = user(6);
+        other.self_mute = true;
+        let events = translate(&connection, (Some(1), EngineEvent::UserUpserted(other)));
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn the_microphone_waits_for_the_server_state() {
+        let connection = connected_to(1);
+        assert_eq!(
+            translate(
+                &connection,
+                (None, EngineEvent::VoiceServerChanged(Some(1)))
+            ),
+            [wanted(false, true)]
+        );
+    }
+
+    #[test]
+    fn a_disconnect_ends_the_audio_and_the_level() {
+        let connection = synced(user(5));
+        translate(
+            &connection,
+            (None, EngineEvent::VoiceServerChanged(Some(1))),
+        );
+        translate(&connection, (None, EngineEvent::MicLevel(0.4)));
+        let ended = EngineEvent::StateChanged(ConnState::Disconnected { error: None });
+        assert_eq!(
+            translate(&connection, (Some(1), ended))[1..],
+            [
+                wanted(false, false),
+                BridgeEvent::InputLevelChanged { percent: 0 }
+            ]
+        );
+        assert_eq!(lock(&connection).audio, AudioWanted::default());
+    }
+
+    #[test]
+    fn the_input_level_is_sent_while_voice_runs_and_only_when_it_changed() {
+        let connection = synced(user(5));
+        let level = |level| translate(&connection, (None, EngineEvent::MicLevel(level)));
+        assert_eq!(level(0.5), []);
+        translate(
+            &connection,
+            (None, EngineEvent::VoiceServerChanged(Some(1))),
+        );
+        assert_eq!(level(0.5), [BridgeEvent::InputLevelChanged { percent: 50 }]);
+        assert_eq!(level(0.501), []);
+        assert_eq!(
+            level(2.0),
+            [BridgeEvent::InputLevelChanged { percent: 100 }]
+        );
+        assert_eq!(
+            translate(&connection, (None, EngineEvent::VoiceServerChanged(None))),
+            [
+                wanted(false, false),
+                BridgeEvent::InputLevelChanged { percent: 0 }
+            ]
+        );
+    }
+
     /// The single person event `event` leads to.
     fn person_of(connection: &SharedConnection, event: EngineEvent) -> Person {
         let events = translate(connection, (Some(1), event));
@@ -378,7 +571,10 @@ mod tests {
         let connection = connected_to(1);
         assert_eq!(translate(&connection, (Some(2), prompt_event(2))), []);
         assert_eq!(
-            translate(&connection, (None, EngineEvent::MicLevel(0.5))),
+            translate(
+                &connection,
+                (None, EngineEvent::AudioDevicesChanged(devices()))
+            ),
             []
         );
         assert_eq!(lock(&connection).certificate_prompt, None);
@@ -388,7 +584,10 @@ mod tests {
     fn events_the_bridge_does_not_offer_yet_are_dropped() {
         let connection = connected_to(1);
         assert_eq!(
-            translate(&connection, (Some(1), EngineEvent::MicLevel(0.5))),
+            translate(
+                &connection,
+                (Some(1), EngineEvent::AudioDevicesChanged(devices()))
+            ),
             []
         );
     }

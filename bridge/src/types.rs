@@ -10,6 +10,74 @@ use crate::error::BridgeError;
 pub struct EngineConfig {
     /// App-private folder for the engine's database and files. Created when missing.
     pub data_dir: String,
+    /// PCM layout of the audio the app moves through the C functions of
+    /// `bridge/include/mumcord_audio.h`. `None` is 48 kHz mono in both directions.
+    #[uniffi(default = None)]
+    pub audio: Option<AudioConfig>,
+}
+
+/// PCM layout of the app's microphone and speaker streams, fixed for the engine's lifetime.
+/// Interleaved samples; 48 kHz needs no resampling. Captured channels are mixed down to mono.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct AudioConfig {
+    /// Frames per second of the microphone stream, 8 000 to 192 000.
+    pub capture_rate: u32,
+    pub capture_channels: u16,
+    /// Frames per second of the speaker stream, 8 000 to 192 000.
+    pub playback_rate: u32,
+    pub playback_channels: u16,
+}
+
+/// Handles for the C functions of `bridge/include/mumcord_audio.h`. Valid until the process
+/// ends; once the engine object is released the functions do nothing with them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct AudioEndpoints {
+    /// For `mumcord_audio_capture_push_*` (microphone callback).
+    pub capture: u64,
+    /// For `mumcord_audio_playback_pull_*` (speaker callback).
+    pub playback: u64,
+}
+
+/// Which platform audio streams the engine needs right now. The app opens and closes its audio
+/// session along it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, uniffi::Record)]
+pub struct AudioWanted {
+    /// The microphone: voice is running and the user may be heard (not muted or deafened, by
+    /// themselves or the server). In push-to-talk mode it stays wanted between presses, so the
+    /// start of speech is not cut off.
+    pub capture: bool,
+    /// The speaker: voice is running on the connection.
+    pub playback: bool,
+}
+
+/// Who cancels the echo of the speaker in the microphone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum EchoCancellation {
+    /// The voice processing of the phone system; there is nothing to switch.
+    System,
+    /// The engine's own canceller.
+    Engine,
+}
+
+/// The voice settings. Talk mode, noise suppression and automatic gain are saved; the bitrate
+/// limit lasts until the engine object is released.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Record)]
+pub struct VoiceSettings {
+    pub talk_mode: TalkMode,
+    pub noise_suppression: bool,
+    pub auto_gain: bool,
+    pub echo_cancellation: EchoCancellation,
+    /// Limit set with `set_bitrate_limit_kbps`; `None` for no limit.
+    pub bitrate_limit_kbps: Option<u32>,
+}
+
+/// Who hears the user while a whisper or shout is held.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum WhisperTarget {
+    /// Whisper to one person ([`Person::session`]).
+    Person { session: u32 },
+    /// Shout to everyone in a channel ([`Channel::id`]).
+    Channel { channel_id: u32 },
 }
 
 /// A saved server of the server list. Every saved server is a favourite. The password is never
@@ -212,4 +280,8 @@ pub struct BridgeSnapshot {
     pub certificate_prompt: Option<CertificatePrompt>,
     /// `None` until the server has sent its channels and people.
     pub server: Option<ServerState>,
+    /// The platform audio streams the engine needs right now.
+    pub audio: AudioWanted,
+    /// A whisper or shout is being held (`start_whisper`); normal talking is paused meanwhile.
+    pub whispering: bool,
 }

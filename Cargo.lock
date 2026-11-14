@@ -2424,10 +2424,11 @@ checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
 [[package]]
 name = "mumcord-audio"
 version = "0.8.0"
-source = "git+https://github.com/Mumcord/mumcord?rev=dc8b580d6994bbddcf3e7f5af55e0b3561fb9355#dc8b580d6994bbddcf3e7f5af55e0b3561fb9355"
+source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"
 dependencies = [
  "audio_thread_priority",
  "cpal",
+ "dasp_sample",
  "futures",
  "libc",
  "mumcord-codec",
@@ -2441,7 +2442,7 @@ dependencies = [
 [[package]]
 name = "mumcord-camera"
 version = "0.8.0"
-source = "git+https://github.com/Mumcord/mumcord?rev=dc8b580d6994bbddcf3e7f5af55e0b3561fb9355#dc8b580d6994bbddcf3e7f5af55e0b3561fb9355"
+source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"
 dependencies = [
  "ashpd",
  "block2",
@@ -2467,7 +2468,7 @@ dependencies = [
 [[package]]
 name = "mumcord-codec"
 version = "0.8.0"
-source = "git+https://github.com/Mumcord/mumcord?rev=dc8b580d6994bbddcf3e7f5af55e0b3561fb9355#dc8b580d6994bbddcf3e7f5af55e0b3561fb9355"
+source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"
 dependencies = [
  "nnnoiseless",
  "opus",
@@ -2480,7 +2481,7 @@ dependencies = [
 [[package]]
 name = "mumcord-engine"
 version = "0.8.0"
-source = "git+https://github.com/Mumcord/mumcord?rev=dc8b580d6994bbddcf3e7f5af55e0b3561fb9355#dc8b580d6994bbddcf3e7f5af55e0b3561fb9355"
+source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"
 dependencies = [
  "ammonia",
  "anyhow",
@@ -2537,6 +2538,7 @@ name = "mumcord-mobile-bridge"
 version = "0.1.0"
 dependencies = [
  "jni",
+ "mumcord-audio",
  "mumcord-engine",
  "mumcord-store",
  "rustls-platform-verifier",
@@ -2550,7 +2552,7 @@ dependencies = [
 [[package]]
 name = "mumcord-p2p"
 version = "0.8.0"
-source = "git+https://github.com/Mumcord/mumcord?rev=dc8b580d6994bbddcf3e7f5af55e0b3561fb9355#dc8b580d6994bbddcf3e7f5af55e0b3561fb9355"
+source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"
 dependencies = [
  "bytes",
  "crab_nat",
@@ -2573,7 +2575,7 @@ dependencies = [
 [[package]]
 name = "mumcord-protocol"
 version = "0.8.0"
-source = "git+https://github.com/Mumcord/mumcord?rev=dc8b580d6994bbddcf3e7f5af55e0b3561fb9355#dc8b580d6994bbddcf3e7f5af55e0b3561fb9355"
+source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"
 dependencies = [
  "aes",
  "base64",
@@ -2594,7 +2596,7 @@ dependencies = [
 [[package]]
 name = "mumcord-screenshare"
 version = "0.8.0"
-source = "git+https://github.com/Mumcord/mumcord?rev=dc8b580d6994bbddcf3e7f5af55e0b3561fb9355#dc8b580d6994bbddcf3e7f5af55e0b3561fb9355"
+source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"
 dependencies = [
  "thiserror 2.0.21",
 ]
@@ -2602,7 +2604,7 @@ dependencies = [
 [[package]]
 name = "mumcord-store"
 version = "0.8.0"
-source = "git+https://github.com/Mumcord/mumcord?rev=dc8b580d6994bbddcf3e7f5af55e0b3561fb9355#dc8b580d6994bbddcf3e7f5af55e0b3561fb9355"
+source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"
 dependencies = [
  "chrono",
  "image",

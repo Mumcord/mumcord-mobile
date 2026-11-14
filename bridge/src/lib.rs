@@ -17,6 +17,14 @@
 //! on an audio thread. [`SecureStorage`] is called from the constructor's thread and from
 //! runtime threads.
 //!
+//! # Audio
+//!
+//! The app captures and plays the audio itself (only the system's voice-communication session
+//! gives echo cancellation and call routing) and moves it through four C functions that its
+//! real-time audio threads call directly: `bridge/include/mumcord_audio.h`, with the handles of
+//! [`MumcordEngine::audio_endpoints`]. [`AudioWanted`] ([`BridgeEvent::AudioWantedChanged`],
+//! [`BridgeSnapshot::audio`]) says when to open the microphone and the speaker.
+//!
 //! # Android start-up
 //!
 //! Checking certificates against the system store needs the app context once per process, before
@@ -50,6 +58,7 @@
 
 #[cfg(target_os = "android")]
 mod android;
+mod audio_abi;
 mod convert;
 mod engine;
 mod error;
@@ -57,14 +66,19 @@ mod events;
 mod storage;
 mod types;
 
+pub use audio_abi::{
+    mumcord_audio_capture_push_f32, mumcord_audio_capture_push_i16,
+    mumcord_audio_playback_pull_f32, mumcord_audio_playback_pull_i16,
+};
 pub use engine::MumcordEngine;
 pub use error::BridgeError;
 pub use events::{BridgeEvent, EngineListener};
 pub use storage::{SecureStorage, SecureStorageError};
 pub use types::{
-    BridgeSnapshot, CertificatePrompt, Channel, ChannelPasswordState, ChannelPermissions,
-    ConnectRequest, ConnectionState, EngineConfig, MumbleLink, PasswordInput, Person, SavedServer,
-    ServerInput, ServerPing, ServerState, TalkMode,
+    AudioConfig, AudioEndpoints, AudioWanted, BridgeSnapshot, CertificatePrompt, Channel,
+    ChannelPasswordState, ChannelPermissions, ConnectRequest, ConnectionState, EchoCancellation,
+    EngineConfig, MumbleLink, PasswordInput, Person, SavedServer, ServerInput, ServerPing,
+    ServerState, TalkMode, VoiceSettings, WhisperTarget,
 };
 
 uniffi::setup_scaffolding!();

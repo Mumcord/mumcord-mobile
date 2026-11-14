@@ -2,7 +2,12 @@
 
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.AudioEndpoints
+import app.mumcord.mobile.bridge.AudioWanted
 import app.mumcord.mobile.bridge.BridgeEvent
+import app.mumcord.mobile.bridge.EchoCancellation
+import app.mumcord.mobile.bridge.VoiceSettings
+import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.bridge.ChannelPasswordState
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.BridgeException
@@ -141,6 +146,8 @@ class FakeEngine(
             connectedServerId = connectedServerId,
             certificatePrompt = null,
             server = null,
+            audio = AudioWanted(false, false),
+            whispering = false,
         )
 
     override suspend fun addServer(input: ServerInput): SavedServer {
@@ -229,6 +236,83 @@ class FakeEngine(
             throw it
         }
         talkMode = mode
+    }
+
+    @Volatile
+    var pushToTalkPressed = false
+        private set
+
+    @Volatile
+    var selfMuted = false
+        private set
+
+    @Volatile
+    var selfDeafened = false
+        private set
+
+    @Volatile
+    var noiseSuppression = false
+        private set
+
+    @Volatile
+    var autoGain = false
+        private set
+
+    @Volatile
+    var bitrateLimitKbps: UInt? = null
+        private set
+
+    /** The target of the running whisper, or null when none runs. */
+    @Volatile
+    var whisperTarget: WhisperTarget? = null
+        private set
+
+    override fun audioEndpoints(): AudioEndpoints = AudioEndpoints(capture = 0uL, playback = 0uL)
+
+    override fun setPushToTalkPressed(pressed: Boolean) {
+        pushToTalkPressed = pressed
+    }
+
+    override suspend fun setSelfMute(muted: Boolean) {
+        selfMuted = muted
+        change(server.selfSession) { it.copy(selfMuted = muted) }
+    }
+
+    // Deafening also mutes, as in Mumble.
+    override suspend fun setSelfDeaf(deafened: Boolean) {
+        selfDeafened = deafened
+        if (deafened) selfMuted = true
+        change(server.selfSession) {
+            it.copy(selfDeafened = deafened, selfMuted = it.selfMuted || deafened)
+        }
+    }
+
+    override suspend fun voiceSettings(): VoiceSettings = VoiceSettings(
+        talkMode = talkMode,
+        noiseSuppression = noiseSuppression,
+        autoGain = autoGain,
+        echoCancellation = EchoCancellation.SYSTEM,
+        bitrateLimitKbps = bitrateLimitKbps,
+    )
+
+    override suspend fun setNoiseSuppression(on: Boolean) {
+        noiseSuppression = on
+    }
+
+    override suspend fun setAutoGain(on: Boolean) {
+        autoGain = on
+    }
+
+    override fun setBitrateLimitKbps(kbps: UInt?) {
+        bitrateLimitKbps = kbps
+    }
+
+    override suspend fun startWhisper(target: WhisperTarget) {
+        whisperTarget = target
+    }
+
+    override fun stopWhisper() {
+        whisperTarget = null
     }
 
     private fun ServerInput.toSaved(id: Long, hadPassword: Boolean) = SavedServer(

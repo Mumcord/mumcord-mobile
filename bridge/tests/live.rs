@@ -134,6 +134,7 @@ fn fresh_engine(name: &str) -> (Arc<MumcordEngine>, Arc<MemoryStorage>, Events) 
     let engine = MumcordEngine::new(
         EngineConfig {
             data_dir: dir.to_string_lossy().into_owned(),
+            audio: None,
         },
         storage.clone(),
         Arc::new(Recorder(Mutex::new(sender))),
