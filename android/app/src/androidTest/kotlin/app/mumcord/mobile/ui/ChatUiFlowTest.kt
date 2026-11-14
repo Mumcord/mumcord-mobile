@@ -3,7 +3,6 @@
 package app.mumcord.mobile.ui
 
 import android.graphics.drawable.GradientDrawable
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
@@ -93,17 +92,8 @@ class ChatUiFlowTest {
     @get:Rule
     val compose = createAndroidComposeRule<ComponentActivity>()
 
-    /**
-     * The app's activity resizes for the keyboard. The bare activity of this test would move
-     * its whole window up instead, on top of the chat's own room for the keyboard, and push
-     * the messages off the screen whenever the keyboard comes up in time.
-     */
     @Before
-    fun resizeForTheKeyboardLikeTheApp() {
-        compose.activityRule.scenario.onActivity { activity ->
-            activity.window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-        }
-    }
+    fun resizeForTheKeyboard() = compose.resizeForTheKeyboardLikeTheApp()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var engine: FakeEngine
