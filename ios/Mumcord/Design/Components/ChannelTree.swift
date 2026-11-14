@@ -165,6 +165,8 @@ enum MumcordAvatarSize: CaseIterable {
     case small
     case medium
     case large
+    /// A private conversation in the list of the Messages tab.
+    case conversation
     /// The head of the person sheet.
     case sheet
     /// A person in the full voice view.
@@ -176,6 +178,7 @@ enum MumcordAvatarSize: CaseIterable {
         case .small: 24
         case .medium: 32
         case .large: 40
+        case .conversation: 48
         case .sheet: 56
         case .tile: 72
         case .extraLarge: 88
@@ -187,6 +190,7 @@ enum MumcordAvatarSize: CaseIterable {
         case .small: 11
         case .medium: 14
         case .large: 16
+        case .conversation: 18
         case .sheet: 24
         case .tile: 28
         case .extraLarge: 32

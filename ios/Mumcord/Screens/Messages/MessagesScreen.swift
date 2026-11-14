@@ -98,7 +98,7 @@ private struct NotificationsOffBanner: View {
             MumcordBanner(
                 text: Strings.messagesNotificationsOffText,
                 title: Strings.messagesNotificationsOffTitle,
-                icon: MumcordIcons.alert
+                icon: MumcordIcons.bell
             )
             .contentShape(Rectangle())
         }
@@ -182,10 +182,11 @@ private struct ConversationLine: View {
 private struct ConversationAvatar: View {
     let name: String
     let online: Bool
+    var size = MumcordAvatarSize.conversation
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
-        MumcordAvatar(initials: name.initials(1), colorSlot: avatarSlot(name), size: .large)
+        MumcordAvatar(initials: name.initials(1), colorSlot: avatarSlot(name), size: size)
             .overlay(alignment: .bottomTrailing) {
                 if online {
                     Circle()
@@ -334,7 +335,7 @@ private struct PickerPage: View {
                                 title: person.name,
                                 divider: index > 0,
                                 action: { actions.messagePerson(person.session) },
-                                leading: { ConversationAvatar(name: person.name, online: false) }
+                                leading: { ConversationAvatar(name: person.name, online: false, size: .large) }
                             )
                             .accessibilityIdentifier("picker-person")
                         }
@@ -372,7 +373,7 @@ struct BlockedPeopleScreen: View {
                                 subtitle: person.serverLabel.isEmpty ? nil : person.serverLabel,
                                 divider: index > 0,
                                 tall: true,
-                                leading: { ConversationAvatar(name: name, online: false) },
+                                leading: { ConversationAvatar(name: name, online: false, size: .large) },
                                 trailing: {
                                     MumcordButton(
                                         text: Strings.personUnblock,

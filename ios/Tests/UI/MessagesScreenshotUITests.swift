@@ -19,7 +19,13 @@ final class MessagesScreenshotUITests: XCTestCase {
     private func connect(_ options: String, theme: String) -> XCUIApplication {
         let app = launchApp(options.isEmpty ? "servers" : "servers," + options, theme: theme)
         tapWhenReady(app.element("Connect to Nordlicht"))
-        expectAppears(app.row("channel-row", containing: "Lobby"))
+        // The question about notifications covers the channels, which are then not offered
+        // to the tests either.
+        if options.contains("notif-ask") {
+            expectAppears(app.element("notifications-continue"))
+        } else {
+            expectAppears(app.row("channel-row", containing: "Lobby"))
+        }
         return app
     }
 

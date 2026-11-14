@@ -66,7 +66,7 @@ struct MoreMessagesSection: View {
             MumcordListRow(
                 title: Strings.moreSenderOnly,
                 subtitle: Strings.moreSenderOnlySub,
-                icon: MumcordIcons.alert,
+                icon: MumcordIcons.bell,
                 divider: true,
                 trailing: {
                     MumcordToggle(
