@@ -90,6 +90,11 @@ if [[ "${run_tests}" == true ]]; then
   fi
 
   log "Building and testing the app in the simulator '${SIMULATOR_NAME}'"
+  # The audio tests open the microphone side of the audio unit. Allowed up front, the simulator
+  # does not put the system's permission question over the tests; never a reason to fail.
+  xcrun simctl boot "${SIMULATOR_NAME}" 2>/dev/null || true
+  xcrun simctl privacy booted grant microphone app.mumcord.mobile ||
+    log "warning: could not allow the microphone in the simulator"
   # xcodebuild refuses to overwrite an existing result bundle.
   rm -rf "${RESULT_BUNDLE}"
   xcodebuild test \
