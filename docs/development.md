@@ -224,7 +224,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `app-screens` | app screenshots, design reference, launch test |
 | `core` | all unit tests (`MumcordTests`), app flow, voice flow |
 | `voice-chat-screens` | voice screenshots, chat screenshots |
-| `chat-flow` | chat flow (the lightest group: the place for new tests) |
+| `chat-flow` | chat flow, session-ended notice (the lightest group: the place for new tests) |
 
 Each group costs about five minutes of simulator start-up on top of its tests, so add a group
 only when the longest one exceeds the others by more than that.
@@ -234,3 +234,31 @@ with the shortest run time (see the Actions run) in `group_tests`; nothing else 
 from the same list. `scripts/build-ios.sh --check-groups` (a CI job that runs first, works on
 any OS) fails when a UI test class is in no group, in two groups, or a listed class does not
 exist. New unit tests need nothing: the whole unit bundle runs in `core`.
+
+### Voice in the background and the system call (iOS)
+
+A voice session is shown to iOS as an ongoing outgoing call through CallKit (`ios/Platform/Call`):
+that is what keeps it running in the background and with a locked screen, gives it the system's
+call screen with mute and end, and lets iOS hold it while the user takes a phone call. While
+such a call exists the audio session is started and stopped by iOS, never by the app; the app
+only opens its audio unit when iOS says the call's audio is active.
+
+Whether sessions are calls at all is decided in exactly one place, `CallSystems.make`
+(`ios/Platform/Call/CallKitSystem.swift`). Where it returns nil, and whenever iOS refuses the
+call, the session runs on the app's own audio session instead: voice still works in the
+background (background mode `audio`), but iOS shows no call, has no mute or end button for it,
+and a phone call only pauses the audio on the phone instead of muting and deafening on the server.
+The simulator always takes this path, because its call service ends outgoing calls by itself.
+
+Only a real iPhone can show: the call screen and the lock screen, a real phone call holding the
+session, car systems, the recent calls list, and how long iOS keeps the app alive.
+
+**For the store release (Epic 6).**
+
+- The app declares the background modes `audio` and `voip`. `voip` is what gives access to
+  CallKit according to Apple's developer support, but the app uses no PushKit and has no push
+  server. App Review may ask to demonstrate the VoIP feature or to remove the mode; whether a
+  CallKit-only app passes is not confirmed by Apple's documentation.
+- Apple does not accept CallKit being active in mainland China. Nothing switches it off by
+  region yet: `CallSystems.make` has to return nil there, which gives the behaviour described
+  above. Apple names no official way to detect the region.
