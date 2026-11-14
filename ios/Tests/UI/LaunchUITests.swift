@@ -7,25 +7,24 @@ final class LaunchUITests: XCTestCase {
         continueAfterFailure = false
     }
 
-    func testAppStartsAndShowsTheEngineVersion() throws {
+    /// Started without arguments the app runs on the real engine, which is created on first use.
+    /// A fresh install shows the talk mode choice, an installation that was set up the list.
+    func testAppStartsOnTheRealEngineAndShowsItsFirstScreen() {
         let app = XCUIApplication()
         app.launch()
 
-        let version = app.staticTexts["engine-version"]
-        XCTAssertTrue(version.waitForExistence(timeout: 10))
+        let talkModeChoice = app.element("How do you want to talk?")
+        let serverList = app.element("Servers")
+        let deadline = Date().addingTimeInterval(20)
+        while !talkModeChoice.exists && !serverList.exists && Date() < deadline {
+            _ = talkModeChoice.waitForExistence(timeout: 0.5)
+        }
+        XCTAssertTrue(
+            talkModeChoice.exists || serverList.exists,
+            "neither the talk mode choice nor the server list is shown"
+        )
 
         // Kept in the result bundle also for a passing test, so CI can publish the first screen.
-        let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "first-screen"
-        screenshot.lifetime = .keepAlways
-        add(screenshot)
-
-        // The label reads "Engine version 0.8.0 (6d2ac79e)": a version and the pinned engine
-        // reference in brackets, both coming from the Rust library.
-        let pattern = #"^Engine version \d+\.\d+\.\d+\S* \(.+\)$"#
-        XCTAssertNotNil(
-            version.label.range(of: pattern, options: .regularExpression),
-            "unexpected engine version text: \(version.label)"
-        )
+        keepScreenshot(of: app, named: "first-screen")
     }
 }
