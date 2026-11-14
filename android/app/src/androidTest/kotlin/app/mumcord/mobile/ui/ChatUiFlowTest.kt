@@ -5,6 +5,7 @@ package app.mumcord.mobile.ui
 import android.graphics.drawable.GradientDrawable
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -17,6 +18,8 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performFirstLinkClick
 import androidx.compose.ui.test.performScrollToIndex
@@ -356,13 +359,17 @@ class ChatUiFlowTest {
      * A message that was just added is in the list at once but on the screen only when the list
      * has scrolled to it, so being displayed is waited for.
      */
-    private fun awaitDisplayed(text: String) = await {
-        try {
-            compose.onNodeWithText(text).assertIsDisplayed()
-            true
-        } catch (_: AssertionError) {
-            false
+    private fun awaitDisplayed(text: String) = try {
+        await {
+            try {
+                compose.onNodeWithText(text).assertIsDisplayed()
+                true
+            } catch (_: AssertionError) {
+                false
+            }
         }
+    } catch (error: ComposeTimeoutException) {
+        throw AssertionError("\"$text\" did not come onto the screen:\n${compose.onRoot().printToString()}", error)
     }
 
     private fun await(condition: () -> Boolean) = compose.waitUntil(TIMEOUT_MILLIS, condition)
