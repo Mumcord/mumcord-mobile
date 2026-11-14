@@ -71,7 +71,7 @@ final class AppScreenshotUITests: XCTestCase {
         dismissKeyboard(in: app)
         let save = app.element("server-form-save")
         reveal(save, in: app)
-        save.tap()
+        save.tapCenter()
         expectAppears(app.element(containing: "Enter a number between 1 and 65535."))
         expectAppears(app.element(containing: "Enter the name you want to use on this server."))
         dismissKeyboard(in: app)

@@ -23,7 +23,7 @@ final class AppFlowUITests: XCTestCase {
         dismissKeyboard(in: app)
         let element = app.element(button)
         if element.exists {
-            element.tap()
+            element.tapCenter()
         }
     }
 
@@ -36,7 +36,7 @@ final class AppFlowUITests: XCTestCase {
         XCTAssertFalse(continueButton.isEnabled)
         tapWhenReady(app.element("talk-mode-push-to-talk"))
         XCTAssertTrue(continueButton.isEnabled)
-        continueButton.tap()
+        continueButton.tapCenter()
 
         expectAppears(app.element(containing: "No servers yet"))
         tapWhenReady(app.element("server-add"))
@@ -44,7 +44,7 @@ final class AppFlowUITests: XCTestCase {
         // An incomplete form says what is missing instead of saving.
         let save = app.element("server-form-save")
         reveal(save, in: app)
-        save.tap()
+        save.tapCenter()
         expectAppears(app.element(containing: "Enter the address of the server."))
 
         typeText("10.0.2.2", into: app.input("Address"))
@@ -53,7 +53,7 @@ final class AppFlowUITests: XCTestCase {
         typeText("Tester", into: app.input("User name"))
         dismissKeyboard(in: app)
         reveal(save, in: app)
-        save.tap()
+        save.tapCenter()
 
         expectAppears(app.element(containing: "Home"))
         expectAppears(app.element(containing: "10.0.2.2:40000"))
@@ -183,7 +183,7 @@ final class AppFlowUITests: XCTestCase {
         dismissKeyboard(in: app)
         let save = app.element("server-form-save")
         reveal(save, in: app)
-        save.tap()
+        save.tapCenter()
         expectGone(app.element("Edit server"))
         expectGone(app.element(containing: "Tidepool"))
         expectAppears(app.element("Edit Tide"))

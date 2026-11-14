@@ -89,14 +89,14 @@ extension XCTestCase {
         line: UInt = #line
     ) {
         expectAppears(element, file: file, line: line)
-        element.tap()
+        element.tapCenter()
     }
 
     /// Scrolls the screen until the element can be tapped, e.g. a button below the keyboard.
     func reveal(_ element: XCUIElement, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         expectAppears(element, file: file, line: line)
         var swipes = 0
-        while !element.isHittable && swipes < 6 {
+        while isBelowTheVisibleArea(element, in: app) && swipes < 6 {
             app.swipeUp()
             swipes += 1
         }
@@ -105,7 +105,7 @@ extension XCTestCase {
     /// Waits for the field, taps it so it has the focus, and types.
     func typeText(_ text: String, into field: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
         expectAppears(field, file: file, line: line)
-        field.tap()
+        field.tapCenter()
         field.typeText(text)
     }
 
@@ -113,7 +113,7 @@ extension XCTestCase {
     /// harmless, which covers a field that reports its placeholder as its value.
     func replaceText(in field: XCUIElement, with text: String, file: StaticString = #filePath, line: UInt = #line) {
         expectAppears(field, file: file, line: line)
-        field.tap()
+        field.tapCenter()
         let current = (field.value as? String) ?? ""
         if !current.isEmpty {
             field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count + 2))
@@ -141,5 +141,23 @@ extension XCTestCase {
         screenshot.name = name
         screenshot.lifetime = .keepAlways
         add(screenshot)
+    }
+}
+
+extension XCTestCase {
+    /// True while the element lies below the screen or under the keyboard.
+    func isBelowTheVisibleArea(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
+        let keyboard = app.keyboards.firstMatch
+        let limit = keyboard.exists ? keyboard.frame.minY : app.frame.maxY
+        return element.frame.isEmpty || element.frame.maxY > limit
+    }
+}
+
+extension XCUIElement {
+    /// Taps the middle of the element with a real touch. `tap()` first asks the accessibility
+    /// hit test whether the element is hittable, which reports the app's SwiftUI controls as
+    /// covered although touches reach them.
+    func tapCenter() {
+        coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 }
