@@ -26,6 +26,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Naming the shell turns on `pipefail`: without it a failing build piped into `tee` passes.
+defaults:
+  run:
+    shell: bash
+
 env:
   CARGO_TERM_COLOR: always
   # Must exist in the Xcode of the runner image below.
