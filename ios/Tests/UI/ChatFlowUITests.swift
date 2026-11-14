@@ -61,9 +61,10 @@ final class ChatFlowUITests: XCTestCase {
         expectAppears(anna)
         // The lower half of the row is the line of text.
         anna.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75)).press(forDuration: 1.2)
-        expectAppears(app.element(containing: "Replying to Anna"))
+        // The reply bar; the words alone are also part of Lea's answer further down.
+        expectAppears(app.element("Cancel reply"))
         tapWhenReady(app.element("Cancel reply"))
-        expectGone(app.element(containing: "Replying to Anna"))
+        expectGone(app.element("Cancel reply"))
     }
 
     func testTypingAnAtSignOffersNamesAndATapCompletesTheMention() {
@@ -127,7 +128,7 @@ final class ChatFlowUITests: XCTestCase {
             }
         }
         expectAppears(warning)
-        XCTAssertTrue(warning.label.contains("https://nordlicht.evil.example/rules"))
+        expectAppears(app.element(containing: "https://nordlicht.evil.example/rules"))
         tapWhenReady(app.element("Cancel"))
         expectGone(warning)
         // Nothing was opened: the app is still in front.

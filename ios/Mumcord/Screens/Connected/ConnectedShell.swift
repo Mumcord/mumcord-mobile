@@ -22,6 +22,14 @@ struct ConnectedShell<Chat: View>: View {
     }
 
     private var tabs: some View {
+        // This frame ends where the keyboard begins, which the chat needs to know: the screen
+        // inside it reaches under the keyboard.
+        GeometryReader { area in
+            screen.environment(\.keyboardTop, area.frame(in: .global).maxY)
+        }
+    }
+
+    private var screen: some View {
         MumcordScreen {
             tabScreen
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -67,6 +75,19 @@ struct ConnectedShell<Chat: View>: View {
         case .more:
             MoreScreen(serverName: state.serverName, onDisconnect: onDisconnect)
         }
+    }
+}
+
+private struct KeyboardTopKey: EnvironmentKey {
+    static let defaultValue = CGFloat.infinity
+}
+
+extension EnvironmentValues {
+    /// Where the keyboard begins on the screen, or the bottom of the area for content without
+    /// one. Set by the connected screens, whose bars stay under the keyboard.
+    var keyboardTop: CGFloat {
+        get { self[KeyboardTopKey.self] }
+        set { self[KeyboardTopKey.self] = newValue }
     }
 }
 

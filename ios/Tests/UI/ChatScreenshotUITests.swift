@@ -37,7 +37,7 @@ final class ChatScreenshotUITests: XCTestCase {
 
     private func reply(theme: String) {
         let app = openChat("chat,chat-reply", theme: theme)
-        expectAppears(app.element(containing: "Replying to Anna"))
+        expectAppears(app.element("Cancel reply"))
         capture(app, "chat-reply", theme: theme)
     }
 

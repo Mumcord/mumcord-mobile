@@ -2,7 +2,6 @@
 
 import MumcordBridge
 import SwiftUI
-import UIKit
 
 /// How times and days are written: the phone's calendar and time zone, today's date and its
 /// 12 or 24 hour setting.
@@ -52,15 +51,26 @@ struct ChatScreen: View {
     let loader: ChatImageLoader
     let clock: ChatClock
     @Environment(\.mumcordTheme) private var theme
-    /// The top edge of the keyboard on the screen; beyond the screen while there is none.
-    @State private var keyboardTop = CGFloat.infinity
-    /// The bottom edge of this screen before it makes room for the keyboard.
-    @State private var bottomEdge: CGFloat = 0
+    /// Where the keyboard begins on the screen, or the bottom of the screen without one.
+    @Environment(\.keyboardTop) private var keyboardTop
 
     var body: some View {
-        // The bars under the chat (voice bar, tab bar) already take part of the keyboard's
-        // height, so only what is left of it is padded.
-        let lift = max(0, bottomEdge - keyboardTop)
+        GeometryReader { area in
+            // The bars under the chat (voice bar, tab bar) already take part of the keyboard's
+            // height, so only what is left of it is padded.
+            let lift = max(0, area.frame(in: .global).maxY - keyboardTop)
+            column
+                .padding(.bottom, lift)
+                .animation(.easeOut(duration: 0.25), value: lift)
+        }
+        .onChange(of: newestFromOthers?.id) { _, id in
+            if id != nil, let newestFromOthers { announce(newestFromOthers) }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("chat-screen")
+    }
+
+    private var column: some View {
         VStack(spacing: 0) {
             MumcordAppBar(
                 title: Strings.chatTitle(state.title),
@@ -93,27 +103,6 @@ struct ChatScreen: View {
             .background(theme.colors.bgChat)
             Composer(state: state, actions: actions)
         }
-        .padding(.bottom, lift)
-        .animation(.easeOut(duration: 0.25), value: lift)
-        .background {
-            GeometryReader { proxy in
-                Color.clear.preference(key: BottomEdgeKey.self, value: proxy.frame(in: .global).maxY)
-            }
-        }
-        .onPreferenceChange(BottomEdgeKey.self) { bottomEdge = $0 }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
-            if let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                keyboardTop = frame.minY
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            keyboardTop = .infinity
-        }
-        .onChange(of: newestFromOthers?.id) { _, id in
-            if id != nil, let newestFromOthers { announce(newestFromOthers) }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("chat-screen")
     }
 
     @ViewBuilder private var content: some View {
@@ -148,14 +137,6 @@ struct ChatScreen: View {
         var words = AttributedString(Strings.chatAnnounce(message.senderName, text.isEmpty ? Strings.chatImageWord : text))
         words.accessibilitySpeechAnnouncementPriority = .low
         AccessibilityNotification.Announcement(words).post()
-    }
-}
-
-private struct BottomEdgeKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 
@@ -378,15 +359,13 @@ private struct Composer: View {
                 },
                 trailing: {
                     // Drawn as in the mockup also while there is nothing to send; a tap then
-                    // does nothing and screen readers hear that it is not available.
+                    // does nothing.
                     MumcordIconButton(
                         icon: MumcordIcons.send,
                         label: Strings.chatSend,
                         style: .accent,
-                        dimsWhenDisabled: false,
                         action: actions.send
                     )
-                    .disabled(!state.canSend)
                     .accessibilityIdentifier("chat-send")
                 }
             )
