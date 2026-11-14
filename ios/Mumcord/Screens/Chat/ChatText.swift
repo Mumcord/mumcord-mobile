@@ -85,7 +85,7 @@ func chatText(_ spans: [Span], styles: ChatTextStyles) -> ChatText {
     return ChatText(text: text, links: links)
 }
 
-private extension SafeLink {
+extension SafeLink {
     /// True when the reader cannot tell from `text` where the link goes.
     func showsHost(_ text: String) -> Bool {
         misleading || text.range(of: host, options: .caseInsensitive) == nil
@@ -114,6 +114,26 @@ extension MessageContent {
         blocks.compactMap { block -> String? in
             switch block {
             case .paragraph(let spans), .quote(let spans): spans.map(\.text).joined()
+            case .code(let text): text
+            case .image: nil
+            }
+        }
+        .joined(separator: " ")
+        .replacingOccurrences(of: "\n", with: " ")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The text of a message as a screen reader says it: as `plainText`, with the real host
+    /// after every link whose text does not name it, as on screen.
+    func spokenText() -> String {
+        blocks.compactMap { block -> String? in
+            switch block {
+            case .paragraph(let spans), .quote(let spans):
+                spans.map { span in
+                    guard let link = span.link, link.showsHost(span.text) else { return span.text }
+                    return span.text + " (\(link.host))"
+                }
+                .joined()
             case .code(let text): text
             case .image: nil
             }

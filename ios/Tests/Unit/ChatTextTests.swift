@@ -523,3 +523,26 @@ final class ChatTextTests: XCTestCase {
         }
     }
 }
+
+/// What a screen reader says of a message.
+final class ChatSpokenTextTests: XCTestCase {
+    private func linked(_ text: String, host: String, misleading: Bool) -> Span {
+        var run = span(text)
+        run.link = SafeLink(url: "https://\(host)/rules", host: host, kind: .web, misleading: misleading)
+        return run
+    }
+
+    func testTheRealHostIsSpokenAfterALinkThatDoesNotNameIt() {
+        let content = messageContent(blocks: [
+            .paragraph(spans: [span("Rules: "), linked("nordlicht.example", host: "nordlicht.evil.example", misleading: true)]),
+        ])
+        XCTAssertEqual(content.spokenText(), "Rules: nordlicht.example (nordlicht.evil.example)")
+    }
+
+    func testALinkThatNamesItsHostIsSpokenAsItIs() {
+        let content = messageContent(blocks: [
+            .paragraph(spans: [span("Rules: "), linked("nordlicht.example/rules", host: "nordlicht.example", misleading: false)]),
+        ])
+        XCTAssertEqual(content.spokenText(), "Rules: nordlicht.example/rules")
+    }
+}

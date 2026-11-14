@@ -99,7 +99,7 @@ extension ChatMessage {
         if let reply = content.reply {
             parts.append(Strings.chatReplyingTo(reply.name))
         }
-        let text = content.plainText()
+        let text = content.spokenText()
         if !text.isEmpty { parts.append(text) }
         for source in imageSources() {
             if case .remote(_, true) = source {
