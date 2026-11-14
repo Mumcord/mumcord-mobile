@@ -102,6 +102,15 @@
     <string name="error_io">Mumcord could not read or write its data on this device.</string>
     <string name="error_internal">Something went wrong inside Mumcord.</string>
 
+    <!-- Local network permission (Android 17 and later) -->
+    <string name="local_network_title">Local network access</string>
+    <string name="local_network_text">%1$s is on your local network, and Android only lets Mumcord reach it if you allow access to nearby devices.</string>
+    <string name="local_network_continue">Continue</string>
+    <string name="local_network_not_now">Not now</string>
+    <string name="local_network_denied">Mumcord may not access your local network, so it cannot reach this server. Allow “Nearby devices” for Mumcord in the system settings, then try again.</string>
+    <string name="local_network_suspected">The server could not be reached. If it is on your local network, Mumcord needs access to nearby devices: try again to allow it.</string>
+    <string name="local_network_open_settings">Open settings</string>
+
     <string name="certificate_unknown_title">Trust this server?</string>
     <string name="certificate_unknown_message">Mumcord has not seen this server before and cannot confirm its identity on its own. If you know the server\'s fingerprint, compare it with the one below.</string>
     <string name="certificate_fingerprint_label">Certificate fingerprint (SHA-256)</string>

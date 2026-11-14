@@ -27,4 +27,6 @@ dependencies {
     implementation(libs.espresso.core)
     implementation(libs.androidx.test.runner)
     implementation(libs.androidx.test.ext.junit)
+    // Drives the system's own permission dialog, which is outside the app.
+    implementation(libs.androidx.test.uiautomator)
 }

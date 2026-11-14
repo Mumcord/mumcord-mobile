@@ -14,13 +14,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.ui.connect.CertificateSheet
 import app.mumcord.mobile.ui.connect.ConfirmSwitchSheet
+import app.mumcord.mobile.ui.connect.LocalNetworkSheet
+import app.mumcord.mobile.ui.connect.LocalNetworkSystem
 import app.mumcord.mobile.ui.connect.PasswordSheet
+import app.mumcord.mobile.ui.connect.rememberLocalNetworkSystem
 import app.mumcord.mobile.ui.link.InvalidLinkSheet
 import app.mumcord.mobile.ui.link.LinkConfirmSheet
-import app.mumcord.mobile.ui.servers.ConnectFailure
 import app.mumcord.mobile.ui.servers.RemoveServerSheet
 import app.mumcord.mobile.ui.servers.ServerFormScreen
 import app.mumcord.mobile.ui.servers.ServerListScreen
@@ -30,13 +31,16 @@ import app.mumcord.mobile.ui.connected.ConnectedShell
 
 /** Connects the screens to the view model; everything below it only gets values and callbacks. */
 @Composable
-fun AppRoute(viewModel: AppViewModel) {
+fun AppRoute(
+    viewModel: AppViewModel,
+    localNetwork: LocalNetworkSystem = rememberLocalNetworkSystem(viewModel::answerLocalNetworkPrompt),
+) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshPings()
         onPauseOrDispose { }
     }
-    AppContent(uiState, viewModel)
+    AppContent(uiState, viewModel, localNetwork)
 }
 
 /**
@@ -47,6 +51,7 @@ fun AppRoute(viewModel: AppViewModel) {
 fun AppContent(
     uiState: AppUiState,
     viewModel: AppViewModel,
+    localNetwork: LocalNetworkSystem,
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
@@ -75,9 +80,7 @@ fun AppContent(
                         rows = uiState.serverRows,
                         loaded = session.serversLoaded,
                         editing = uiState.editing,
-                        failure = (session.phase as? ConnectionPhase.Failed)?.let {
-                            ConnectFailure(it.error, uiState.activeServerName)
-                        },
+                        failure = uiState.failure,
                         onConnect = viewModel::connect,
                         onCancelConnect = viewModel::disconnect,
                         onAdd = viewModel::openAddServer,
@@ -85,6 +88,7 @@ fun AppContent(
                         onEdit = viewModel::openEditServer,
                         onRemove = viewModel::requestRemove,
                         onRetry = viewModel::retry,
+                        onOpenSettings = localNetwork.openSettings,
                         onDismissError = viewModel::dismissError,
                         topInsets = topInsets,
                         bottomInsets = bottomInsets,
@@ -148,6 +152,13 @@ fun AppContent(
                 state = overlay.state,
                 onUsernameChange = viewModel::changeLinkUsername,
                 onConnect = viewModel::confirmLink,
+                onDismiss = viewModel::dismissOverlay,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+            )
+            overlay is Overlay.LocalNetwork -> LocalNetworkSheet(
+                serverName = overlay.serverName,
+                onContinue = localNetwork.ask,
                 onDismiss = viewModel::dismissOverlay,
                 topInsets = topInsets,
                 bottomInsets = bottomInsets,

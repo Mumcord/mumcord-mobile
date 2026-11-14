@@ -5,9 +5,12 @@ package app.mumcord.mobile.ui
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.session.ConnectionError
+import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.SessionState
 import app.mumcord.mobile.ui.connected.ConnectedUiState
 import app.mumcord.mobile.ui.link.LinkConfirmState
+import app.mumcord.mobile.ui.servers.ConnectFailure
+import app.mumcord.mobile.ui.servers.LocalNetworkHint
 import app.mumcord.mobile.ui.servers.PingState
 import app.mumcord.mobile.ui.servers.ServerFormState
 import app.mumcord.mobile.ui.servers.ServerRow
@@ -36,6 +39,9 @@ sealed interface Overlay {
     data class Link(val state: LinkConfirmState) : Overlay
 
     data object InvalidLink : Overlay
+
+    /** Before the system asks for local network access: why [serverName] needs it. */
+    data class LocalNetwork(val target: ConnectTarget, val serverName: String) : Overlay
 }
 
 data class AppUiState(
@@ -51,6 +57,12 @@ data class AppUiState(
     /** The open add or edit form, or null. */
     val form: ServerFormState? = null,
     val overlay: Overlay? = null,
+    /** The server whose address is being looked at before its connection starts. */
+    val checkingServerId: Long? = null,
+    /** The server that was not connected to because local network access is refused. */
+    val localNetworkDeniedServerId: Long? = null,
+    /** The server with a private address that is tried without local network access. */
+    val localNetworkSuspectServerId: Long? = null,
     /** The connected screens, or null while no server is shown. */
     val connected: ConnectedUiState? = null,
 ) {
@@ -63,7 +75,27 @@ data class AppUiState(
         }
 
     val serverRows: List<ServerRow>
-        get() = serverRows(session, pings)
+        get() = serverRows(session, pings, checkingServerId)
+
+    /** The failed connection shown above the server list, or null. */
+    val failure: ConnectFailure?
+        get() {
+            val deniedName = session.servers.firstOrNull { it.id == localNetworkDeniedServerId }?.name
+            val failed = session.phase as? ConnectionPhase.Failed
+            return when {
+                deniedName != null ->
+                    ConnectFailure(ConnectionError.ServerUnreachable, deniedName, LocalNetworkHint.Denied)
+                failed != null -> ConnectFailure(
+                    error = failed.error,
+                    serverName = activeServerName,
+                    localNetwork = LocalNetworkHint.Suspected.takeIf {
+                        failed.error == ConnectionError.ServerUnreachable &&
+                            session.activeServerId == localNetworkSuspectServerId
+                    },
+                )
+                else -> null
+            }
+        }
 
     /** The name of the server of the current connection, attempt or failure. */
     val activeServerName: String?

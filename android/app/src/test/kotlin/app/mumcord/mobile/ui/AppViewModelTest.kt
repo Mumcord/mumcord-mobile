@@ -18,6 +18,7 @@ import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.session.channel
 import app.mumcord.mobile.session.person
 import app.mumcord.mobile.session.savedServer
+import app.mumcord.mobile.ui.connect.FakeLocalNetworkGateway
 import app.mumcord.mobile.ui.servers.PingState
 import app.mumcord.mobile.ui.setup.SetupStore
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,7 @@ class AppViewModelTest {
     private val tidepool = savedServer(2, "Tidepool", username = "Anna")
     private lateinit var engine: FakeEngine
     private val setupStore = FakeSetupStore(done = true)
+    private val localNetwork = FakeLocalNetworkGateway()
 
     private class FakeSetupStore(done: Boolean) : SetupStore {
         override var firstStartDone = done
@@ -81,7 +83,7 @@ class AppViewModelTest {
             log = {},
             linkParser = ::parseTestLink,
         )
-        return AppViewModel(repository, setupStore).also { viewModel ->
+        return AppViewModel(repository, setupStore, localNetwork).also { viewModel ->
             // The state is only kept up to date while somebody watches it, as a screen would.
             backgroundScope.launch { viewModel.uiState.collect() }
             runCurrent()
@@ -111,6 +113,7 @@ class AppViewModelTest {
         val viewModel = AppViewModel(
             SessionRepository({ FakeEngine(it, server).also { e -> engine = e } }, backgroundScope, dispatcher, {}),
             FakeSetupStore(done = false),
+            localNetwork,
         )
         backgroundScope.launch { viewModel.uiState.collect() }
         runCurrent()
@@ -131,6 +134,7 @@ class AppViewModelTest {
         val viewModel = AppViewModel(
             SessionRepository({ FakeEngine(it, server).also { e -> engine = e } }, backgroundScope, dispatcher, {}),
             store,
+            localNetwork,
         )
         backgroundScope.launch { viewModel.uiState.collect() }
         runCurrent()
@@ -155,6 +159,7 @@ class AppViewModelTest {
                 {},
             ),
             store,
+            localNetwork,
         )
         backgroundScope.launch { viewModel.uiState.collect() }
         runCurrent()

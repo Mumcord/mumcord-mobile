@@ -35,12 +35,18 @@ import app.mumcord.mobile.session.savedServer
 import app.mumcord.mobile.ui.connect.CERTIFICATE_REJECT_TEST_TAG
 import app.mumcord.mobile.ui.connect.CERTIFICATE_TRUST_TEST_TAG
 import app.mumcord.mobile.ui.connect.FINGERPRINT_TEST_TAG
+import app.mumcord.mobile.ui.connect.FakeLocalNetworkGateway
+import app.mumcord.mobile.ui.connect.LOCAL_NETWORK_CONTINUE_TEST_TAG
+import app.mumcord.mobile.ui.connect.LocalNetworkAnswer
+import app.mumcord.mobile.ui.connect.LocalNetworkPermission
+import app.mumcord.mobile.ui.connect.LocalNetworkSystem
 import app.mumcord.mobile.ui.connect.PASSWORD_CONNECT_TEST_TAG
 import app.mumcord.mobile.ui.connect.SWITCH_CONFIRM_TEST_TAG
 import app.mumcord.mobile.ui.link.LINK_CONNECT_TEST_TAG
 import app.mumcord.mobile.ui.servers.CONNECT_ERROR_TEST_TAG
 import app.mumcord.mobile.ui.servers.CONNECT_RETRY_TEST_TAG
 import app.mumcord.mobile.ui.servers.FORM_SAVE_TEST_TAG
+import app.mumcord.mobile.ui.servers.LOCAL_NETWORK_SETTINGS_TEST_TAG
 import app.mumcord.mobile.ui.servers.REMOVE_CONFIRM_TEST_TAG
 import app.mumcord.mobile.ui.servers.SERVER_ADD_TEST_TAG
 import app.mumcord.mobile.ui.servers.SERVER_ROW_TEST_TAG
@@ -83,6 +89,26 @@ class AppFlowTest {
     private val tidepool = savedServer(2, "Tidepool")
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var engine: FakeEngine
+    private val localNetwork = FakeLocalNetworkGateway()
+
+    /** What the user answers when the system asks for local network access. */
+    private var promptAnswer = LocalNetworkAnswer(granted = true, refusedBefore = false, refusedAfter = false)
+    private var settingsOpened = 0
+
+    /** Stands in for the system: its question is answered at once with [promptAnswer]. */
+    private fun fakeSystem(viewModel: AppViewModel) = LocalNetworkSystem(
+        ask = {
+            if (promptAnswer.granted) localNetwork.permission = LocalNetworkPermission.Granted
+            viewModel.answerLocalNetworkPrompt(promptAnswer)
+        },
+        openSettings = { settingsOpened++ },
+    )
+
+    /** Android 17 without the permission, and Nordlicht at home on the phone's own network. */
+    private fun nordlichtOnTheLocalNetwork() {
+        localNetwork.permission = LocalNetworkPermission.Missing
+        localNetwork.names[nordlicht.address] = listOf("192.168.1.20")
+    }
 
     private class FakeSetupStore(override var firstStartDone: Boolean) : SetupStore {
         override fun markFirstStartDone() {
@@ -111,9 +137,9 @@ class AppFlowTest {
                 MumbleLink("new.example", 40000u, "Ben", listOf("Games", "Chess"))
             },
         )
-        val viewModel = AppViewModel(repository, FakeSetupStore(setupDone))
+        val viewModel = AppViewModel(repository, FakeSetupStore(setupDone), localNetwork)
         compose.setContent {
-            MumcordTheme { AppRoute(viewModel) }
+            MumcordTheme { AppRoute(viewModel, fakeSystem(viewModel)) }
         }
         return viewModel
     }
@@ -301,6 +327,74 @@ class AppFlowTest {
         assertEquals(1, engine.disconnects)
         assertEquals(ConnectCall(3, null, listOf("Games", "Chess")), engine.connectCalls.last())
     }
+
+    // ----- local network permission (FR-5.8) -----
+
+    @Test
+    fun aServerOnTheLocalNetworkIsExplainedAndConnectsByItselfOnceAllowed() {
+        nordlichtOnTheLocalNetwork()
+        start()
+        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+
+        await { exists("Local network access") }
+        assertTrue(engine.connectCalls.isEmpty())
+        compose.onNodeWithTag(LOCAL_NETWORK_CONTINUE_TEST_TAG).performClick()
+
+        await { exists("Channels") }
+        assertEquals(listOf(ConnectCall(1, null, emptyList())), engine.connectCalls.toList())
+    }
+
+    @Test
+    fun notNowClosesTheExplanationAndLeavesTheListWithoutAnError() {
+        nordlichtOnTheLocalNetwork()
+        start()
+        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        await { exists("Local network access") }
+
+        compose.onNodeWithText("Not now").performClick()
+
+        await { !exists("Local network access") }
+        assertTrue(compose.onAllNodesWithTag(CONNECT_ERROR_TEST_TAG).fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithContentDescription("Connect to Nordlicht").assertIsDisplayed()
+        assertTrue(engine.connectCalls.isEmpty())
+    }
+
+    @Test
+    fun refusedLocalNetworkAccessIsNamedOffersTheSettingsAndConnectsOnceAllowedThere() {
+        nordlichtOnTheLocalNetwork()
+        promptAnswer = LocalNetworkAnswer(granted = false, refusedBefore = false, refusedAfter = true)
+        start()
+        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        await { exists("Local network access") }
+        compose.onNodeWithTag(LOCAL_NETWORK_CONTINUE_TEST_TAG).performClick()
+
+        await { hasText("may not access your local network") }
+        compose.onNodeWithTag(LOCAL_NETWORK_SETTINGS_TEST_TAG).assertIsDisplayed().performClick()
+        assertEquals(1, settingsOpened)
+
+        // The system still asks: "Try again" explains again. This time it is refused for good.
+        promptAnswer = LocalNetworkAnswer(granted = false, refusedBefore = true, refusedAfter = false)
+        compose.onNodeWithTag(CONNECT_RETRY_TEST_TAG).performClick()
+        await { exists("Local network access") }
+        compose.onNodeWithTag(LOCAL_NETWORK_CONTINUE_TEST_TAG).performClick()
+        await { hasText("may not access your local network") }
+
+        // Now the system no longer asks, so nothing is explained: the error stays, with its way out.
+        compose.onNodeWithTag(CONNECT_RETRY_TEST_TAG).performClick()
+        compose.waitForIdle()
+        assertTrue(compose.onAllNodesWithTag(LOCAL_NETWORK_CONTINUE_TEST_TAG).fetchSemanticsNodes().isEmpty())
+        compose.onNodeWithTag(LOCAL_NETWORK_SETTINGS_TEST_TAG).assertIsDisplayed()
+        assertTrue(engine.connectCalls.isEmpty())
+
+        // Allowed in the system settings: "Try again" connects.
+        localNetwork.permission = LocalNetworkPermission.Granted
+        compose.onNodeWithTag(CONNECT_RETRY_TEST_TAG).performClick()
+        await { exists("Channels") }
+        assertEquals(1, engine.connectCalls.size)
+    }
+
+    private fun hasText(part: String): Boolean =
+        compose.onAllNodesWithText(part, substring = true).fetchSemanticsNodes().isNotEmpty()
 
     private fun exists(text: String): Boolean =
         compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()

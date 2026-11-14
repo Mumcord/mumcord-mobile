@@ -6,8 +6,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!--
         Since Android 17 a server on the local network (home or office, private addresses) can
-        only be reached with this permission. It is only declared so far; asking for it with an
-        explanation when such an address is used is a follow-up task.
+        only be reached with this permission. The app asks for it, with an explanation, when the
+        user connects to such a server.
     -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 

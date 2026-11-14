@@ -16,14 +16,20 @@ import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.ui.connect.LocalNetworkAnswer
+import app.mumcord.mobile.ui.connect.LocalNetworkGateway
+import app.mumcord.mobile.ui.connect.LocalNetworkStep
+import app.mumcord.mobile.ui.connect.check
 import app.mumcord.mobile.ui.connected.ConnectedController
 import app.mumcord.mobile.ui.connected.ConnectedLocal
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.ui.link.linkConfirmState
+import app.mumcord.mobile.ui.servers.LocalNetworkHint
 import app.mumcord.mobile.ui.servers.ServerFormState
 import app.mumcord.mobile.ui.servers.toPingState
 import app.mumcord.mobile.ui.setup.PreferencesSetupStore
 import app.mumcord.mobile.ui.setup.SetupStore
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +48,7 @@ import kotlinx.coroutines.launch
 class AppViewModel(
     private val repository: SessionRepository,
     private val setupStore: SetupStore,
+    private val localNetwork: LocalNetworkGateway,
 ) : ViewModel() {
     private val local = MutableStateFlow(AppUiState(setupDone = setupStore.firstStartDone))
 
@@ -64,6 +71,9 @@ class AppViewModel(
 
     /** The last connect, so "Try again" and the password retry keep a link's channel. */
     private var lastTarget: ConnectTarget? = null
+
+    /** Looking at the address before a connection starts; a newer connect replaces it. */
+    private var addressCheck: Job? = null
 
     init {
         viewModelScope.launch { repository.loadServers() }
@@ -187,16 +197,66 @@ class AppViewModel(
         }
     }
 
-    private fun start(target: ConnectTarget) {
+    /**
+     * Connects, unless the server is on the local network and the app may not reach it yet
+     * (Android 17 and later): then the reason is explained first, or the refusal is shown.
+     * [suspected] marks a retry of a private address that was out of reach without that access.
+     */
+    private fun start(target: ConnectTarget, suspected: Boolean = false) {
+        val server = server(target.serverId) ?: return
         lastTarget = target
-        local.update { it.copy(overlay = null, editing = false) }
-        viewModelScope.launch {
-            repository.connectServer(target.serverId, target.password, target.channelPath)
+        addressCheck?.cancel()
+        local.update {
+            it.copy(
+                overlay = null,
+                editing = false,
+                checkingServerId = target.serverId,
+                localNetworkDeniedServerId = null,
+                localNetworkSuspectServerId = null,
+            )
+        }
+        addressCheck = viewModelScope.launch {
+            val check = localNetwork.check(server.address, suspected)
+            when (check.step) {
+                LocalNetworkStep.Connect -> {
+                    local.update {
+                        it.copy(
+                            checkingServerId = null,
+                            localNetworkSuspectServerId = target.serverId.takeIf { check.suspect },
+                        )
+                    }
+                    repository.connectServer(target.serverId, target.password, target.channelPath)
+                }
+                LocalNetworkStep.Explain -> {
+                    // An error of an earlier attempt would otherwise stay behind the question.
+                    repository.dismissFailure()
+                    local.update {
+                        it.copy(checkingServerId = null, overlay = Overlay.LocalNetwork(target, server.name))
+                    }
+                }
+                LocalNetworkStep.Denied -> {
+                    repository.dismissFailure()
+                    local.update { it.copy(checkingServerId = null, localNetworkDeniedServerId = target.serverId) }
+                }
+            }
+        }
+    }
+
+    /** The answer to the system's question for local network access: connect, or say why not. */
+    fun answerLocalNetworkPrompt(answer: LocalNetworkAnswer) {
+        val overlay = local.value.overlay as? Overlay.LocalNetwork ?: return
+        if (answer.granted) {
+            start(overlay.target)
+        } else {
+            localNetwork.promptBlocked = answer.blocksPrompt
+            local.update { it.copy(overlay = null, localNetworkDeniedServerId = overlay.target.serverId) }
         }
     }
 
     /** Ends the connection, also while it is still being made. */
     fun disconnect() {
+        addressCheck?.cancel()
+        local.update { it.copy(checkingServerId = null) }
         viewModelScope.launch { repository.disconnect() }
     }
 
@@ -209,6 +269,12 @@ class AppViewModel(
      * reads the server list again when that was what failed.
      */
     fun retry() {
+        val deniedServerId = local.value.localNetworkDeniedServerId
+        if (deniedServerId != null) {
+            // Checks again: access may have been allowed in the system settings meanwhile.
+            start(lastTarget?.takeIf { it.serverId == deniedServerId } ?: ConnectTarget(deniedServerId))
+            return
+        }
         val session = repository.state.value
         val failed = session.phase as? ConnectionPhase.Failed ?: return
         val serverId = session.activeServerId
@@ -222,7 +288,10 @@ class AppViewModel(
         if (failed.error == ConnectionError.WrongPassword) {
             local.update { it.copy(overlay = Overlay.EnterPassword(target.copy(password = null), serverName)) }
         } else {
-            start(target.copy(password = null))
+            start(
+                target.copy(password = null),
+                suspected = local.value.copy(session = session).failure?.localNetwork == LocalNetworkHint.Suspected,
+            )
         }
     }
 
@@ -237,7 +306,10 @@ class AppViewModel(
         start(overlay.target.copy(password = overlay.password))
     }
 
-    fun dismissError() = repository.dismissFailure()
+    fun dismissError() {
+        local.update { it.copy(localNetworkDeniedServerId = null) }
+        repository.dismissFailure()
+    }
 
     // ----- mumble:// links -----
 
@@ -291,7 +363,11 @@ class AppViewModel(
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val application = checkNotNull(this[APPLICATION_KEY]) as MumcordApplication
-                AppViewModel(application.sessionRepository, PreferencesSetupStore(application))
+                AppViewModel(
+                    application.sessionRepository,
+                    PreferencesSetupStore(application),
+                    application.localNetworkGateway,
+                )
             }
         }
     }

@@ -6,6 +6,8 @@ import android.app.Application
 import android.util.Log
 import app.mumcord.mobile.session.BridgeEngineFactory
 import app.mumcord.mobile.session.SessionRepository
+import app.mumcord.mobile.ui.connect.AndroidLocalNetworkGateway
+import app.mumcord.mobile.ui.connect.LocalNetworkGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,6 +25,8 @@ class MumcordApplication : Application() {
             log = { message -> Log.w(LOG_TAG, message) },
         )
     }
+
+    val localNetworkGateway: LocalNetworkGateway by lazy { AndroidLocalNetworkGateway(this) }
 
     private companion object {
         const val LOG_TAG = "Mumcord"

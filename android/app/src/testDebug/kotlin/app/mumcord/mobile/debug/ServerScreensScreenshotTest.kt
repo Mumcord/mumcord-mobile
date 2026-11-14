@@ -12,7 +12,9 @@ import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.session.CertificatePromptState
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.ui.connect.CertificateSheet
+import app.mumcord.mobile.ui.connect.LocalNetworkSheet
 import app.mumcord.mobile.ui.servers.ConnectFailure
+import app.mumcord.mobile.ui.servers.LocalNetworkHint
 import app.mumcord.mobile.ui.servers.PingState
 import app.mumcord.mobile.ui.servers.ServerFormScreen
 import app.mumcord.mobile.ui.servers.ServerFormState
@@ -66,6 +68,7 @@ class ServerScreensScreenshotTest {
             onEdit = {},
             onRemove = {},
             onRetry = {},
+            onOpenSettings = {},
             onDismissError = {},
             topInsets = top,
             bottomInsets = bottom,
@@ -132,6 +135,18 @@ class ServerScreensScreenshotTest {
         ServerList(rows(), ConnectFailure(ConnectionError.ServerUnreachable, "Nordlicht"))
     }
 
+    // No mockup exists for the local network permission; both states need product review.
+    private fun localNetworkExplain(dark: Boolean) = capture("android-localnet-explain", dark) {
+        Box {
+            ServerList(rows())
+            LocalNetworkSheet(serverName = "Nordlicht", onContinue = {}, onDismiss = {}, topInsets = top, bottomInsets = bottom)
+        }
+    }
+
+    private fun localNetworkDenied(dark: Boolean) = capture("android-localnet-denied", dark) {
+        ServerList(rows(), ConnectFailure(ConnectionError.ServerUnreachable, "Nordlicht", LocalNetworkHint.Denied))
+    }
+
     @Test fun serverListDark() = serverList(dark = true)
 
     @Test fun serverListLight() = serverList(dark = false)
@@ -159,4 +174,12 @@ class ServerScreensScreenshotTest {
     @Test fun connectErrorDark() = connectError(dark = true)
 
     @Test fun connectErrorLight() = connectError(dark = false)
+
+    @Test fun localNetworkExplainDark() = localNetworkExplain(dark = true)
+
+    @Test fun localNetworkExplainLight() = localNetworkExplain(dark = false)
+
+    @Test fun localNetworkDeniedDark() = localNetworkDenied(dark = true)
+
+    @Test fun localNetworkDeniedLight() = localNetworkDenied(dark = false)
 }

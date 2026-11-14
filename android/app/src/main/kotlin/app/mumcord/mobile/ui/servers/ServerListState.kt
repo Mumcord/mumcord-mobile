@@ -31,7 +31,8 @@ data class ServerRow(
     val highlighted: Boolean,
 )
 
-fun serverRows(session: SessionState, pings: Map<Long, PingState>): List<ServerRow> =
+/** [checkingServerId] is the server whose connection is being prepared; it already shows as connecting. */
+fun serverRows(session: SessionState, pings: Map<Long, PingState>, checkingServerId: Long? = null): List<ServerRow> =
     session.servers.mapIndexed { index, server ->
         ServerRow(
             id = server.id,
@@ -39,7 +40,7 @@ fun serverRows(session: SessionState, pings: Map<Long, PingState>): List<ServerR
             initials = initials(server.name),
             address = server.displayAddress(),
             ping = pings[server.id],
-            connecting = session.isBusy && session.activeServerId == server.id,
+            connecting = server.id == checkingServerId || (session.isBusy && session.activeServerId == server.id),
             highlighted = index == 0,
         )
     }

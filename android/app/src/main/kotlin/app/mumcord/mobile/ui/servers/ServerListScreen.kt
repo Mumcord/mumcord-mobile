@@ -56,10 +56,27 @@ const val SERVER_ROW_TEST_TAG = "server-row"
 const val SERVER_CONNECT_TEST_TAG = "server-connect"
 const val SERVER_ADD_TEST_TAG = "server-add"
 const val CONNECT_ERROR_TEST_TAG = "connect-error"
+const val LOCAL_NETWORK_SETTINGS_TEST_TAG = "local-network-settings"
 const val CONNECT_RETRY_TEST_TAG = "connect-retry"
 
-/** A failed connection shown above the list. [serverName] is null when no server is involved. */
-data class ConnectFailure(val error: ConnectionError, val serverName: String?)
+/** What the local network permission has to do with a failed connection. */
+enum class LocalNetworkHint {
+    /** Access is refused, so the server on the local network was not even tried. */
+    Denied,
+
+    /** The server has a private address and may be out of reach only because access is missing. */
+    Suspected,
+}
+
+/**
+ * A failed connection shown above the list. [serverName] is null when no server is involved;
+ * [localNetwork] is set when the missing local network permission is, or may be, the reason.
+ */
+data class ConnectFailure(
+    val error: ConnectionError,
+    val serverName: String?,
+    val localNetwork: LocalNetworkHint? = null,
+)
 
 /**
  * The saved servers with people online and latency, and the way to add, edit, remove and
@@ -78,13 +95,14 @@ fun ServerListScreen(
     onEdit: (Long) -> Unit,
     onRemove: (Long) -> Unit,
     onRetry: () -> Unit,
+    onOpenSettings: () -> Unit,
     onDismissError: () -> Unit,
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
     MumcordScreen {
         MumcordAppBar(title = stringResource(R.string.servers_title), large = true, windowInsets = topInsets)
-        if (failure != null) FailureBanner(failure, onRetry, onDismissError)
+        if (failure != null) FailureBanner(failure, onRetry, onOpenSettings, onDismissError)
         when {
             // Nothing to show before the list is read; an empty state would flash by.
             !loaded -> Unit
@@ -205,7 +223,12 @@ private fun statusLine(row: ServerRow): (@Composable RowScope.() -> Unit)? {
 }
 
 @Composable
-private fun FailureBanner(failure: ConnectFailure, onRetry: () -> Unit, onDismiss: () -> Unit) {
+private fun FailureBanner(
+    failure: ConnectFailure,
+    onRetry: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onDismiss: () -> Unit,
+) {
     Column(
         Modifier
             .testTag(CONNECT_ERROR_TEST_TAG)
@@ -217,7 +240,11 @@ private fun FailureBanner(failure: ConnectFailure, onRetry: () -> Unit, onDismis
             } else {
                 stringResource(R.string.error_title)
             },
-            text = stringResource(failure.error.messageRes()),
+            text = when (failure.localNetwork) {
+                LocalNetworkHint.Denied -> stringResource(R.string.local_network_denied)
+                LocalNetworkHint.Suspected -> stringResource(R.string.local_network_suspected)
+                null -> stringResource(failure.error.messageRes())
+            },
             icon = MumcordIcons.Alert,
             tone = MumcordBannerTone.Danger,
         )
@@ -225,6 +252,14 @@ private fun FailureBanner(failure: ConnectFailure, onRetry: () -> Unit, onDismis
             horizontalArrangement = Arrangement.spacedBy(MumcordSpace.s2),
             modifier = Modifier.padding(horizontal = MumcordSpace.s4),
         ) {
+            if (failure.localNetwork == LocalNetworkHint.Denied) {
+                MumcordButton(
+                    text = stringResource(R.string.local_network_open_settings),
+                    onClick = onOpenSettings,
+                    small = true,
+                    modifier = Modifier.testTag(LOCAL_NETWORK_SETTINGS_TEST_TAG),
+                )
+            }
             MumcordButton(
                 text = stringResource(
                     if (failure.error == ConnectionError.WrongPassword && failure.serverName != null) {
@@ -234,6 +269,11 @@ private fun FailureBanner(failure: ConnectFailure, onRetry: () -> Unit, onDismis
                     },
                 ),
                 onClick = onRetry,
+                style = if (failure.localNetwork == LocalNetworkHint.Denied) {
+                    MumcordButtonStyle.Secondary
+                } else {
+                    MumcordButtonStyle.Primary
+                },
                 small = true,
                 modifier = Modifier.testTag(CONNECT_RETRY_TEST_TAG),
             )

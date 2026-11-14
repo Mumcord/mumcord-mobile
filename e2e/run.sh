@@ -7,22 +7,25 @@
 #   1. build the app and the test APK (android/e2e)
 #   2. start the test server (scripts/testenv.sh)
 #   3. start the emulator without a window, unless one is already running
-#   4. install the app afresh, so every run starts without remembered servers or certificates
-#   5. run the tests and report the result
+#   4. install the app afresh
+#   5. run the scenarios one after the other, each with fresh app data (no remembered server,
+#      certificate or permission answer) and its own state of the local network permission
+#      (granted up front, or not, so that the app has to ask), and report the result
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
-#   e2e/run.sh                                                run everything
-#   e2e/run.sh -e class app.mumcord.mobile.e2e.ConnectFlowTest    run one test class
+#   e2e/run.sh                              run everything
+#   E2E_SCENARIO=LocalNetwork e2e/run.sh    run only the scenarios whose test name contains this
 #
 # Needs the toolchain of scripts/setup-android.sh and its environment
 # (eval "$(scripts/setup-android.sh --env)"), KVM, and what scripts/testenv.sh needs.
 #
 # Environment:
 #   MUMCORD_PORT_BASE     host port of the test server (default 64838)
+#   E2E_SCENARIO          run only the scenarios whose test name contains this text
 #   E2E_AVD               emulator device to start (default mumcord-test)
 #   E2E_BOOT_TIMEOUT      seconds the emulator may take to boot (default 300)
-#   E2E_TEST_TIMEOUT      seconds all tests together may take (default 600)
+#   E2E_TEST_TIMEOUT      seconds one scenario may take (default 600)
 #
 # Logs of the run (test output, app log, emulator log) land in e2e/build/.
 set -euo pipefail
@@ -39,6 +42,15 @@ RUNNER="androidx.test.runner.AndroidJUnitRunner"
 HOST_FROM_EMULATOR="10.0.2.2"
 # First Android version (17) that has the local network permission.
 LOCAL_NETWORK_PERMISSION_API=37
+LOCAL_NETWORK_PERMISSION="android.permission.ACCESS_LOCAL_NETWORK"
+# The scenarios: "<local network permission> <test>". With "granted" the permission is given up
+# front, as most tests need it to reach the server on the host; with "ask" the app starts
+# without it and the test goes through the app's explanation and the system's dialog.
+SCENARIOS=(
+  "granted ${TEST_PACKAGE}.ConnectFlowTest"
+  "ask ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
+  "ask ${TEST_PACKAGE}.LocalNetworkFlowTest#refusingItIsNamedInTheErrorWhichLeadsToTheSystemSettingsAndBackToAConnection"
+)
 # Port of the emulator this script starts; its adb name follows from it.
 EMULATOR_PORT=5554
 
@@ -143,26 +155,41 @@ adb_device uninstall "${TEST_PACKAGE}" >/dev/null 2>&1 || true
 adb_device uninstall "${APP_PACKAGE}" >/dev/null 2>&1 || true
 timeout 120 "${ADB}" -s "${serial}" install "${APP_APK}" >/dev/null || die "installing the app failed"
 timeout 120 "${ADB}" -s "${serial}" install "${TEST_APK}" >/dev/null || die "installing the tests failed"
-# Since Android 17 the test server on the host counts as local network, which needs this
-# permission. Older versions do not know it; there the address is reachable without.
-if (("$(adb_device shell getprop ro.build.version.sdk | tr -d '\r')" >= LOCAL_NETWORK_PERMISSION_API)); then
-  adb_device shell pm grant "${APP_PACKAGE}" android.permission.ACCESS_LOCAL_NETWORK \
-    || die "granting local network access failed"
-fi
 adb_device logcat -c || true
+device_api="$(adb_device shell getprop ro.build.version.sdk | tr -d '\r')"
 
-step "running the tests"
-instrument_status=0
-timeout "${TEST_TIMEOUT}" "${ADB}" -s "${serial}" shell am instrument -w \
-  -e serverHost "${HOST_FROM_EMULATOR}" -e serverPort "${MUMCORD_PORT_BASE}" "$@" \
-  "${TEST_PACKAGE}/${RUNNER}" | tee "${OUT_DIR}/instrument.txt" || instrument_status=$?
+# Runs one scenario: fresh app data, the permission as the scenario wants it, then its test.
+run_scenario() {
+  local permission="$1" test="$2" report="${OUT_DIR}/instrument-scenario.txt" status=0
+  step "scenario: ${test##*.} (local network permission: ${permission})"
+  # Clearing the data also takes back every permission and forgets earlier answers to prompts.
+  adb_device shell pm clear "${APP_PACKAGE}" >/dev/null || die "clearing the app data failed"
+  # Since Android 17 the test server on the host counts as local network, which needs this
+  # permission. Older versions do not know it; there the address is reachable without.
+  if [[ "${permission}" == "granted" ]] && ((device_api >= LOCAL_NETWORK_PERMISSION_API)); then
+    adb_device shell pm grant "${APP_PACKAGE}" "${LOCAL_NETWORK_PERMISSION}" \
+      || die "granting local network access failed"
+  fi
+  timeout "${TEST_TIMEOUT}" "${ADB}" -s "${serial}" shell am instrument -w \
+    -e serverHost "${HOST_FROM_EMULATOR}" -e serverPort "${MUMCORD_PORT_BASE}" -e class "${test}" \
+    "${@:3}" "${TEST_PACKAGE}/${RUNNER}" | tee "${report}" || status=$?
+  cat "${report}" >>"${OUT_DIR}/instrument.txt"
+  if ((status == 124)); then
+    die "the scenario did not finish within ${TEST_TIMEOUT} s"
+  fi
+  # "am instrument" exits with 0 even when tests fail, so the verdict comes from its report.
+  # A run that passed ends with "OK (N tests)"; a run in which nothing was executed does not count.
+  if ((status != 0)) || ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "${report}"; then
+    die "tests failed, see above and e2e/build/logcat.txt"
+  fi
+}
 
-if ((instrument_status == 124)); then
-  die "the tests did not finish within ${TEST_TIMEOUT} s"
-fi
-# "am instrument" exits with 0 even when tests fail, so the verdict comes from its report.
-# A run that passed ends with "OK (N tests)"; a run in which nothing was executed does not count.
-if ((instrument_status != 0)) || ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "${OUT_DIR}/instrument.txt"; then
-  die "tests failed, see above and e2e/build/logcat.txt"
-fi
+scenarios_run=0
+for scenario in "${SCENARIOS[@]}"; do
+  read -r permission test <<<"${scenario}"
+  [[ "${test}" == *"${E2E_SCENARIO:-}"* ]] || continue
+  run_scenario "${permission}" "${test}" "$@"
+  scenarios_run=$((scenarios_run + 1))
+done
+((scenarios_run > 0)) || die "no scenario matches E2E_SCENARIO=${E2E_SCENARIO:-}"
 step "PASSED"

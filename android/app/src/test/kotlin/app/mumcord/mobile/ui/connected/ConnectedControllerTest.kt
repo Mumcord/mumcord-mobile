@@ -13,6 +13,7 @@ import app.mumcord.mobile.session.mockupServer
 import app.mumcord.mobile.session.savedServer
 import app.mumcord.mobile.ui.AppScreen
 import app.mumcord.mobile.ui.AppViewModel
+import app.mumcord.mobile.ui.connect.FakeLocalNetworkGateway
 import app.mumcord.mobile.ui.setup.SetupStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -60,7 +61,7 @@ class ConnectedControllerTest {
             engineDispatcher = dispatcher,
             log = {},
         )
-        return AppViewModel(repository, DoneSetup).also { viewModel ->
+        return AppViewModel(repository, DoneSetup, FakeLocalNetworkGateway()).also { viewModel ->
             backgroundScope.launch { viewModel.uiState.collect() }
             runCurrent()
             viewModel.connect(1)
