@@ -27,6 +27,25 @@
 //! on an audio thread. [`SecureStorage`] is called from the constructor's thread and from
 //! runtime threads.
 //!
+//! ## Calling rule for host apps
+//!
+//! A waiting command is finished by a runtime thread (`mumcord-bridge`), which calls the
+//! generated bindings' continuation callback. The host must not let its own code continue on
+//! that thread:
+//!
+//! - Kotlin: never await a command from a coroutine that resumes where it is completed (no
+//!   dispatcher, `Dispatchers.Unconfined`). The coroutine would continue inside the callback and
+//!   poll the finished future there, which calls back a second time inside the first. JNA attached
+//!   the thread to the Java runtime only for the callback and detaches it when the inner one
+//!   returns, while the outer one is still running Kotlin code. Android ends the process for
+//!   that (`attempting to detach while still running code`); no exception can be caught. Run
+//!   every command on a dispatcher of the app's own and hand the result to the caller from there
+//!   (Android: `EngineCalls`).
+//! - Swift: a continuation is never resumed in place, the task goes back to its executor, so
+//!   awaiting a command is safe from anywhere.
+//! - Both: [`EngineListener::on_event`] runs on the event thread. It must return quickly and
+//!   only queue the event; it must not call the engine and must not wait for anything.
+//!
 //! # Audio
 //!
 //! The app captures and plays the audio itself (only the system's voice-communication session

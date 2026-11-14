@@ -73,7 +73,7 @@ class ChatRepository internal constructor(
                     mutableUnread.value = emptyMap()
                     return@collect
                 }
-                val snapshot = session.chatCall("chat unread") { it.snapshot().chatUnread }
+                val snapshot = session.call("chat unread") { it.snapshot().chatUnread }
                 if (snapshot is Outcome.Ok) {
                     mutableUnread.update { current ->
                         // An event that arrived in between is newer than the snapshot.
@@ -85,45 +85,45 @@ class ChatRepository internal constructor(
     }
 
     suspend fun page(chat: ChatId, before: String?): Outcome<ChatPage> =
-        session.chatCall("chat page") { it.chatPage(chat, before, PAGE_SIZE.toUInt()) }
+        session.call("chat page") { it.chatPage(chat, before, PAGE_SIZE.toUInt()) }
 
     suspend fun send(chat: ChatId, text: String, replyTo: ReplyQuote?): Outcome<ChatMessage> =
-        session.chatCall("send message") { it.sendMessage(chat, text, replyTo) }
+        session.call("send message") { it.sendMessage(chat, text, replyTo) }
 
     suspend fun sendImage(chat: ChatId, bytes: ByteArray, mime: String): Outcome<ChatMessage> =
-        session.chatCall("send image") { it.sendImage(chat, bytes, mime) }
+        session.call("send image") { it.sendImage(chat, bytes, mime) }
 
     suspend fun sendGif(chat: ChatId, url: String): Outcome<ChatMessage> =
-        session.chatCall("send gif") { it.sendGifFavourite(chat, url) }
+        session.call("send gif") { it.sendGifFavourite(chat, url) }
 
     /** The bytes of an image that was sent inside a message. */
     suspend fun image(chat: ChatId, messageId: String, imageId: String): ImageData? =
-        session.chatCall("chat image") { it.chatImage(chat, messageId, imageId) }.valueOrNull()
+        session.call("chat image") { it.chatImage(chat, messageId, imageId) }.valueOrNull()
 
     /** An image or GIF from the web, or null when it cannot or may not be loaded. */
     suspend fun remoteImage(url: String): ImageData? =
-        session.chatCall("remote image") { it.loadRemoteImage(url, mediaPolicy.loadMedia()) }.valueOrNull()
+        session.call("remote image") { it.loadRemoteImage(url, mediaPolicy.loadMedia()) }.valueOrNull()
 
     suspend fun mentionCandidates(query: String): List<MentionCandidate> =
-        session.chatCall("mention candidates") { it.mentionCandidates(query, MENTION_LIMIT.toUInt()) }.valueOrNull().orEmpty()
+        session.call("mention candidates") { it.mentionCandidates(query, MENTION_LIMIT.toUInt()) }.valueOrNull().orEmpty()
 
-    suspend fun limits(): ChatLimits? = session.chatCall("chat limits") { it.chatLimits() }.valueOrNull()
+    suspend fun limits(): ChatLimits? = session.call("chat limits") { it.chatLimits() }.valueOrNull()
 
     suspend fun markRead(chat: ChatId) {
-        session.chatCall("mark chat read") { it.markChatRead(chat) }
+        session.call("mark chat read") { it.markChatRead(chat) }
     }
 
     /** Tells the engine which chat is on screen, or that none is. */
     fun setOpenChat(chat: ChatId?) = session.setOpenChat(chat)
 
     suspend fun gifFavourites(): List<GifFavourite> =
-        session.chatCall("gif favourites") { it.gifFavourites() }.valueOrNull().orEmpty()
+        session.call("gif favourites") { it.gifFavourites() }.valueOrNull().orEmpty()
 
     suspend fun addGifFavourite(url: String): Outcome<Unit> =
-        session.chatCall("add gif favourite") { it.addGifFavourite(url) }
+        session.call("add gif favourite") { it.addGifFavourite(url) }
 
     suspend fun removeGifFavourite(url: String): Outcome<Unit> =
-        session.chatCall("remove gif favourite") { it.removeGifFavourite(url) }
+        session.call("remove gif favourite") { it.removeGifFavourite(url) }
 
     private fun <T> Outcome<T>.valueOrNull(): T? = (this as? Outcome.Ok)?.value
 

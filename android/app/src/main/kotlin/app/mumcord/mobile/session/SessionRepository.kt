@@ -8,7 +8,6 @@ import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.EngineListener
 import app.mumcord.mobile.bridge.MumbleLink
-import app.mumcord.mobile.bridge.MumcordEngineInterface
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
@@ -24,9 +23,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withContext
 
 /** The result of a command that the screen which started it reports itself (a form, a sheet). */
 sealed interface Outcome<out T> {
@@ -35,26 +31,29 @@ sealed interface Outcome<out T> {
 }
 
 /**
- * Owns the engine, the server list and the one connection. The only place that talks to the
- * bridge: screens read [state] and call the commands through a view model.
+ * Owns the server list and the one connection. Screens read [state] and call the commands
+ * through a view model; the engine itself is only reached through [EngineCalls].
  *
  * @param scope lives as long as the process; its dispatcher folds the events, so it must not
  *   be the main thread.
- * @param engineDispatcher where the engine is created (it reads files and the secure storage)
- *   and where chat commands run.
+ * @param engineDispatcher where the engine is created and every waiting command runs; see
+ *   [EngineCalls].
  * @param log receives short technical messages; never names, addresses, passwords or other
  *   personal data.
  * @param mediaPolicy decides whether images and GIFs from the web are loaded; see [chat].
  * @param linkParser reads a `mumble://` link; a seam because the real one needs the native
  *   library.
+ * @param checkThreads fail a command that is given from inside the engine's listener; off in
+ *   release builds.
  */
 class SessionRepository(
-    private val engineFactory: EngineFactory,
+    engineFactory: EngineFactory,
     private val scope: CoroutineScope,
-    private val engineDispatcher: CoroutineDispatcher,
+    engineDispatcher: CoroutineDispatcher,
     private val log: (String) -> Unit,
     private val linkParser: (String) -> MumbleLink = ::parseMumbleLink,
     private val mediaPolicy: MediaPolicy = MediaPolicy { true },
+    checkThreads: Boolean = true,
 ) {
     private val mutableState = MutableStateFlow(SessionState())
     val state: StateFlow<SessionState> = mutableState.asStateFlow()
@@ -62,11 +61,23 @@ class SessionRepository(
     // The engine calls back on its own thread, which must never wait: the callback only queues
     // the event, and a single reader keeps them in order.
     private val events = Channel<BridgeEvent>(Channel.UNLIMITED)
-    private val engineLock = Mutex()
 
-    // Also read without the lock by the commands that must not wait (the hold buttons).
-    @Volatile
-    private var engine: MumcordEngineInterface? = null
+    private val engine = EngineCalls(
+        factory = engineFactory,
+        dispatcher = engineDispatcher,
+        listener = object : EngineListener {
+            override fun onEvent(event: BridgeEvent) {
+                when (event) {
+                    is BridgeEvent.InputLevelChanged -> mutableInputLevel.value = event.percent.toInt()
+                    is BridgeEvent.ChatMessageReceived,
+                    is BridgeEvent.ChatUnreadChanged,
+                    -> chatEvents.trySend(event)
+                    else -> events.trySend(event)
+                }
+            }
+        },
+        checkThreads = checkThreads,
+    )
 
     private val mutableInputLevel = MutableStateFlow(0)
 
@@ -208,7 +219,7 @@ class SessionRepository(
      * without an engine there is nothing to hold.
      */
     fun setPushToTalkPressed(pressed: Boolean) {
-        engine?.setPushToTalkPressed(pressed)
+        engine.now { it.setPushToTalkPressed(pressed) }
     }
 
     /**
@@ -217,7 +228,7 @@ class SessionRepository(
      */
     suspend fun startWhisper(target: WhisperTarget): Boolean =
         try {
-            engine().startWhisper(target)
+            engine.call { it.startWhisper(target) }
             true
         } catch (e: CancellationException) {
             throw e
@@ -233,14 +244,14 @@ class SessionRepository(
 
     /** Ends the whisper or shout. Never waits, so a release always gets through. */
     fun stopWhisper() {
-        engine?.stopWhisper()
+        engine.now { it.stopWhisper() }
     }
 
     /**
      * Where the phone's audio streams exchange their samples with the engine, or null while no
      * engine exists. The handles stay valid for the whole process.
      */
-    suspend fun audioEndpoints(): AudioEndpoints? = engineLock.withLock { engine?.audioEndpoints() }
+    fun audioEndpoints(): AudioEndpoints? = engine.now { it.audioEndpoints() }
 
     /** Gives up on a channel password question. */
     fun dismissChannelPassword() = mutableState.update { it.copy(channelPassword = null) }
@@ -267,21 +278,16 @@ class SessionRepository(
      * there is no chat to open.
      */
     fun setOpenChat(chat: ChatId?) {
-        engine?.setOpenChat(chat)
+        engine.now { it.setOpenChat(chat) }
     }
 
     /**
-     * A chat command; [name] is what the log calls it when it fails. It always runs on the
-     * engine dispatcher: the bridge resumes a waiting command on one of its own threads, and a
-     * caller that continues right there (a screen's own coroutine does) would call the bridge
-     * again from inside that callback, which the native layer does not survive.
+     * A command that may wait; [name] is what the log calls it when it fails. The chat uses it
+     * too.
      */
-    internal suspend fun <T> chatCall(name: String, command: suspend (MumcordEngineInterface) -> T): Outcome<T> =
-        withContext(engineDispatcher) { call(name, command) }
-
-    private suspend fun <T> call(name: String, command: suspend (MumcordEngineInterface) -> T): Outcome<T> =
+    internal suspend fun <T> call(name: String, command: EngineCommand<T>): Outcome<T> =
         try {
-            Outcome.Ok(command(engine()))
+            Outcome.Ok(engine.call(command))
         } catch (e: CancellationException) {
             throw e
         } catch (e: BridgeException) {
@@ -297,24 +303,5 @@ class SessionRepository(
         // Only the kind of failure: the detail text can contain the server address.
         log("$command failed: $error (${cause.javaClass.simpleName})")
         return Outcome.Failed(error)
-    }
-
-    /** Created on first use and kept for the life of the process; a failed start is retried. */
-    private suspend fun engine(): MumcordEngineInterface = engineLock.withLock {
-        engine ?: withContext(engineDispatcher) {
-            engineFactory.create(
-                object : EngineListener {
-                    override fun onEvent(event: BridgeEvent) {
-                        when (event) {
-                            is BridgeEvent.InputLevelChanged -> mutableInputLevel.value = event.percent.toInt()
-                            is BridgeEvent.ChatMessageReceived,
-                            is BridgeEvent.ChatUnreadChanged,
-                            -> chatEvents.trySend(event)
-                            else -> events.trySend(event)
-                        }
-                    }
-                },
-            )
-        }.also { engine = it }
     }
 }

@@ -5,8 +5,10 @@ package app.mumcord.mobile
 import android.app.Application
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.util.Log
 import app.mumcord.mobile.session.BridgeEngineFactory
+import app.mumcord.mobile.session.EngineCalls
 import app.mumcord.mobile.platform.audio.AndroidVoiceSession
 import app.mumcord.mobile.platform.audio.AudioController
 import app.mumcord.mobile.platform.audio.NativeAudio
@@ -32,8 +34,9 @@ class MumcordApplication : Application() {
         SessionRepository(
             engineFactory = BridgeEngineFactory(this),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-            engineDispatcher = Dispatchers.IO,
+            engineDispatcher = EngineCalls.newDispatcher(),
             log = log,
+            checkThreads = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
         )
     }
 
