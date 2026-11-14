@@ -76,8 +76,6 @@ android {
         disable += "ChromeOsAbiSupport"
         // Lint rules shipped inside a library that this lint version cannot load; not our code.
         disable += "ObsoleteLintCustomCheck"
-        // The launcher icon comes with the design system.
-        disable += "MissingApplicationIcon"
     }
 }
 
