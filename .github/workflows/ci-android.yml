@@ -24,9 +24,11 @@ on:
 permissions:
   contents: read
 
+# One group per commit: every pushed commit gets a complete run of its own. A later push
+# neither cancels a run that is in progress nor waits behind it.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
