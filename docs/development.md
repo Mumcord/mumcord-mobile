@@ -122,6 +122,23 @@ emulator is already running, the script uses it and leaves it running. The resul
 - **Settings:** `E2E_AVD` (emulator device, default `mumcord-test`), `E2E_BOOT_TIMEOUT` and
   `E2E_TEST_TIMEOUT` (seconds, default 300 and 600).
 
+## Continuous integration
+
+`.github/workflows/ci-android.yml` runs on pull requests and on `main` whenever the Android
+app, the bridge, the end-to-end tests, the scripts or the pinned versions change. It has two
+jobs on GitHub's Linux runners, both using `scripts/setup-android.sh`, so CI builds with exactly
+the versions listed above:
+
+- **Lint, test and build:** `./gradlew lint test assembleDebug` with the toolchain installed by
+  `scripts/setup-android.sh --no-emulator`. The debug APK and the lint reports are attached to
+  the run as artifacts.
+- **Emulator tests:** boots the `mumcord-test` emulator, runs
+  `./gradlew connectedDebugAndroidTest` and then `e2e/run.sh` against the test server in Docker.
+  The contents of `e2e/build/` and the test reports are attached to the run, also when it fails.
+
+The Rust build, the Gradle downloads and the toolchain are cached between runs. The emulator
+and its image are not (they are several GB) and are downloaded on every run.
+
 ## Updating a version
 
 All versions and checksums are pinned at the top of `scripts/setup-android.sh`. Change them
