@@ -5,7 +5,7 @@
 # Runs on macOS only (needs Xcode, XcodeGen, cmake and the Rust toolchain of this repository).
 #
 #   scripts/build-ios.sh          bridge for device and simulator, Swift bindings,
-#                                 MumcordBridge.xcframework, Mumcord.xcodeproj
+#                                 MumcordBridge.xcframework, design tokens, Mumcord.xcodeproj
 #   scripts/build-ios.sh --test   the same, then build the app and run its unit and UI tests
 #                                 in the simulator
 #
@@ -47,8 +47,8 @@ for argument in "$@"; do
 done
 
 [[ "$(uname -s)" == "Darwin" ]] || die "the iOS build needs macOS with Xcode; this is $(uname -s)"
-for tool in cargo xcodebuild xcrun xcodegen cmake; do
-  command -v "${tool}" >/dev/null || die "'${tool}' not found (Xcode, 'brew install xcodegen cmake', rustup)"
+for tool in cargo xcodebuild xcrun xcodegen cmake python3; do
+  command -v "${tool}" >/dev/null || die "'${tool}' not found (Xcode, 'brew install xcodegen cmake', rustup; python3 ships with the Xcode command line tools)"
 done
 
 cd "${REPO_ROOT}"
@@ -74,6 +74,10 @@ xcodebuild -create-xcframework \
   -library "${device_library}" -headers "${HEADERS_DIR}" \
   -library "${simulator_library}" -headers "${HEADERS_DIR}" \
   -output "${XCFRAMEWORK}"
+
+# The generated files must exist before XcodeGen runs: it lists the files of the source folders.
+log "Generating the design tokens, icons and fonts"
+python3 "${IOS_DIR}/Tools/generate_design.py"
 
 log "Generating the Xcode project"
 xcodegen generate --spec "${IOS_DIR}/project.yml" --project "${IOS_DIR}"

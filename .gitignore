@@ -25,6 +25,9 @@ android/engine/src/main/kotlin/app/mumcord/mobile/bridge/
 ios/Bridge/*.xcframework/
 ios/Bridge/Generated/
 
+# Design tokens, icons and fonts generated from design/ (ios/Tools/generate_design.py)
+ios/Mumcord/Design/Generated/
+
 # Xcode (the project is generated from ios/project.yml)
 *.xcodeproj/
 *.xcworkspace/

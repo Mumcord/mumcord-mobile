@@ -50,11 +50,25 @@ targets:
     sources:
       - path: Mumcord
       - path: Platform
+    # Mumcord/Design/Generated (tokens, icons, fonts) comes from design/*.json. The folder is
+    # filled by scripts/build-ios.sh before this project is generated, so its files are part of
+    # the target; this phase refreshes them before every compile when the JSON changed.
+    preBuildScripts:
+      - name: Generate design tokens and icons
+        basedOnDependencyAnalysis: false
+        script: |
+          if ! command -v python3 >/dev/null; then
+            echo "error: python3 not found; it is needed to generate the design tokens (it ships with the Xcode command line tools)" >&2
+            exit 1
+          fi
+          python3 "${SRCROOT}/Tools/generate_design.py"
     dependencies:
       - target: MumcordBridge
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile
+        # The phase above reads design/ outside the project folder and writes source files.
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: Mumcord
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
