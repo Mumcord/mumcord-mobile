@@ -87,10 +87,10 @@ jobs:
         working-directory: android
         run: ./gradlew --console=plain lint test assembleDebug
 
-      # The second person of the end-to-end voice tests. Built here too, so that it stays in
-      # the Rust cache this job saves and the emulator job only has to link it.
-      - name: Build the voice peer of the end-to-end tests
-        run: cargo build --locked --package mumcord-voice-peer
+      # The other people of the end-to-end voice and chat tests. Built here too, so that they stay in
+      # the Rust cache this job saves and the emulator job only has to link them.
+      - name: Build the other people of the end-to-end tests
+        run: cargo build --locked --package mumcord-voice-peer --package mumcord-chat-peer
 
       - name: Upload the debug APK
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -186,9 +186,9 @@ jobs:
         working-directory: android
         run: ./gradlew --console=plain assembleDebug assembleDebugAndroidTest
 
-      # The second person of the voice scenarios; e2e/run.sh then finds it built.
-      - name: Build the voice peer of the end-to-end tests
-        run: cargo build --locked --package mumcord-voice-peer
+      # The other people of the voice and chat scenarios; e2e/run.sh then finds them built.
+      - name: Build the other people of the end-to-end tests
+        run: cargo build --locked --package mumcord-voice-peer --package mumcord-chat-peer
 
       # Started here and used by both test steps; e2e/run.sh takes a running emulator as it is.
       - name: Start the emulator

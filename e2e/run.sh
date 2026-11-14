@@ -188,7 +188,6 @@ start_person() {
   done
 }
 
-# The lengths (ms) of the stretches of voice a person heard that count as voice, one per line.
 # Plays the phone network for a scenario: the test asks in the device log ("gsm call <number>",
 # "gsm cancel <number>") and the emulator's console, which only the host reaches, does it.
 start_phone_network() {
@@ -210,6 +209,7 @@ stop_phone_network() {
   network_pid=""
 }
 
+# The lengths (ms) of the stretches of voice a person heard that count as voice, one per line.
 voice_spans() {
   sed -n 's/^SPAN ms=//p' "$1" | awk -v least="${VOICE_SPAN_MS}" '$1 >= least'
 }
@@ -305,7 +305,7 @@ cleanup() {
   if ((status != 0)); then
     # What the other people reported belongs next to the failure, not only into a file.
     local log
-    for log in "${PEER_LOG}" "${BYSTANDER_LOG}"; do
+    for log in "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}"; do
       [[ -s "${log}" ]] || continue
       printf 'e2e: the end of %s:\n' "${log#"${REPO_ROOT}/"}"
       tail -n 40 "${log}"

@@ -128,11 +128,14 @@ was on the screen in its failure message.
   with a second person on the host (`e2e/voice-peer`); the notification question (allowed,
   and "not now"); the session's notification and its buttons; voice with the app in the
   background and the screen locked, with voice activity (three minutes) and with
-  push-to-talk (one minute, silent while locked); and a phone call during a session, for
+  push-to-talk (one minute, silent while locked); a phone call during a session, for
   which the script plays the phone network through the emulator's console
-  (`adb emu gsm call|cancel`).
+  (`adb emu gsm call|cancel`); and the chat with two more people on the host, `e2e/chat-peer`
+  (writes like the desktop app and reports what it receives) and `e2e/raw-chat.py` (sends
+  markup a hostile client might send), followed by a restart of the app that must still show
+  the history.
 - **Besides the Android toolchain** the machine needs KVM, `git`, Docker with the compose
-  plugin, `sqlite3` and `openssl`. No Docker network is created; the server uses Docker's
+  plugin, `sqlite3`, `openssl` and `python3`. No Docker network is created; the server uses Docker's
   built-in bridge.
 - **Settings:** `E2E_AVD` (emulator device, default `mumcord-test`), `E2E_BOOT_TIMEOUT` and
   `E2E_TEST_TIMEOUT` (seconds, default 300 and 600; the second is per scenario) and
