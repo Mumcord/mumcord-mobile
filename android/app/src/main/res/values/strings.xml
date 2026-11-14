@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="app_name" translatable="false">Mumcord</string>
+    <string name="engine_version">Engine %1$s</string>
+
+    <string name="connect_title">Connect to a server</string>
+    <string name="connect_address_label">Server address</string>
+    <string name="connect_port_label">Port</string>
+    <string name="connect_port_invalid">Enter a number between 1 and 65535.</string>
+    <string name="connect_username_label">Your name</string>
+    <string name="connect_action">Connect</string>
+    <string name="connect_in_progress">Connecting…</string>
+    <string name="connect_cancel">Cancel</string>
+
+    <string name="error_title">Could not connect</string>
+    <string name="error_retry">Try again</string>
+    <string name="error_not_connected">You are not connected to a server.</string>
+    <string name="error_server_unreachable">The server could not be reached. Check the address, the port and your internet connection.</string>
+    <string name="error_wrong_password">The server needs a password, or the password was wrong.</string>
+    <string name="error_name_in_use">This name is already in use on the server. Choose another name.</string>
+    <string name="error_certificate_rejected">The connection was stopped because the server\'s certificate was not trusted.</string>
+    <string name="error_certificate_changed">The server\'s certificate has changed. The connection was stopped to keep you safe.</string>
+    <string name="error_server_too_old">This server runs a version of Mumble that is too old for Mumcord.</string>
+    <string name="error_invalid_input">The server address, the port or the name is not valid.</string>
+    <string name="error_secure_storage_unavailable">The secure storage of this device is not available, so Mumcord cannot protect your identity.</string>
+    <string name="error_io">Mumcord could not read or write its data on this device.</string>
+    <string name="error_internal">Something went wrong inside Mumcord.</string>
+
+    <string name="certificate_unknown_title">Trust this server?</string>
+    <string name="certificate_unknown_message">Mumcord has not seen this server before and cannot confirm its identity on its own. If you know the server\'s fingerprint, compare it with the one below.</string>
+    <string name="certificate_fingerprint_label">Certificate fingerprint (SHA-256)</string>
+    <string name="certificate_unknown_trust">Trust and connect</string>
+    <string name="certificate_unknown_reject">Do not connect</string>
+    <string name="certificate_changed_title">Warning: this server\'s identity has changed</string>
+    <string name="certificate_changed_message">The server presents a different certificate than the one you trusted before. Someone may be trying to intercept your connection. Only continue if the server\'s operator has confirmed the change.</string>
+    <string name="certificate_changed_previous_label">Fingerprint trusted so far</string>
+    <string name="certificate_changed_new_label">New fingerprint</string>
+    <string name="certificate_changed_trust">Trust the new certificate</string>
+    <string name="certificate_changed_reject">Do not connect</string>
+
+    <string name="channels_title">Channels</string>
+    <string name="channels_disconnect">Disconnect</string>
+    <string name="channels_reconnecting">Connection lost. Reconnecting, attempt %1$d of %2$d…</string>
+    <string name="channels_self_marker">(you)</string>
+    <!-- Screen-reader text for a channel row: channel name, then the people count from channels_people_count. -->
+    <string name="channels_channel_description">Channel %1$s, %2$s</string>
+    <string name="channels_person_description">%1$s</string>
+    <string name="channels_self_description">%1$s, you</string>
+    <plurals name="channels_people_count">
+        <item quantity="one">%1$d person</item>
+        <item quantity="other">%1$d people</item>
+    </plurals>
+</resources>

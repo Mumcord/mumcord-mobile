@@ -32,9 +32,9 @@
 //!
 //! loads the library (`System.loadLibrary("mumcord_mobile")`) and calls
 //! `SystemCertificates.init(applicationContext)`. The app also has to ship the Kotlin companion
-//! library of `rustls-platform-verifier` (Maven artifact `rustls:rustls-platform-verifier`, the
-//! local Maven repository inside the `rustls-platform-verifier-android` crate). iOS needs no
-//! start-up call.
+//! library of `rustls-platform-verifier` (Maven artifact `org.rustls:rustls-platform-verifier`
+//! in the version of the `rustls-platform-verifier-android` crate, from the Maven repository
+//! named in that crate's README). iOS needs no start-up call.
 //!
 //! # Bindings
 //!
