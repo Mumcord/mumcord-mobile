@@ -40,6 +40,10 @@ struct MumcordChannelBody<Content: View>: View {
 /// - `empty`: nobody is inside: the name is muted.
 /// - `lockedLabel`: set for a password-protected channel; read by VoiceOver for the lock.
 /// - `toggleLabel`: what VoiceOver reads for the chevron, such as "Collapse Lobby".
+/// - `spokenLabel`: what VoiceOver reads for the row instead of its visible texts.
+/// - `identifier`: the accessibility identifier of the part that joins, for UI tests.
+/// - `onLongPress`: opens the channel's menu; `longPressLabel` names that action for VoiceOver,
+///   which offers it as a custom action.
 struct MumcordChannelRow: View {
     let name: String
     var icon = MumcordIcons.hash
@@ -50,7 +54,11 @@ struct MumcordChannelRow: View {
     var empty = false
     var meta: String?
     var lockedLabel: String?
+    var spokenLabel: String?
+    var identifier = ""
     var onToggleExpanded: () -> Void = {}
+    var onLongPress: (() -> Void)?
+    var longPressLabel: String?
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
 
@@ -59,33 +67,10 @@ struct MumcordChannelRow: View {
         let shape = RoundedRectangle(cornerRadius: MumcordRadius.md)
         HStack(spacing: 6) {
             chevron
-            Button(action: action) {
-                HStack(spacing: 6) {
-                    MumcordIcon(
-                        icon: icon,
-                        label: nil,
-                        tint: current ? colors.talking : colors.textMuted,
-                        size: MumcordSize.iconMd
-                    )
-                    LineText(name, style: current ? .channelStrong : .channel, color: empty ? colors.textMuted : colors.text)
-                    if let memberCount {
-                        LineText(String(memberCount), style: metaStyle, color: colors.textMuted, tabularNumbers: true)
-                            .layoutPriority(1)
-                    }
-                    Spacer(minLength: 0)
-                    if let meta {
-                        LineText(meta, style: metaStyle, color: colors.textMuted)
-                            .layoutPriority(1)
-                    }
-                    if let lockedLabel {
-                        MumcordIcon(icon: MumcordIcons.lock, label: lockedLabel, tint: colors.textMuted, size: MumcordSize.iconSm)
-                    }
-                }
-                .frame(minHeight: MumcordSize.touchVisual)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(current ? .isSelected : [])
+            joinArea
+                .accessibilityLabel(spokenLabel ?? visibleLabel)
+                .accessibilityAddTraits(current ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier(identifier)
         }
         // 2 pt of each side is the border of the current channel.
         .padding(.leading, 6)
@@ -100,6 +85,59 @@ struct MumcordChannelRow: View {
                 shape.strokeBorder(colors.talking, lineWidth: 2).allowsHitTesting(false)
             }
         }
+    }
+
+    /// The part of the row that joins the channel. A button cannot tell a tap from a long
+    /// press, so a row with a menu listens to the two gestures itself.
+    @ViewBuilder private var joinArea: some View {
+        if let onLongPress {
+            content
+                .onTapGesture(perform: action)
+                .onLongPressGesture(perform: onLongPress)
+                // Gestures are invisible to VoiceOver: it gets one element with both actions.
+                .accessibilityElement(children: .ignore)
+                .accessibilityAction(.default, action)
+                .accessibilityAction(named: Text(verbatim: longPressLabel ?? name), onLongPress)
+        } else {
+            Button(action: action) { content }
+                .buttonStyle(.plain)
+        }
+    }
+
+    private var content: some View {
+        let colors = theme.colors
+        return HStack(spacing: 6) {
+            MumcordIcon(
+                icon: icon,
+                label: nil,
+                tint: current ? colors.talking : colors.textMuted,
+                size: MumcordSize.iconMd
+            )
+            LineText(name, style: current ? .channelStrong : .channel, color: empty ? colors.textMuted : colors.text)
+            if let memberCount {
+                LineText(String(memberCount), style: metaStyle, color: colors.textMuted, tabularNumbers: true)
+                    .layoutPriority(1)
+            }
+            Spacer(minLength: 0)
+            if let meta {
+                LineText(meta, style: metaStyle, color: colors.textMuted)
+                    .layoutPriority(1)
+            }
+            if let lockedLabel {
+                MumcordIcon(icon: MumcordIcons.lock, label: lockedLabel, tint: colors.textMuted, size: MumcordSize.iconSm)
+            }
+        }
+        .frame(minHeight: MumcordSize.touchVisual)
+        .contentShape(Rectangle())
+    }
+
+    /// The visible texts of the row in reading order.
+    private var visibleLabel: String {
+        var parts = [name]
+        if let memberCount { parts.append(String(memberCount)) }
+        if let meta { parts.append(meta) }
+        if let lockedLabel { parts.append(lockedLabel) }
+        return parts.joined(separator: ", ")
     }
 
     private var metaStyle: TextToken {
@@ -127,6 +165,8 @@ enum MumcordAvatarSize: CaseIterable {
     case small
     case medium
     case large
+    /// The head of the person sheet.
+    case sheet
     case extraLarge
 
     var diameter: CGFloat {
@@ -134,6 +174,7 @@ enum MumcordAvatarSize: CaseIterable {
         case .small: 24
         case .medium: 32
         case .large: 40
+        case .sheet: 56
         case .extraLarge: 88
         }
     }
@@ -143,6 +184,7 @@ enum MumcordAvatarSize: CaseIterable {
         case .small: 11
         case .medium: 14
         case .large: 16
+        case .sheet: 24
         case .extraLarge: 32
         }
     }

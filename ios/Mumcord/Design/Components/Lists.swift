@@ -69,6 +69,7 @@ struct MumcordList<Content: View>: View {
 /// Row of a list (`.row`). Every row but the first of a list sets `divider` to get the line
 /// above it.
 ///
+/// - `status`: a third line under the subtitle, such as a state dot with "5 online · 24 ms".
 /// - `leading`: replaces `icon` with other content, such as an avatar or a server tile.
 /// - `trailing`: content at the end: a value, a chevron, a toggle.
 /// - `tall`: the taller variant for rows with a tile.
@@ -76,6 +77,7 @@ struct MumcordList<Content: View>: View {
 struct MumcordListRow<Leading: View, Trailing: View>: View {
     private let title: String
     private let subtitle: String?
+    private let status: AnyView?
     private let icon: MumcordIconData?
     private let divider: Bool
     private let tall: Bool
@@ -89,6 +91,7 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
     init(
         title: String,
         subtitle: String? = nil,
+        status: AnyView? = nil,
         icon: MumcordIconData? = nil,
         divider: Bool = false,
         tall: Bool = false,
@@ -100,6 +103,7 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
     ) {
         self.title = title
         self.subtitle = subtitle
+        self.status = status
         self.icon = icon
         self.divider = divider
         self.tall = tall
@@ -114,8 +118,11 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
         if let action {
             Button(action: action) { row.contentShape(Rectangle()) }
                 .buttonStyle(.plain)
-        } else {
+        } else if Trailing.self == EmptyView.self {
             row.accessibilityElement(children: .combine)
+        } else {
+            // Controls at the end, such as "Connect", stay elements of their own.
+            row
         }
     }
 
@@ -134,8 +141,12 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
                 if let subtitle {
                     LineText(subtitle, style: .small, color: colors.textMuted)
                 }
+                if let status {
+                    HStack(spacing: 6) { status }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
             HStack(spacing: MumcordSpace.s2) { trailing }
                 .layoutPriority(1)
         }
@@ -156,6 +167,7 @@ extension MumcordListRow where Leading == EmptyView {
     init(
         title: String,
         subtitle: String? = nil,
+        status: AnyView? = nil,
         icon: MumcordIconData? = nil,
         divider: Bool = false,
         tall: Bool = false,
@@ -167,6 +179,7 @@ extension MumcordListRow where Leading == EmptyView {
         self.init(
             title: title,
             subtitle: subtitle,
+            status: status,
             icon: icon,
             divider: divider,
             tall: tall,
@@ -183,6 +196,7 @@ extension MumcordListRow where Trailing == EmptyView {
     init(
         title: String,
         subtitle: String? = nil,
+        status: AnyView? = nil,
         divider: Bool = false,
         tall: Bool = false,
         danger: Bool = false,
@@ -193,6 +207,7 @@ extension MumcordListRow where Trailing == EmptyView {
         self.init(
             title: title,
             subtitle: subtitle,
+            status: status,
             icon: nil,
             divider: divider,
             tall: tall,
@@ -209,6 +224,7 @@ extension MumcordListRow where Leading == EmptyView, Trailing == EmptyView {
     init(
         title: String,
         subtitle: String? = nil,
+        status: AnyView? = nil,
         icon: MumcordIconData? = nil,
         divider: Bool = false,
         tall: Bool = false,
@@ -219,6 +235,7 @@ extension MumcordListRow where Leading == EmptyView, Trailing == EmptyView {
         self.init(
             title: title,
             subtitle: subtitle,
+            status: status,
             icon: icon,
             divider: divider,
             tall: tall,
@@ -231,7 +248,7 @@ extension MumcordListRow where Leading == EmptyView, Trailing == EmptyView {
     }
 }
 
-/// Small muted text for the end of a list row, such as the current value of a setting.
+/// Small muted text for the end or the status line of a list row, such as the current value of a setting.
 struct MumcordListRowValue: View {
     let text: String
     @Environment(\.mumcordTheme) private var theme

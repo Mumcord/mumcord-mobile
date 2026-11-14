@@ -13,13 +13,14 @@ enum MumcordButtonStyle {
 
 /// Text button (`.btn`): primary for the main action of a screen, secondary with an outline,
 /// danger for destructive actions, ghost for quiet text actions. `fullWidth` makes it as wide
-/// as its container. Disable it with `.disabled(true)`.
+/// as its container, `minHeight` taller than the standard 48 pt. Disable it with `.disabled(true)`.
 struct MumcordButton: View {
     let text: String
     var style = MumcordButtonStyle.primary
     var small = false
     var icon: MumcordIconData?
     var fullWidth = false
+    var minHeight: CGFloat?
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
     @Environment(\.isEnabled) private var isEnabled
@@ -34,7 +35,7 @@ struct MumcordButton: View {
                 LineText(text, style: small ? .smallStrong : .bodyStrong, color: content)
             }
             .padding(.horizontal, horizontalPadding)
-            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: small ? MumcordSize.touchVisual : 48)
+            .frame(maxWidth: fullWidth ? .infinity : nil, minHeight: minHeight ?? (small ? MumcordSize.touchVisual : 48))
             .background(background, in: Capsule())
             .overlay {
                 if style == .secondary {
@@ -135,5 +136,27 @@ struct MumcordIconButton: View {
         case .off: return colors.danger
         case .accent: return colors.primaryText
         }
+    }
+}
+
+/// The floating main action of a screen (`.fab`), such as "Add server". The screen places it in
+/// its bottom trailing corner. `label` is what VoiceOver reads and must name the action.
+struct MumcordFab: View {
+    let icon: MumcordIconData
+    let label: String
+    let action: () -> Void
+    @Environment(\.mumcordTheme) private var theme
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: MumcordRadius.sheet)
+        Button(action: action) {
+            MumcordIcon(icon: icon, label: nil, tint: theme.colors.primaryText, size: MumcordSize.iconLg)
+                .frame(width: 60, height: 60)
+                .background(theme.colors.primaryBg, in: shape)
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .tokenShadow(theme.shadows.primaryGlow, shape: shape)
+        .accessibilityLabel(label)
     }
 }

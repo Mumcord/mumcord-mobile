@@ -49,12 +49,14 @@ enum MumcordBannerTone {
 }
 
 /// Hint banner (`.banner`) with a 16 pt margin at the sides: an icon in the colour of its
-/// `tone`, an optional bold `title` and the hint `text`.
+/// `tone`, an optional bold `title` and the hint `text`. Inside a bottom sheet, which has its
+/// own margin, `horizontalMargin` is zero.
 struct MumcordBanner: View {
     let text: String
     var title: String?
     var icon = MumcordIcons.info
     var tone = MumcordBannerTone.info
+    var horizontalMargin: CGFloat = MumcordSpace.s4
     @Environment(\.mumcordTheme) private var theme
     @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
 
@@ -70,7 +72,7 @@ struct MumcordBanner: View {
         .padding(EdgeInsets(top: MumcordSpace.s3 + 1, leading: MumcordSpace.s4 + 1, bottom: MumcordSpace.s3 + 1, trailing: MumcordSpace.s3 + 1))
         .background(colors.bgSelected, in: shape)
         .overlay { shape.strokeBorder(colors.border, lineWidth: 1) }
-        .padding(.horizontal, MumcordSpace.s4)
+        .padding(.horizontal, horizontalMargin)
         .padding(.vertical, MumcordSpace.s2)
         .accessibilityElement(children: .combine)
     }
