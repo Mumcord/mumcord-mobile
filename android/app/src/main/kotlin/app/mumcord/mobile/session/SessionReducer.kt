@@ -3,6 +3,7 @@
 package app.mumcord.mobile.session
 
 import app.mumcord.mobile.bridge.BridgeEvent
+import app.mumcord.mobile.bridge.ChannelPasswordState
 import app.mumcord.mobile.bridge.ConnectionState
 
 /** Folds one engine event into the state. Pure, so it can run on any thread and be tested. */
@@ -16,6 +17,9 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
             certificatePrompt = null,
             server = null,
             activeServerId = activeServerId.takeIf { connection.error != null },
+            channelPassword = null,
+            denied = null,
+            hints = emptyList(),
         )
         ConnectionState.Connecting -> copy(phase = ConnectionPhase.Connecting)
         ConnectionState.Connected ->
@@ -55,8 +59,12 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
         server = server?.let { it.copy(people = it.people - event.session) },
     )
     is BridgeEvent.ServersChanged -> copy(servers = event.servers, serversLoaded = true)
-    // No UI for these yet: channel passwords and denials (task 2.5) use them.
-    is BridgeEvent.ActionDenied,
-    is BridgeEvent.ChannelPasswordChanged,
-    -> this
+    is BridgeEvent.ChannelPasswordChanged -> copy(
+        channelPassword = when (event.state) {
+            ChannelPasswordState.REQUIRED -> ChannelPasswordPrompt(event.channelId, wrong = false)
+            ChannelPasswordState.WRONG -> ChannelPasswordPrompt(event.channelId, wrong = true)
+            ChannelPasswordState.ENDED -> null
+        },
+    )
+    is BridgeEvent.ActionDenied -> copy(denied = DeniedAction(event.channelId, event.detail))
 }

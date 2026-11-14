@@ -31,14 +31,16 @@ import app.mumcord.mobile.design.tokens.MumcordSpace
 /**
  * A bottom sheet over the screen: the dimmed backdrop and the sheet frame with [title] and
  * scrolling [content]. Tapping the backdrop or going back calls [onDismiss]; a sheet with a
- * decision that must be made on purpose passes null and cannot be dismissed.
+ * decision that must be made on purpose passes null and cannot be dismissed. A sheet without
+ * a visible [title] names itself for screen readers with [paneTitle].
  */
 @Composable
 fun SheetOverlay(
-    title: String,
+    title: String?,
     onDismiss: (() -> Unit)?,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
+    paneTitle: String = title.orEmpty(),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     BackHandler { onDismiss?.invoke() }
@@ -57,7 +59,7 @@ fun SheetOverlay(
             modifier = Modifier
                 // Taps on the sheet itself must not reach the backdrop.
                 .pointerInput(Unit) { detectTapGestures { } }
-                .semantics { paneTitle = title },
+                .semantics { this.paneTitle = paneTitle },
         ) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(MumcordSpace.s3),

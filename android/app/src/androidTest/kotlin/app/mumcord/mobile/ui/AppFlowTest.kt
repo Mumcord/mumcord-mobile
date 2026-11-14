@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -46,7 +47,9 @@ import app.mumcord.mobile.ui.servers.SERVER_ROW_TEST_TAG
 import app.mumcord.mobile.ui.setup.SetupStore
 import app.mumcord.mobile.ui.setup.TALK_MODE_CONTINUE_TEST_TAG
 import app.mumcord.mobile.ui.setup.TALK_MODE_PUSH_TO_TALK_TEST_TAG
-import app.mumcord.mobile.ui.slice.CHANNELS_DISCONNECT_TEST_TAG
+import app.mumcord.mobile.ui.connected.CHANNEL_PASSWORD_JOIN_TEST_TAG
+import app.mumcord.mobile.ui.connected.MORE_DISCONNECT_TEST_TAG
+import app.mumcord.mobile.ui.connected.PERSON_MUTE_TEST_TAG
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -150,8 +153,66 @@ class AppFlowTest {
         compose.onNodeWithText("<b>Games</b>").assertIsDisplayed()
         compose.onNodeWithText("Alice").assertIsDisplayed()
 
-        compose.onNodeWithTag(CHANNELS_DISCONNECT_TEST_TAG).performClick()
+        compose.onNodeWithText("More").performClick()
+        compose.onNodeWithTag(MORE_DISCONNECT_TEST_TAG).performClick()
         await { exists("Home") && !exists("Channels") }
+    }
+
+    @Test
+    fun connectedJoinAChannelOpenAPersonSearchSwitchTabsAndDisconnect() {
+        val viewModel = start()
+        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        await { exists("Test Root") && exists("you are here") }
+
+        // Tapping a channel joins it.
+        compose.onNodeWithText("<b>Games</b>").performClick()
+        await { engine.joinCalls.toList() == listOf<Pair<UInt, String?>>(2u to null) }
+
+        // Tapping a person opens the sheet with the settings for the user only.
+        compose.onNodeWithText("Alice").performClick()
+        await { exists("Volume for you") && exists("Mute for me") }
+        compose.onNodeWithTag(PERSON_MUTE_TEST_TAG).performClick()
+        await { viewModel.uiState.value.session.server?.people?.get(8u)?.locallyMuted == true }
+        compose.runOnUiThread { viewModel.connected.dismissSheet() }
+        await { !exists("Volume for you") }
+
+        // Search filters channels and people by name.
+        compose.onNodeWithContentDescription("Search channels and people").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("ali")
+        await { exists("Alice") && !exists("<b>Games</b>") }
+        compose.onNodeWithContentDescription("Close search").performClick()
+        await { exists("<b>Games</b>") }
+
+        compose.onNodeWithText("Chat").performClick()
+        await { exists("No chat messages yet.") }
+        compose.onNodeWithText("More").performClick()
+        compose.onNodeWithTag(MORE_DISCONNECT_TEST_TAG).performClick()
+        await { !exists("More") }
+    }
+
+    @Test
+    fun aLockedChannelAsksForItsPasswordAndARefusalShowsABanner() {
+        start(configure = {
+            it.channelPasswords[1u] = "secret"
+            it.deniedChannels += 2u
+        })
+        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        await { exists("Test Root") }
+        // The user starts in Lobby; move to the root first so Lobby can be joined.
+        compose.onNodeWithText("Test Root").performClick()
+        await { engine.joinCalls.size == 1 }
+
+        compose.onNodeWithText("Lobby").performClick()
+        await { exists("Channel password") }
+        compose.onNode(hasSetTextAction()).performTextInput("wrong")
+        compose.onNodeWithTag(CHANNEL_PASSWORD_JOIN_TEST_TAG).performClick()
+        await { hasFieldError("That password was not accepted. Try again.") }
+        compose.onNode(hasSetTextAction()).performTextInput("secret")
+        compose.onNodeWithTag(CHANNEL_PASSWORD_JOIN_TEST_TAG).performClick()
+        await { !exists("Channel password") }
+
+        compose.onNodeWithText("<b>Games</b>").performClick()
+        await { exists("You cannot join <b>Games</b> Permission denied.") }
     }
 
     @Test

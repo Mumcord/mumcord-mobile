@@ -5,6 +5,7 @@ package app.mumcord.mobile.design.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,6 +71,7 @@ fun MumcordChannelBody(modifier: Modifier = Modifier, content: @Composable Colum
  * @param empty nobody is inside: the name is muted.
  * @param lockedDescription set for a password-protected channel; read by TalkBack for the lock.
  * @param toggleDescription what TalkBack reads for the chevron, such as "Collapse Lobby".
+ * @param onLongClick opens the channel's menu; [longClickLabel] names it for TalkBack.
  */
 @Composable
 fun MumcordChannelRow(
@@ -85,6 +87,8 @@ fun MumcordChannelRow(
     empty: Boolean = false,
     meta: String? = null,
     lockedDescription: String? = null,
+    onLongClick: (() -> Unit)? = null,
+    longClickLabel: String? = null,
 ) {
     val colors = MumcordTheme.colors
     val shape = RoundedCornerShape(MumcordRadius.md)
@@ -101,7 +105,7 @@ fun MumcordChannelRow(
             .defaultMinSize(minHeight = MumcordSize.touchVisual)
             .clip(shape)
             .then(highlight)
-            .clickable(onClick = onClick)
+            .combinedClickable(onLongClickLabel = longClickLabel, onLongClick = onLongClick, onClick = onClick)
             .semantics { selected = current }
             // 2 dp of each side is the border of the current channel (transparent otherwise).
             .padding(start = 6.dp, end = 10.dp),
@@ -184,6 +188,7 @@ enum class MumcordAvatarSize(internal val diameter: Dp, internal val fontSize: I
     Small(24.dp, 11),
     Medium(32.dp, 14),
     Large(40.dp, 16),
+    Sheet(56.dp, 24),
     ExtraLarge(88.dp, 32),
 }
 

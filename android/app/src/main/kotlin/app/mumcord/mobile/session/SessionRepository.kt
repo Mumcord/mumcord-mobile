@@ -151,6 +151,33 @@ class SessionRepository(
         }
     }
 
+    /** Asks to enter a channel; a refusal arrives as a password question or a denial. */
+    suspend fun joinChannel(channelId: UInt, password: String?) {
+        mutableState.update { it.copy(denied = null) }
+        report(call("join channel") { it.joinChannel(channelId, password) })
+    }
+
+    /** How loud a person is for the user only, 0 to 200 percent. */
+    suspend fun setPersonVolume(session: UInt, percent: Int) {
+        report(call("set person volume") { it.setPersonVolume(session, percent.coerceIn(0, 200).toUShort()) })
+    }
+
+    suspend fun setPersonLocalMute(session: UInt, muted: Boolean) {
+        report(call("set person mute") { it.setPersonLocalMute(session, muted) })
+    }
+
+    /** Gives up on a channel password question. */
+    fun dismissChannelPassword() = mutableState.update { it.copy(channelPassword = null) }
+
+    fun dismissDenied() = mutableState.update { it.copy(denied = null) }
+
+    /** A command of the connected screens that failed in the engine is shown like a refusal. */
+    private fun report(outcome: Outcome<Unit>) {
+        if (outcome is Outcome.Failed) {
+            mutableState.update { it.copy(denied = DeniedAction(channelId = null, detail = "")) }
+        }
+    }
+
     /** Puts a shown error away. */
     fun dismissFailure() {
         mutableState.update {

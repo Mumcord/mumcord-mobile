@@ -1,41 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-
 package app.mumcord.mobile.session
 
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.Person
 
+/** A channel with the people in it and its sub-channels, both in display order. */
 data class ChannelNode(
-    val id: UInt,
-    val name: String,
-    val people: List<PersonEntry>,
+    val channel: Channel,
+    val people: List<Person>,
     val children: List<ChannelNode>,
 )
-
-data class PersonEntry(
-    val session: UInt,
-    val name: String,
-    val isSelf: Boolean,
-)
-
-/** One line of the channel list: the tree flattened in display order with its nesting depth. */
-sealed interface TreeRow {
-    val depth: Int
-
-    data class ChannelRow(
-        val id: UInt,
-        val name: String,
-        val peopleCount: Int,
-        override val depth: Int,
-    ) : TreeRow
-
-    data class PersonRow(
-        val session: UInt,
-        val name: String,
-        val isSelf: Boolean,
-        override val depth: Int,
-    ) : TreeRow
-}
 
 private val channelOrder: Comparator<Channel> =
     compareBy<Channel> { it.position }
@@ -52,31 +26,15 @@ private val personOrder: Comparator<Person> =
  * root (their parent is unknown or was removed) and the people in them are left out, so
  * inconsistent server data can never produce a loop.
  */
-fun buildChannelTree(
-    selfSession: UInt,
-    channels: Collection<Channel>,
-    people: Collection<Person>,
-): ChannelNode? {
+fun buildChannelTree(channels: Collection<Channel>, people: Collection<Person>): ChannelNode? {
     val root = channels.filter { it.parentId == null }.minByOrNull { it.id } ?: return null
     val childrenByParent = channels.filter { it.parentId != null }.groupBy { it.parentId }
     val peopleByChannel = people.groupBy { it.channelId }
 
     fun node(channel: Channel): ChannelNode = ChannelNode(
-        id = channel.id,
-        name = channel.name,
-        people = peopleByChannel[channel.id].orEmpty().sortedWith(personOrder).map {
-            PersonEntry(session = it.session, name = it.name, isSelf = it.session == selfSession)
-        },
+        channel = channel,
+        people = peopleByChannel[channel.id].orEmpty().sortedWith(personOrder),
         children = childrenByParent[channel.id].orEmpty().sortedWith(channelOrder).map(::node),
     )
     return node(root)
-}
-
-/** People of a channel come first, then its sub-channels, each one level deeper. */
-fun ChannelNode.flatten(depth: Int = 0): List<TreeRow> = buildList {
-    add(TreeRow.ChannelRow(id = id, name = name, peopleCount = people.size, depth = depth))
-    people.forEach {
-        add(TreeRow.PersonRow(it.session, it.name, it.isSelf, depth = depth + 1))
-    }
-    children.forEach { addAll(it.flatten(depth + 1)) }
 }

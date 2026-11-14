@@ -25,7 +25,8 @@ import app.mumcord.mobile.ui.servers.RemoveServerSheet
 import app.mumcord.mobile.ui.servers.ServerFormScreen
 import app.mumcord.mobile.ui.servers.ServerListScreen
 import app.mumcord.mobile.ui.setup.TalkModeChoiceScreen
-import app.mumcord.mobile.ui.slice.ChannelTreeScreen
+import app.mumcord.mobile.ui.connected.ConnectedSheetHost
+import app.mumcord.mobile.ui.connected.ConnectedShell
 
 /** Connects the screens to the view model; everything below it only gets values and callbacks. */
 @Composable
@@ -53,7 +54,8 @@ fun AppContent(
     val prompt = session.certificatePrompt
     // Questions wait until the first-start setup is done.
     val overlay = uiState.overlay.takeIf { uiState.setupDone }
-    val sheetOpen = prompt != null || overlay != null
+    val connectedSheet = uiState.connected?.sheet
+    val sheetOpen = prompt != null || overlay != null || connectedSheet != null
     Box(Modifier.fillMaxSize()) {
         // While a sheet is open, the screen behind it is not offered to screen readers.
         Box(if (sheetOpen) Modifier.clearAndSetSemantics { } else Modifier) {
@@ -99,8 +101,14 @@ fun AppContent(
                         bottomInsets = bottomInsets,
                     )
                 }
-                AppScreen.Channels -> session.server?.let { server ->
-                    ChannelTreeScreen(rows = server.rows, phase = session.phase, onDisconnect = viewModel::disconnect)
+                AppScreen.Channels -> uiState.connected?.let { connected ->
+                    ConnectedShell(
+                        state = connected,
+                        actions = viewModel.connected,
+                        onDisconnect = viewModel::disconnect,
+                        topInsets = topInsets,
+                        bottomInsets = bottomInsets,
+                    )
                 }
             }
         }
@@ -145,6 +153,7 @@ fun AppContent(
                 bottomInsets = bottomInsets,
             )
             overlay is Overlay.InvalidLink -> InvalidLinkSheet(viewModel::dismissOverlay, topInsets, bottomInsets)
+            connectedSheet != null -> ConnectedSheetHost(connectedSheet, viewModel.connected, topInsets, bottomInsets)
         }
     }
 }

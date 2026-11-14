@@ -15,6 +15,10 @@ import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
+import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.ui.connected.ConnectedController
+import app.mumcord.mobile.ui.connected.ConnectedLocal
+import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.ui.link.linkConfirmState
 import app.mumcord.mobile.ui.servers.ServerFormState
 import app.mumcord.mobile.ui.servers.toPingState
@@ -32,7 +36,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
- * The state of everything before the connected screens: first-start setup, the server list,
+ * The state of the app. Its own part is everything before the connected screens: first-start setup, the server list,
  * the add and edit form, connecting with its questions and errors, and opened links.
  */
 class AppViewModel(
@@ -41,13 +45,22 @@ class AppViewModel(
 ) : ViewModel() {
     private val local = MutableStateFlow(AppUiState(setupDone = setupStore.firstStartDone))
 
+
+    /** The connected screens' own state and actions. */
+    val connected = ConnectedController(repository, viewModelScope)
+
     val uiState: StateFlow<AppUiState> =
-        combine(local, repository.state) { ui, session -> ui.copy(session = session) }
+        combine(local, repository.state, connected.local, ::merge)
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-                local.value.copy(session = repository.state.value),
+                merge(local.value, repository.state.value, connected.local.value),
             )
+
+    private fun merge(ui: AppUiState, session: SessionState, connectedLocal: ConnectedLocal): AppUiState {
+        val merged = ui.copy(session = session)
+        return merged.copy(connected = connectedUiState(session, connectedLocal, merged.activeServerName.orEmpty()))
+    }
 
     /** The last connect, so "Try again" and the password retry keep a link's channel. */
     private var lastTarget: ConnectTarget? = null

@@ -7,10 +7,12 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
@@ -22,8 +24,9 @@ import app.mumcord.mobile.ui.servers.SERVER_ADD_TEST_TAG
 import app.mumcord.mobile.ui.servers.SERVER_CONNECT_TEST_TAG
 import app.mumcord.mobile.ui.setup.TALK_MODE_CONTINUE_TEST_TAG
 import app.mumcord.mobile.ui.setup.TALK_MODE_PUSH_TO_TALK_TEST_TAG
-import app.mumcord.mobile.ui.slice.CHANNELS_DISCONNECT_TEST_TAG
-import app.mumcord.mobile.ui.slice.CHANNEL_ROW_TEST_TAG
+import app.mumcord.mobile.ui.connected.CHANNEL_ROW_TEST_TAG
+import app.mumcord.mobile.ui.connected.MORE_DISCONNECT_TEST_TAG
+import app.mumcord.mobile.ui.connected.PERSON_ROW_TEST_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
@@ -59,8 +62,11 @@ class ConnectFlowTest {
         awaitOrFail("the channel list") { channelNames().size > TestServer.SEEDED_CHANNELS.size }
         assertSeededChannels()
 
-        compose.onNodeWithTag(CHANNELS_DISCONNECT_TEST_TAG).performClick()
-        awaitOrFail("the server list after disconnecting") { exists(SERVER_CONNECT_TEST_TAG) }
+        // Everybody arrives in the root channel; tapping Lobby moves the user there.
+        compose.onNode(hasTestTag(CHANNEL_ROW_TEST_TAG) and hasText(LOBBY)).performClick()
+        awaitOrFail("the own user in $LOBBY") { ownChannel() == LOBBY && personBelow(LOBBY) == USER_NAME }
+
+        disconnect()
 
         // The certificate was trusted above and is remembered: no second question.
         compose.onNodeWithTag(SERVER_CONNECT_TEST_TAG).performClick()
@@ -70,8 +76,31 @@ class ConnectFlowTest {
         assertFalse("Asked again about a certificate that is already trusted", exists(CERTIFICATE_TRUST_TEST_TAG))
         assertSeededChannels()
 
-        compose.onNodeWithTag(CHANNELS_DISCONNECT_TEST_TAG).performClick()
+        disconnect()
+    }
+
+    /** Until the voice bar exists, the More tab is the way to leave a server. */
+    private fun disconnect() {
+        compose.onNodeWithText(TAB_MORE).performClick()
+        awaitOrFail("the More tab") { exists(MORE_DISCONNECT_TEST_TAG) }
+        compose.onNodeWithTag(MORE_DISCONNECT_TEST_TAG).performClick()
         awaitOrFail("the server list after disconnecting") { exists(SERVER_CONNECT_TEST_TAG) }
+    }
+
+    /** The name of the channel marked "you are here". */
+    private fun ownChannel(): String? =
+        compose.onAllNodesWithTag(CHANNEL_ROW_TEST_TAG).fetchSemanticsNodes()
+            .map { row -> row.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } }
+            .firstOrNull { OWN_CHANNEL_MARK in it }
+            ?.firstOrNull()
+
+    /** The name of the first person listed directly below the channel [name]. */
+    private fun personBelow(name: String): String? {
+        val rows = compose.onAllNodes(hasTestTag(CHANNEL_ROW_TEST_TAG) or hasTestTag(PERSON_ROW_TEST_TAG))
+            .fetchSemanticsNodes()
+            .map { it.config.getOrNull(SemanticsProperties.TestTag) to it.config.getOrNull(SemanticsProperties.Text)?.firstOrNull()?.text }
+        val index = rows.indexOfFirst { it.first == CHANNEL_ROW_TEST_TAG && it.second == name }
+        return rows.getOrNull(index + 1)?.takeIf { index >= 0 && it.first == PERSON_ROW_TEST_TAG }?.second
     }
 
     private fun addServer() {
@@ -124,6 +153,9 @@ class ConnectFlowTest {
 
     private companion object {
         const val USER_NAME = "e2e-phone"
+        const val LOBBY = "Lobby"
+        const val TAB_MORE = "More"
+        const val OWN_CHANNEL_MARK = "you are here"
 
         // The labels of the form fields, which is how a screen reader finds them too.
         const val FIELD_ADDRESS = "Address"

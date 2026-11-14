@@ -6,6 +6,7 @@ import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.ui.connected.ConnectedUiState
 import app.mumcord.mobile.ui.link.LinkConfirmState
 import app.mumcord.mobile.ui.servers.PingState
 import app.mumcord.mobile.ui.servers.ServerFormState
@@ -50,11 +51,13 @@ data class AppUiState(
     /** The open add or edit form, or null. */
     val form: ServerFormState? = null,
     val overlay: Overlay? = null,
+    /** The connected screens, or null while no server is shown. */
+    val connected: ConnectedUiState? = null,
 ) {
     val screen: AppScreen
         get() = when {
             !setupDone -> AppScreen.TalkModeChoice
-            session.showsServer -> AppScreen.Channels
+            connected != null -> AppScreen.Channels
             form != null -> AppScreen.ServerForm
             else -> AppScreen.ServerList
         }

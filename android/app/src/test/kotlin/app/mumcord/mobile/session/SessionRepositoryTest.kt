@@ -117,13 +117,7 @@ class SessionRepositoryTest {
         engine.emit(BridgeEvent.PersonRemoved(10u))
         runCurrent()
 
-        assertEquals(
-            listOf(
-                TreeRow.ChannelRow(id = 0u, name = "Root", peopleCount = 1, depth = 0),
-                TreeRow.PersonRow(session = 11u, name = "Alice renamed", isSelf = false, depth = 1),
-            ),
-            repository.state.value.server?.rows,
-        )
+        assertEquals(listOf("Alice renamed"), repository.state.value.server?.root?.people?.map { it.name })
     }
 
     @Test

@@ -3,6 +3,8 @@
 package app.mumcord.mobile.session
 
 import app.mumcord.mobile.bridge.BridgeEvent
+import app.mumcord.mobile.bridge.ChannelPasswordState
+import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.BridgeSnapshot
 import app.mumcord.mobile.bridge.CertificatePrompt
@@ -58,6 +60,15 @@ class FakeEngine(
     /** When set, the server refuses every connection without exactly this password. */
     @Volatile
     var requiredPassword: String? = null
+
+    /** Channels that only let in who joins with exactly this password. */
+    val channelPasswords = ConcurrentHashMap<UInt, String>()
+
+    /** Channels the server refuses to let the user into. */
+    val deniedChannels: MutableSet<UInt> = ConcurrentHashMap.newKeySet()
+    val joinCalls = CopyOnWriteArrayList<Pair<UInt, String?>>()
+    val volumeCalls = CopyOnWriteArrayList<Pair<UInt, Int>>()
+    private val people = ConcurrentHashMap(server.people.associateBy { it.session })
 
     @Volatile
     var talkMode = TalkMode.VOICE_ACTIVITY
@@ -176,11 +187,39 @@ class FakeEngine(
         return pings[serverId]
     }
 
-    override suspend fun joinChannel(channelId: UInt, password: String?) = Unit
+    override suspend fun joinChannel(channelId: UInt, password: String?) {
+        joinCalls += channelId to password
+        val needed = channelPasswords[channelId]
+        when {
+            channelId in deniedChannels -> emit(BridgeEvent.ActionDenied(channelId, "Permission denied."))
+            needed != null && password == null ->
+                emit(BridgeEvent.ChannelPasswordChanged(channelId, ChannelPasswordState.REQUIRED))
+            needed != null && password != needed ->
+                emit(BridgeEvent.ChannelPasswordChanged(channelId, ChannelPasswordState.WRONG))
+            else -> {
+                if (password != null) emit(BridgeEvent.ChannelPasswordChanged(channelId, ChannelPasswordState.ENDED))
+                change(server.selfSession) { it.copy(channelId = channelId) }
+            }
+        }
+    }
 
-    override suspend fun setPersonVolume(session: UInt, percent: UShort) = Unit
+    override suspend fun setPersonVolume(session: UInt, percent: UShort) {
+        volumeCalls += session to percent.toInt()
+        change(session) { it.copy(localVolume = percent) }
+    }
 
-    override suspend fun setPersonLocalMute(session: UInt, muted: Boolean) = Unit
+    override suspend fun setPersonLocalMute(session: UInt, muted: Boolean) {
+        change(session) { it.copy(locallyMuted = muted) }
+    }
+
+    /** Changes a person and reports it, as the engine does. */
+    fun change(session: UInt, change: (Person) -> Person) {
+        val person = people[session] ?: return
+        change(person).also {
+            people[session] = it
+            emit(BridgeEvent.PersonChanged(it))
+        }
+    }
 
     override suspend fun talkMode(): TalkMode = talkMode
 

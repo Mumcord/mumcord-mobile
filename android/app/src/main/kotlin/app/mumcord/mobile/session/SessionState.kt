@@ -19,6 +19,12 @@ data class SessionState(
      * the error can name the server and "Try again" knows where to connect.
      */
     val activeServerId: Long? = null,
+    /** The channel whose password the server asks for, until it is typed or given up. */
+    val channelPassword: ChannelPasswordPrompt? = null,
+    /** The latest thing the server refused, until it is put away. */
+    val denied: DeniedAction? = null,
+    /** Things the app cannot show, newest last; see [withHint]. */
+    val hints: List<UnsupportedHint> = emptyList(),
 ) {
     /** True once the server's channels are known and the connection is still alive. */
     val showsServer: Boolean
@@ -55,14 +61,37 @@ data class CertificatePromptState(
 }
 
 /**
- * The server's channels and people as the engine reported them, plus the rows derived from
- * them. The rows are built when the value is created, which happens off the main thread.
+ * The server's channels and people as the engine reported them, plus the tree derived from
+ * them. The tree is built when the value is created, which happens off the main thread.
  */
 data class ServerModel(
     val selfSession: UInt,
     val channels: Map<UInt, Channel>,
     val people: Map<UInt, Person>,
 ) {
-    val root: ChannelNode? = buildChannelTree(selfSession, channels.values, people.values)
-    val rows: List<TreeRow> = root?.flatten().orEmpty()
+    val root: ChannelNode? = buildChannelTree(channels.values, people.values)
+
+    /** The channel the user is in, or null while the server has not said. */
+    val selfChannelId: UInt?
+        get() = people[selfSession]?.channelId
 }
+
+/** [wrong] is true after the server refused the typed password, so the sheet can say so. */
+data class ChannelPasswordPrompt(val channelId: UInt, val wrong: Boolean)
+
+/** A refusal by the server. [detail] is the server's own text and therefore untrusted. */
+data class DeniedAction(val channelId: UInt?, val detail: String)
+
+enum class UnsupportedKind { FileTransfer, WatchTogether, PluginContent }
+
+/**
+ * Something a person did that this app cannot show (FR-5.14). [personName] is untrusted text.
+ * [id] tells two hints of the same kind by the same person apart.
+ */
+data class UnsupportedHint(val id: Long, val personName: String, val kind: UnsupportedKind)
+
+/** How many hints stay visible; older ones make room so the list stays calm. */
+const val MAX_HINTS = 3
+
+fun SessionState.withHint(hint: UnsupportedHint): SessionState =
+    copy(hints = (hints + hint).takeLast(MAX_HINTS))

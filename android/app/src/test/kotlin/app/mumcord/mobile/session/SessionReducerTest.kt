@@ -3,6 +3,7 @@
 package app.mumcord.mobile.session
 
 import app.mumcord.mobile.bridge.BridgeEvent
+import app.mumcord.mobile.bridge.ChannelPasswordState
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.CertificatePrompt
 import app.mumcord.mobile.bridge.ConnectionState
@@ -32,11 +33,41 @@ class SessionReducerTest {
         BridgeEvent.ServerSynced(server),
     )
 
-    private fun names(state: SessionState): List<String> = state.server?.rows.orEmpty().map {
-        when (it) {
-            is TreeRow.ChannelRow -> it.name
-            is TreeRow.PersonRow -> it.name
+    private fun names(state: SessionState): List<String> {
+        fun ChannelNode.names(): List<String> = listOf(channel.name) + people.map { it.name } + children.flatMap { it.names() }
+        return state.server?.root?.names().orEmpty()
+    }
+
+    @Test
+    fun aChannelPasswordQuestionIsAskedMarkedWrongAndEnds() {
+        val asked = fold(*connected, BridgeEvent.ChannelPasswordChanged(1u, ChannelPasswordState.REQUIRED))
+        assertEquals(ChannelPasswordPrompt(1u, wrong = false), asked.channelPassword)
+        val wrong = asked.fold(BridgeEvent.ChannelPasswordChanged(1u, ChannelPasswordState.WRONG))
+        assertEquals(ChannelPasswordPrompt(1u, wrong = true), wrong.channelPassword)
+        assertNull(wrong.fold(BridgeEvent.ChannelPasswordChanged(1u, ChannelPasswordState.ENDED)).channelPassword)
+    }
+
+    @Test
+    fun aRefusalIsKeptAndTheEndOfTheConnectionForgetsQuestionsRefusalsAndHints() {
+        val state = fold(
+            *connected,
+            BridgeEvent.ChannelPasswordChanged(1u, ChannelPasswordState.REQUIRED),
+            BridgeEvent.ActionDenied(1u, "Permission denied."),
+        ).withHint(UnsupportedHint(1, "Jonas", UnsupportedKind.FileTransfer))
+        assertEquals(DeniedAction(1u, "Permission denied."), state.denied)
+
+        val ended = state.fold(BridgeEvent.ConnectionChanged(ConnectionState.Disconnected(null)))
+        assertNull(ended.channelPassword)
+        assertNull(ended.denied)
+        assertEquals(emptyList<UnsupportedHint>(), ended.hints)
+    }
+
+    @Test
+    fun hintsKeepOnlyTheNewestFew() {
+        val state = (1L..5L).fold(SessionState()) { state, id ->
+            state.withHint(UnsupportedHint(id, "Jonas", UnsupportedKind.FileTransfer))
         }
+        assertEquals(listOf(3L, 4L, 5L), state.hints.map { it.id })
     }
 
     @Test
