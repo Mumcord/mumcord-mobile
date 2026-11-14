@@ -51,4 +51,9 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.PersonRemoved -> copy(
         server = server?.let { it.copy(people = it.people - event.session) },
     )
+    // No UI for these yet: the server list (task 2.4) and channel passwords and denials (task 2.5) use them.
+    is BridgeEvent.ActionDenied,
+    is BridgeEvent.ChannelPasswordChanged,
+    is BridgeEvent.ServersChanged,
+    -> this
 }

@@ -2,18 +2,16 @@
 
 package app.mumcord.mobile.session
 
-import app.mumcord.mobile.bridge.Channel
-import app.mumcord.mobile.bridge.Person
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ChannelTreeTest {
-    private val root = Channel(id = 0u, parentId = null, name = "Root", position = 0)
+    private val root = channel(0u, "Root")
 
     @Test
     fun noRootChannelGivesNoTree() {
-        val orphan = Channel(id = 4u, parentId = 9u, name = "Orphan", position = 0)
+        val orphan = channel(4u, "Orphan", parentId = 9u)
         assertNull(buildChannelTree(1u, listOf(orphan), emptyList()))
     }
 
@@ -21,10 +19,10 @@ class ChannelTreeTest {
     fun childrenAreOrderedByPositionThenNameIgnoringCase() {
         val channels = listOf(
             root,
-            Channel(id = 1u, parentId = 0u, name = "zebra", position = 0),
-            Channel(id = 2u, parentId = 0u, name = "Alpha", position = 0),
-            Channel(id = 3u, parentId = 0u, name = "Last by name, first by position", position = -1),
-            Channel(id = 4u, parentId = 0u, name = "beta", position = 0),
+            channel(1u, "zebra", parentId = 0u),
+            channel(2u, "Alpha", parentId = 0u),
+            channel(3u, "Last by name, first by position", parentId = 0u, position = -1),
+            channel(4u, "beta", parentId = 0u),
         )
         val tree = checkNotNull(buildChannelTree(1u, channels, emptyList()))
         assertEquals(listOf(3u, 2u, 4u, 1u), tree.children.map { it.id })
@@ -32,11 +30,11 @@ class ChannelTreeTest {
 
     @Test
     fun peopleAreGroupedPerChannelSortedByNameAndTheOwnUserIsMarked() {
-        val channels = listOf(root, Channel(id = 1u, parentId = 0u, name = "Lobby", position = 0))
+        val channels = listOf(root, channel(1u, "Lobby", parentId = 0u))
         val people = listOf(
-            Person(session = 10u, channelId = 1u, name = "mallory"),
-            Person(session = 11u, channelId = 1u, name = "Alice"),
-            Person(session = 12u, channelId = 0u, name = "Bob"),
+            person(10u, "mallory", channelId = 1u),
+            person(11u, "Alice", channelId = 1u),
+            person(12u, "Bob", channelId = 0u),
         )
         val tree = checkNotNull(buildChannelTree(11u, channels, people))
         assertEquals(listOf(PersonEntry(12u, "Bob", isSelf = false)), tree.people)
@@ -50,12 +48,12 @@ class ChannelTreeTest {
     fun channelsThatDoNotHangOffTheRootAreLeftOut() {
         val channels = listOf(
             root,
-            Channel(id = 1u, parentId = 0u, name = "Lobby", position = 0),
-            Channel(id = 5u, parentId = 6u, name = "Loop A", position = 0),
-            Channel(id = 6u, parentId = 5u, name = "Loop B", position = 0),
-            Channel(id = 7u, parentId = 99u, name = "Orphan", position = 0),
+            channel(1u, "Lobby", parentId = 0u),
+            channel(5u, "Loop A", parentId = 6u),
+            channel(6u, "Loop B", parentId = 5u),
+            channel(7u, "Orphan", parentId = 99u),
         )
-        val people = listOf(Person(session = 10u, channelId = 7u, name = "Lost"))
+        val people = listOf(person(10u, "Lost", channelId = 7u))
         val rows = checkNotNull(buildChannelTree(1u, channels, people)).flatten()
         assertEquals(
             listOf(
@@ -70,12 +68,12 @@ class ChannelTreeTest {
     fun flattenListsPeopleBeforeSubChannelsWithGrowingDepth() {
         val channels = listOf(
             root,
-            Channel(id = 1u, parentId = 0u, name = "Games", position = 0),
-            Channel(id = 2u, parentId = 1u, name = "Chess", position = 0),
+            channel(1u, "Games", parentId = 0u),
+            channel(2u, "Chess", parentId = 1u),
         )
         val people = listOf(
-            Person(session = 10u, channelId = 0u, name = "Alice"),
-            Person(session = 11u, channelId = 2u, name = "Bob"),
+            person(10u, "Alice", channelId = 0u),
+            person(11u, "Bob", channelId = 2u),
         )
         val rows = checkNotNull(buildChannelTree(10u, channels, people)).flatten()
         assertEquals(

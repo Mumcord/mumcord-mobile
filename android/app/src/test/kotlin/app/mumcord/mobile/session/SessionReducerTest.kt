@@ -5,9 +5,7 @@ package app.mumcord.mobile.session
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.CertificatePrompt
-import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.ConnectionState
-import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.ServerState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -19,10 +17,10 @@ class SessionReducerTest {
     private val server = ServerState(
         selfSession = 10u,
         channels = listOf(
-            Channel(id = 0u, parentId = null, name = "Root", position = 0),
-            Channel(id = 1u, parentId = 0u, name = "Lobby", position = 0),
+            channel(0u, "Root"),
+            channel(1u, "Lobby", parentId = 0u),
         ),
-        people = listOf(Person(session = 10u, channelId = 0u, name = "Me")),
+        people = listOf(person(10u, "Me", channelId = 0u)),
     )
 
     private fun fold(vararg events: BridgeEvent): SessionState =
@@ -100,8 +98,8 @@ class SessionReducerTest {
             *connected,
             BridgeEvent.ChannelsChanged(
                 listOf(
-                    Channel(id = 1u, parentId = 0u, name = "Lounge", position = 0),
-                    Channel(id = 2u, parentId = 0u, name = "Games", position = 0),
+                    channel(1u, "Lounge", parentId = 0u),
+                    channel(2u, "Games", parentId = 0u),
                 ),
             ),
         )
@@ -112,7 +110,7 @@ class SessionReducerTest {
     fun channelRemovedDropsTheChannelAndItsSubChannels() {
         val state = fold(
             *connected,
-            BridgeEvent.ChannelsChanged(listOf(Channel(id = 2u, parentId = 1u, name = "Sub", position = 0))),
+            BridgeEvent.ChannelsChanged(listOf(channel(2u, "Sub", parentId = 1u))),
             BridgeEvent.ChannelRemoved(1u),
         )
         assertEquals(listOf("Root", "Me"), names(state))
@@ -120,10 +118,10 @@ class SessionReducerTest {
 
     @Test
     fun personChangedAddsAPersonAndMovesThemBetweenChannels() {
-        val joined = fold(*connected, BridgeEvent.PersonChanged(Person(11u, 0u, "Alice")))
+        val joined = fold(*connected, BridgeEvent.PersonChanged(person(11u, "Alice", channelId = 0u)))
         assertEquals(listOf("Root", "Alice", "Me", "Lobby"), names(joined))
 
-        val moved = joined.fold(BridgeEvent.PersonChanged(Person(11u, 1u, "Alice")))
+        val moved = joined.fold(BridgeEvent.PersonChanged(person(11u, "Alice", channelId = 1u)))
         assertEquals(listOf("Root", "Me", "Lobby", "Alice"), names(moved))
     }
 
@@ -131,7 +129,7 @@ class SessionReducerTest {
     fun personRemovedDropsThePerson() {
         val state = fold(
             *connected,
-            BridgeEvent.PersonChanged(Person(11u, 1u, "Alice")),
+            BridgeEvent.PersonChanged(person(11u, "Alice", channelId = 1u)),
             BridgeEvent.PersonRemoved(11u),
         )
         assertEquals(listOf("Root", "Me", "Lobby"), names(state))
@@ -140,7 +138,7 @@ class SessionReducerTest {
     @Test
     fun changesBeforeTheServerIsSyncedAreIgnored() {
         val state = fold(
-            BridgeEvent.PersonChanged(Person(11u, 1u, "Alice")),
+            BridgeEvent.PersonChanged(person(11u, "Alice", channelId = 1u)),
             BridgeEvent.ChannelRemoved(1u),
         )
         assertNull(state.server)
@@ -183,6 +181,9 @@ class SessionReducerTest {
             BridgeException.CertificateRejected("d") to ConnectionError.CertificateRejected,
             BridgeException.CertificateChanged("d") to ConnectionError.CertificateChanged,
             BridgeException.ServerTooOld("d") to ConnectionError.ServerTooOld,
+            BridgeException.Banned("d") to ConnectionError.Banned,
+            BridgeException.NotFound("d") to ConnectionError.NotFound,
+            BridgeException.PermissionDenied("d") to ConnectionError.PermissionDenied,
             BridgeException.InvalidInput("d") to ConnectionError.InvalidInput,
             BridgeException.SecureStorageUnavailable("d") to ConnectionError.SecureStorageUnavailable,
             BridgeException.Io("d") to ConnectionError.Io,

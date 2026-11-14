@@ -10,3 +10,4 @@
 - Android: secrets are kept encrypted with a key in the phone's secure hardware and are excluded from backups
 - iOS app project with Keychain storage (this device only)
 - Android: Mumcord look in dark and light (colours, fonts, icons and base components shared with the desktop app), following the system setting and the system font size
+- Bridge: saved servers, server ping, connect by saved server, channel passwords, per-person volume and mute, talking and stream state, `mumble://` link parsing, talk mode setting

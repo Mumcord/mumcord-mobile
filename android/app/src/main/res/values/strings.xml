@@ -22,6 +22,9 @@
     <string name="error_certificate_rejected">The connection was stopped because the server\'s certificate was not trusted.</string>
     <string name="error_certificate_changed">The server\'s certificate has changed. The connection was stopped to keep you safe.</string>
     <string name="error_server_too_old">This server runs a version of Mumble that is too old for Mumcord.</string>
+    <string name="error_banned">You are banned from this server.</string>
+    <string name="error_not_found">This server entry no longer exists.</string>
+    <string name="error_permission_denied">The server did not allow this.</string>
     <string name="error_invalid_input">The server address, the port or the name is not valid.</string>
     <string name="error_secure_storage_unavailable">The secure storage of this device is not available, so Mumcord cannot protect your identity.</string>
     <string name="error_io">Mumcord could not read or write its data on this device.</string>

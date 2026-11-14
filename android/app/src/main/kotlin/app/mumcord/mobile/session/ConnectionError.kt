@@ -13,6 +13,9 @@ enum class ConnectionError {
     CertificateRejected,
     CertificateChanged,
     ServerTooOld,
+    Banned,
+    NotFound,
+    PermissionDenied,
     InvalidInput,
     SecureStorageUnavailable,
     Io,
@@ -27,6 +30,9 @@ fun BridgeException.toConnectionError(): ConnectionError = when (this) {
     is BridgeException.CertificateRejected -> ConnectionError.CertificateRejected
     is BridgeException.CertificateChanged -> ConnectionError.CertificateChanged
     is BridgeException.ServerTooOld -> ConnectionError.ServerTooOld
+    is BridgeException.Banned -> ConnectionError.Banned
+    is BridgeException.NotFound -> ConnectionError.NotFound
+    is BridgeException.PermissionDenied -> ConnectionError.PermissionDenied
     is BridgeException.InvalidInput -> ConnectionError.InvalidInput
     is BridgeException.SecureStorageUnavailable -> ConnectionError.SecureStorageUnavailable
     is BridgeException.Io -> ConnectionError.Io

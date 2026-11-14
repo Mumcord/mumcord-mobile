@@ -12,5 +12,5 @@ repository = "https://github.com/Mumcord/mumcord-mobile"
 [workspace.dependencies]
 # The pinned Mumcord engine. `rev` must be the reference in `engine.lock.toml`; the bridge's
 # build script fails when the two differ. Desktop-only parts stay off (`default-features = false`).
-mumcord-engine = { git = "https://github.com/Mumcord/mumcord", rev = "6d2ac79e26c9ac8260927c95b3ba815ea11e632f", default-features = false }
-mumcord-store = { git = "https://github.com/Mumcord/mumcord", rev = "6d2ac79e26c9ac8260927c95b3ba815ea11e632f" }
+mumcord-engine = { git = "https://github.com/Mumcord/mumcord", rev = "dc8b580d6994bbddcf3e7f5af55e0b3561fb9355", default-features = false }
+mumcord-store = { git = "https://github.com/Mumcord/mumcord", rev = "dc8b580d6994bbddcf3e7f5af55e0b3561fb9355" }

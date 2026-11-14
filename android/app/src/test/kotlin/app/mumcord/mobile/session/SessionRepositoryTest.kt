@@ -5,9 +5,7 @@ package app.mumcord.mobile.session
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.CertificatePrompt
-import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.ConnectRequest
-import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.ServerState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -23,8 +21,8 @@ import org.junit.Test
 class SessionRepositoryTest {
     private val server = ServerState(
         selfSession = 10u,
-        channels = listOf(Channel(id = 0u, parentId = null, name = "Root", position = 0)),
-        people = listOf(Person(session = 10u, channelId = 0u, name = "Me")),
+        channels = listOf(channel(0u, "Root")),
+        people = listOf(person(10u, "Me", channelId = 0u)),
     )
     private val prompt = CertificatePrompt(fingerprint = "AA:BB", previousFingerprint = null)
 
@@ -100,8 +98,8 @@ class SessionRepositoryTest {
         val repository = repository(prompt = null)
         repository.connect("server.example", 64738u, "Me")
         val engine = engines.single()
-        engine.emit(BridgeEvent.PersonChanged(Person(11u, 0u, "Alice")))
-        engine.emit(BridgeEvent.PersonChanged(Person(11u, 0u, "Alice renamed")))
+        engine.emit(BridgeEvent.PersonChanged(person(11u, "Alice", channelId = 0u)))
+        engine.emit(BridgeEvent.PersonChanged(person(11u, "Alice renamed", channelId = 0u)))
         engine.emit(BridgeEvent.PersonRemoved(10u))
         runCurrent()
 

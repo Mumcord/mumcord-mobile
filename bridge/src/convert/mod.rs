@@ -3,6 +3,12 @@
 //! Mapping from engine types to the bridge's own types, so no engine type reaches the bindings.
 
 mod error;
+mod link;
+mod servers;
 mod state;
 
-pub(crate) use state::{certificate_prompt, channel, connection_state, person, server_state};
+pub(crate) use link::parse_mumble_link;
+pub(crate) use servers::{saved_server, server_fields, server_ping, store_talk_mode, talk_mode};
+pub(crate) use state::{
+    PersonFlags, certificate_prompt, channel, channel_password_state, connection_state, person,
+};

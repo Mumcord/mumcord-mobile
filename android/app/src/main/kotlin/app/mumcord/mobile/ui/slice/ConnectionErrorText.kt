@@ -16,6 +16,9 @@ fun ConnectionError.messageRes(): Int = when (this) {
     ConnectionError.CertificateRejected -> R.string.error_certificate_rejected
     ConnectionError.CertificateChanged -> R.string.error_certificate_changed
     ConnectionError.ServerTooOld -> R.string.error_server_too_old
+    ConnectionError.Banned -> R.string.error_banned
+    ConnectionError.NotFound -> R.string.error_not_found
+    ConnectionError.PermissionDenied -> R.string.error_permission_denied
     ConnectionError.InvalidInput -> R.string.error_invalid_input
     ConnectionError.SecureStorageUnavailable -> R.string.error_secure_storage_unavailable
     ConnectionError.Io -> R.string.error_io

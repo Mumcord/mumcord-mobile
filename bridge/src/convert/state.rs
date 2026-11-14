@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-use mumcord_engine::{ChannelView, ConnState, Snapshot, UserView};
+use mumcord_engine::{
+    ChannelPasswordState as EngineChannelPasswordState, ChannelView, ConnState, UserView,
+};
 
-use crate::types::{CertificatePrompt, Channel, ConnectionState, Person, ServerState};
+use crate::types::{
+    CertificatePrompt, Channel, ChannelPasswordState, ChannelPermissions, ConnectionState, Person,
+};
 
 pub(crate) fn connection_state(state: ConnState) -> ConnectionState {
     match state {
@@ -35,27 +39,62 @@ pub(crate) fn certificate_prompt(
 }
 
 pub(crate) fn channel(channel: ChannelView) -> Channel {
+    let rights = channel.permissions;
     Channel {
         id: channel.id,
         parent_id: channel.parent_id,
         name: channel.name,
         position: channel.position,
+        has_description: channel.has_description,
+        max_people: channel.max_users,
+        temporary: channel.temporary,
+        restricted: channel.enter_restricted,
+        can_enter: rights.enter,
+        permissions: ChannelPermissions {
+            speak: rights.speak,
+            whisper: rights.whisper,
+            text_message: rights.text_message,
+            move_people: rights.move_users,
+            mute_deafen: rights.mute_deafen,
+            kick: rights.kick,
+            ban: rights.ban,
+        },
     }
 }
 
-pub(crate) fn person(user: UserView) -> Person {
+/// What the bridge itself knows about a person, next to what the engine's view says.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct PersonFlags {
+    pub(crate) is_self: bool,
+    pub(crate) talking: bool,
+    pub(crate) streaming: bool,
+    pub(crate) camera: bool,
+}
+
+pub(crate) fn person(user: &UserView, flags: PersonFlags) -> Person {
     Person {
         session: user.session,
         channel_id: user.channel_id,
-        name: user.name,
+        name: user.name.clone(),
+        is_self: flags.is_self,
+        talking: flags.talking,
+        self_muted: user.self_mute,
+        self_deafened: user.self_deaf,
+        server_muted: user.server_mute,
+        server_deafened: user.server_deaf,
+        suppressed: user.suppressed,
+        local_volume: user.volume,
+        locally_muted: user.local_mute,
+        streaming: flags.streaming,
+        camera: flags.camera,
     }
 }
 
-pub(crate) fn server_state(snapshot: Snapshot) -> ServerState {
-    ServerState {
-        self_session: snapshot.self_session,
-        channels: snapshot.channels.into_iter().map(channel).collect(),
-        people: snapshot.users.into_iter().map(person).collect(),
+pub(crate) fn channel_password_state(state: EngineChannelPasswordState) -> ChannelPasswordState {
+    match state {
+        EngineChannelPasswordState::Required => ChannelPasswordState::Required,
+        EngineChannelPasswordState::Wrong => ChannelPasswordState::Wrong,
+        EngineChannelPasswordState::Ended => ChannelPasswordState::Ended,
     }
 }
 

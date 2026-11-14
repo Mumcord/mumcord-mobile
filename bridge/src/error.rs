@@ -20,6 +20,14 @@ pub enum BridgeError {
     /// The user declined a certificate that differs from the trusted one.
     #[error("certificate changed: {detail}")]
     CertificateChanged { detail: String },
+    /// The server banned the user; `detail` is the server's reason, if it gave one.
+    #[error("banned: {detail}")]
+    Banned { detail: String },
+    /// The server refused something; `detail` is its own text.
+    #[error("permission denied: {detail}")]
+    PermissionDenied { detail: String },
+    #[error("not found: {detail}")]
+    NotFound { detail: String },
     #[error("server too old: {detail}")]
     ServerTooOld { detail: String },
     #[error("invalid input: {detail}")]
@@ -36,6 +44,12 @@ impl BridgeError {
     pub(crate) fn invalid(detail: &str) -> Self {
         Self::InvalidInput {
             detail: detail.to_owned(),
+        }
+    }
+
+    pub(crate) fn not_connected() -> Self {
+        Self::NotConnected {
+            detail: "not connected".to_owned(),
         }
     }
 

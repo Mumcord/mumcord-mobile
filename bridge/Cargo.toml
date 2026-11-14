@@ -29,6 +29,7 @@ tokio = { version = "1.54", features = ["rt-multi-thread", "sync"] }
 tracing = "0.1"
 # Exact version: the generated Kotlin and Swift code must match the library it was built from.
 uniffi = "=0.32.2"
+url = "2"
 
 [target.'cfg(target_os = "android")'.dependencies]
 # Same versions as the engine uses, so there is one verifier and one JNI layer in the library.

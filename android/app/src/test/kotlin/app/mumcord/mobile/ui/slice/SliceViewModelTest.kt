@@ -2,10 +2,10 @@
 
 package app.mumcord.mobile.ui.slice
 
-import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.ConnectRequest
-import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.ServerState
+import app.mumcord.mobile.session.channel
+import app.mumcord.mobile.session.person
 import app.mumcord.mobile.session.FakeEngine
 import app.mumcord.mobile.session.SessionRepository
 import kotlinx.coroutines.Dispatchers
@@ -31,8 +31,8 @@ class SliceViewModelTest {
     private val dispatcher = StandardTestDispatcher()
     private val server = ServerState(
         selfSession = 10u,
-        channels = listOf(Channel(id = 0u, parentId = null, name = "Root", position = 0)),
-        people = listOf(Person(session = 10u, channelId = 0u, name = "Me")),
+        channels = listOf(channel(0u, "Root")),
+        people = listOf(person(10u, "Me", channelId = 0u)),
     )
     private val engines = mutableListOf<FakeEngine>()
 

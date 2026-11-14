@@ -15,8 +15,9 @@ import androidx.compose.ui.test.performTextReplacement
 import app.mumcord.mobile.bridge.CertificatePrompt
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.ConnectRequest
-import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.ServerState
+import app.mumcord.mobile.session.channel
+import app.mumcord.mobile.session.person
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.session.FakeEngine
 import app.mumcord.mobile.session.SessionRepository
@@ -38,14 +39,14 @@ class SliceFlowTest {
     private val server = ServerState(
         selfSession = 7u,
         channels = listOf(
-            Channel(id = 0u, parentId = null, name = "Test Root", position = 0),
-            Channel(id = 1u, parentId = 0u, name = "Lobby", position = 0),
+            channel(0u, "Test Root"),
+            channel(1u, "Lobby", parentId = 0u),
             // Markup in a name must show up as the characters it is made of.
-            Channel(id = 2u, parentId = 0u, name = "<b>Games</b>", position = 1),
+            channel(2u, "<b>Games</b>", parentId = 0u, position = 1),
         ),
         people = listOf(
-            Person(session = 7u, channelId = 1u, name = "Tester"),
-            Person(session = 8u, channelId = 1u, name = "Alice"),
+            person(7u, "Tester", channelId = 1u),
+            person(8u, "Alice", channelId = 1u),
         ),
     )
 

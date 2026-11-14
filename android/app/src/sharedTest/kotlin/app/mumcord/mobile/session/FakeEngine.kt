@@ -10,7 +10,12 @@ import app.mumcord.mobile.bridge.ConnectRequest
 import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.bridge.EngineListener
 import app.mumcord.mobile.bridge.MumcordEngineInterface
+import app.mumcord.mobile.bridge.PasswordInput
+import app.mumcord.mobile.bridge.SavedServer
+import app.mumcord.mobile.bridge.ServerInput
+import app.mumcord.mobile.bridge.ServerPing
 import app.mumcord.mobile.bridge.ServerState
+import app.mumcord.mobile.bridge.TalkMode
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -70,7 +75,76 @@ class FakeEngine(
     }
 
     override fun snapshot(): BridgeSnapshot =
-        BridgeSnapshot(connection = connection, certificatePrompt = null, server = null)
+        BridgeSnapshot(
+            servers = savedServers.toList(),
+            connection = connection,
+            connectedServerId = null,
+            certificatePrompt = null,
+            server = null,
+        )
+
+    private val savedServers = CopyOnWriteArrayList<SavedServer>()
+    private var nextServerId = 1L
+
+    @Volatile
+    private var talkMode = TalkMode.VOICE_ACTIVITY
+
+    override suspend fun addServer(input: ServerInput): SavedServer =
+        input.toSaved(nextServerId++).also {
+            savedServers += it
+            emit(BridgeEvent.ServersChanged(savedServers.toList()))
+        }
+
+    override suspend fun updateServer(serverId: Long, input: ServerInput): SavedServer {
+        val index = savedServers.indexOfFirst { it.id == serverId }
+        if (index < 0) throw BridgeException.NotFound("no server $serverId")
+        return input.toSaved(serverId).also {
+            savedServers[index] = it
+            emit(BridgeEvent.ServersChanged(savedServers.toList()))
+        }
+    }
+
+    override suspend fun removeServer(serverId: Long) {
+        if (!savedServers.removeIf { it.id == serverId }) throw BridgeException.NotFound("no server $serverId")
+        emit(BridgeEvent.ServersChanged(savedServers.toList()))
+    }
+
+    override suspend fun reorderServers(serverIds: List<Long>) {
+        val byId = savedServers.associateBy { it.id }
+        savedServers.clear()
+        savedServers += serverIds.mapNotNull { byId[it] }
+        emit(BridgeEvent.ServersChanged(savedServers.toList()))
+    }
+
+    override suspend fun pingServer(serverId: Long, refresh: Boolean): ServerPing? = null
+
+    override suspend fun connectServer(serverId: Long, password: String?, channelPath: List<String>) {
+        val saved = savedServers.firstOrNull { it.id == serverId }
+            ?: throw BridgeException.NotFound("no server $serverId")
+        connect(ConnectRequest(saved.address, saved.port, saved.username, password))
+    }
+
+    override suspend fun joinChannel(channelId: UInt, password: String?) = Unit
+
+    override suspend fun setPersonVolume(session: UInt, percent: UShort) = Unit
+
+    override suspend fun setPersonLocalMute(session: UInt, muted: Boolean) = Unit
+
+    override suspend fun talkMode(): TalkMode = talkMode
+
+    override suspend fun setTalkMode(mode: TalkMode) {
+        talkMode = mode
+    }
+
+    private fun ServerInput.toSaved(id: Long) = SavedServer(
+        id = id,
+        name = name.ifEmpty { address },
+        address = address,
+        port = port,
+        username = username,
+        hasPassword = password is PasswordInput.Set,
+        identityId = identityId,
+    )
 
     private fun finishConnecting() {
         emit(BridgeEvent.ConnectionChanged(ConnectionState.Connected))
