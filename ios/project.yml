@@ -64,6 +64,18 @@ targets:
           python3 "${SRCROOT}/Tools/generate_design.py"
     dependencies:
       - target: MumcordBridge
+    # Keys that have no INFOPLIST_KEY_ build setting. The file is written by XcodeGen into the
+    # git-ignored build folder and merged with the generated keys below.
+    info:
+      path: build/Mumcord-Info.plist
+      properties:
+        # mumble:// links open the app, which shows their target and asks before connecting.
+        CFBundleURLTypes:
+          - CFBundleURLName: app.mumcord.mobile.mumble
+            CFBundleTypeRole: Viewer
+            CFBundleURLSchemes: [mumble]
+        # Without this sentence iOS blocks connections to servers on the local network.
+        NSLocalNetworkUsageDescription: Mumcord connects to Mumble servers on your local network.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile
