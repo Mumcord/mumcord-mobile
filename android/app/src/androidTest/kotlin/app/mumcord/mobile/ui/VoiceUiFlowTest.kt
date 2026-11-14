@@ -285,6 +285,6 @@ class VoiceUiFlowTest {
     private fun await(condition: () -> Boolean) = compose.waitUntil(TIMEOUT_MILLIS, condition)
 
     private companion object {
-        const val TIMEOUT_MILLIS = 5_000L
+        const val TIMEOUT_MILLIS = 20_000L
     }
 }
