@@ -1,0 +1,221 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Android app: lint, unit tests and debug build, then the instrumented tests and the end-to-end
+# tests in the emulator. The toolchain comes from scripts/setup-android.sh, the only place
+# where its versions are pinned, so CI and developer machines cannot drift apart.
+name: CI Android
+
+on:
+  pull_request:
+    paths: &paths
+      - "android/**"
+      - "bridge/**"
+      - "e2e/**"
+      - "scripts/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "engine.lock.toml"
+      - "rust-toolchain.toml"
+      - ".github/workflows/ci-android.yml"
+  push:
+    branches: [main]
+    paths: *paths
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Lint, test and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The binding generator builds the engine for the runner itself too: cmake builds Opus
+      # from source, the audio device layer links ALSA and PipeWire (bindings generated with
+      # libclang), the secret storage links D-Bus.
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev
+
+      # Version, components and targets come from rust-toolchain.toml.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
+
+      # JDK, SDK, NDK and cargo-ndk without the emulator and its image, which are several GB
+      # and would crowd the cargo and Gradle caches out of the repository's cache quota.
+      - name: Cache the Android toolchain
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Android/Sdk
+            ~/.local/share/mumcord
+            ~/.cargo/bin/cargo-ndk
+          key: android-toolchain-${{ hashFiles('scripts/setup-android.sh') }}
+
+      - name: Install the Android toolchain
+        run: |
+          scripts/setup-android.sh --no-emulator
+          scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: android
+
+      - name: Cache Gradle
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-build-${{ hashFiles('android/gradle/**', 'android/**/*.gradle.kts', 'android/gradle.properties') }}
+          restore-keys: gradle-build-
+
+      - name: Lint, test and build
+        working-directory: android
+        run: ./gradlew --console=plain lint test assembleDebug
+
+      - name: Upload the debug APK
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload the lint reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lint-reports
+          path: android/**/build/reports/lint-results-*
+          if-no-files-found: warn
+
+  emulator:
+    name: Emulator tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      E2E_AVD: mumcord-test
+      E2E_BOOT_TIMEOUT: 600
+      E2E_TEST_TIMEOUT: 900
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The emulator needs hardware virtualisation; the runner user may not use it by default.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # The SDK the runner ships is not used (the project installs its own pinned one); removing
+      # it makes room for the emulator image, the emulator's disk and the Rust build.
+      - name: Free disk space
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev
+
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
+
+      # Only restored: the build job saves this cache, without the emulator parts. The emulator
+      # and its image are downloaded on every run instead.
+      - name: Restore the Android toolchain
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Android/Sdk
+            ~/.local/share/mumcord
+            ~/.cargo/bin/cargo-ndk
+          key: android-toolchain-${{ hashFiles('scripts/setup-android.sh') }}
+
+      - name: Install the Android toolchain and the emulator
+        run: |
+          scripts/setup-android.sh
+          scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: android
+          # Both jobs build the same; the build job saves the cache.
+          save-if: false
+
+      - name: Cache Gradle
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-emulator-${{ hashFiles('android/gradle/**', 'android/**/*.gradle.kts', 'android/gradle.properties') }}
+          restore-keys: gradle-emulator-
+
+      # Built before the emulator starts, so the build does not compete with it for memory.
+      - name: Build the app and the tests
+        working-directory: android
+        run: ./gradlew --console=plain assembleDebug assembleDebugAndroidTest
+
+      # Started here and used by both test steps; e2e/run.sh takes a running emulator as it is.
+      - name: Start the emulator
+        run: |
+          mkdir -p e2e/build
+          nohup "${ANDROID_HOME}/emulator/emulator" -avd "${E2E_AVD}" -no-window -no-audio \
+            -no-boot-anim -no-snapshot -gpu swiftshader_indirect \
+            > e2e/build/ci-emulator.log 2>&1 &
+          emulator_pid=$!
+          adb="${ANDROID_HOME}/platform-tools/adb"
+          waited=0
+          until [[ "$(timeout 5 "${adb}" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; do
+            if ! kill -0 "${emulator_pid}" 2>/dev/null; then
+              tail -n 40 e2e/build/ci-emulator.log
+              echo "::error::the emulator exited while booting"
+              exit 1
+            fi
+            if ((waited >= E2E_BOOT_TIMEOUT)); then
+              tail -n 40 e2e/build/ci-emulator.log
+              echo "::error::the emulator did not finish booting within ${E2E_BOOT_TIMEOUT} s"
+              exit 1
+            fi
+            sleep 5
+            waited=$((waited + 5))
+          done
+          echo "emulator booted after about ${waited} s"
+
+      # The fake-engine tests, the secure-storage tests among them. The end-to-end tests of
+      # android/e2e skip themselves here because they have no server.
+      - name: Instrumented tests
+        working-directory: android
+        run: ./gradlew --console=plain connectedDebugAndroidTest
+
+      # The real app with the real engine against the stock Mumble test server in Docker.
+      - name: End-to-end tests
+        run: e2e/run.sh
+
+      - name: Stop the emulator
+        if: always()
+        run: timeout 30 "${ANDROID_HOME}/platform-tools/adb" emu kill || true
+
+      - name: Upload the test logs and reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: emulator-test-logs
+          path: |
+            e2e/build/
+            android/**/build/reports/androidTests/
+            android/**/build/outputs/androidTest-results/
+          if-no-files-found: warn
