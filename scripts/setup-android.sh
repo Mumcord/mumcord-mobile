@@ -6,6 +6,8 @@
 # that are already present at the pinned version are skipped.
 #
 #   scripts/setup-android.sh            install (or complete) the toolchain
+#   scripts/setup-android.sh --no-emulator   the same without emulator, its image and device
+#                                            (enough to build; used by the CI build job)
 #   scripts/setup-android.sh --verify   prove it works (SDK list, NDK compile, emulator boot)
 #   scripts/setup-android.sh --env      print only the export lines, for eval
 set -euo pipefail
@@ -116,7 +118,9 @@ install_cmdline_tools() {
   rm -rf "${tmp}"
 }
 
+# install_sdk_packages <1 to include the emulator and its image, 0 to leave them out>
 install_sdk_packages() {
+  local with_emulator="$1"
   # sdkmanager verifies the checksum of every package it downloads.
   local -A packages=(
     ["platform-tools"]="platform-tools"
@@ -124,9 +128,11 @@ install_sdk_packages() {
     ["platforms;android-${MIN_API}"]="platforms/android-${MIN_API}"
     ["build-tools;${BUILD_TOOLS_VERSION}"]="build-tools/${BUILD_TOOLS_VERSION}"
     ["ndk;${NDK_VERSION}"]="ndk/${NDK_VERSION}"
-    ["emulator"]="emulator"
-    ["${SYSTEM_IMAGE}"]="${SYSTEM_IMAGE//;//}"
   )
+  if ((with_emulator)); then
+    packages["emulator"]="emulator"
+    packages["${SYSTEM_IMAGE}"]="${SYSTEM_IMAGE//;//}"
+  fi
   local missing=() package
   for package in "${!packages[@]}"; do
     [[ -f "${SDK_ROOT}/${packages[${package}]}/source.properties" ]] || missing+=("${package}")
@@ -143,6 +149,7 @@ install_sdk_packages() {
     "${SDKMANAGER}" --sdk_root="${SDK_ROOT}" --install "${missing[@]}" >/dev/null
   fi
 
+  ((with_emulator)) || return 0
   local emulator_revision
   emulator_revision="$(pkg_revision "${SDK_ROOT}/emulator")"
   if [[ "${emulator_revision}" != "${EMULATOR_REVISION}" ]]; then
@@ -249,18 +256,22 @@ main() {
       check_host
       verify
       ;;
-    install)
+    install | --no-emulator)
       check_host
       install_jdk
       install_cmdline_tools
-      install_sdk_packages
-      create_avd
+      if [[ "${mode}" == "install" ]]; then
+        install_sdk_packages 1
+        create_avd
+      else
+        install_sdk_packages 0
+      fi
       install_rust_parts
       log "Done. Set these variables in the shell that builds the project:"
       print_env
       ;;
     *)
-      die "unknown option '${mode}' (use no option, --verify or --env)"
+      die "unknown option '${mode}' (use no option, --no-emulator, --verify or --env)"
       ;;
   esac
 }
