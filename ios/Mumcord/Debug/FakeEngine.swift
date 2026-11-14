@@ -176,7 +176,9 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
                 connection: connection,
                 connectedServerId: connectedServerId,
                 certificatePrompt: nil,
-                server: nil
+                server: nil,
+                audio: AudioWanted(capture: false, playback: false),
+                whispering: false
             )
         }
     }
@@ -297,6 +299,38 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
             _talkMode = mode
         }
     }
+
+    // The voice controls are not used by the screens that exist yet.
+
+    func audioEndpoints() -> AudioEndpoints {
+        AudioEndpoints(capture: 0, playback: 0)
+    }
+
+    func setPushToTalkPressed(pressed: Bool) {}
+
+    func setSelfMute(muted: Bool) async throws {}
+
+    func setSelfDeaf(deafened: Bool) async throws {}
+
+    func voiceSettings() async throws -> VoiceSettings {
+        VoiceSettings(
+            talkMode: currentTalkMode,
+            noiseSuppression: true,
+            autoGain: true,
+            echoCancellation: .system,
+            bitrateLimitKbps: nil
+        )
+    }
+
+    func setNoiseSuppression(on: Bool) async throws {}
+
+    func setAutoGain(on: Bool) async throws {}
+
+    func setBitrateLimitKbps(kbps: UInt32?) {}
+
+    func startWhisper(target: WhisperTarget) async throws {}
+
+    func stopWhisper() {}
 
     private static func saved(_ input: ServerInput, id: Int64, hadPassword: Bool) -> SavedServer {
         let hasPassword: Bool

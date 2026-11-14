@@ -74,6 +74,9 @@ extension SessionState {
             }
         case .actionDenied(let channelId, let detail):
             next.denied = DeniedAction(channelId: channelId, detail: detail)
+        // Voice phase: the audio session and the input level meter are not built yet.
+        case .audioWantedChanged, .inputLevelChanged:
+            break
         }
         return next
     }
