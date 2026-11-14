@@ -5,6 +5,19 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// The screenshot tests run with every `test`, where they only draw the screens into
+// build/outputs/screenshots. `recordScreenshots` writes them to docs/images/screenshots, and
+// `verifyScreenshots` compares them with the files there. The comparison is its own task
+// because pixels differ slightly between machines (fonts are drawn by the host's libraries).
+val screenshotGoldens = rootProject.layout.projectDirectory.dir("../docs/images/screenshots")
+val screenshotMode = gradle.startParameter.taskNames.map { it.substringAfterLast(':') }.let { names ->
+    when {
+        "recordScreenshots" in names -> "record"
+        "verifyScreenshots" in names -> "verify"
+        else -> "render"
+    }
+}
+
 android {
     namespace = "app.mumcord.mobile"
     compileSdk = 37
@@ -39,6 +52,21 @@ android {
         compose = true
     }
 
+    testOptions {
+        unitTests {
+            // The screenshot tests draw real screens and need the fonts and other resources.
+            isIncludeAndroidResources = true
+            all {
+                it.systemProperty("mumcord.screenshots.mode", screenshotMode)
+                it.systemProperty("mumcord.screenshots.goldens", screenshotGoldens.asFile.absolutePath)
+                it.systemProperty(
+                    "mumcord.screenshots.output",
+                    layout.buildDirectory.dir("outputs/screenshots").get().asFile.absolutePath,
+                )
+            }
+        }
+    }
+
     lint {
         abortOnError = true
         warningsAsErrors = true
@@ -54,6 +82,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":design"))
     implementation(project(":engine"))
     implementation(project(":platform:securestore"))
     implementation(platform(libs.compose.bom))
@@ -66,10 +95,25 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.compose.ui.test.junit4)
+    // The Espresso that the Compose test library asks for is too old for the Android version
+    // the tests are drawn with.
+    testImplementation(libs.espresso.core)
 
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.espresso.core)
     // Provides the empty Activity the Compose test rule starts the screens in.
     debugImplementation(libs.compose.ui.test.manifest)
+}
+
+for (name in listOf("recordScreenshots", "verifyScreenshots")) {
+    tasks.register(name) {
+        group = "verification"
+        description = "Runs the screenshot tests of the debug build in ${name.removeSuffix("Screenshots")} mode."
+        dependsOn("testDebugUnitTest")
+    }
 }

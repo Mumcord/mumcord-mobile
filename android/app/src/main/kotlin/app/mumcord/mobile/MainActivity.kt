@@ -8,6 +8,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import app.mumcord.mobile.bridge.engineVersion
+import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.ui.slice.SliceRoute
 import app.mumcord.mobile.ui.slice.SliceViewModel
 

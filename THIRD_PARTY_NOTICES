@@ -1,0 +1,43 @@
+Mumcord Mobile contains the following third-party material. The notices of the Rust and
+Android libraries the apps are built from are generated for each release.
+
+--------------------------------------------------------------------------------
+Instrument Sans (font, design/fonts/instrument-sans)
+--------------------------------------------------------------------------------
+
+License: SIL Open Font License, Version 1.1 (OFL-1.1)
+Source: https://github.com/Instrument/instrument-sans (file taken from https://github.com/google/fonts)
+Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans)
+
+The full licence text is in design/fonts/instrument-sans/OFL.txt.
+
+--------------------------------------------------------------------------------
+Bricolage Grotesque (font, design/fonts/bricolage-grotesque)
+--------------------------------------------------------------------------------
+
+License: SIL Open Font License, Version 1.1 (OFL-1.1)
+Source: https://github.com/ateliertriay/bricolage (file taken from https://github.com/google/fonts)
+Copyright 2022 The Bricolage Grotesque Project Authors (https://github.com/ateliertriay/bricolage)
+
+The full licence text is in design/fonts/bricolage-grotesque/OFL.txt.
+
+--------------------------------------------------------------------------------
+Icons (design/icons.json)
+--------------------------------------------------------------------------------
+
+The icon shapes follow the Lucide icon set (https://lucide.dev), which continues Feather.
+
+License: ISC License (Lucide), MIT License (the parts taken from Feather)
+Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT).
+All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+
+Permission to use, copy, modify, and/or distribute this software for any purpose with or
+without fee is hereby granted, provided that the above copyright notice and this permission
+notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS
+SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.

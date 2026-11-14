@@ -12,12 +12,12 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
-import app.mumcord.mobile.MumcordTheme
 import app.mumcord.mobile.bridge.CertificatePrompt
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.ConnectRequest
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.ServerState
+import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.session.FakeEngine
 import app.mumcord.mobile.session.SessionRepository
 import kotlinx.coroutines.CoroutineScope

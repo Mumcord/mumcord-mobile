@@ -9,3 +9,4 @@
 - Android app: connects to a Mumble server, asks before trusting an unknown or changed server certificate, shows the channel tree with people, disconnects
 - Android: secrets are kept encrypted with a key in the phone's secure hardware and are excluded from backups
 - iOS app project with Keychain storage (this device only)
+- Android: Mumcord look in dark and light (colours, fonts, icons and base components shared with the desktop app), following the system setting and the system font size

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+            Component gallery and reference screen of the design system. This manifest is only
+            merged into debug builds, so the screen does not exist in the product. Exported so
+            that it can be started from a computer:
+            adb shell am start -n app.mumcord.mobile/.debug.DesignGalleryActivity
+        -->
+        <activity
+            android:name=".debug.DesignGalleryActivity"
+            android:exported="true" />
+    </application>
+
+</manifest>
