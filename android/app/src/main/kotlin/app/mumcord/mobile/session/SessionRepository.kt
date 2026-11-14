@@ -2,6 +2,7 @@
 
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.AudioEndpoints
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.EngineListener
@@ -165,6 +166,12 @@ class SessionRepository(
     suspend fun setPersonLocalMute(session: UInt, muted: Boolean) {
         report(call("set person mute") { it.setPersonLocalMute(session, muted) })
     }
+
+    /**
+     * Where the phone's audio streams exchange their samples with the engine, or null while no
+     * engine exists. The handles stay valid for the whole process.
+     */
+    suspend fun audioEndpoints(): AudioEndpoints? = engineLock.withLock { engine?.audioEndpoints() }
 
     /** Gives up on a channel password question. */
     fun dismissChannelPassword() = mutableState.update { it.copy(channelPassword = null) }

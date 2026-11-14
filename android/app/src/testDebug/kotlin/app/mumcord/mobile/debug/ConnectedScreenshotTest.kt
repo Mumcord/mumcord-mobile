@@ -22,6 +22,7 @@ import app.mumcord.mobile.ui.connected.ConnectedLocal
 import app.mumcord.mobile.ui.connected.ConnectedSheetHost
 import app.mumcord.mobile.ui.connected.ConnectedShell
 import app.mumcord.mobile.ui.connected.ConnectedTab
+import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.connectedUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,16 +66,30 @@ class ConnectedScreenshotTest {
     @After
     fun tearDown() = scope.cancel()
 
-    private fun capture(name: String, dark: Boolean, local: ConnectedLocal, session: SessionState = this.session) =
-        composeRule.captureScreenshot("$name-${if (dark) "dark" else "light"}") {
-            val state = checkNotNull(connectedUiState(session, local, "Nordlicht"))
-            MumcordTheme(darkTheme = dark) {
-                Box(Modifier.fillMaxSize()) {
-                    ConnectedShell(state, actions, onDisconnect = {}, topInsets = top, bottomInsets = bottom)
-                    state.sheet?.let { ConnectedSheetHost(it, actions, top, bottom) }
+    private fun capture(
+        name: String,
+        dark: Boolean,
+        local: ConnectedLocal,
+        session: SessionState = this.session,
+        microphone: MicrophoneNotice = MicrophoneNotice.None,
+    ) = composeRule.captureScreenshot("$name-${if (dark) "dark" else "light"}") {
+        val state = checkNotNull(connectedUiState(session, local, "Nordlicht", microphone))
+        MumcordTheme(darkTheme = dark) {
+            Box(Modifier.fillMaxSize()) {
+                ConnectedShell(
+                    state,
+                    actions,
+                    onDisconnect = {},
+                    onMicrophone = {},
+                    topInsets = top,
+                    bottomInsets = bottom,
+                )
+                state.sheet?.let {
+                    ConnectedSheetHost(it, actions, top, bottom, onMicrophoneContinue = {}, onMicrophoneNotNow = {})
                 }
             }
         }
+    }
 
     private fun channels(dark: Boolean) = capture("android-channels", dark, ConnectedLocal())
 
@@ -95,7 +110,22 @@ class ConnectedScreenshotTest {
 
     private fun emptyTab(dark: Boolean) = capture("android-tab-empty", dark, ConnectedLocal(tab = ConnectedTab.Chat))
 
+    // No mockup exists for the two microphone states; they are built from the design system.
+    private fun microphoneExplain(dark: Boolean) =
+        capture("android-mic-explain", dark, ConnectedLocal(), microphone = MicrophoneNotice.Explain)
+
+    private fun microphoneDenied(dark: Boolean) =
+        capture("android-mic-denied", dark, ConnectedLocal(), microphone = MicrophoneNotice.Denied)
+
     @Test fun channelsDark() = channels(dark = true)
+
+    @Test fun microphoneExplainDark() = microphoneExplain(dark = true)
+
+    @Test fun microphoneExplainLight() = microphoneExplain(dark = false)
+
+    @Test fun microphoneDeniedDark() = microphoneDenied(dark = true)
+
+    @Test fun microphoneDeniedLight() = microphoneDenied(dark = false)
 
     @Test fun channelsLight() = channels(dark = false)
 

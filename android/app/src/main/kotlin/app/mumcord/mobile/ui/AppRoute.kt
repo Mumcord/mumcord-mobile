@@ -28,30 +28,37 @@ import app.mumcord.mobile.ui.servers.ServerListScreen
 import app.mumcord.mobile.ui.setup.TalkModeChoiceScreen
 import app.mumcord.mobile.ui.connected.ConnectedSheetHost
 import app.mumcord.mobile.ui.connected.ConnectedShell
+import app.mumcord.mobile.ui.connected.MicrophoneNotice
+import app.mumcord.mobile.ui.connected.MicrophoneSystem
+import app.mumcord.mobile.ui.connected.rememberMicrophoneSystem
 
 /** Connects the screens to the view model; everything below it only gets values and callbacks. */
 @Composable
 fun AppRoute(
     viewModel: AppViewModel,
     localNetwork: LocalNetworkSystem = rememberLocalNetworkSystem(viewModel::answerLocalNetworkPrompt),
+    microphone: MicrophoneSystem = rememberMicrophoneSystem(viewModel::answerMicrophonePrompt),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshPings()
+        viewModel.recheckMicrophone()
         onPauseOrDispose { }
     }
-    AppContent(uiState, viewModel, localNetwork)
+    AppContent(uiState, viewModel, localNetwork, microphone)
 }
 
 /**
  * The screen that follows from the state, and over it at most one sheet: the certificate
- * question first (the connection waits for it), otherwise the open question of [Overlay].
+ * question first (the connection waits for it), then the open question of [Overlay], then the
+ * sheet of the connected screens (among them the microphone explanation).
  */
 @Composable
 fun AppContent(
     uiState: AppUiState,
     viewModel: AppViewModel,
     localNetwork: LocalNetworkSystem,
+    microphone: MicrophoneSystem,
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
@@ -110,6 +117,11 @@ fun AppContent(
                         state = connected,
                         actions = viewModel.connected,
                         onDisconnect = viewModel::disconnect,
+                        onMicrophone = if (connected.microphone == MicrophoneNotice.Blocked) {
+                            microphone.openSettings
+                        } else {
+                            microphone.ask
+                        },
                         topInsets = topInsets,
                         bottomInsets = bottomInsets,
                     )
@@ -164,7 +176,14 @@ fun AppContent(
                 bottomInsets = bottomInsets,
             )
             overlay is Overlay.InvalidLink -> InvalidLinkSheet(viewModel::dismissOverlay, topInsets, bottomInsets)
-            connectedSheet != null -> ConnectedSheetHost(connectedSheet, viewModel.connected, topInsets, bottomInsets)
+            connectedSheet != null -> ConnectedSheetHost(
+                sheet = connectedSheet,
+                actions = viewModel.connected,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+                onMicrophoneContinue = microphone.ask,
+                onMicrophoneNotNow = viewModel::microphoneNotNow,
+            )
         }
     }
 }

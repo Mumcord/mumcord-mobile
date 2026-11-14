@@ -2,6 +2,7 @@
 
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.AudioWanted
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SavedServer
@@ -23,6 +24,8 @@ data class SessionState(
     val channelPassword: ChannelPasswordPrompt? = null,
     /** The latest thing the server refused, until it is put away. */
     val denied: DeniedAction? = null,
+    /** Which of the phone's audio streams the engine wants to run right now. */
+    val audio: AudioWanted = AudioWanted(capture = false, playback = false),
     /** Things the app cannot show, newest last; see [withHint]. */
     val hints: List<UnsupportedHint> = emptyList(),
 ) {

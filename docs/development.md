@@ -27,6 +27,7 @@ version are skipped. Running it accepts the Android SDK licences on your behalf.
 | Platforms | API 37.0 (compile), API 31 (minimum) | `~/Android/Sdk/platforms` |
 | Build tools | 37.0.0 | `~/Android/Sdk/build-tools/37.0.0` |
 | NDK | 30.0.16248370 (r30) | `~/Android/Sdk/ndk/30.0.16248370` |
+| CMake (builds the C++ audio library) | 3.31.6 | `~/Android/Sdk/cmake/3.31.6` |
 | Platform tools (`adb`) and emulator | current stable | `~/Android/Sdk/platform-tools`, `~/Android/Sdk/emulator` |
 | Emulator image | API 37.0, Google APIs, x86_64 | `~/Android/Sdk/system-images` |
 | Emulator device `mumcord-test` | Pixel 7 profile | `~/.android/avd` |

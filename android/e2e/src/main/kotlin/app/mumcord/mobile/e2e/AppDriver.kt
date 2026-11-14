@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -29,10 +30,10 @@ import org.junit.Assert.assertEquals
 /** The steps in the real app that several end-to-end tests share. */
 class AppDriver(private val compose: ComposeTestRule, private val server: TestServer) {
     /** First start: the talk mode has to be chosen, nothing is picked for the user. */
-    fun chooseTalkMode() {
+    fun chooseTalkMode(mode: String = TALK_MODE_PUSH_TO_TALK_TEST_TAG) {
         awaitOrFail("the talk mode choice") { exists(TALK_MODE_CONTINUE_TEST_TAG) }
         compose.onNodeWithTag(TALK_MODE_CONTINUE_TEST_TAG).assertIsNotEnabled()
-        compose.onNodeWithTag(TALK_MODE_PUSH_TO_TALK_TEST_TAG).performClick()
+        compose.onNodeWithTag(mode).performClick()
         compose.onNodeWithTag(TALK_MODE_CONTINUE_TEST_TAG).performClick()
         awaitOrFail("the empty server list") { exists(SERVER_ADD_TEST_TAG) }
     }
@@ -60,6 +61,14 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
     fun awaitChannels(what: String = "the channel list") {
         awaitOrFail(what) { connected() }
         assertSeededChannels()
+    }
+
+    /**
+     * Everybody arrives in the root channel, where the test server lets nobody talk. In the
+     * Lobby talking is allowed, so there the engine wants the microphone.
+     */
+    fun joinLobby() {
+        compose.onNode(hasTestTag(CHANNEL_ROW_TEST_TAG) and hasText(LOBBY)).performClick()
     }
 
     fun connected(): Boolean = channelNames().size > TestServer.SEEDED_CHANNELS.size
@@ -117,6 +126,7 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
 
     companion object {
         const val USER_NAME = "e2e-phone"
+        const val LOBBY = "Lobby"
         const val TIMEOUT_MILLIS = 30_000L
         private const val TAB_MORE = "More"
 

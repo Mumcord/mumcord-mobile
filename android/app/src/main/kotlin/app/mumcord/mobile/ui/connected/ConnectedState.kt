@@ -164,6 +164,9 @@ sealed interface ConnectedSheet {
 
     /** [expanded] as in [ChannelListRow.ChannelItem]; [canJoin] is false for the own channel. */
     data class ChannelMenu(val id: UInt, val name: String, val expanded: Boolean?, val canJoin: Boolean) : ConnectedSheet
+
+    /** Why the microphone is needed, before the system asks for it. */
+    data object Microphone : ConnectedSheet
 }
 
 /** A refusal by the server; [channelName] and [detail] are untrusted text. */
@@ -179,11 +182,18 @@ data class ConnectedUiState(
     val reconnecting: ConnectionPhase.Reconnecting?,
     val denied: DeniedBanner?,
     val hints: List<UnsupportedHint>,
+    /** [MicrophoneNotice.Denied] or [MicrophoneNotice.Blocked] while the others cannot hear the user. */
+    val microphone: MicrophoneNotice,
     val sheet: ConnectedSheet?,
 )
 
 /** The connected screens as a value, or null while no server is shown. */
-fun connectedUiState(session: SessionState, local: ConnectedLocal, serverName: String): ConnectedUiState? {
+fun connectedUiState(
+    session: SessionState,
+    local: ConnectedLocal,
+    serverName: String,
+    microphone: MicrophoneNotice = MicrophoneNotice.None,
+): ConnectedUiState? {
     val server = session.server?.takeIf { session.showsServer } ?: return null
     val rows = channelRows(server.root, server.selfChannelId, local.collapsed, if (local.searching) local.query else "")
 
@@ -197,6 +207,9 @@ fun connectedUiState(session: SessionState, local: ConnectedLocal, serverName: S
             wrong = prompt.wrong,
             password = local.password,
         )
+        // Asked when talking first becomes possible; it closes what the user had open, so
+        // there is never more than one sheet.
+        microphone == MicrophoneNotice.Explain -> ConnectedSheet.Microphone
         person != null -> ConnectedSheet.PersonSheet(
             session = person.session,
             name = person.name,
@@ -226,6 +239,8 @@ fun connectedUiState(session: SessionState, local: ConnectedLocal, serverName: S
             DeniedBanner(denied.channelId?.let(server.channels::get)?.name, denied.detail)
         },
         hints = session.hints,
+        microphone = microphone.takeIf { it == MicrophoneNotice.Denied || it == MicrophoneNotice.Blocked }
+            ?: MicrophoneNotice.None,
         sheet = sheet,
     )
 }

@@ -61,7 +61,7 @@ class ConnectedControllerTest {
             engineDispatcher = dispatcher,
             log = {},
         )
-        return AppViewModel(repository, DoneSetup, FakeLocalNetworkGateway()).also { viewModel ->
+        return AppViewModel(repository, DoneSetup, FakeLocalNetworkGateway(), FakeMicrophoneAccess()).also { viewModel ->
             backgroundScope.launch { viewModel.uiState.collect() }
             runCurrent()
             viewModel.connect(1)

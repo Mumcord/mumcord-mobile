@@ -1,7 +1,8 @@
 # Rust workspace of the mobile apps.
 [workspace]
 resolver = "3"
-members = ["bridge"]
+# e2e/voice-peer is the second person of the end-to-end voice test; only e2e/run.sh builds it.
+members = ["bridge", "e2e/voice-peer"]
 
 [workspace.package]
 edition = "2024"

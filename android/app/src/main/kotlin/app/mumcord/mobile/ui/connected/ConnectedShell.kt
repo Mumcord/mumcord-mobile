@@ -43,6 +43,7 @@ fun ConnectedShell(
     state: ConnectedUiState,
     actions: ConnectedController,
     onDisconnect: () -> Unit,
+    onMicrophone: () -> Unit,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
 ) {
@@ -63,7 +64,7 @@ fun ConnectedShell(
                 ConnectedTab.More -> MoreScreen(state.serverName, onDisconnect, topInsets)
             }
         }
-        ConnectedBanners(state, actions::dismissDenied)
+        ConnectedBanners(state, actions::dismissDenied, onMicrophone)
         // The voice bar (FR-5.22) goes here, between the banners and the tab bar.
         MumcordTabBar(
             tabs = listOf(
@@ -79,12 +80,16 @@ fun ConnectedShell(
     }
 }
 
-/** A lost connection and the latest refusal by the server, visible on every tab. */
+/**
+ * A lost connection, the microphone that may not be used and the latest refusal by the server,
+ * visible on every tab.
+ */
 @Composable
-private fun ConnectedBanners(state: ConnectedUiState, onDismissDenied: () -> Unit) {
+private fun ConnectedBanners(state: ConnectedUiState, onDismissDenied: () -> Unit, onMicrophone: () -> Unit) {
     val reconnecting = state.reconnecting
     val denied = state.denied
-    if (reconnecting == null && denied == null) return
+    val microphone = state.microphone
+    if (reconnecting == null && denied == null && microphone == MicrophoneNotice.None) return
     Column(
         verticalArrangement = Arrangement.spacedBy(MumcordSpace.s2),
         modifier = Modifier.padding(bottom = MumcordSpace.s2),
@@ -96,6 +101,9 @@ private fun ConnectedBanners(state: ConnectedUiState, onDismissDenied: () -> Uni
                 icon = MumcordIcons.Alert,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
+        }
+        if (microphone != MicrophoneNotice.None) {
+            MicrophoneBanner(blocked = microphone == MicrophoneNotice.Blocked, onClick = onMicrophone)
         }
         if (denied != null) {
             MumcordBanner(

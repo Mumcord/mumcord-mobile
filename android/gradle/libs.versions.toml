@@ -5,6 +5,8 @@
 [versions]
 # Same NDK as scripts/setup-android.sh installs; Gradle uses it to strip the native libraries.
 ndk = "30.0.16248370"
+# Same CMake as scripts/setup-android.sh installs; it builds the C++ audio library.
+cmake = "3.31.6"
 agp = "9.5.1"
 # Must be the Kotlin version the Compose compiler plugin is released with.
 kotlin = "2.4.21"

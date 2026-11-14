@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Talking needs the microphone. Listening works without it; the app asks when it is first needed. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Switching the phone to its voice-call audio mode while voice runs. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+</manifest>

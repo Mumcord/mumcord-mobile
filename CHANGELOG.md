@@ -16,3 +16,4 @@
 - Android: connecting to a server on your local network explains why access to nearby devices is needed before Android asks for it (Android 17 and later); if it is refused, the error says so and leads to the system settings
 - iOS: first-start talk mode choice, server list, add, edit and remove servers, certificate warnings, connection errors with retry, `mumble://` links with confirmation, and the Channels tab with channel tree, join, channel passwords, person sheet, search and Disconnect under More – the same as on Android
 - Bridge: voice controls (push-to-talk, mute, deafen, whisper and shout, level meter, noise suppression and gain switches) and a real-time audio path for the apps' microphone and speaker
+- Android: voice is audible. The phone's speaker and microphone run in voice-call mode with the system's echo cancellation; the microphone is asked for when you can first talk, with a one-sentence reason, and listening works without it

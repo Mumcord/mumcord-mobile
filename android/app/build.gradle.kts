@@ -84,6 +84,7 @@ android {
 dependencies {
     implementation(project(":design"))
     implementation(project(":engine"))
+    implementation(project(":platform:audio"))
     implementation(project(":platform:securestore"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

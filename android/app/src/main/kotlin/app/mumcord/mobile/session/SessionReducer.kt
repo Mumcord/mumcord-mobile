@@ -33,8 +33,7 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
             certificatePrompt = null,
         )
     }
-    // voice phase (task 3.4)
-    is BridgeEvent.AudioWantedChanged -> this
+    is BridgeEvent.AudioWantedChanged -> copy(audio = event.audio)
     // voice phase (task 3.4)
     is BridgeEvent.InputLevelChanged -> this
     is BridgeEvent.CertificatePromptRequired -> copy(

@@ -36,6 +36,7 @@ import app.mumcord.mobile.ui.connect.CERTIFICATE_REJECT_TEST_TAG
 import app.mumcord.mobile.ui.connect.CERTIFICATE_TRUST_TEST_TAG
 import app.mumcord.mobile.ui.connect.FINGERPRINT_TEST_TAG
 import app.mumcord.mobile.ui.connect.FakeLocalNetworkGateway
+import app.mumcord.mobile.ui.connected.FakeMicrophoneAccess
 import app.mumcord.mobile.ui.connect.LOCAL_NETWORK_CONTINUE_TEST_TAG
 import app.mumcord.mobile.ui.connect.LocalNetworkAnswer
 import app.mumcord.mobile.ui.connect.LocalNetworkPermission
@@ -137,7 +138,7 @@ class AppFlowTest {
                 MumbleLink("new.example", 40000u, "Ben", listOf("Games", "Chess"))
             },
         )
-        val viewModel = AppViewModel(repository, FakeSetupStore(setupDone), localNetwork)
+        val viewModel = AppViewModel(repository, FakeSetupStore(setupDone), localNetwork, FakeMicrophoneAccess())
         compose.setContent {
             MumcordTheme { AppRoute(viewModel, fakeSystem(viewModel)) }
         }

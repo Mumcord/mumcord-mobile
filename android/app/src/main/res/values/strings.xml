@@ -155,6 +155,15 @@
     <string name="channel_join">Join</string>
     <string name="channel_collapse">Collapse</string>
     <string name="channel_expand">Expand</string>
+    <string name="microphone_title">Microphone</string>
+    <string name="microphone_text">Mumcord needs the microphone so that the others can hear you. Listening works without it.</string>
+    <string name="microphone_continue">Continue</string>
+    <string name="microphone_not_now">Not now</string>
+    <string name="microphone_denied_title">The others cannot hear you</string>
+    <string name="microphone_denied_ask">Mumcord may not use the microphone. Tap here to allow it.</string>
+    <string name="microphone_denied_settings">Mumcord may not use the microphone. Tap here and allow “Microphone” for Mumcord in the system settings.</string>
+    <string name="microphone_allow">Allow the microphone</string>
+    <string name="microphone_open_settings">Open settings</string>
     <string name="denied_title">The server did not allow that</string>
     <string name="denied_title_channel">You cannot join %1$s</string>
     <string name="denied_text">You do not have permission for this.</string>

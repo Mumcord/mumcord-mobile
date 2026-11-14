@@ -19,6 +19,7 @@ import app.mumcord.mobile.session.channel
 import app.mumcord.mobile.session.person
 import app.mumcord.mobile.session.savedServer
 import app.mumcord.mobile.ui.connect.FakeLocalNetworkGateway
+import app.mumcord.mobile.ui.connected.FakeMicrophoneAccess
 import app.mumcord.mobile.ui.servers.PingState
 import app.mumcord.mobile.ui.setup.SetupStore
 import kotlinx.coroutines.Dispatchers
@@ -83,7 +84,7 @@ class AppViewModelTest {
             log = {},
             linkParser = ::parseTestLink,
         )
-        return AppViewModel(repository, setupStore, localNetwork).also { viewModel ->
+        return AppViewModel(repository, setupStore, localNetwork, FakeMicrophoneAccess()).also { viewModel ->
             // The state is only kept up to date while somebody watches it, as a screen would.
             backgroundScope.launch { viewModel.uiState.collect() }
             runCurrent()
@@ -114,6 +115,7 @@ class AppViewModelTest {
             SessionRepository({ FakeEngine(it, server).also { e -> engine = e } }, backgroundScope, dispatcher, {}),
             FakeSetupStore(done = false),
             localNetwork,
+            FakeMicrophoneAccess(),
         )
         backgroundScope.launch { viewModel.uiState.collect() }
         runCurrent()
@@ -135,6 +137,7 @@ class AppViewModelTest {
             SessionRepository({ FakeEngine(it, server).also { e -> engine = e } }, backgroundScope, dispatcher, {}),
             store,
             localNetwork,
+            FakeMicrophoneAccess(),
         )
         backgroundScope.launch { viewModel.uiState.collect() }
         runCurrent()
@@ -160,6 +163,7 @@ class AppViewModelTest {
             ),
             store,
             localNetwork,
+            FakeMicrophoneAccess(),
         )
         backgroundScope.launch { viewModel.uiState.collect() }
         runCurrent()

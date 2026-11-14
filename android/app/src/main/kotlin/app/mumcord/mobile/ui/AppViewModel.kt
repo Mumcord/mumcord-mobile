@@ -22,6 +22,9 @@ import app.mumcord.mobile.ui.connect.LocalNetworkStep
 import app.mumcord.mobile.ui.connect.check
 import app.mumcord.mobile.ui.connected.ConnectedController
 import app.mumcord.mobile.ui.connected.ConnectedLocal
+import app.mumcord.mobile.ui.connected.MicrophoneAccess
+import app.mumcord.mobile.ui.connected.MicrophoneAnswer
+import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.ui.link.linkConfirmState
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
@@ -49,6 +52,7 @@ class AppViewModel(
     private val repository: SessionRepository,
     private val setupStore: SetupStore,
     private val localNetwork: LocalNetworkGateway,
+    private val microphone: MicrophoneAccess,
 ) : ViewModel() {
     private val local = MutableStateFlow(AppUiState(setupDone = setupStore.firstStartDone))
 
@@ -57,16 +61,23 @@ class AppViewModel(
     val connected = ConnectedController(repository, viewModelScope)
 
     val uiState: StateFlow<AppUiState> =
-        combine(local, repository.state, connected.local, ::merge)
+        combine(local, repository.state, connected.local, microphone.notice, ::merge)
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-                merge(local.value, repository.state.value, connected.local.value),
+                merge(local.value, repository.state.value, connected.local.value, microphone.notice.value),
             )
 
-    private fun merge(ui: AppUiState, session: SessionState, connectedLocal: ConnectedLocal): AppUiState {
+    private fun merge(
+        ui: AppUiState,
+        session: SessionState,
+        connectedLocal: ConnectedLocal,
+        microphoneNotice: MicrophoneNotice,
+    ): AppUiState {
         val merged = ui.copy(session = session)
-        return merged.copy(connected = connectedUiState(session, connectedLocal, merged.activeServerName.orEmpty()))
+        return merged.copy(
+            connected = connectedUiState(session, connectedLocal, merged.activeServerName.orEmpty(), microphoneNotice),
+        )
     }
 
     /** The last connect, so "Try again" and the password retry keep a link's channel. */
@@ -254,6 +265,16 @@ class AppViewModel(
     }
 
     /** Ends the connection, also while it is still being made. */
+    // ----- microphone -----
+
+    /** The explanation was put away: the user keeps listening and a notice says so. */
+    fun microphoneNotNow() = microphone.notNow()
+
+    fun answerMicrophonePrompt(answer: MicrophoneAnswer) = microphone.answer(answer)
+
+    /** Back on screen: the permission may have changed in the system settings. */
+    fun recheckMicrophone() = microphone.recheck()
+
     fun disconnect() {
         addressCheck?.cancel()
         local.update { it.copy(checkingServerId = null) }
@@ -367,6 +388,7 @@ class AppViewModel(
                     application.sessionRepository,
                     PreferencesSetupStore(application),
                     application.localNetworkGateway,
+                    application.voiceAudio,
                 )
             }
         }

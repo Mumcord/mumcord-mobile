@@ -9,8 +9,10 @@
 #   3. start the emulator without a window, unless one is already running
 #   4. install the app afresh
 #   5. run the scenarios one after the other, each with fresh app data (no remembered server,
-#      certificate or permission answer) and its own state of the local network permission
-#      (granted up front, or not, so that the app has to ask), and report the result
+#      certificate or permission answer) and its own state of the local network and the
+#      microphone permission (granted up front, or not, so that the app has to ask), and report
+#      the result. The voice scenario talks to a second person: e2e/voice-peer, the engine
+#      itself running on this machine.
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
@@ -18,7 +20,7 @@
 #   E2E_SCENARIO=LocalNetwork e2e/run.sh    run only the scenarios whose test name contains this
 #
 # Needs the toolchain of scripts/setup-android.sh and its environment
-# (eval "$(scripts/setup-android.sh --env)"), KVM, and what scripts/testenv.sh needs.
+# (eval "$(scripts/setup-android.sh --env)"), KVM, cargo, and what scripts/testenv.sh needs.
 #
 # Environment:
 #   MUMCORD_PORT_BASE     host port of the test server (default 64838)
@@ -27,7 +29,7 @@
 #   E2E_BOOT_TIMEOUT      seconds the emulator may take to boot (default 300)
 #   E2E_TEST_TIMEOUT      seconds one scenario may take (default 600)
 #
-# Logs of the run (test output, app log, emulator log) land in e2e/build/.
+# Logs of the run (test output, app log, emulator log, second person) land in e2e/build/.
 set -euo pipefail
 
 export MUMCORD_PORT_BASE="${MUMCORD_PORT_BASE:-64838}"
@@ -43,14 +45,22 @@ HOST_FROM_EMULATOR="10.0.2.2"
 # First Android version (17) that has the local network permission.
 LOCAL_NETWORK_PERMISSION_API=37
 LOCAL_NETWORK_PERMISSION="android.permission.ACCESS_LOCAL_NETWORK"
-# The scenarios: "<local network permission> <test>". With "granted" the permission is given up
-# front, as most tests need it to reach the server on the host; with "ask" the app starts
-# without it and the test goes through the app's explanation and the system's dialog.
+MICROPHONE_PERMISSION="android.permission.RECORD_AUDIO"
+# The scenarios: "<local network permission> <microphone permission> <second person> <test>".
+# With "granted" a permission is given up front (most tests need the local network to reach the
+# server on the host, and are not about the microphone); with "ask" the app starts without it
+# and the test goes through the app's explanation and the system's dialog. With "peer" a second
+# person is on the server during the test and has to hear the app talk; "alone" otherwise.
 SCENARIOS=(
-  "granted ${TEST_PACKAGE}.ConnectFlowTest"
-  "ask ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
-  "ask ${TEST_PACKAGE}.LocalNetworkFlowTest#refusingItIsNamedInTheErrorWhichLeadsToTheSystemSettingsAndBackToAConnection"
+  "granted granted alone ${TEST_PACKAGE}.ConnectFlowTest"
+  "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
+  "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#refusingItIsNamedInTheErrorWhichLeadsToTheSystemSettingsAndBackToAConnection"
+  "granted ask alone ${TEST_PACKAGE}.MicrophoneFlowTest#itIsExplainedWhenTalkingBecomesPossibleThenTheSystemAsksAndAllowingItLeavesNoNotice"
+  "granted ask alone ${TEST_PACKAGE}.MicrophoneFlowTest#refusingItKeepsTheConnectionWithANoticeThatLeadsToTheQuestionAndThenToTheSystemSettings"
+  "granted granted peer ${TEST_PACKAGE}.VoiceFlowTest"
 )
+# Seconds the second person may take to connect to the test server.
+PEER_CONNECT_TIMEOUT=40
 # Port of the emulator this script starts; its adb name follows from it.
 EMULATOR_PORT=5554
 
@@ -58,6 +68,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${REPO_ROOT}/e2e/build"
 APP_APK="${REPO_ROOT}/android/app/build/outputs/apk/debug/app-debug.apk"
 TEST_APK="${REPO_ROOT}/android/e2e/build/outputs/apk/debug/e2e-debug.apk"
+PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/voice-peer"
+PEER_LOG="${OUT_DIR}/voice-peer.log"
 
 step() {
   printf '\ne2e: %s\n' "$*"
@@ -76,10 +88,33 @@ EMULATOR="${ANDROID_HOME}/emulator/emulator"
 
 serial=""
 emulator_pid=""
+peer_pid=""
 server_started=0
 
 adb_device() {
   "${ADB}" -s "${serial}" "$@"
+}
+
+stop_peer() {
+  [[ -n "${peer_pid}" ]] || return 0
+  kill "${peer_pid}" 2>/dev/null || true
+  # Its exit status is that of being stopped, which is not a failure.
+  wait "${peer_pid}" 2>/dev/null || true
+  peer_pid=""
+}
+
+# Starts the second person and waits until it is on the server.
+start_peer() {
+  : >"${PEER_LOG}"
+  "${PEER_BINARY}" >"${PEER_LOG}" 2>&1 &
+  peer_pid=$!
+  local waited=0
+  until grep -q '^CONNECTED' "${PEER_LOG}"; do
+    kill -0 "${peer_pid}" 2>/dev/null || die "the second person ended early, see e2e/build/voice-peer.log"
+    ((waited < PEER_CONNECT_TIMEOUT)) || die "the second person did not connect within ${PEER_CONNECT_TIMEOUT} s"
+    sleep 1
+    waited=$((waited + 1))
+  done
 }
 
 cleanup() {
@@ -87,6 +122,7 @@ cleanup() {
   trap - EXIT
   set +e
   step "cleaning up"
+  stop_peer
   if [[ -n "${serial}" ]]; then
     timeout 20 "${ADB}" -s "${serial}" logcat -d >"${OUT_DIR}/logcat.txt" 2>/dev/null
   fi
@@ -131,11 +167,13 @@ start_emulator() {
 }
 
 mkdir -p "${OUT_DIR}"
-rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log"
+rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" "${PEER_LOG}"
 trap cleanup EXIT
 
 step "building the app and the tests"
 (cd "${REPO_ROOT}/android" && ./gradlew --console=plain --quiet :app:assembleDebug :e2e:assembleDebug)
+(cd "${REPO_ROOT}" && cargo build --locked --quiet --package mumcord-voice-peer)
+[[ -x "${PEER_BINARY}" ]] || die "the second person's program was not built at ${PEER_BINARY}"
 
 step "starting the test server on port ${MUMCORD_PORT_BASE}"
 server_started=1
@@ -158,10 +196,10 @@ timeout 120 "${ADB}" -s "${serial}" install "${TEST_APK}" >/dev/null || die "ins
 adb_device logcat -c || true
 device_api="$(adb_device shell getprop ro.build.version.sdk | tr -d '\r')"
 
-# Runs one scenario: fresh app data, the permission as the scenario wants it, then its test.
+# Runs one scenario: fresh app data, the permissions as the scenario wants them, then its test.
 run_scenario() {
-  local permission="$1" test="$2" report="${OUT_DIR}/instrument-scenario.txt" status=0
-  step "scenario: ${test##*.} (local network permission: ${permission})"
+  local permission="$1" microphone="$2" peer="$3" test="$4" report="${OUT_DIR}/instrument-scenario.txt" status=0
+  step "scenario: ${test##*.} (local network: ${permission}, microphone: ${microphone}, second person: ${peer})"
   # Clearing the data also takes back every permission and forgets earlier answers to prompts.
   adb_device shell pm clear "${APP_PACKAGE}" >/dev/null || die "clearing the app data failed"
   # Since Android 17 the test server on the host counts as local network, which needs this
@@ -170,9 +208,16 @@ run_scenario() {
     adb_device shell pm grant "${APP_PACKAGE}" "${LOCAL_NETWORK_PERMISSION}" \
       || die "granting local network access failed"
   fi
+  if [[ "${microphone}" == "granted" ]]; then
+    adb_device shell pm grant "${APP_PACKAGE}" "${MICROPHONE_PERMISSION}" \
+      || die "granting the microphone failed"
+  fi
+  if [[ "${peer}" == "peer" ]]; then
+    start_peer
+  fi
   timeout "${TEST_TIMEOUT}" "${ADB}" -s "${serial}" shell am instrument -w \
     -e serverHost "${HOST_FROM_EMULATOR}" -e serverPort "${MUMCORD_PORT_BASE}" -e class "${test}" \
-    "${@:3}" "${TEST_PACKAGE}/${RUNNER}" | tee "${report}" || status=$?
+    "${@:5}" "${TEST_PACKAGE}/${RUNNER}" | tee "${report}" || status=$?
   cat "${report}" >>"${OUT_DIR}/instrument.txt"
   if ((status == 124)); then
     die "the scenario did not finish within ${TEST_TIMEOUT} s"
@@ -182,13 +227,18 @@ run_scenario() {
   if ((status != 0)) || ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "${report}"; then
     die "tests failed, see above and e2e/build/logcat.txt"
   fi
+  if [[ "${peer}" == "peer" ]]; then
+    # The other half of the proof: what the second person received from the app.
+    grep '^HEARD' "${PEER_LOG}" || die "the second person did not hear the app, see e2e/build/voice-peer.log"
+    stop_peer
+  fi
 }
 
 scenarios_run=0
 for scenario in "${SCENARIOS[@]}"; do
-  read -r permission test <<<"${scenario}"
+  read -r permission microphone peer test <<<"${scenario}"
   [[ "${test}" == *"${E2E_SCENARIO:-}"* ]] || continue
-  run_scenario "${permission}" "${test}" "$@"
+  run_scenario "${permission}" "${microphone}" "${peer}" "${test}" "$@"
   scenarios_run=$((scenarios_run + 1))
 done
 ((scenarios_run > 0)) || die "no scenario matches E2E_SCENARIO=${E2E_SCENARIO:-}"

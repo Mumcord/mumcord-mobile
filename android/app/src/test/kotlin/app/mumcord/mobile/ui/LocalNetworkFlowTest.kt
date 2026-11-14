@@ -14,6 +14,7 @@ import app.mumcord.mobile.session.channel
 import app.mumcord.mobile.session.person
 import app.mumcord.mobile.session.savedServer
 import app.mumcord.mobile.ui.connect.FakeLocalNetworkGateway
+import app.mumcord.mobile.ui.connected.FakeMicrophoneAccess
 import app.mumcord.mobile.ui.connect.LocalNetworkAnswer
 import app.mumcord.mobile.ui.connect.LocalNetworkPermission
 import app.mumcord.mobile.ui.servers.ConnectFailure
@@ -89,7 +90,7 @@ class LocalNetworkFlowTest {
                 MumbleLink(home.address, home.port, home.username, listOf("Lobby"))
             },
         )
-        return AppViewModel(repository, DoneSetup, localNetwork).also { viewModel ->
+        return AppViewModel(repository, DoneSetup, localNetwork, FakeMicrophoneAccess()).also { viewModel ->
             backgroundScope.launch { viewModel.uiState.collect() }
             runCurrent()
         }

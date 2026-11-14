@@ -26,6 +26,9 @@ COMPILE_API="37.0"
 MIN_API="31"
 BUILD_TOOLS_VERSION="37.0.0"
 NDK_VERSION="30.0.16248370"
+# Builds the small C++ audio library (android/platform/audio); same version as in
+# android/gradle/libs.versions.toml.
+CMAKE_VERSION="3.31.6"
 SYSTEM_IMAGE="system-images;android-${COMPILE_API};google_apis;x86_64"
 # sdkmanager cannot pin the emulator; this is the revision the setup was
 # verified with. A different one only triggers a warning.
@@ -128,6 +131,7 @@ install_sdk_packages() {
     ["platforms;android-${MIN_API}"]="platforms/android-${MIN_API}"
     ["build-tools;${BUILD_TOOLS_VERSION}"]="build-tools/${BUILD_TOOLS_VERSION}"
     ["ndk;${NDK_VERSION}"]="ndk/${NDK_VERSION}"
+    ["cmake;${CMAKE_VERSION}"]="cmake/${CMAKE_VERSION}"
   )
   if ((with_emulator)); then
     packages["emulator"]="emulator"
