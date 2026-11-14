@@ -135,3 +135,62 @@ extension Outcome {
         return nil
     }
 }
+
+/// The phone's side of voice and of the local network, faked, for a model under test.
+final class PhoneFakes {
+    let microphone: FakeMicrophoneGateway
+    let backend = FakeStreamBackend()
+    let session = FakeVoiceSession()
+    let localNetwork: FakeLocalNetworkGateway
+    /// How often the app's page in the system settings was opened.
+    private(set) var settingsOpened = 0
+
+    init(
+        microphone: FakeMicrophoneGateway = FakeMicrophoneGateway(),
+        localNetwork: FakeLocalNetworkGateway = FakeLocalNetworkGateway()
+    ) {
+        self.microphone = microphone
+        self.localNetwork = localNetwork
+    }
+
+    /// A model on `store` whose audio, microphone question and local network are these fakes.
+    @MainActor
+    func makeModel(store: SessionStore, setupStore: SetupStore) -> AppModel {
+        AppModel(
+            store: store,
+            setupStore: setupStore,
+            microphone: VoiceAudio(
+                store: store,
+                gateway: microphone,
+                backend: backend,
+                session: session,
+                scheduler: QueueAudioScheduler(),
+                log: { _ in }
+            ),
+            localNetwork: localNetwork,
+            openSettings: { [weak self] in self?.settingsOpened += 1 }
+        )
+    }
+}
+
+extension AppModel {
+    /// A model for tests that do not look at voice or the local network: the microphone is
+    /// allowed and every server is on the internet.
+    convenience init(store: SessionStore, setupStore: SetupStore) {
+        let fakes = PhoneFakes()
+        self.init(
+            store: store,
+            setupStore: setupStore,
+            microphone: VoiceAudio(
+                store: store,
+                gateway: fakes.microphone,
+                backend: fakes.backend,
+                session: fakes.session,
+                scheduler: QueueAudioScheduler(),
+                log: { _ in }
+            ),
+            localNetwork: fakes.localNetwork,
+            openSettings: {}
+        )
+    }
+}
