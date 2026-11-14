@@ -74,7 +74,9 @@ extension AppModel {
             log: AppLog.write
         )
         voiceSession.onSignal = { [weak call] in call?.onAudioSignal($0) }
-        return AppModel(
+        let notificationGateway = SystemNotificationGateway()
+        let messageSettings = EngineMessageNotificationSettings(store: store)
+        let model = AppModel(
             store: store,
             setupStore: UserDefaultsSetupStore(),
             microphone: audio,
@@ -85,9 +87,28 @@ extension AppModel {
                 }
             },
             call: call,
-            sessionEnded: call.takeSessionEndedNotice()
+            sessionEnded: call.takeSessionEndedNotice(),
+            notifications: NotificationPrompt(gateway: notificationGateway),
+            messageSettings: messageSettings
         )
+        // Created at the start of the app: a tap on a notification that started the app is
+        // delivered right after launch.
+        let notifier = SystemMessageNotifier(newMessage: Strings.messageNew, log: AppLog.write)
+        notifier.onOpen { [weak model] key in
+            if let chat = chatFromNotificationKey(key) { model?.openChat(chat) }
+        }
+        messageNotifications = MessageNotificationCenter(
+            store: store,
+            chats: model.chatStore,
+            notifier: notifier,
+            settings: messageSettings,
+            permitted: { notificationGateway.granted() }
+        )
+        return model
     }()
+
+    /// Lives as long as the process: it turns the engine's message events into notifications.
+    @MainActor private static var messageNotifications: MessageNotificationCenter?
 }
 
 /// The app's technical log. Messages never contain names, addresses or other personal data.

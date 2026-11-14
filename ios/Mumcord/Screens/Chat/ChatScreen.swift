@@ -50,9 +50,16 @@ struct ChatScreen: View {
     let actions: ChatController
     let loader: ChatImageLoader
     let clock: ChatClock
+    /// Set for a private conversation: the way back to the conversation list.
+    var onBack: (() -> Void)?
     @Environment(\.mumcordTheme) private var theme
     /// Where the keyboard begins on the screen, or the bottom of the screen without one.
     @Environment(\.keyboardTop) private var keyboardTop
+
+    private var subtitle: String {
+        guard let peer = state.peer else { return Strings.chatSubtitle(state.people, state.serverName) }
+        return peer.online ? Strings.conversationOnline(state.serverName) : Strings.conversationOffline(state.serverName)
+    }
 
     var body: some View {
         GeometryReader { area in
@@ -73,12 +80,15 @@ struct ChatScreen: View {
     private var column: some View {
         VStack(spacing: 0) {
             MumcordAppBar(
-                title: Strings.chatTitle(state.title),
+                // A person's name stands as it is; only a channel gets the "#".
+                title: state.peer == nil ? Strings.chatTitle(state.title) : state.title,
                 border: true,
+                onBack: onBack,
+                backLabel: Strings.conversationBack,
                 leading: { EmptyView() },
                 subtitle: {
-                    MumcordDot()
-                    MumcordAppBarSubtitle(text: Strings.chatSubtitle(state.people, state.serverName))
+                    MumcordDot(off: state.peer?.online == false)
+                    MumcordAppBarSubtitle(text: subtitle)
                 },
                 actions: { EmptyView() }
             )

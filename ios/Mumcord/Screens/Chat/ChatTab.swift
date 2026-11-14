@@ -32,8 +32,8 @@ struct ChatOverlayHost: View {
     @State private var calendar = Calendar.current
 
     var body: some View {
-        if let state = model.chatUiState(calendar: calendar) {
-            ChatOverlays(state: state, actions: model.chat, loader: model.chatImages)
+        if let state = model.activeChatUiState(calendar: calendar) {
+            ChatOverlays(state: state, actions: model.activeChat, loader: model.chatImages)
         }
     }
 }

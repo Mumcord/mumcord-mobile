@@ -19,6 +19,12 @@ final class ChatController {
     private(set) var unread: [ChatId: Int] = [:]
 
     @ObservationIgnored private let chats: ChatStore
+    /// What was typed stays when another chat is opened. Right for the channel chat, which
+    /// follows the user from channel to channel; a private conversation must not hand its text
+    /// to the next person.
+    @ObservationIgnored private let keepDraft: Bool
+    /// Names this screen among the screens that show chats; see `ChatStore.setOpenChat`.
+    @ObservationIgnored private let owner = UUID()
     /// The chat's screen is the one on top (its tab is selected).
     @ObservationIgnored private var shown = false
     /// The app is in front; a chat behind the lock screen is not being read.
@@ -27,8 +33,9 @@ final class ChatController {
     @ObservationIgnored private var mentionTask: Task<Void, Never>?
     @ObservationIgnored private var nextPendingId: Int64 = 1
 
-    init(chats: ChatStore) {
+    init(chats: ChatStore, keepDraft: Bool = true) {
         self.chats = chats
+        self.keepDraft = keepDraft
         let incoming = chats.incoming()
         Task { [weak self] in
             for await message in incoming {
@@ -57,11 +64,12 @@ final class ChatController {
         pageTask?.cancel()
         mentionTask?.cancel()
         // What was typed is kept: joining another channel must not throw a text away.
+        let keep = keepDraft || local.chat == chat
         var next = ChatLocal()
         next.chat = chat
         next.loading = chat != nil
-        next.draft = local.draft
-        next.cursor = local.cursor
+        next.draft = keep ? local.draft : ""
+        next.cursor = keep ? local.cursor : 0
         next.visible = local.visible
         local = next
         syncOpenChat()
@@ -143,7 +151,7 @@ final class ChatController {
     }
 
     private func syncOpenChat() {
-        chats.setOpenChat(local.visible ? local.chat : nil)
+        chats.setOpenChat(owner: owner, chat: local.visible ? local.chat : nil)
     }
 
     /// Messages count as read once the newest one was on screen in front of the user.

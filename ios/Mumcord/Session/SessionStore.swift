@@ -28,8 +28,8 @@ final class SessionStore: @unchecked Sendable {
     private let engine: EngineHolder
     private let log: @Sendable (String) -> Void
     private let linkParser: @Sendable (String) throws -> MumbleLink
-    /// Chat messages and unread counts as the engine reports them, for `ChatStore`, its one
-    /// reader. They never pass through the state, so chat traffic does not redraw the channels.
+    /// Chat messages, unread counts, notifications, message requests and blocked people as the
+    /// engine reports them, for `ChatStore`, its one reader. They never pass through the state, so chat traffic does not redraw the channels.
     let chatEvents: AsyncStream<BridgeEvent>
 
     /// - Parameters:
@@ -57,7 +57,8 @@ final class SessionStore: @unchecked Sendable {
                 switch event {
                 case .inputLevelChanged(let percent):
                     self?.publishInputLevel(Int(percent))
-                case .chatMessageReceived, .chatUnreadChanged:
+                case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,
+                     .blockedPeopleChanged:
                     chatQueue.yield(event)
                 default:
                     self?.update { $0.fold(event) }
@@ -377,11 +378,33 @@ final class SessionStore: @unchecked Sendable {
     /// A command of the connected screens that failed in the engine is shown like a refusal.
     private func report(_ outcome: Outcome<Void>) {
         guard case .failed = outcome else { return }
+        reportFailure()
+    }
+
+    /// Shows a failed command of the connected screens like a refusal by the server.
+    func reportFailure() {
         update { state in
             var next = state
             next.denied = DeniedAction(channelId: nil, detail: "")
             return next
         }
+    }
+
+    /// The phone settings, or nil when they cannot be read.
+    func mobileSettings() async -> MobileSettings? {
+        await call("mobile settings") { $0.mobileSettings() }.value
+    }
+
+    /// Reads the phone settings, changes them and saves the result.
+    func updateMobileSettings(_ change: (inout MobileSettings) -> Void) async -> Outcome<Void> {
+        let read = await call("mobile settings") { $0.mobileSettings() }
+        guard case .ok(var settings) = read else {
+            if case .failed(let error) = read { return .failed(error) }
+            return .failed(.internalError)
+        }
+        change(&settings)
+        let changed = settings
+        return await call("set mobile settings") { try await $0.setMobileSettings(settings: changed) }
     }
 
     /// Runs a command on the engine, creating it on first use. `name` is what the log calls it.

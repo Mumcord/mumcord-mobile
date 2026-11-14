@@ -43,6 +43,18 @@ protocol EngineClient: AnyObject, Sendable {
     func gifFavourites() async throws -> [GifFavourite]
     func addGifFavourite(url: String) async throws
     func removeGifFavourite(url: String) async throws
+    /// The stored private conversations of the connected server, newest first.
+    func privateConversations() async throws -> [Conversation]
+    func chatWith(session: UInt32) throws -> ChatId
+    func messageRequests() async throws -> MessageRequests
+    func acceptMessageRequest(id: UInt64) async throws
+    func declineMessageRequest(id: UInt64) async throws
+    func sendChatRequest(session: UInt32, note: String?) async throws
+    func blockedPeople() async throws -> [BlockedPerson]
+    func blockPerson(session: UInt32) async throws
+    func unblockPerson(id: Int64) async throws
+    func mobileSettings() -> MobileSettings
+    func setMobileSettings(settings: MobileSettings) async throws
 }
 
 extension MumcordEngine: EngineClient {

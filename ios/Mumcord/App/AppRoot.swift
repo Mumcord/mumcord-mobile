@@ -16,6 +16,7 @@ struct AppRoot: View {
                 if phase == .active {
                     model.refreshPings()
                     model.recheckMicrophone()
+                    model.recheckNotifications()
                     model.call?.onAppActive()
                 } else {
                     // Hold to talk and hold to whisper work only while the app is on screen
@@ -26,6 +27,7 @@ struct AppRoot: View {
             // A chat behind the lock screen or another app is not being read.
             .onChange(of: scenePhase, initial: true) { _, phase in
                 model.chat.setResumed(phase == .active)
+                model.conversation.setResumed(phase == .active)
             }
     }
 }
@@ -41,7 +43,9 @@ struct AppContent: View {
         // Questions wait until the first-start setup is done.
         let overlay = uiState.setupDone ? uiState.overlay : nil
         let connectedSheet = uiState.connected?.sheet
-        let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil
+        let messagesLocal = model.messages.local
+        let messagesSheet = messagesLocal.blockSession != nil || messagesLocal.requestSession != nil
+        let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
         ZStack {
             screen
                 // While a sheet is open, the screen behind it is not offered to screen readers.
@@ -55,9 +59,9 @@ struct AppContent: View {
             } else if let overlay {
                 sheet(for: overlay)
             } else if let connectedSheet {
-                ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model))
+                ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model), model: model)
             } else if uiState.connected != nil {
-                ChatOverlayHost(model: model)
+                MessagesOverlayHost(model: model)
             }
         }
     }
@@ -103,7 +107,8 @@ struct AppContent: View {
                     state: connected,
                     actions: ConnectedActions(model: model),
                     onDisconnect: model.disconnect,
-                    chatBadge: model.chatBadge
+                    chatBadge: model.chatBadge,
+                    model: model
                 ) {
                     ChatTab(model: model)
                 }

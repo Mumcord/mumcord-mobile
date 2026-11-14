@@ -64,6 +64,13 @@ struct AppDebugLaunch {
                 )
             }
             var server = options.contains("voice-server") ? mockupVoiceServer() : mockupServer()
+            if options.contains("chat-requests") {
+                server.people = server.people.map { person in
+                    var changed = person
+                    changed.supportsChatRequests = !person.isSelf
+                    return changed
+                }
+            }
             if options.contains("self-muted") {
                 server.people = server.people.map { person in
                     var changed = person
@@ -78,6 +85,9 @@ struct AppDebugLaunch {
                 servers: options.contains("servers") ? Mockup.servers : []
             )
             engine.pings = Mockup.pings
+            if options.contains("messages") {
+                MessagesMockup.fill(engine)
+            }
             if options.contains("unreachable") {
                 engine.connectFailure = .ServerUnreachable(detail: "unreachable")
             }
@@ -129,6 +139,18 @@ extension AppDebugLaunch {
         return FakeMicrophoneGateway()
     }
 
+    /// Notifications as the options describe them: allowed when they say nothing, never asked
+    /// for with "notif-ask", refused with "notif-denied". The system's own question never shows.
+    var notificationGateway: FakeNotificationGateway {
+        if options.contains("notif-ask") {
+            return FakeNotificationGateway(granted: false, asked: false)
+        }
+        if options.contains("notif-denied") {
+            return FakeNotificationGateway(granted: false, asked: true)
+        }
+        return FakeNotificationGateway(granted: true, asked: true)
+    }
+
     /// The local network as the options describe it; every server is on the internet when they
     /// say nothing.
     var localNetworkGateway: FakeLocalNetworkGateway {
@@ -163,7 +185,8 @@ extension AppDebugLaunch {
             openSettings: {},
             sessionEnded: options.contains("session-ended")
                 ? SessionEndedNotice(serverId: Mockup.servers[0].id, serverName: Mockup.servers[0].name)
-                : nil
+                : nil,
+            notifications: NotificationPrompt(gateway: notificationGateway)
         )
         if options.contains("chat") {
             presetChat(model, store)

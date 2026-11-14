@@ -31,6 +31,15 @@ final class AppModel {
     @ObservationIgnored let chat: ChatController
     /// Gets the pictures of the chat.
     @ObservationIgnored let chatImages: ChatImageLoader
+    /// The chat commands and streams of the connection; the message notifications follow it too.
+    @ObservationIgnored let chatStore: ChatStore
+    /// The Messages tab: conversations, requests, blocking. Read only by its own views.
+    @ObservationIgnored let messages: MessagesController
+    /// The private conversation that is open on the Messages tab. It does not keep what was
+    /// typed for the next person.
+    @ObservationIgnored let conversation: ChatController
+    /// The question about notifications and whether the phone shows them.
+    @ObservationIgnored let notifications: NotificationAccess
     /// The last connect, so "Try again" and the password retry keep a link's channel.
     @ObservationIgnored private var lastTarget: ConnectTarget?
 
@@ -39,6 +48,7 @@ final class AppModel {
     private var session = SessionState()
     var connectedLocal = ConnectedLocal()
     private var microphoneNotice = MicrophoneNotice.none
+    private var notificationState: NotificationState
 
     init(
         store: SessionStore,
@@ -47,7 +57,9 @@ final class AppModel {
         localNetwork: LocalNetworkGateway,
         openSettings: @escaping () -> Void,
         call: VoiceCall? = nil,
-        sessionEnded: SessionEndedNotice? = nil
+        sessionEnded: SessionEndedNotice? = nil,
+        notifications: NotificationAccess = NoNotificationQuestion(),
+        messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(senderOnly: false)
     ) {
         self.store = store
         self.setupStore = setupStore
@@ -55,8 +67,13 @@ final class AppModel {
         self.localNetwork = localNetwork
         self.openSettings = openSettings
         self.call = call
+        self.notifications = notifications
+        notificationState = notifications.state
         let chatStore = ChatStore(session: store)
+        self.chatStore = chatStore
         chat = ChatController(chats: chatStore)
+        conversation = ChatController(chats: chatStore, keepDraft: false)
+        messages = MessagesController(store: store, chats: chatStore, settings: messageSettings)
         chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
         local = AppUiState(setupDone: setupStore.firstStartDone)
         if let sessionEnded {
@@ -76,6 +93,15 @@ final class AppModel {
                 self.microphoneNotice = notice
             }
         }
+        let notificationStates = notifications.states()
+        Task { [weak self] in
+            for await state in notificationStates {
+                guard let self else { return }
+                self.notificationState = state
+            }
+        }
+        messages.showMessagesTab = { [weak self] in self?.showTab(.messages) }
+        messages.dismissConnectedSheet = { [weak self] in self?.dismissSheet() }
         let levels = store.inputLevels()
         Task { [inputLevel] in
             for await percent in levels {
@@ -92,7 +118,8 @@ final class AppModel {
             session: session,
             local: connectedLocal,
             serverName: merged.activeServerName ?? "",
-            microphone: microphoneNotice
+            microphone: microphoneNotice,
+            explainNotifications: notificationState.explain
         )
         return merged
     }
@@ -127,6 +154,84 @@ final class AppModel {
     func syncChat() {
         chat.open(currentChannelChat(session))
         chat.setShown(session.showsServer && connectedLocal.tab == .chat && !connectedLocal.voiceOpen)
+        let open = session.showsServer ? messages.local.open?.chat : nil
+        conversation.open(open)
+        conversation.setShown(open != nil && connectedLocal.tab == .messages && !connectedLocal.voiceOpen)
+    }
+
+    /// The chat controller of the tab on screen; the chat's sheets and pictures go to it.
+    var activeChat: ChatController {
+        connectedLocal.tab == .messages ? conversation : chat
+    }
+
+    /// The chat on screen as a value: the open conversation on the Messages tab, else the
+    /// channel's chat.
+    func activeChatUiState(calendar: Calendar) -> ChatUiState? {
+        connectedLocal.tab == .messages ? conversationUiState(calendar: calendar) : chatUiState(calendar: calendar)
+    }
+
+    /// The Messages tab and the blocking screens as a value. Only their own views read it.
+    var messagesUiState: MessagesUiState? {
+        messages.uiState(session: session, notificationsGranted: notificationState.granted)
+    }
+
+    /// The open private conversation as a value, or nil while there is none to show.
+    func conversationUiState(calendar: Calendar) -> ChatUiState? {
+        guard let state = messagesUiState, let open = state.open else { return nil }
+        return Mumcord.conversationUiState(
+            session: session,
+            local: conversation.local,
+            chat: open.chat,
+            peerName: open.name,
+            peerOnline: state.openOnline,
+            serverName: local.activeServerName(session) ?? "",
+            calendar: calendar
+        )
+    }
+
+    /// The number on the Messages tab.
+    var messagesBadge: Int {
+        messagesTabBadge(messages.unread)
+    }
+
+    /// Brings a tab in front of whatever is open: a sheet and the full voice view go away.
+    func showTab(_ tab: ConnectedTab) {
+        connectedLocal.voiceOpen = false
+        connectedLocal.personSession = nil
+        connectedLocal.volumeDraft = nil
+        connectedLocal.menuChannelId = nil
+        connectedLocal.tab = tab
+        syncChat()
+    }
+
+    /// A message notification was tapped: a mention opens the Chat tab, a private message its
+    /// conversation. Nothing happens without a connection.
+    func openChat(_ chat: ChatId) {
+        guard session.showsServer else { return }
+        if chat.isChannel {
+            showTab(.chat)
+        } else {
+            showTab(.messages)
+            messages.openConversation(chat, name: "", session: nil)
+            syncChat()
+        }
+    }
+
+    // MARK: Notifications
+
+    /// The explanation was put away without letting the system ask.
+    func notificationsNotNow() {
+        notifications.notNow()
+    }
+
+    /// Lets the system ask for notifications.
+    func askNotifications() {
+        notifications.ask()
+    }
+
+    /// The app is on screen again: notifications may have been allowed in the system settings.
+    func recheckNotifications() {
+        notifications.recheck()
     }
 
     /// The Chat tab as a value, or nil while there is no chat to show. Only the chat views

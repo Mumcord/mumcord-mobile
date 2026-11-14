@@ -232,6 +232,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `core` | all unit tests (`MumcordTests`), app flow, voice flow |
 | `voice-chat-screens` | voice screenshots, chat screenshots |
 | `chat-flow` | chat flow, session-ended notice (the lightest group: the place for new tests) |
+| `messages` | messages flow, messages screenshots |
 
 Before its tests each group starts the app once in the simulator and ends it again (about 20
 seconds), so the first UI test does not pay for the first start of the app in a cold simulator.
@@ -244,6 +245,16 @@ with the shortest run time (see the Actions run) in `group_tests`; nothing else 
 from the same list. `scripts/build-ios.sh --check-groups` (a CI job that runs first, works on
 any OS) fails when a UI test class is in no group, in two groups, or a listed class does not
 exist. New unit tests need nothing: the whole unit bundle runs in `core`.
+
+### Message notifications (iOS)
+
+Private messages and mentions become local notifications (`UNUserNotificationCenter`) only while
+the app is connected; there is no push server, so nothing arrives after disconnecting or once
+the system has ended the app. One notification per conversation, grouped by conversation, removed
+when the chat is opened or read. The UI tests run with a fake permission (`notif-ask`,
+`notif-denied`) and never show the system's question. Only a real iPhone shows the system's
+permission question, the banner and lock screen with the phone's preview setting, "Show sender
+only", grouping in the notification centre, a tap that opens the conversation, and Focus modes.
 
 ### Voice in the background and the system call (iOS)
 

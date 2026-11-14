@@ -56,6 +56,25 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _limits = ChatLimits(text: 5000, image: 131_072, allowHtml: true)
     private var _loadMediaCalls: [Bool] = []
     private var nextMessageId = 1
+    private var _conversations: [Conversation] = []
+    private var _requests = MessageRequests(incoming: [], sent: [])
+    private var _blocked: [BlockedPerson] = []
+    private var nextBlockId: Int64 = 1
+    private var _requestAnswers: [(id: UInt64, accepted: Bool)] = []
+    private var _chatRequestCalls: [(session: UInt32, note: String?)] = []
+    private var _chatRequestFailure: BridgeError?
+    private var _blockFailure: BridgeError?
+    private var _conversationReads = 0
+    private var _mobileSettings = MobileSettings(
+        talkModeChosen: true,
+        defaultOutput: .speaker,
+        mobileDataAutoplayStreams: false,
+        mobileDataLoadMedia: true,
+        mobileDataReducedVoice: false,
+        idleDisconnect: false,
+        notifySenderOnly: false,
+        updateCheck: true
+    )
     /// The user's own mute before a deafen, which comes back when the deafen ends.
     private var mutedBeforeDeafen = false
     private var people: [UInt32: Person]
@@ -566,6 +585,177 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func removeGifFavourite(url: String) async throws {
         locked { _gifFavourites.removeAll { $0.url == url } }
+    }
+
+    // MARK: Private conversations, requests, blocking
+
+    /// The private conversations as the engine lists them, newest first.
+    var conversations: [Conversation] {
+        get { locked { _conversations } }
+        set { locked { _conversations = newValue } }
+    }
+
+    /// How often the list of private conversations was read.
+    var conversationReads: Int { locked { _conversationReads } }
+
+    /// The message requests as the engine holds them before the app asks.
+    var requests: MessageRequests {
+        get { locked { _requests } }
+        set { locked { _requests = newValue } }
+    }
+
+    /// The blocked people as the engine has them before the app asks.
+    var blocked: [BlockedPerson] {
+        get { locked { _blocked } }
+        set { locked { _blocked = newValue } }
+    }
+
+    /// Every answer to a message request, in order.
+    var requestAnswers: [(id: UInt64, accepted: Bool)] { locked { _requestAnswers } }
+    var chatRequestCalls: [(session: UInt32, note: String?)] { locked { _chatRequestCalls } }
+
+    /// While set, sending a chat request fails with it.
+    var chatRequestFailure: BridgeError? {
+        get { locked { _chatRequestFailure } }
+        set { locked { _chatRequestFailure = newValue } }
+    }
+
+    /// While set, blocking a person fails with it.
+    var blockFailure: BridgeError? {
+        get { locked { _blockFailure } }
+        set { locked { _blockFailure = newValue } }
+    }
+
+    var storedMobileSettings: MobileSettings {
+        get { locked { _mobileSettings } }
+        set { locked { _mobileSettings = newValue } }
+    }
+
+    /// The engine found a message worth a system notification.
+    func notify(_ notification: ChatNotification) {
+        emit(.chatNotification(notification: notification))
+    }
+
+    /// The held requests change, as when somebody writes for the first time.
+    func changeRequests(_ requests: MessageRequests) {
+        locked { _requests = requests }
+        emit(.messageRequestsChanged(requests: requests))
+    }
+
+    /// A person comes to the server.
+    func join(_ person: Person) {
+        locked { people[person.session] = person }
+        emit(.personChanged(person: person))
+    }
+
+    /// A person leaves the server.
+    func leave(_ session: UInt32) {
+        locked { people[session] = nil }
+        emit(.personRemoved(session: session))
+    }
+
+    func privateConversations() async throws -> [Conversation] {
+        locked {
+            _conversationReads += 1
+            return _conversations
+        }
+    }
+
+    func chatWith(session: UInt32) throws -> ChatId {
+        try locked {
+            guard people[session] != nil else { throw BridgeError.NotFound(detail: "no such person") }
+            // As the engine: the stored conversation of a person who is listed, else their session's.
+            return _conversations.first { $0.peerSession == session }?.chat ?? .session(session: session)
+        }
+    }
+
+    func messageRequests() async throws -> MessageRequests {
+        locked { _requests }
+    }
+
+    func acceptMessageRequest(id: UInt64) async throws {
+        try answerRequest(id, accepted: true)
+    }
+
+    func declineMessageRequest(id: UInt64) async throws {
+        try answerRequest(id, accepted: false)
+    }
+
+    /// An accepted request turns its held messages into a conversation, as in the engine.
+    private func answerRequest(_ id: UInt64, accepted: Bool) throws {
+        let requests: MessageRequests = try locked {
+            guard let request = _requests.incoming.first(where: { $0.id == id }) else {
+                throw BridgeError.NotFound(detail: "no such request")
+            }
+            _requestAnswers.append((id, accepted))
+            _requests = MessageRequests(incoming: _requests.incoming.filter { $0.id != id }, sent: _requests.sent)
+            if accepted, let last = request.messages.last {
+                let chat = ChatId.session(session: request.session)
+                _messages[chat, default: []].append(contentsOf: request.messages)
+                _conversations.insert(
+                    Conversation(chat: chat, peerName: request.name, peerSession: request.session, last: last, unread: 0),
+                    at: 0
+                )
+            }
+            return _requests
+        }
+        emit(.messageRequestsChanged(requests: requests))
+    }
+
+    func sendChatRequest(session: UInt32, note: String?) async throws {
+        let requests: MessageRequests = try locked {
+            if let failure = _chatRequestFailure { throw failure }
+            _chatRequestCalls.append((session, note))
+            let sent = SentChatRequest(session: session, name: people[session]?.name ?? "", accepted: false)
+            _requests = MessageRequests(incoming: _requests.incoming, sent: _requests.sent + [sent])
+            return _requests
+        }
+        emit(.messageRequestsChanged(requests: requests))
+    }
+
+    func blockedPeople() async throws -> [BlockedPerson] {
+        locked { _blocked }
+    }
+
+    func blockPerson(session: UInt32) async throws {
+        let list: [BlockedPerson] = try locked {
+            if let failure = _blockFailure { throw failure }
+            guard let person = people[session] else { throw BridgeError.NotFound(detail: "no such person") }
+            _blocked.append(
+                BlockedPerson(
+                    id: nextBlockId,
+                    name: person.name,
+                    serverLabel: "",
+                    blockedAtMs: 0,
+                    certHash: nil,
+                    session: session
+                )
+            )
+            nextBlockId += 1
+            return _blocked
+        }
+        change(session) { $0.blocked = true }
+        emit(.blockedPeopleChanged(people: list))
+    }
+
+    func unblockPerson(id: Int64) async throws {
+        let (list, session): ([BlockedPerson], UInt32?) = locked {
+            let session = _blocked.first { $0.id == id }?.session
+            _blocked.removeAll { $0.id == id }
+            return (_blocked, session)
+        }
+        if let session {
+            change(session) { $0.blocked = false }
+        }
+        emit(.blockedPeopleChanged(people: list))
+    }
+
+    func mobileSettings() -> MobileSettings {
+        locked { _mobileSettings }
+    }
+
+    func setMobileSettings(settings: MobileSettings) async throws {
+        locked { _mobileSettings = settings }
     }
 
     private func finishConnecting() {

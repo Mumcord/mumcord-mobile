@@ -354,10 +354,15 @@ enum ChatSheet: Equatable {
     case linkWarning(SafeLink)
 }
 
+/// The other person of a private conversation; `online` while they are on the server.
+struct ChatPeer: Equatable {
+    let online: Bool
+}
+
 /// The chat screen as a value.
 struct ChatUiState: Equatable {
     let chat: ChatId
-    /// The channel's name; untrusted text.
+    /// The channel's name, or the other person's in a private conversation; untrusted text.
     let title: String
     let people: Int
     let serverName: String
@@ -382,6 +387,8 @@ struct ChatUiState: Equatable {
     let viewer: ChatImageSource?
     let urlToOpen: String?
     let notice: ChatNotice?
+    /// Set for a private conversation, nil for a channel's chat.
+    var peer: ChatPeer?
 
     /// Nothing was ever written here, and nothing is on its way.
     var empty: Bool { !loading && !loadFailed && rows.isEmpty }
@@ -400,6 +407,56 @@ func chatUiState(session: SessionState, local: ChatLocal, serverName: String, ca
     guard let server = session.server, let chat = currentChannelChat(session), local.chat == chat,
           let channelId = server.selfChannelId
     else { return nil }
+    return chatUiState(
+        chat: chat,
+        local: local,
+        session: session,
+        server: server,
+        title: server.channels[channelId]?.name ?? "",
+        people: server.people.values.filter { $0.channelId == channelId }.count,
+        serverName: serverName,
+        calendar: calendar,
+        peer: nil
+    )
+}
+
+/// A private conversation: the chat with one person, named `peerName`. Nil while no server is
+/// shown or `local` is not (yet) about `chat`.
+func conversationUiState(
+    session: SessionState,
+    local: ChatLocal,
+    chat: ChatId?,
+    peerName: String,
+    peerOnline: Bool,
+    serverName: String,
+    calendar: Calendar
+) -> ChatUiState? {
+    guard session.showsServer, let server = session.server, let chat, local.chat == chat else { return nil }
+    if case .channel = chat { return nil }
+    return chatUiState(
+        chat: chat,
+        local: local,
+        session: session,
+        server: server,
+        title: peerName,
+        people: 2,
+        serverName: serverName,
+        calendar: calendar,
+        peer: ChatPeer(online: peerOnline)
+    )
+}
+
+private func chatUiState(
+    chat: ChatId,
+    local: ChatLocal,
+    session: SessionState,
+    server: ServerModel,
+    title: String,
+    people: Int,
+    serverName: String,
+    calendar: Calendar,
+    peer: ChatPeer?
+) -> ChatUiState {
     let sheet: ChatSheet?
     if let link = local.linkWarning {
         sheet = .linkWarning(link)
@@ -412,8 +469,8 @@ func chatUiState(session: SessionState, local: ChatLocal, serverName: String, ca
     }
     return ChatUiState(
         chat: chat,
-        title: server.channels[channelId]?.name ?? "",
-        people: server.people.values.filter { $0.channelId == channelId }.count,
+        title: title,
+        people: people,
         serverName: serverName,
         selfName: server.people[server.selfSession]?.name ?? "",
         rows: chatRows(messages: local.messages, pending: local.pending, hints: session.hints, calendar: calendar),
@@ -432,7 +489,8 @@ func chatUiState(session: SessionState, local: ChatLocal, serverName: String, ca
         sheet: sheet,
         viewer: local.viewer,
         urlToOpen: local.urlToOpen,
-        notice: local.notice
+        notice: local.notice,
+        peer: peer
     )
 }
 

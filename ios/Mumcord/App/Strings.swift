@@ -151,7 +151,6 @@ enum Strings {
     static var tabChat: String { text("tab_chat") }
     static var tabMessages: String { text("tab_messages") }
     static var tabMore: String { text("tab_more") }
-    static var tabMessagesEmpty: String { text("tab_messages_empty") }
     static func moreDisconnect(_ p1: String) -> String { format("more_disconnect", p1) }
     static func channelsPeopleCount(_ p1: Int) -> String {
         format(p1 == 1 ? "channels_people_count.one" : "channels_people_count.other", p1)
@@ -268,6 +267,77 @@ enum Strings {
     static func sessionEndedText(_ p1: String) -> String { format("session_ended_text", p1) }
     static var sessionEndedReconnect: String { text("session_ended_reconnect") }
     static var sessionEndedClose: String { text("session_ended_close") }
+
+    static var messagesEmpty: String { text("messages_empty") }
+    static var messagesSearch: String { text("messages_search") }
+    static var messagesSearchClose: String { text("messages_search_close") }
+    static var messagesSearchEmpty: String { text("messages_search_empty") }
+    static var messagesSection: String { text("messages_section") }
+    static var messagesNew: String { text("messages_new") }
+    static func messagesRequests(_ p1: Int) -> String { format("messages_requests", p1) }
+    static var messagesRequestsSub: String { text("messages_requests_sub") }
+    static var messagesUnknownPerson: String { text("messages_unknown_person") }
+    static var messagesPreviewPicture: String { text("messages_preview_picture") }
+    static var messagesOnline: String { text("messages_online") }
+    static func messagesRowUnread(_ p1: Int) -> String {
+        format(p1 == 1 ? "messages_row_unread.one" : "messages_row_unread.other", p1)
+    }
+    static func messagesTabUnread(_ p1: Int) -> String {
+        format(p1 == 1 ? "messages_tab_unread.one" : "messages_tab_unread.other", p1)
+    }
+    static var messagesNotificationsOffTitle: String { text("messages_notifications_off_title") }
+    static var messagesNotificationsOffText: String { text("messages_notifications_off_text") }
+    static var messagesNotificationsOffAction: String { text("messages_notifications_off_action") }
+    static var conversationBack: String { text("conversation_back") }
+    static func conversationOnline(_ p1: String) -> String { format("conversation_online", p1) }
+    static func conversationOffline(_ p1: String) -> String { format("conversation_offline", p1) }
+    static var requestsTitle: String { text("requests_title") }
+    static var requestsBack: String { text("requests_back") }
+    static var requestsHint: String { text("requests_hint") }
+    static var requestsChatRequest: String { text("requests_chat_request") }
+    static var requestsChatRequestEmpty: String { text("requests_chat_request_empty") }
+    static func requestsMoreMessages(_ p1: Int) -> String {
+        format(p1 == 1 ? "requests_more_messages.one" : "requests_more_messages.other", p1)
+    }
+    static var requestsAccept: String { text("requests_accept") }
+    static var requestsDecline: String { text("requests_decline") }
+    static func requestsAcceptDescription(_ p1: String) -> String { format("requests_accept_description", p1) }
+    static func requestsDeclineDescription(_ p1: String) -> String { format("requests_decline_description", p1) }
+    static var pickerTitle: String { text("picker_title") }
+    static var pickerSearch: String { text("picker_search") }
+    static var pickerEmpty: String { text("picker_empty") }
+    static var pickerNoMatch: String { text("picker_no_match") }
+    static var personMessage: String { text("person_message") }
+    static var personChatRequest: String { text("person_chat_request") }
+    static var personChatRequestPending: String { text("person_chat_request_pending") }
+    static var personBlock: String { text("person_block") }
+    static var personUnblock: String { text("person_unblock") }
+    static func chatRequestTitle(_ p1: String) -> String { format("chat_request_title", p1) }
+    static func chatRequestText(_ p1: String) -> String { format("chat_request_text", p1) }
+    static var chatRequestNote: String { text("chat_request_note") }
+    static func chatRequestCounter(_ p1: Int, _ p2: Int) -> String { format("chat_request_counter", p1, p2) }
+    static var chatRequestSend: String { text("chat_request_send") }
+    static func chatRequestRefused(_ p1: String) -> String { format("chat_request_refused", p1) }
+    static var chatRequestFailed: String { text("chat_request_failed") }
+    static func blockTitle(_ p1: String) -> String { format("block_title", p1) }
+    static func blockPrivate(_ p1: String) -> String { format("block_private", p1) }
+    static func blockChannel(_ p1: String) -> String { format("block_channel", p1) }
+    static func blockVoice(_ p1: String) -> String { format("block_voice", p1) }
+    static var blockSilent: String { text("block_silent") }
+    static var blockFailed: String { text("block_failed") }
+    static var moreSectionMessages: String { text("more_section_messages") }
+    static var moreBlocked: String { text("more_blocked") }
+    static var moreSenderOnly: String { text("more_sender_only") }
+    static var moreSenderOnlySub: String { text("more_sender_only_sub") }
+    static var blockedTitle: String { text("blocked_title") }
+    static var blockedBack: String { text("blocked_back") }
+    static var blockedEmpty: String { text("blocked_empty") }
+    static func blockedUnblockDescription(_ p1: String) -> String { format("blocked_unblock_description", p1) }
+    static var notificationsTitle: String { text("notifications_title") }
+    static var notificationsText: String { text("notifications_text") }
+    static var notificationsContinue: String { text("notifications_continue") }
+    static var notificationsNotNow: String { text("notifications_not_now") }
+    static var messageNew: String { text("message_new") }
 
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")

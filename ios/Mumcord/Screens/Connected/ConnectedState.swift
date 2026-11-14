@@ -184,6 +184,8 @@ enum ConnectedSheet: Equatable {
     case channelPassword(channelName: String, wrong: Bool, password: String)
     /// Why the microphone is needed, before the system asks for it.
     case microphone
+    /// What notifications are for, before the system asks for them.
+    case notifications
     case person(PersonSheetState)
     /// `expanded` as in `ChannelItem`; `canJoin` is false for the own channel.
     case channelMenu(id: UInt32, name: String, expanded: Bool?, canJoin: Bool)
@@ -227,7 +229,8 @@ func connectedUiState(
     session: SessionState,
     local: ConnectedLocal,
     serverName: String,
-    microphone: MicrophoneNotice = .none
+    microphone: MicrophoneNotice = .none,
+    explainNotifications: Bool = false
 ) -> ConnectedUiState? {
     guard session.showsServer, let server = session.server else { return nil }
     let rows = channelRows(
@@ -248,6 +251,9 @@ func connectedUiState(
         // Asked when talking first becomes possible; it closes what the user had open, so
         // there is never more than one sheet.
         sheet = .microphone
+    } else if explainNotifications {
+        // Asked once the first session runs, after the microphone.
+        sheet = .notifications
     } else if let person = local.personSession.flatMap({ server.people[$0] }) {
         sheet = .person(PersonSheetState(
             session: person.session,

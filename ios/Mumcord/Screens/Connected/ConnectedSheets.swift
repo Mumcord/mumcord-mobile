@@ -7,6 +7,7 @@ import SwiftUI
 struct ConnectedSheetHost: View {
     let sheet: ConnectedSheet
     let actions: ConnectedActions
+    let model: AppModel
 
     var body: some View {
         switch sheet {
@@ -14,8 +15,10 @@ struct ConnectedSheetHost: View {
             ChannelPasswordSheet(channelName: channelName, wrong: wrong, password: password, actions: actions)
         case .microphone:
             MicrophoneSheet(onContinue: actions.requestMicrophone, onDismiss: actions.microphoneNotNow)
+        case .notifications:
+            NotificationSheet(onContinue: actions.askNotifications, onDismiss: actions.notificationsNotNow)
         case .person(let person):
-            PersonSheet(person: person, actions: actions)
+            PersonSheet(person: person, actions: actions, model: model)
         case .channelMenu(let id, let name, let expanded, let canJoin):
             ChannelMenuSheet(id: id, name: name, expanded: expanded, canJoin: canJoin, actions: actions)
         }
@@ -52,6 +55,7 @@ private struct ChannelPasswordSheet: View {
 private struct PersonSheet: View {
     let person: PersonSheetState
     let actions: ConnectedActions
+    let model: AppModel
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
@@ -89,11 +93,25 @@ private struct PersonSheet: View {
                     }
                 )
             }
-            // A card of its own, as in the mockup, where it follows "Send private message".
             MumcordList(horizontalMargin: 0, background: theme.colors.bgHover) {
+                MumcordListRow(
+                    title: Strings.personMessage,
+                    icon: MumcordIcons.messages,
+                    action: { model.messages.messagePerson(person.session) },
+                    trailing: {
+                        MumcordIcon(
+                            icon: MumcordIcons.chevronRight,
+                            label: nil,
+                            tint: theme.colors.textMuted,
+                            size: MumcordSize.iconSm
+                        )
+                    }
+                )
+                .accessibilityIdentifier("person-message")
                 MumcordListRow(
                     title: Strings.personWhisper(person.name),
                     icon: MumcordIcons.users,
+                    divider: true,
                     action: { actions.openWhisper(.person(session: person.session)) },
                     trailing: {
                         MumcordIcon(
@@ -106,6 +124,8 @@ private struct PersonSheet: View {
                 )
                 .accessibilityIdentifier("person-whisper")
             }
+            // The card with the chat request and blocking has no mockup.
+            PersonMessagingRows(session: person.session, model: model)
         }
     }
 }

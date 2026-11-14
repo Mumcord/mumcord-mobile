@@ -4,13 +4,15 @@ import SwiftUI
 
 /// The frame of the app while connected: the selected tab's screen, the banners, the whisper
 /// bar, the voice bar and the bottom tab bar, or the full voice view over all of it. `chat` is
-/// the Chat tab, which reads its own state; Messages is filled by its own task.
+/// the Chat tab, which reads its own state, as the Messages tab does through `model`.
 struct ConnectedShell<Chat: View>: View {
     let state: ConnectedUiState
     let actions: ConnectedActions
     let onDisconnect: () -> Void
     /// Unread messages of the current channel's chat, shown on the Chat tab.
     let chatBadge: Int
+    /// For the Messages tab and the messages part of More, which read their own state.
+    let model: AppModel
     @ViewBuilder let chat: () -> Chat
 
     var body: some View {
@@ -49,7 +51,7 @@ struct ConnectedShell<Chat: View>: View {
                         badge: chatBadge > 0 ? String(chatBadge) : nil,
                         accessibilityLabel: chatBadge > 0 ? Strings.chatTabUnread(chatBadge) : nil
                     ),
-                    MumcordTab(icon: MumcordIcons.messages, label: Strings.tabMessages),
+                    MessagesTabItem.make(model.messagesBadge),
                     MumcordTab(icon: MumcordIcons.more, label: Strings.tabMore),
                 ],
                 selectedIndex: state.tab.rawValue,
@@ -71,9 +73,11 @@ struct ConnectedShell<Chat: View>: View {
         case .chat:
             chat()
         case .messages:
-            EmptyTabScreen(title: Strings.tabMessages, text: Strings.tabMessagesEmpty)
+            MessagesTab(model: model)
         case .more:
-            MoreScreen(serverName: state.serverName, onDisconnect: onDisconnect)
+            MoreBlockedHost(model: model) {
+                MoreScreen(serverName: state.serverName, model: model, onDisconnect: onDisconnect)
+            }
         }
     }
 }
@@ -142,30 +146,27 @@ struct ConnectedBanners: View {
     }
 }
 
-/// A tab without content yet: its name and one neutral sentence.
-private struct EmptyTabScreen: View {
-    let title: String
-    let text: String
-
-    var body: some View {
-        VStack(spacing: 0) {
-            MumcordAppBar(title: title, large: true)
-            Paragraph(text)
-                .padding(MumcordSpace.s6)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("empty-tab")
+/// The Messages tab's entry in the tab bar, with the number of unread private messages.
+private enum MessagesTabItem {
+    static func make(_ badge: Int) -> MumcordTab {
+        MumcordTab(
+            icon: MumcordIcons.messages,
+            label: Strings.tabMessages,
+            badge: badge > 0 ? String(badge) : nil,
+            accessibilityLabel: badge > 0 ? Strings.messagesTabUnread(badge) : nil
+        )
     }
 }
 
 private struct MoreScreen: View {
     let serverName: String
+    let model: AppModel
     let onDisconnect: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             MumcordAppBar(title: Strings.tabMore, large: true)
+            MoreMessagesSection(model: model)
             MumcordList {
                 MumcordListRow(
                     title: Strings.moreDisconnect(serverName),

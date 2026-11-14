@@ -30,6 +30,8 @@ struct ConnectedActions {
     /// Lets the system ask for the microphone, or opens the system settings once it no longer asks.
     let requestMicrophone: () -> Void
     let microphoneNotNow: () -> Void
+    let askNotifications: () -> Void
+    let notificationsNotNow: () -> Void
     /// The microphone level; changes often, so only the level meter reads it.
     let inputLevel: InputLevel
 }
@@ -63,6 +65,8 @@ extension ConnectedActions {
             closeWhisper: model.closeWhisper,
             requestMicrophone: model.requestMicrophone,
             microphoneNotNow: model.microphoneNotNow,
+            askNotifications: model.askNotifications,
+            notificationsNotNow: model.notificationsNotNow,
             inputLevel: model.inputLevel
         )
     }
