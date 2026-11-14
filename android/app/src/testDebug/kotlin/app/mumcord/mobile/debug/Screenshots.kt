@@ -13,7 +13,18 @@ import com.github.takahirom.roborazzi.RoborazziOptions
 import com.github.takahirom.roborazzi.RoborazziTaskType
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.robolectric.shadows.ShadowLooper
+import app.mumcord.mobile.session.SessionRepository
+import app.mumcord.mobile.ui.chat.ChatClock
+import app.mumcord.mobile.ui.chat.ChatController
+import app.mumcord.mobile.ui.chat.ChatImageLoader
+import app.mumcord.mobile.ui.chat.ChatImageSystem
+import app.mumcord.mobile.ui.connected.ChatEnvironment
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.flowOf
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.util.Locale
 
 /** The size of the mockups: 390 x 844 dp at two pixels per dp, so the files can be laid over them. */
 const val PHONE_QUALIFIERS = "w390dp-h844dp-xhdpi"
@@ -60,3 +71,17 @@ fun ComposeContentTestRule.captureScreenshot(name: String, scale: Double = 1.0, 
         ),
     )
 }
+
+/** A chat controller for screens that show no chat: nothing is open and nothing is asked for. */
+fun screenshotChatController(repository: SessionRepository, scope: CoroutineScope): ChatController =
+    ChatController(repository.chat, openChat = flowOf(null), shown = flowOf(false), scope = scope)
+
+/** The day of the mockups' chat, in UTC with a 24 hour clock, and pictures drawn by [loader]. */
+fun screenshotChatEnvironment(loader: ChatImageLoader = ChatImageLoader { _, _, _ -> null }): ChatEnvironment =
+    ChatEnvironment(
+        loader = loader,
+        images = ChatImageSystem(pickPhoto = {}, takePhoto = {}),
+        clock = ChatClock(ZoneOffset.UTC, MOCKUP_DAY, use24Hour = true, locale = Locale.US),
+    )
+
+val MOCKUP_DAY: LocalDate = LocalDate.of(2026, 5, 4)

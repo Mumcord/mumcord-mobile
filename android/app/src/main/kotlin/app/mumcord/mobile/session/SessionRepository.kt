@@ -5,6 +5,7 @@ package app.mumcord.mobile.session
 import app.mumcord.mobile.bridge.AudioEndpoints
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BridgeException
+import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.EngineListener
 import app.mumcord.mobile.bridge.MumbleLink
 import app.mumcord.mobile.bridge.MumcordEngineInterface
@@ -39,18 +40,21 @@ sealed interface Outcome<out T> {
  *
  * @param scope lives as long as the process; its dispatcher folds the events, so it must not
  *   be the main thread.
- * @param engineDispatcher where the engine is created (it reads files and the secure storage).
+ * @param engineDispatcher where the engine is created (it reads files and the secure storage)
+ *   and where chat commands run.
  * @param log receives short technical messages; never names, addresses, passwords or other
  *   personal data.
+ * @param mediaPolicy decides whether images and GIFs from the web are loaded; see [chat].
  * @param linkParser reads a `mumble://` link; a seam because the real one needs the native
  *   library.
  */
 class SessionRepository(
     private val engineFactory: EngineFactory,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     private val engineDispatcher: CoroutineDispatcher,
     private val log: (String) -> Unit,
     private val linkParser: (String) -> MumbleLink = ::parseMumbleLink,
+    private val mediaPolicy: MediaPolicy = MediaPolicy { true },
 ) {
     private val mutableState = MutableStateFlow(SessionState())
     val state: StateFlow<SessionState> = mutableState.asStateFlow()
@@ -68,6 +72,15 @@ class SessionRepository(
 
     /** The microphone level for the level meter, 0 to 100, up to 20 times a second. */
     val inputLevel: StateFlow<Int> = mutableInputLevel.asStateFlow()
+
+    /**
+     * Chat traffic, in order, for the one reader that keeps the chat ([chat]). It is kept out
+     * of [state] so that a busy chat does not redraw the channel list.
+     */
+    internal val chatEvents: Channel<BridgeEvent> = Channel(Channel.UNLIMITED)
+
+    /** The chat of the connection. What arrives before it is first asked for waits in the queue. */
+    val chat: ChatRepository by lazy { ChatRepository(this, scope, mediaPolicy) }
 
     init {
         scope.launch {
@@ -249,6 +262,23 @@ class SessionRepository(
         }
     }
 
+    /**
+     * Tells the engine which chat is on screen, or that none is. Never waits; without an engine
+     * there is no chat to open.
+     */
+    fun setOpenChat(chat: ChatId?) {
+        engine?.setOpenChat(chat)
+    }
+
+    /**
+     * A chat command; [name] is what the log calls it when it fails. It always runs on the
+     * engine dispatcher: the bridge resumes a waiting command on one of its own threads, and a
+     * caller that continues right there (a screen's own coroutine does) would call the bridge
+     * again from inside that callback, which the native layer does not survive.
+     */
+    internal suspend fun <T> chatCall(name: String, command: suspend (MumcordEngineInterface) -> T): Outcome<T> =
+        withContext(engineDispatcher) { call(name, command) }
+
     private suspend fun <T> call(name: String, command: suspend (MumcordEngineInterface) -> T): Outcome<T> =
         try {
             Outcome.Ok(command(engine()))
@@ -275,10 +305,12 @@ class SessionRepository(
             engineFactory.create(
                 object : EngineListener {
                     override fun onEvent(event: BridgeEvent) {
-                        if (event is BridgeEvent.InputLevelChanged) {
-                            mutableInputLevel.value = event.percent.toInt()
-                        } else {
-                            events.trySend(event)
+                        when (event) {
+                            is BridgeEvent.InputLevelChanged -> mutableInputLevel.value = event.percent.toInt()
+                            is BridgeEvent.ChatMessageReceived,
+                            is BridgeEvent.ChatUnreadChanged,
+                            -> chatEvents.trySend(event)
+                            else -> events.trySend(event)
                         }
                     }
                 },

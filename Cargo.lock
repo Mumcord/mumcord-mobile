@@ -2466,6 +2466,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mumcord-chat-peer"
+version = "0.1.0"
+dependencies = [
+ "mumcord-mobile-bridge",
+ "tokio",
+]
+
+[[package]]
 name = "mumcord-codec"
 version = "0.8.0"
 source = "git+https://github.com/Mumcord/mumcord?rev=184549ab03ed9a6873bb513a8ef90dfbe43b682d#184549ab03ed9a6873bb513a8ef90dfbe43b682d"

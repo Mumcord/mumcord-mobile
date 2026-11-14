@@ -27,6 +27,9 @@ dependencies {
     compileOnly(project(":platform:audio"))
     // What the user is set to on the server, read from the app under test.
     compileOnly(project(":platform:call"))
+    // The chat test hands the app a picture where the system photo picker would: through the
+    // app's view model, which the app itself brings along.
+    compileOnly(libs.lifecycle.viewmodel)
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui.test.junit4)

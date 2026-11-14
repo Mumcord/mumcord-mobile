@@ -212,7 +212,7 @@ class AppFlowTest {
         await { compose.onAllNodesWithText("<b>Games</b>").fetchSemanticsNodes().size == 2 }
 
         compose.onNodeWithText("Chat").performClick()
-        await { exists("No chat messages yet.") }
+        await { exists("No messages here yet.") }
         compose.onNodeWithText("More").performClick()
         compose.onNodeWithTag(MORE_DISCONNECT_TEST_TAG).performClick()
         await { !exists("More") }

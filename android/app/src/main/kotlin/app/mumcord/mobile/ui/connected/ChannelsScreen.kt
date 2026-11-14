@@ -202,7 +202,7 @@ internal fun PersonFlags.statusIcons(): List<MumcordPersonStatus> = buildList {
 }
 
 @Composable
-private fun UnsupportedHint.text(): String = stringResource(
+internal fun UnsupportedHint.text(): String = stringResource(
     when (kind) {
         UnsupportedKind.FileTransfer -> R.string.hint_file_transfer
         UnsupportedKind.WatchTogether -> R.string.hint_watch_together

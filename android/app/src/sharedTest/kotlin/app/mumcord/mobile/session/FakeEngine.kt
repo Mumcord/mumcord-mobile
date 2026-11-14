@@ -75,6 +75,15 @@ class FakeEngine(
     val chatImages = ConcurrentHashMap<Pair<String, String>, ImageData>()
     val remoteImages = ConcurrentHashMap<String, ImageData>()
     val openChatCalls = CopyOnWriteArrayList<ChatId?>()
+    val markReadCalls = CopyOnWriteArrayList<ChatId>()
+
+    /** When set, reading a page of a chat fails with it. */
+    @Volatile
+    var pageFailure: BridgeException? = null
+
+    /** When set, sending anything to a chat fails with it. */
+    @Volatile
+    var sendFailure: BridgeException? = null
 
     @Volatile var openChat: ChatId? = null
         private set
@@ -389,16 +398,20 @@ class FakeEngine(
     )
 
     override suspend fun chatPage(chat: ChatId, before: String?, limit: UInt): ChatPage {
+        pageFailure?.let { throw it }
         val all = messages[chat].orEmpty().toList()
         val end = before?.let { id -> all.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: all.size
         val start = maxOf(0, end - limit.toInt())
         return ChatPage(messages = all.subList(start, end), hasMore = start > 0)
     }
 
-    override suspend fun sendMessage(chat: ChatId, text: String, replyTo: ReplyQuote?): ChatMessage =
-        appendOwn(chat, MessageContent(reply = replyTo, blocks = listOf(ContentBlock.Paragraph(listOf(span(text)))), truncated = false))
+    override suspend fun sendMessage(chat: ChatId, text: String, replyTo: ReplyQuote?): ChatMessage {
+        sendFailure?.let { throw it }
+        return appendOwn(chat, MessageContent(reply = replyTo, blocks = listOf(ContentBlock.Paragraph(listOf(span(text)))), truncated = false))
+    }
 
     override suspend fun sendImage(chat: ChatId, bytes: ByteArray, mime: String): ChatMessage {
+        sendFailure?.let { throw it }
         val imageId = "image-${nextMessageId}"
         val image = ImageRef.Embedded(imageId, mime, 1u, 1u, bytes.size.toUInt(), false)
         return appendOwn(chat, MessageContent(null, listOf(ContentBlock.Image(image)), false)).also {
@@ -406,8 +419,19 @@ class FakeEngine(
         }
     }
 
-    override suspend fun sendGifFavourite(chat: ChatId, url: String): ChatMessage =
-        appendOwn(chat, messageContent(url))
+    override suspend fun sendGifFavourite(chat: ChatId, url: String): ChatMessage {
+        sendFailure?.let { throw it }
+        return appendOwn(chat, messageContent(url))
+    }
+
+    /** A message of somebody else arrives: it is stored, counted as unread and reported. */
+    fun receive(message: ChatMessage) {
+        messages.getOrPut(message.chat) { CopyOnWriteArrayList() } += message
+        val count = (unread[message.chat] ?: 0u) + 1u
+        unread[message.chat] = count
+        emit(BridgeEvent.ChatUnreadChanged(message.chat, count))
+        emit(BridgeEvent.ChatMessageReceived(message))
+    }
 
     override suspend fun chatImage(chat: ChatId, messageId: String, imageId: String): ImageData =
         chatImages[messageId to imageId] ?: error("no image $imageId in message $messageId")
@@ -423,7 +447,8 @@ class FakeEngine(
     override fun chatWith(session: UInt): ChatId = ChatId.Session(session)
 
     override suspend fun markChatRead(chat: ChatId) {
-        unread.remove(chat)
+        markReadCalls += chat
+        if (unread.remove(chat) != null) emit(BridgeEvent.ChatUnreadChanged(chat, 0u))
     }
 
     override fun setOpenChat(chat: ChatId?) {

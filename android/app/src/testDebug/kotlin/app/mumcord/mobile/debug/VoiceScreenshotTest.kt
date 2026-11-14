@@ -62,6 +62,7 @@ class VoiceScreenshotTest {
         log = {},
     )
     private val actions = ConnectedController(repository, scope)
+    private val chatActions = screenshotChatController(repository, scope)
 
     private fun session(talkMode: TalkMode, selfMuted: Boolean = false): SessionState {
         val server = mockupVoiceServer()
@@ -85,7 +86,18 @@ class VoiceScreenshotTest {
         val state = checkNotNull(connectedUiState(session, local, "Nordlicht"))
         MumcordTheme(darkTheme = dark) {
             Box(Modifier.fillMaxSize()) {
-                ConnectedShell(state, actions, onDisconnect = {}, onMicrophone = {}, topInsets = top, bottomInsets = bottom)
+                ConnectedShell(
+                    state,
+                    actions,
+                    onDisconnect = {},
+                    onMicrophone = {},
+                    chat = null,
+                    chatBadge = 0,
+                    chatActions = chatActions,
+                    chatEnvironment = screenshotChatEnvironment(),
+                    topInsets = top,
+                    bottomInsets = bottom,
+                )
                 state.sheet?.let {
                     ConnectedSheetHost(it, actions, top, bottom, onMicrophoneContinue = {}, onMicrophoneNotNow = {})
                 }

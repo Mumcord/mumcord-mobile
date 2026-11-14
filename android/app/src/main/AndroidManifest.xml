@@ -37,6 +37,21 @@
                 <data android:scheme="mumble" />
             </intent-filter>
         </activity>
+        <!--
+            Hands the system camera app the file for a photo the user takes for the chat. Not
+            exported: other apps only reach a file through the one-time grant of that request.
+            The app itself has no CAMERA permission and must not declare one, or Android would
+            demand it for the camera app's capture request too.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

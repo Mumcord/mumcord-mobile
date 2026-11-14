@@ -11,6 +11,8 @@ import app.mumcord.mobile.platform.audio.AndroidVoiceSession
 import app.mumcord.mobile.platform.audio.AudioController
 import app.mumcord.mobile.platform.audio.NativeAudio
 import app.mumcord.mobile.session.SessionRepository
+import app.mumcord.mobile.ui.chat.BridgeImageLoader
+import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.session.VoiceAudio
 import app.mumcord.mobile.session.VoiceCall
 import app.mumcord.mobile.ui.connect.AndroidLocalNetworkGateway
@@ -33,6 +35,10 @@ class MumcordApplication : Application() {
             engineDispatcher = Dispatchers.IO,
             log = log,
         )
+    }
+
+    val chatImageLoader: ChatImageLoader by lazy {
+        BridgeImageLoader(sessionRepository.chat, log = { message -> Log.w(LOG_TAG, message) })
     }
 
     val localNetworkGateway: LocalNetworkGateway by lazy { AndroidLocalNetworkGateway(this) }

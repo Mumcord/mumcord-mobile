@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.mumcord.mobile.MumcordApplication
+import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.platform.call.SessionEndedNotice
 import app.mumcord.mobile.bridge.TalkMode
@@ -17,12 +18,17 @@ import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.ui.chat.ChatController
+import app.mumcord.mobile.ui.chat.ChatUiState
+import app.mumcord.mobile.ui.chat.chatTabBadge
+import app.mumcord.mobile.ui.chat.chatUiState
 import app.mumcord.mobile.ui.connect.LocalNetworkAnswer
 import app.mumcord.mobile.ui.connect.LocalNetworkGateway
 import app.mumcord.mobile.ui.connect.LocalNetworkStep
 import app.mumcord.mobile.ui.connect.check
 import app.mumcord.mobile.ui.connected.ConnectedController
 import app.mumcord.mobile.ui.connected.ConnectedLocal
+import app.mumcord.mobile.ui.connected.ConnectedTab
 import app.mumcord.mobile.ui.connected.MicrophoneAccess
 import app.mumcord.mobile.ui.connected.MicrophoneAnswer
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
@@ -45,6 +51,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.ZoneId
 
 /**
  * The state of the app. Its own part is everything before the connected screens: first-start setup, the server list,
@@ -101,6 +108,29 @@ class AppViewModel(
             ),
         )
     }
+
+    /** The Chat tab: the chat of the channel the user is in, while that tab is the one on screen. */
+    val chat = ChatController(
+        chats = repository.chat,
+        openChat = repository.state.map { session ->
+            session.server?.takeIf { session.showsServer }?.selfChannelId?.let { ChatId.Channel(it) }
+        },
+        shown = connected.local.map { it.tab == ConnectedTab.Chat && !it.voiceOpen },
+        scope = viewModelScope,
+    )
+
+    /** Its own flow: a busy chat does not rebuild the channel list, and the other way round. */
+    val chatState: StateFlow<ChatUiState?> =
+        combine(repository.state, chat.local, uiState.map { it.activeServerName.orEmpty() }.distinctUntilChanged()) {
+                session, chatLocal, serverName ->
+            chatUiState(session, chatLocal, serverName, ZoneId.systemDefault())
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    /** The number on the Chat tab. */
+    val chatBadge: StateFlow<Int> =
+        combine(repository.chat.unread, repository.state, connected.local) { unread, session, connectedLocal ->
+            chatTabBadge(unread, session, chatTabOpen = connectedLocal.tab == ConnectedTab.Chat)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
 
     /** The last connect, so "Try again" and the password retry keep a link's channel. */
     private var lastTarget: ConnectTarget? = null

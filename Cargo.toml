@@ -2,7 +2,7 @@
 [workspace]
 resolver = "3"
 # e2e/voice-peer is the second person of the end-to-end voice test; only e2e/run.sh builds it.
-members = ["bridge", "e2e/voice-peer"]
+members = ["bridge", "e2e/chat-peer", "e2e/voice-peer"]
 
 [workspace.package]
 edition = "2024"

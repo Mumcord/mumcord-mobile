@@ -53,10 +53,9 @@ class ConnectedScreenshotTest {
     private val scope = CoroutineScope(Dispatchers.Unconfined)
 
     // Nothing is tapped in a screenshot, so the engine is never asked for.
-    private val actions = ConnectedController(
-        SessionRepository({ error("no engine in screenshots") }, scope, Dispatchers.Unconfined, log = {}),
-        scope,
-    )
+    private val repository = SessionRepository({ error("no engine in screenshots") }, scope, Dispatchers.Unconfined, log = {})
+    private val actions = ConnectedController(repository, scope)
+    private val chatActions = screenshotChatController(repository, scope)
 
     private val session = listOf(
         BridgeEvent.ConnectionChanged(ConnectionState.Connected),
@@ -82,6 +81,10 @@ class ConnectedScreenshotTest {
                     actions,
                     onDisconnect = {},
                     onMicrophone = {},
+                    chat = null,
+                    chatBadge = 0,
+                    chatActions = chatActions,
+                    chatEnvironment = screenshotChatEnvironment(),
                     topInsets = top,
                     bottomInsets = bottom,
                 )
@@ -109,7 +112,7 @@ class ConnectedScreenshotTest {
 
     private fun more(dark: Boolean) = capture("android-more", dark, ConnectedLocal(tab = ConnectedTab.More))
 
-    private fun emptyTab(dark: Boolean) = capture("android-tab-empty", dark, ConnectedLocal(tab = ConnectedTab.Chat))
+    private fun emptyTab(dark: Boolean) = capture("android-tab-empty", dark, ConnectedLocal(tab = ConnectedTab.Messages))
 
     // No mockup exists for the two microphone states; they are built from the design system.
     private fun microphoneExplain(dark: Boolean) =

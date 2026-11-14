@@ -11,9 +11,17 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.mumcord.mobile.MumcordApplication
+import app.mumcord.mobile.ui.chat.ChatImageLoader
+import app.mumcord.mobile.ui.chat.ChatImageSystem
+import app.mumcord.mobile.ui.chat.ChatOverlays
+import app.mumcord.mobile.ui.chat.ChatUiState
+import app.mumcord.mobile.ui.chat.rememberChatClock
+import app.mumcord.mobile.ui.chat.rememberChatImageSystem
 import app.mumcord.mobile.ui.connect.CertificateSheet
 import app.mumcord.mobile.ui.connect.ConfirmSwitchSheet
 import app.mumcord.mobile.ui.connect.LocalNetworkSheet
@@ -27,7 +35,9 @@ import app.mumcord.mobile.ui.servers.RemoveServerSheet
 import app.mumcord.mobile.ui.servers.ServerFormScreen
 import app.mumcord.mobile.ui.servers.ServerListScreen
 import app.mumcord.mobile.ui.setup.TalkModeChoiceScreen
+import app.mumcord.mobile.ui.connected.ChatEnvironment
 import app.mumcord.mobile.ui.connected.ConnectedSheetHost
+import app.mumcord.mobile.ui.connected.ConnectedTab
 import app.mumcord.mobile.ui.connected.ConnectedShell
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.MicrophoneSystem
@@ -42,14 +52,22 @@ fun AppRoute(
     localNetwork: LocalNetworkSystem = rememberLocalNetworkSystem(viewModel::answerLocalNetworkPrompt),
     microphone: MicrophoneSystem = rememberMicrophoneSystem(viewModel::answerMicrophonePrompt),
     notifications: NotificationSystem = rememberNotificationSystem(viewModel::answerNotificationPrompt),
+    chatImages: ChatImageSystem = rememberChatImageSystem(
+        onImage = { viewModel.chat.sendImage(it.bytes, it.mime) },
+        onUnreadable = viewModel.chat::imageUnreadable,
+    ),
+    chatImageLoader: ChatImageLoader = (LocalContext.current.applicationContext as MumcordApplication).chatImageLoader,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val chat by viewModel.chatState.collectAsStateWithLifecycle()
+    val chatBadge by viewModel.chatBadge.collectAsStateWithLifecycle()
+    val chatEnvironment = ChatEnvironment(chatImageLoader, chatImages, rememberChatClock())
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshPings()
         viewModel.recheckMicrophone()
         onPauseOrDispose { }
     }
-    AppContent(uiState, viewModel, localNetwork, microphone, notifications)
+    AppContent(uiState, viewModel, localNetwork, microphone, chat, chatBadge, chatEnvironment, notifications)
 }
 
 /**
@@ -63,6 +81,9 @@ fun AppContent(
     viewModel: AppViewModel,
     localNetwork: LocalNetworkSystem,
     microphone: MicrophoneSystem,
+    chat: ChatUiState?,
+    chatBadge: Int,
+    chatEnvironment: ChatEnvironment,
     notifications: NotificationSystem = NotificationSystem(ask = {}),
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
@@ -72,7 +93,12 @@ fun AppContent(
     // Questions wait until the first-start setup is done.
     val overlay = uiState.overlay.takeIf { uiState.setupDone }
     val connectedSheet = uiState.connected?.sheet
-    val sheetOpen = prompt != null || overlay != null || connectedSheet != null
+    // The chat's sheets and its full-screen picture belong to the Chat tab only.
+    val chatOverlay = chat?.takeIf {
+        uiState.connected?.tab == ConnectedTab.Chat && (it.sheet != null || it.viewer != null || it.urlToOpen != null)
+    }
+    val sheetOpen = prompt != null || overlay != null || connectedSheet != null ||
+        chatOverlay?.sheet != null || chatOverlay?.viewer != null
     Box(Modifier.fillMaxSize()) {
         // While a sheet is open, the screen behind it is not offered to screen readers.
         Box(if (sheetOpen) Modifier.clearAndSetSemantics { } else Modifier) {
@@ -127,6 +153,10 @@ fun AppContent(
                         } else {
                             microphone.ask
                         },
+                        chat = chat,
+                        chatBadge = chatBadge,
+                        chatActions = viewModel.chat,
+                        chatEnvironment = chatEnvironment,
                         topInsets = topInsets,
                         bottomInsets = bottomInsets,
                     )
@@ -197,6 +227,14 @@ fun AppContent(
                 onMicrophoneNotNow = viewModel::microphoneNotNow,
                 onNotificationsContinue = notifications.ask,
                 onNotificationsNotNow = viewModel::notificationsNotNow,
+            )
+            chatOverlay != null -> ChatOverlays(
+                state = chatOverlay,
+                actions = viewModel.chat,
+                loader = chatEnvironment.loader,
+                images = chatEnvironment.images,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
             )
         }
     }

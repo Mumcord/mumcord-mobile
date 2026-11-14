@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.printToString
+import app.mumcord.mobile.ui.chat.CHAT_SCREEN_TEST_TAG
 import app.mumcord.mobile.ui.connect.CERTIFICATE_TRUST_TEST_TAG
 import app.mumcord.mobile.ui.connected.CHANNEL_ROW_TEST_TAG
 import app.mumcord.mobile.ui.connected.MORE_DISCONNECT_TEST_TAG
@@ -71,6 +73,13 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
      */
     fun joinLobby() {
         compose.onNode(hasTestTag(CHANNEL_ROW_TEST_TAG) and hasText(LOBBY)).performClick()
+    }
+
+    /** Opens the Chat tab: the chat of the channel the user is in. */
+    fun openChatTab() {
+        // With unread messages the tab is named "Chat, 2 unread messages" for screen readers.
+        compose.onNode(hasText(TAB_CHAT) or hasContentDescription("$TAB_CHAT, ", substring = true)).performClick()
+        awaitOrFail("the Chat tab") { exists(CHAT_SCREEN_TEST_TAG) }
     }
 
     fun connected(): Boolean = channelNames().size > TestServer.SEEDED_CHANNELS.size
@@ -147,6 +156,7 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
          * times slower than a developer's; a wait ends as soon as what it waits for is there.
          */
         const val TIMEOUT_MILLIS = 60_000L
+        private const val TAB_CHAT = "Chat"
         private const val TAB_MORE = "More"
         private const val LEAVE_SERVER = "Leave server"
 

@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -30,6 +31,12 @@ import app.mumcord.mobile.design.components.MumcordTab
 import app.mumcord.mobile.design.components.MumcordTabBar
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.tokens.MumcordSpace
+import app.mumcord.mobile.ui.chat.ChatClock
+import app.mumcord.mobile.ui.chat.ChatController
+import app.mumcord.mobile.ui.chat.ChatImageLoader
+import app.mumcord.mobile.ui.chat.ChatImageSystem
+import app.mumcord.mobile.ui.chat.ChatScreen
+import app.mumcord.mobile.ui.chat.ChatUiState
 import app.mumcord.mobile.ui.common.Paragraph
 
 const val DENIED_BANNER_TEST_TAG = "denied-banner"
@@ -39,7 +46,7 @@ const val EMPTY_TAB_TEST_TAG = "empty-tab"
 /**
  * The frame of the app while connected: the selected tab's screen, the banners, the whisper
  * bar, the voice bar and the bottom tab bar; or the full voice view, which covers all of it.
- * Chat and Messages are filled by their own tasks.
+ * Messages is filled by its own task.
  */
 @Composable
 fun ConnectedShell(
@@ -47,6 +54,10 @@ fun ConnectedShell(
     actions: ConnectedController,
     onDisconnect: () -> Unit,
     onMicrophone: () -> Unit,
+    chat: ChatUiState?,
+    chatBadge: Int,
+    chatActions: ChatController,
+    chatEnvironment: ChatEnvironment,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
 ) {
@@ -64,8 +75,10 @@ fun ConnectedShell(
         Box(Modifier.weight(1f)) {
             when (state.tab) {
                 ConnectedTab.Channels -> ChannelsScreen(state, actions, topInsets)
-                ConnectedTab.Chat ->
-                    EmptyTabScreen(stringResource(R.string.tab_chat), stringResource(R.string.tab_chat_empty), topInsets)
+                // Null for the moment the user's own channel is not known yet.
+                ConnectedTab.Chat -> if (chat != null) {
+                    ChatScreen(chat, chatActions, chatEnvironment.loader, chatEnvironment.clock, topInsets)
+                }
                 ConnectedTab.Messages -> EmptyTabScreen(
                     stringResource(R.string.tab_messages),
                     stringResource(R.string.tab_messages_empty),
@@ -82,7 +95,13 @@ fun ConnectedShell(
         MumcordTabBar(
             tabs = listOf(
                 MumcordTab(MumcordIcons.List, stringResource(R.string.tab_channels)),
-                MumcordTab(MumcordIcons.Hash, stringResource(R.string.tab_chat)),
+                MumcordTab(
+                    MumcordIcons.Hash,
+                    stringResource(R.string.tab_chat),
+                    badge = chatBadge.takeIf { it > 0 }?.let(::badgeText),
+                    contentDescription = chatBadge.takeIf { it > 0 }
+                        ?.let { pluralStringResource(R.plurals.chat_tab_unread, it, it) },
+                ),
                 MumcordTab(MumcordIcons.Messages, stringResource(R.string.tab_messages)),
                 MumcordTab(MumcordIcons.More, stringResource(R.string.tab_more)),
             ),
@@ -92,6 +111,14 @@ fun ConnectedShell(
         )
     }
 }
+
+/** What the Chat tab needs from the phone besides its state. */
+class ChatEnvironment(val loader: ChatImageLoader, val images: ChatImageSystem, val clock: ChatClock)
+
+private const val MAX_BADGE = 99
+
+/** An unread count as a badge shows it: the number, or "99+" beyond that. */
+fun badgeText(count: Int): String = if (count > MAX_BADGE) "$MAX_BADGE+" else count.toString()
 
 /**
  * A lost connection, the microphone that may not be used and the latest refusal by the server,

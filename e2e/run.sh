@@ -15,7 +15,11 @@
 #      tested. The phone call scenario lets this script play the phone network through the
 #      emulator's console. The voice scenarios talk to a second person (and the whisper scenario to
 #      a third who must hear nothing): e2e/voice-peer, the engine itself running on this
-#      machine. What they heard, and for how long, is the other half of each proof.
+#      machine. What they heard, and for how long, is the other half of each proof. The chat
+#      scenario has two more people: e2e/chat-peer (the bridge, writing as the desktop app
+#      does, and reporting what the phone wrote) and e2e/raw-chat.py (a foreign client that
+#      sends raw script and markup). It is followed by a scenario that starts the app again
+#      with the same app data, after its process was killed, and looks for the history.
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
@@ -68,7 +72,10 @@ LOCK_PTT_SECONDS=60
 # who else is on the server and what they have to report (see check_peers): "alone" nobody;
 # "peer" a second person who has to hear the app talk; "ptt" the same, and the app may be heard
 # only for as long as hold-to-talk was held; "mute" the same, heard three separate times;
-# "whisper" a second person who has to hear the whisper and a third who must hear nothing.
+# "whisper" a second person who has to hear the whisper and a third who must hear nothing;
+# "chat" a second person who writes and has to receive what the app wrote, and a third who
+# sends raw markup; "chat-restart" nobody, and the app keeps the data of the scenario before it
+# (its process is killed instead), so it must follow a "chat" scenario.
 SCENARIOS=(
   "granted granted alone ${TEST_PACKAGE}.ConnectFlowTest"
   "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
@@ -85,6 +92,8 @@ SCENARIOS=(
   "granted granted lock ${TEST_PACKAGE}.BackgroundVoiceFlowTest#withVoiceActivityBothDirectionsKeepWorkingInTheBackgroundAndWhileLocked"
   "granted granted lockptt ${TEST_PACKAGE}.BackgroundVoiceFlowTest#withPushToTalkThePhoneStaysSilentWhileLockedAndStillPlaysTheOthers"
   "granted granted call ${TEST_PACKAGE}.PhoneCallFlowTest"
+  "granted granted chat ${TEST_PACKAGE}.ChatFlowTest#messagesOfOthersAppearAndThePhonesMessagesReachThem"
+  "granted granted chat-restart ${TEST_PACKAGE}.ChatFlowTest#theHistoryIsStillThereAfterTheAppWasKilledAndStartedAgain"
 )
 # A stretch of voice a person heard counts from this length (ms); the engine's own short
 # sounds, like the one for somebody entering the channel, are shorter.
@@ -113,6 +122,11 @@ PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/voice-peer"
 # What the other people of the running scenario report; set by run_scenario.
 PEER_LOG=""
 BYSTANDER_LOG=""
+CHAT_PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/chat-peer"
+CHAT_PEER_LOG="${OUT_DIR}/chat-peer.log"
+RAW_CHAT_LOG="${OUT_DIR}/raw-chat.log"
+# The user name the app connects with in the tests (AppDriver.USER_NAME).
+PHONE_NAME="e2e-phone"
 
 step() {
   printf '\ne2e: %s\n' "$*"
@@ -152,10 +166,17 @@ stop_peers() {
 # Starts another person (e2e/voice-peer with the given arguments), who writes to the log file
 # given first, and waits until they are on the server.
 start_peer() {
+  local log="$1"
+  shift
+  start_person "${log}" "${PEER_BINARY}" "$@"
+}
+
+# Starts another person's program and waits until it reports that it is on the server.
+start_person() {
   local log="$1" pid waited=0
   shift
   : >"${log}"
-  "${PEER_BINARY}" "$@" >"${log}" 2>&1 &
+  "$@" >"${log}" 2>&1 &
   pid=$!
   peer_pids+=("${pid}")
   until grep -q '^CONNECTED' "${log}"; do
@@ -197,8 +218,10 @@ voice_spans() {
 check_peers() {
   local kind="$1" report="$2" spans count held longest
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
-  spans="$(voice_spans "${PEER_LOG}")"
-  count="$(grep -c . <<<"${spans}" || true)"
+  if [[ "${kind}" != "chat" ]]; then
+    spans="$(voice_spans "${PEER_LOG}")"
+    count="$(grep -c . <<<"${spans}" || true)"
+  fi
   case "${kind}" in
     peer)
       grep '^HEARD' "${PEER_LOG}" || die "the second person did not hear the app, see ${peer_log}"
@@ -253,6 +276,22 @@ check_peers() {
         || die "the whisper was not heard for as long as its button was held"
       [[ -z "$(voice_spans "${BYSTANDER_LOG}")" ]] \
         || die "the third person heard the whisper, see ${bystander_log}"
+      ;;
+    chat)
+      grep -q '^SENT' "${CHAT_PEER_LOG}" || die "the second person did not get its messages out, see e2e/build/chat-peer.log"
+      grep -q '^RAW SENT' "${RAW_CHAT_LOG}" || die "the raw markup was not sent, see e2e/build/raw-chat.log"
+      # What the phone wrote may still be on its way to the second person.
+      sleep 2
+      local expected
+      for expected in \
+        'text="Hello from the phone"' \
+        'links=\["https://phone.example/page"\]' \
+        'links=\["https://gifs.example/phone.gif"\]' \
+        'images=1'; do
+        grep "^RECEIVED from=${PHONE_NAME} " "${CHAT_PEER_LOG}" | grep -q -- "${expected}" \
+          || die "the second person did not receive ${expected} from the app, see e2e/build/chat-peer.log"
+      done
+      printf 'e2e: chat: the second person received the text, the link, the GIF link and the picture of the app\n'
       ;;
   esac
 }
@@ -323,13 +362,15 @@ start_emulator() {
 
 mkdir -p "${OUT_DIR}"
 rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" \
-  "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.*
+  "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.* "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}"
 trap cleanup EXIT
 
 step "building the app and the tests"
 (cd "${REPO_ROOT}/android" && ./gradlew --console=plain --quiet :app:assembleDebug :e2e:assembleDebug)
-(cd "${REPO_ROOT}" && cargo build --locked --quiet --package mumcord-voice-peer)
+(cd "${REPO_ROOT}" && cargo build --locked --quiet --package mumcord-voice-peer --package mumcord-chat-peer)
 [[ -x "${PEER_BINARY}" ]] || die "the second person's program was not built at ${PEER_BINARY}"
+[[ -x "${CHAT_PEER_BINARY}" ]] || die "the chat person's program was not built at ${CHAT_PEER_BINARY}"
+command -v python3 >/dev/null 2>&1 || die "python3 is required for the raw chat message"
 
 step "starting the test server on port ${MUMCORD_PORT_BASE}"
 server_started=1
@@ -359,8 +400,13 @@ run_scenario() {
   PEER_LOG="${OUT_DIR}/voice-peer-${peer}.log"
   BYSTANDER_LOG="${OUT_DIR}/voice-bystander-${peer}.log"
   step "scenario: ${test##*.} (local network: ${permission}, microphone: ${microphone}, second person: ${peer})"
-  # Clearing the data also takes back every permission and forgets earlier answers to prompts.
-  adb_device shell pm clear "${APP_PACKAGE}" >/dev/null || die "clearing the app data failed"
+  if [[ "${peer}" == "chat-restart" ]]; then
+    # The app's process is killed and its data kept: what the next start shows was stored.
+    adb_device shell am force-stop "${APP_PACKAGE}" || die "stopping the app failed"
+  else
+    # Clearing the data also takes back every permission and forgets earlier answers to prompts.
+    adb_device shell pm clear "${APP_PACKAGE}" >/dev/null || die "clearing the app data failed"
+  fi
   # Since Android 17 the test server on the host counts as local network, which needs this
   # permission. Older versions do not know it; there the address is reachable without.
   if [[ "${permission}" == "granted" ]] && ((device_api >= LOCAL_NETWORK_PERMISSION_API)); then
@@ -377,7 +423,7 @@ run_scenario() {
   fi
   local extra=()
   case "${peer}" in
-    alone | notify) ;;
+    alone | notify | chat-restart) ;;
     lockptt)
       extra=(-e lockSeconds "${LOCK_PTT_SECONDS}")
       start_peer "${PEER_LOG}"
@@ -385,6 +431,10 @@ run_scenario() {
     call)
       start_phone_network
       start_peer "${PEER_LOG}"
+      ;;
+    chat)
+      start_person "${CHAT_PEER_LOG}" "${CHAT_PEER_BINARY}" --phone "${PHONE_NAME}"
+      start_person "${RAW_CHAT_LOG}" python3 "${REPO_ROOT}/e2e/raw-chat.py" "${PHONE_NAME}"
       ;;
     whisper)
       start_peer "${PEER_LOG}" --listen-only
@@ -408,7 +458,7 @@ run_scenario() {
     die "tests failed, see above and e2e/build/logcat.txt"
   fi
   stop_phone_network
-  if [[ "${peer}" != "alone" && "${peer}" != "notify" ]]; then
+  if [[ "${peer}" != "alone" && "${peer}" != "notify" && "${peer}" != "chat-restart" ]]; then
     check_peers "${peer}" "${report}"
     stop_peers
   fi

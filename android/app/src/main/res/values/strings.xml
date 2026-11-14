@@ -183,7 +183,6 @@
     <string name="tab_chat">Chat</string>
     <string name="tab_messages">Messages</string>
     <string name="tab_more">More</string>
-    <string name="tab_chat_empty">No chat messages yet.</string>
     <string name="tab_messages_empty">No private messages yet.</string>
     <string name="more_disconnect">Disconnect from %1$s</string>
     <plurals name="channels_people_count">
@@ -220,4 +219,70 @@
     <string name="whisper_active">Whispering</string>
     <string name="whisper_inactive">Not whispering</string>
     <string name="whisper_close">Close whisper</string>
+    <!-- Chat tab -->
+    <string name="chat_title"># %1$s</string>
+    <plurals name="chat_subtitle">
+        <item quantity="one">%1$d person · %2$s</item>
+        <item quantity="other">%1$d people · %2$s</item>
+    </plurals>
+    <string name="chat_placeholder">Message %1$s…</string>
+    <string name="chat_add_image">Add image</string>
+    <string name="chat_add_gif">Add GIF</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_empty">No messages here yet.</string>
+    <string name="chat_loading">Loading messages…</string>
+    <string name="chat_load_failed">The messages could not be loaded.</string>
+    <string name="chat_retry">Try again</string>
+    <string name="chat_loading_older">Loading earlier messages…</string>
+    <string name="chat_history_start">The history on this phone begins here.</string>
+    <string name="chat_day_today">Today</string>
+    <string name="chat_day_yesterday">Yesterday</string>
+    <plurals name="chat_new_messages">
+        <item quantity="one">%1$d new message</item>
+        <item quantity="other">%1$d new messages</item>
+    </plurals>
+    <plurals name="chat_tab_unread">
+        <item quantity="one">Chat, %1$d unread message</item>
+        <item quantity="other">Chat, %1$d unread messages</item>
+    </plurals>
+    <string name="chat_announce">New message from %1$s: %2$s</string>
+    <string name="chat_mentions_you">Mentions you</string>
+    <string name="chat_reply_action">Reply</string>
+    <string name="chat_replying_to">Replying to %1$s</string>
+    <string name="chat_reply_cancel">Cancel reply</string>
+    <string name="chat_mention_item">\@%1$s</string>
+    <string name="chat_image_word">Image</string>
+    <string name="chat_gif_word">GIF</string>
+    <string name="chat_image_open_action">Open image</string>
+    <string name="chat_gif_add_action">Add to GIF favourites</string>
+    <string name="chat_truncated">This message was shortened.</string>
+    <string name="chat_sending">Sending…</string>
+    <string name="chat_not_sent">Not sent.</string>
+    <string name="chat_refused">Not sent: the server did not accept this message.</string>
+    <string name="chat_image_refused">Not sent: this picture is too large for the server or cannot be sent here.</string>
+    <string name="chat_discard">Discard</string>
+    <plurals name="chat_characters_left">
+        <item quantity="one">%1$d character left</item>
+        <item quantity="other">%1$d characters left</item>
+    </plurals>
+    <plurals name="chat_characters_over">
+        <item quantity="one">%1$d character too long</item>
+        <item quantity="other">%1$d characters too long</item>
+    </plurals>
+    <string name="chat_image_unreadable">That picture could not be used.</string>
+    <string name="chat_notice_dismiss">Dismiss</string>
+    <string name="gif_title">GIF favourites</string>
+    <string name="gif_hint">Long-press a GIF in chat to add it to your favourites</string>
+    <string name="gif_item">Send GIF %1$d</string>
+    <string name="gif_remove">Remove from favourites</string>
+    <string name="gif_saved">Added to your GIF favourites.</string>
+    <string name="gif_not_saved">The GIF could not be added to your favourites.</string>
+    <string name="image_source_title">Add image</string>
+    <string name="image_source_library">Photo library</string>
+    <string name="image_source_camera">Take photo</string>
+    <string name="link_warning_title">Check this link</string>
+    <string name="link_warning_text">The text of this link names a different address than the one it opens. It really goes to:</string>
+    <string name="link_warning_open">Open link</string>
+    <string name="viewer_title">Image</string>
+    <string name="viewer_close">Close image</string>
 </resources>
