@@ -11,7 +11,7 @@ enum Outcome<Value> {
 
 /// Creates the engine. A seam so tests can run the store against a fake engine. It reads the
 /// database and the secure storage and may throw; the store calls it off the main thread.
-typealias EngineFactory = @Sendable (EngineListener) throws -> MumcordEngineProtocol
+typealias EngineFactory = @Sendable (EngineListener) throws -> EngineClient
 
 /// Owns the engine, the server list and the one connection. The only place that talks to the
 /// bridge: screens read the state and call the commands through `AppModel`.
@@ -98,7 +98,7 @@ final class SessionStore: @unchecked Sendable {
     /// Reads the saved servers once; later changes arrive as events. A failure can be retried.
     func loadServers() async {
         if state.serversLoaded { return }
-        switch await call("load servers", { $0.snapshot().servers }) {
+        switch await call("load servers", { $0.savedServers() }) {
         // An event that arrived in between is newer than the snapshot.
         case .ok(let servers):
             update { state in
@@ -265,7 +265,7 @@ final class SessionStore: @unchecked Sendable {
 
     private func call<Value>(
         _ name: String,
-        _ command: (MumcordEngineProtocol) async throws -> Value
+        _ command: (EngineClient) async throws -> Value
     ) async -> Outcome<Value> {
         do {
             return .ok(try await command(try await engine.get()))
@@ -295,14 +295,14 @@ final class SessionStore: @unchecked Sendable {
 private actor EngineHolder {
     private let factory: EngineFactory
     private let listener: EngineListener
-    private var created: MumcordEngineProtocol?
+    private var created: EngineClient?
 
     init(factory: @escaping EngineFactory, listener: EngineListener) {
         self.factory = factory
         self.listener = listener
     }
 
-    func get() throws -> MumcordEngineProtocol {
+    func get() throws -> EngineClient {
         if let created { return created }
         let engine = try factory(listener)
         created = engine

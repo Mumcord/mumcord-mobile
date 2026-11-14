@@ -77,6 +77,10 @@ extension SessionState {
         // Voice phase: the audio session and the input level meter are not built yet.
         case .audioWantedChanged, .inputLevelChanged:
             break
+        // Chat phase: messages, unread counts, message requests and blocked people.
+        case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,
+             .blockedPeopleChanged:
+            break
         }
         return next
     }

@@ -16,7 +16,7 @@ struct ConnectCall: Equatable {
 /// delivers `server` once trusted, and reports every end of a connection as an event.
 ///
 /// Debug builds only: the unit tests and the UI tests run the app against it.
-final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
+final class FakeEngine: EngineClient, @unchecked Sendable {
     private let listener: EngineListener
     private let server: ServerState
     private let prompt: CertificatePrompt?
@@ -39,7 +39,6 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
     private var _talkMode = TalkMode.voiceActivity
     private var people: [UInt32: Person]
     private var connection = ConnectionState.disconnected(error: nil)
-    private var connectedServerId: Int64?
     private var savedServers: [SavedServer]
     private var nextServerId: Int64
 
@@ -118,7 +117,6 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
         if case .connectionChanged(let state) = event {
             locked {
                 connection = state
-                if case .disconnected = state { connectedServerId = nil }
             }
         }
         listener.onEvent(event: event)
@@ -137,7 +135,6 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
                 throw BridgeError.InvalidInput(detail: "already connected")
             }
             _connectCalls.append(ConnectCall(serverId: serverId, password: password, channelPath: channelPath))
-            connectedServerId = serverId
             return _requiredPassword
         }
         emit(.connectionChanged(state: .connecting))
@@ -148,11 +145,6 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
         } else {
             finishConnecting()
         }
-    }
-
-    // The call of the first slice, which the app no longer uses.
-    func connect(request: ConnectRequest) async throws {
-        throw BridgeError.Internal(detail: "connect is not used by the app")
     }
 
     func answerCertificatePrompt(fingerprint: String, trust: Bool) async throws {
@@ -169,18 +161,8 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
         emit(.connectionChanged(state: .disconnected(error: nil)))
     }
 
-    func snapshot() -> BridgeSnapshot {
-        locked {
-            BridgeSnapshot(
-                servers: savedServers,
-                connection: connection,
-                connectedServerId: connectedServerId,
-                certificatePrompt: nil,
-                server: nil,
-                audio: AudioWanted(capture: false, playback: false),
-                whispering: false
-            )
-        }
+    func savedServers() -> [SavedServer] {
+        locked { savedServers }
     }
 
     func addServer(input: ServerInput) async throws -> SavedServer {
@@ -225,14 +207,6 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
                 throw BridgeError.NotFound(detail: "no server \(serverId)")
             }
             savedServers.remove(at: index)
-            return savedServers
-        }
-        emit(.serversChanged(servers: all))
-    }
-
-    func reorderServers(serverIds: [Int64]) async throws {
-        let all: [SavedServer] = locked {
-            savedServers = serverIds.compactMap { id in savedServers.first { $0.id == id } }
             return savedServers
         }
         emit(.serversChanged(servers: all))
@@ -286,10 +260,6 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
         }
     }
 
-    func talkMode() async throws -> TalkMode {
-        currentTalkMode
-    }
-
     func setTalkMode(mode: TalkMode) async throws {
         try locked {
             if let failure = _talkModeFailure {
@@ -299,38 +269,6 @@ final class FakeEngine: MumcordEngineProtocol, @unchecked Sendable {
             _talkMode = mode
         }
     }
-
-    // The voice controls are not used by the screens that exist yet.
-
-    func audioEndpoints() -> AudioEndpoints {
-        AudioEndpoints(capture: 0, playback: 0)
-    }
-
-    func setPushToTalkPressed(pressed: Bool) {}
-
-    func setSelfMute(muted: Bool) async throws {}
-
-    func setSelfDeaf(deafened: Bool) async throws {}
-
-    func voiceSettings() async throws -> VoiceSettings {
-        VoiceSettings(
-            talkMode: currentTalkMode,
-            noiseSuppression: true,
-            autoGain: true,
-            echoCancellation: .system,
-            bitrateLimitKbps: nil
-        )
-    }
-
-    func setNoiseSuppression(on: Bool) async throws {}
-
-    func setAutoGain(on: Bool) async throws {}
-
-    func setBitrateLimitKbps(kbps: UInt32?) {}
-
-    func startWhisper(target: WhisperTarget) async throws {}
-
-    func stopWhisper() {}
 
     private static func saved(_ input: ServerInput, id: Int64, hadPassword: Bool) -> SavedServer {
         let hasPassword: Bool
