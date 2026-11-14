@@ -4,6 +4,7 @@ package app.mumcord.mobile.e2e
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasStateDescription
@@ -69,8 +70,19 @@ class ChatFlowTest {
         awaitMessage("the second person's link", hasText(PEER_LINK_TEXT))
         awaitMessage("the second person's GIF link", hasText(PEER_GIF))
         awaitMessage("the second person's picture", hasTestTag(CHAT_IMAGE_TEST_TAG))
-        compose.onNodeWithTag(CHAT_IMAGE_TEST_TAG).performClick()
-        app.await("the picture on the whole screen") { app.exists(IMAGE_VIEWER_TEST_TAG) }
+        // The picture takes taps only once it is loaded, which on a slow emulator is later
+        // than its place in the list appears: tapped again until it opens.
+        app.await("the picture on the whole screen") {
+            try {
+                compose.onNodeWithTag(CHAT_IMAGE_TEST_TAG).performClick()
+                compose.waitUntil(OPEN_MILLIS) { app.exists(IMAGE_VIEWER_TEST_TAG) }
+            } catch (_: AssertionError) {
+                // The picture's place is gone: the viewer covers it, or the list just moved.
+            } catch (_: ComposeTimeoutException) {
+                // Not open yet; the next round taps again.
+            }
+            app.exists(IMAGE_VIEWER_TEST_TAG)
+        }
         Espresso.pressBack()
         app.await("the chat after closing the picture") { !app.exists(IMAGE_VIEWER_TEST_TAG) }
 
@@ -146,6 +158,9 @@ class ChatFlowTest {
     }
 
     private companion object {
+        /** How long one tap on the picture is given to open it before it is tapped again. */
+        const val OPEN_MILLIS = 3_000L
+
         /** The names `e2e/chat-peer` and `e2e/raw-chat.py` connect with, and what they write. */
         const val PEER_NAME = "e2e-peer"
         const val RAW_NAME = "e2e-raw"
