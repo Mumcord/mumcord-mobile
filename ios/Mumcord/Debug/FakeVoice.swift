@@ -110,7 +110,21 @@ final class FakeVoiceSession: VoiceSession, @unchecked Sendable {
     private let lock = NSLock()
     private var _begins = 0
     private var _ends = 0
+    private var _systemActivates = false
     var onEvent: ((VoiceSessionEvent) -> Void)?
+
+    var systemActivates: Bool {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _systemActivates
+        }
+        set {
+            lock.lock()
+            _systemActivates = newValue
+            lock.unlock()
+        }
+    }
 
     var begins: Int {
         lock.lock()

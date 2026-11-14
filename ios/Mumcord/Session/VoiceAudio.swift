@@ -70,6 +70,16 @@ final class VoiceAudio: MicrophoneAccess, @unchecked Sendable {
         }
     }
 
+    /// Stops playing and recording on this phone for an interruption, or goes on after it.
+    func setPlaybackPaused(_ paused: Bool) {
+        controller?.setPlaybackPaused(paused)
+    }
+
+    /// Who starts the phone's audio session: the app, or the system for a call.
+    func setActivation(_ activation: AudioActivation) {
+        controller?.setActivation(activation)
+    }
+
     func notNow() {
         update { $0.gateway.declined = true }
     }

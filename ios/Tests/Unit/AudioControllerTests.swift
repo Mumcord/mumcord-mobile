@@ -244,6 +244,80 @@ final class AudioControllerTests: XCTestCase {
         XCTAssertEqual(backend.running, request(playback: true, capture: false))
     }
 
+    func testPausingPlaybackStopsTheUnitUntilItIsResumed() {
+        let controller = makeController()
+        controller.setWanted(playback: true, capture: true)
+        controller.setPlaybackPaused(true)
+        XCTAssertNil(backend.running)
+        controller.setPlaybackPaused(false)
+        XCTAssertEqual(backend.running, request(playback: true, capture: true))
+    }
+
+    // MARK: The session as a call of the phone
+
+    func testWhileACallWaitsForItsAudioNothingRuns() {
+        let controller = makeController()
+        controller.setActivation(.callWaiting)
+        controller.setWanted(playback: true, capture: true)
+        XCTAssertEqual(backend.opens, [])
+        XCTAssertEqual(session.begins, 0)
+        XCTAssertEqual(state, AudioState())
+    }
+
+    func testTheUnitOpensOnceTheSystemStartedTheAudioOfTheCall() {
+        let controller = makeController()
+        controller.setActivation(.callWaiting)
+        controller.setWanted(playback: true, capture: true)
+        controller.setActivation(.callActive)
+        XCTAssertEqual(backend.running, request(playback: true, capture: true))
+        XCTAssertEqual(state, AudioState(playback: .running, capture: .running))
+        // The session is the system's to start and stop.
+        XCTAssertTrue(session.systemActivates)
+    }
+
+    func testTheUnitClosesWhenTheSystemTakesTheAudioOfTheCallAway() {
+        let controller = makeController()
+        controller.setActivation(.callActive)
+        controller.setWanted(playback: true, capture: false)
+        controller.setActivation(.callWaiting)
+        XCTAssertNil(backend.running)
+        XCTAssertEqual(state, AudioState())
+
+        controller.setActivation(.callActive)
+        XCTAssertEqual(backend.running, request(playback: true, capture: false))
+    }
+
+    func testAudioThatRunsAlreadyIsHandedOverToTheCall() {
+        let controller = makeController()
+        controller.setWanted(playback: true, capture: false)
+        XCTAssertFalse(session.systemActivates)
+
+        // The app gives its own session back before the system starts the call's.
+        controller.setActivation(.callWaiting)
+        XCTAssertNil(backend.running)
+        XCTAssertEqual(session.ends, 1)
+        XCTAssertTrue(session.systemActivates)
+    }
+
+    func testWithoutACallTheAppStartsTheAudioItselfAgain() {
+        let controller = makeController()
+        controller.setActivation(.callWaiting)
+        controller.setWanted(playback: true, capture: false)
+        controller.setActivation(.own)
+        XCTAssertEqual(backend.running, request(playback: true, capture: false))
+        XCTAssertFalse(session.systemActivates)
+    }
+
+    func testAudioTheSystemStartsForTheCallEndsAnInterruption() {
+        let controller = makeController()
+        controller.setActivation(.callActive)
+        controller.setWanted(playback: true, capture: false)
+        controller.setPlaybackPaused(true)
+        controller.setActivation(.callWaiting)
+        controller.setActivation(.callActive)
+        XCTAssertEqual(backend.running, request(playback: true, capture: false))
+    }
+
     func testAfterAResetOfTheAudioServiceEverythingIsSetUpAgain() throws {
         let controller = makeController()
         controller.setWanted(playback: true, capture: true)

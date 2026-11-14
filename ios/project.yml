@@ -75,6 +75,8 @@ targets:
       # The audio unit and the audio session of voice (Platform/Audio).
       - sdk: AudioToolbox.framework
       - sdk: AVFAudio.framework
+      # Shows a voice session to the system as a call (Platform/Call).
+      - sdk: CallKit.framework
       # Asks the system whether it refuses local network access.
       - sdk: Network.framework
     # Keys that have no INFOPLIST_KEY_ build setting. The file is written by XcodeGen into the
@@ -93,6 +95,10 @@ targets:
         NSCameraUsageDescription: Mumcord uses the camera when you take a photo to send in a chat.
         # Without this sentence iOS ends the app when it asks for the microphone.
         NSMicrophoneUsageDescription: Mumcord needs the microphone so that the others can hear you.
+        # Voice goes on in the background and with a locked screen: `audio` keeps the app
+        # running while it plays and records, `voip` lets it show the session to the system
+        # as a call.
+        UIBackgroundModes: [audio, voip]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile

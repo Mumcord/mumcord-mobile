@@ -12,6 +12,16 @@ enum VoiceSessionEvent: Equatable {
     case servicesReset
 }
 
+/// What the phone's audio session reports while voice runs, as the system says it. What
+/// follows from a signal is decided by the interruption rules (`InterruptionState`).
+enum AudioSessionSignal: Equatable {
+    case interruptionBegan
+    /// `shouldResume` is the system's advice whether to go on playing.
+    case interruptionEnded(shouldResume: Bool)
+    case routeChanged
+    case servicesReset
+}
+
 /// What the phone has to be told while voice runs. The one place for it: audio routing and call
 /// integration of later tasks belong here too.
 protocol VoiceSession: AnyObject {
@@ -19,6 +29,9 @@ protocol VoiceSession: AnyObject {
     func begin() -> Bool
     /// Called after the unit closed; gives the audio back to other apps.
     func end()
+    /// True while the session belongs to a call that the system starts and stops itself:
+    /// `begin` then only sets the session up and `end` leaves it alone. Set by the controller.
+    var systemActivates: Bool { get set }
     /// Told on a thread of the system; what follows from an event is decided elsewhere.
     var onEvent: ((VoiceSessionEvent) -> Void)? { get set }
 }
@@ -34,6 +47,10 @@ final class SystemVoiceSession: VoiceSession {
     private let log: (String) -> Void
     private var observers: [NSObjectProtocol] = []
     var onEvent: ((VoiceSessionEvent) -> Void)?
+    var systemActivates = false
+    /// Receives every signal of the system, on a thread of the system. Interruptions are only
+    /// reported here: whether they stop the audio is decided by the interruption rules.
+    var onSignal: ((AudioSessionSignal) -> Void)?
 
     init(log: @escaping (String) -> Void) {
         self.log = log
@@ -44,15 +61,26 @@ final class SystemVoiceSession: VoiceSession {
         ) { [weak self] notification in
             let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             switch raw.flatMap(AVAudioSession.InterruptionType.init(rawValue:)) {
-            case .began: self?.onEvent?(.interruptionBegan)
-            case .ended: self?.onEvent?(.interruptionEnded)
-            default: break
+            case .began:
+                self?.onSignal?(.interruptionBegan)
+            case .ended:
+                let options = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+                let shouldResume = AVAudioSession.InterruptionOptions(rawValue: options).contains(.shouldResume)
+                self?.onSignal?(.interruptionEnded(shouldResume: shouldResume))
+            default:
+                break
             }
+        })
+        observers.append(center.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: session, queue: nil
+        ) { [weak self] _ in
+            self?.onSignal?(.routeChanged)
         })
         observers.append(center.addObserver(
             forName: AVAudioSession.mediaServicesWereResetNotification, object: session, queue: nil
         ) { [weak self] _ in
             self?.onEvent?(.servicesReset)
+            self?.onSignal?(.servicesReset)
         })
     }
 
@@ -60,7 +88,10 @@ final class SystemVoiceSession: VoiceSession {
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
     }
 
-    func begin() -> Bool {
+    /// Sets the session up for voice without starting it. Called on its own before a call is
+    /// asked for, so the system finds the session ready when it starts it for the call.
+    @discardableResult
+    func prepare() -> Bool {
         let session = AVAudioSession.sharedInstance()
         do {
             // No options: the voice-chat mode already allows Bluetooth hands-free headsets, and
@@ -70,7 +101,19 @@ final class SystemVoiceSession: VoiceSession {
             // Wishes only: the device decides, and the audio unit converts what differs.
             try? session.setPreferredSampleRate(Self.sampleRate)
             try? session.setPreferredIOBufferDuration(Self.bufferDuration)
-            try session.setActive(true)
+            return true
+        } catch {
+            log("setting up the voice session failed (\((error as NSError).code))")
+            return false
+        }
+    }
+
+    func begin() -> Bool {
+        guard prepare() else { return false }
+        // The session of a call is started by the system, never by the app.
+        if systemActivates { return true }
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
             return true
         } catch {
             log("starting the voice session failed (\((error as NSError).code))")
@@ -79,6 +122,7 @@ final class SystemVoiceSession: VoiceSession {
     }
 
     func end() {
+        if systemActivates { return }
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {

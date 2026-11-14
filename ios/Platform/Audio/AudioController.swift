@@ -42,6 +42,17 @@ final class QueueAudioScheduler: AudioScheduler {
     }
 }
 
+/// Who starts the phone's audio session for voice.
+enum AudioActivation: Equatable {
+    /// The app itself: there is no call, or the system did not take the session as one.
+    case own
+    /// The session is a call and the system has not given it the audio, or has taken it away
+    /// (the call is on hold): nothing may run.
+    case callWaiting
+    /// The session is a call and the system has started its audio.
+    case callActive
+}
+
 /// Runs the speaker and the microphone exactly while the engine wants them. The app only says
 /// what is wanted (`setWanted`) and where the samples go (`setEndpoints`); `onState` says what
 /// came of it.
@@ -74,6 +85,7 @@ final class AudioController {
     private var sessionActive = false
     /// Between the begin and the end of an interruption by the phone.
     private var interrupted = false
+    private var activation = AudioActivation.own
     /// The unit could not be opened with the microphone, or not at all, after every retry.
     private var captureFailed = false
     private var playbackFailed = false
@@ -132,6 +144,28 @@ final class AudioController {
         }
     }
 
+    /// Stops playing and recording on this phone for an interruption, or goes on after it.
+    func setPlaybackPaused(_ paused: Bool) {
+        scheduler.run {
+            self.handle(paused ? .interruptionBegan : .interruptionEnded)
+        }
+    }
+
+    /// Who starts the audio session from now on. The unit is closed under the old rule and
+    /// opened again under the new one, when that lets it run.
+    func setActivation(_ next: AudioActivation) {
+        scheduler.run {
+            guard next != self.activation else { return }
+            self.stop()
+            self.activation = next
+            self.session.systemActivates = next != .own
+            // Audio the system has just started is not interrupted any more.
+            if next == .callActive { self.interrupted = false }
+            self.forgetFailures()
+            self.reconcile()
+        }
+    }
+
     private func handle(_ event: VoiceSessionEvent) {
         switch event {
         case .interruptionBegan:
@@ -160,7 +194,7 @@ final class AudioController {
 
     /// What the unit should do now, or nil when it should not run.
     private func desired() -> StreamRequest? {
-        guard let handles, !interrupted else { return nil }
+        guard let handles, !interrupted, activation != .callWaiting else { return nil }
         let playback = playbackNeeded && !playbackFailed
         let capture = captureNeeded && !captureFailed && microphoneGranted()
         guard playback || capture else { return nil }
