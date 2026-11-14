@@ -122,11 +122,16 @@ extension XCTestCase {
     }
 
     /// Puts the keyboard away with its own return key, which does not change what was typed. Best
-    /// effort: a keyboard without such a key (the number pad) or with a key that acts (Go, Search,
-    /// Next) stays.
+    /// effort: a keyboard without such a key (the number pad) or with a key that acts (Go, Next)
+    /// stays.
     func dismissKeyboard(in app: XCUIApplication) {
-        let keys = ["Done", "done", "Return", "return"]
+        let keys = ["Done", "done", "Return", "return", "Search", "search"]
         var attempts = 0
+        // A fresh simulator explains swipe typing on top of the keys first.
+        let tutorial = app.keyboards.buttons["Continue"]
+        if tutorial.waitForExistence(timeout: 1) {
+            tutorial.tap()
+        }
         while app.keyboards.firstMatch.exists && attempts < 6 {
             guard let key = keys.map({ app.keyboards.buttons[$0] }).first(where: { $0.exists }) else { return }
             key.tap()

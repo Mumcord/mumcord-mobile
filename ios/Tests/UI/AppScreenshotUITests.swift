@@ -74,7 +74,10 @@ final class AppScreenshotUITests: XCTestCase {
         save.tapCenter()
         expectAppears(app.element(containing: "Enter a number between 1 and 65535."))
         expectAppears(app.element(containing: "Enter the name you want to use on this server."))
-        dismissKeyboard(in: app)
+        // The form's keyboard has no key that only closes it; dragging the form down does, and
+        // a second drag brings the first field back to the top.
+        app.swipeDown()
+        app.swipeDown()
         capture(app, "server-form", theme: theme)
     }
 

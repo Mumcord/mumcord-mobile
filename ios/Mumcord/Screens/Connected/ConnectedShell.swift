@@ -30,6 +30,8 @@ struct ConnectedShell: View {
                 }
             )
         }
+        // The tab bar stays at the bottom while the search field has the keyboard open.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     @ViewBuilder private var tabScreen: some View {
