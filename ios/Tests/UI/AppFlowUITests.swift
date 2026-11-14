@@ -108,7 +108,7 @@ final class AppFlowUITests: XCTestCase {
         expectAppears(app.row("person-row", containing: "Anna"))
 
         tapWhenReady(app.element("Chat"))
-        expectAppears(app.element(containing: "No chat messages yet."))
+        expectAppears(app.element(containing: "No messages here yet."))
         tapWhenReady(app.element("More"))
         tapWhenReady(app.element("more-disconnect"))
         expectGone(app.element("more-disconnect"))

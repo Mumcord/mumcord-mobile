@@ -146,7 +146,7 @@ final class AppScreenshotUITests: XCTestCase {
 
     private func tabEmpty(theme: String) {
         let app = launchConnected("servers", theme: theme)
-        tapWhenReady(app.element("Chat"))
+        tapWhenReady(app.element("Messages"))
         expectAppears(app.element("empty-tab"))
         capture(app, "tab-empty", theme: theme)
     }

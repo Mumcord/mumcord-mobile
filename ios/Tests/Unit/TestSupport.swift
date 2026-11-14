@@ -123,12 +123,6 @@ func parseTestLink(_ url: String) throws -> MumbleLink {
 }
 
 extension Outcome {
-    /// The value of a successful command.
-    var value: Value? {
-        if case .ok(let value) = self { return value }
-        return nil
-    }
-
     /// The error of a failed command.
     var failure: ConnectionError? {
         if case .failed(let error) = self { return error }
