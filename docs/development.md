@@ -86,8 +86,41 @@ cargo ndk -t x86_64 -t arm64-v8a build
 $ANDROID_HOME/platform-tools/adb logcat
 ```
 
-From inside the emulator the local test server of the Mumcord repository (`testenv/up.sh`) is
-reachable as `10.0.2.2:64738`. Never test against a public server.
+From inside the emulator the local test server (`scripts/testenv.sh up`, see
+[End-to-end tests](#end-to-end-tests)) is reachable as `10.0.2.2:64838`. Never test against a
+public server.
+
+## End-to-end tests
+
+The end-to-end tests run the real app with the real engine in the emulator against the local
+Mumble test server and check what a user would see. One command does everything:
+
+```sh
+eval "$(scripts/setup-android.sh --env)"
+e2e/run.sh
+```
+
+It builds the app and the tests, starts the test server and the emulator (without a window),
+installs the app afresh, runs the tests, and stops the server and the emulator again. A run
+takes under a minute once everything is built (the first build takes several minutes). If an
+emulator is already running, the script uses it and leaves it running. The result is
+`e2e: PASSED` or `e2e: FAILED: …` and a matching exit code; the test output, the app log and the emulator log are in `e2e/build/`.
+
+- **Test server:** `scripts/testenv.sh up` and `down` start and stop it on their own. It is the
+  test environment of the Mumcord repository (a stock `mumble-server` in Docker with the
+  channels Lobby, Raid and AFK) at the commit pinned in `engine.lock.toml`, checked out into
+  the git-ignored `.engine/`. It listens on port 64838 (`MUMCORD_PORT_BASE` changes that), so
+  it does not collide with a test server of the desktop client. Every run starts with a fresh
+  server and freshly installed app data.
+- **Tests:** the Gradle module `android/e2e`. A new flow is a new test class there; run a
+  single one with `e2e/run.sh -e class app.mumcord.mobile.e2e.ConnectFlowTest`. The tests skip
+  themselves when started without the script (for example by `./gradlew connectedDebugAndroidTest`),
+  because they then have no server.
+- **Besides the Android toolchain** the machine needs KVM, `git`, Docker with the compose
+  plugin, `sqlite3` and `openssl`. No Docker network is created; the server uses Docker's
+  built-in bridge.
+- **Settings:** `E2E_AVD` (emulator device, default `mumcord-test`), `E2E_BOOT_TIMEOUT` and
+  `E2E_TEST_TIMEOUT` (seconds, default 300 and 600).
 
 ## Updating a version
 

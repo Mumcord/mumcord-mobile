@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -31,6 +32,9 @@ import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.TreeRow
 
 private val INDENT_PER_LEVEL = 20.dp
+
+const val CHANNEL_ROW_TEST_TAG = "channel-row"
+const val CHANNELS_DISCONNECT_TEST_TAG = "channels-disconnect"
 
 @Composable
 fun ChannelTreeScreen(
@@ -53,7 +57,10 @@ fun ChannelTreeScreen(
                         .weight(1f)
                         .semantics { heading() },
                 )
-                OutlinedButton(onClick = onDisconnect) {
+                OutlinedButton(
+                    onClick = onDisconnect,
+                    modifier = Modifier.testTag(CHANNELS_DISCONNECT_TEST_TAG),
+                ) {
                     Text(stringResource(R.string.channels_disconnect))
                 }
             }
@@ -101,6 +108,7 @@ private fun ChannelLine(row: TreeRow.ChannelRow) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp + INDENT_PER_LEVEL * row.depth, end = 16.dp, top = 10.dp, bottom = 10.dp)
+            .testTag(CHANNEL_ROW_TEST_TAG)
             .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
     ) {

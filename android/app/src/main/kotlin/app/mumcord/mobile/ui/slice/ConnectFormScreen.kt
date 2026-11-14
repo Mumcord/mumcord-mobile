@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -38,6 +39,12 @@ import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.R
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
+
+const val CONNECT_ADDRESS_TEST_TAG = "connect-address"
+const val CONNECT_PORT_TEST_TAG = "connect-port"
+const val CONNECT_USERNAME_TEST_TAG = "connect-username"
+const val CONNECT_ACTION_TEST_TAG = "connect-action"
+const val CONNECT_ERROR_TEST_TAG = "connect-error"
 
 @Composable
 fun ConnectFormScreen(
@@ -78,7 +85,7 @@ fun ConnectFormScreen(
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Next,
                 ),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag(CONNECT_ADDRESS_TEST_TAG),
             )
             val portInvalid = form.port.isNotEmpty() && form.portNumber == null
             OutlinedTextField(
@@ -97,7 +104,7 @@ fun ConnectFormScreen(
                     keyboardType = KeyboardType.Number,
                     imeAction = ImeAction.Next,
                 ),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag(CONNECT_PORT_TEST_TAG),
             )
             OutlinedTextField(
                 value = form.username,
@@ -110,7 +117,7 @@ fun ConnectFormScreen(
                     autoCorrectEnabled = false,
                     imeAction = ImeAction.Done,
                 ),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag(CONNECT_USERNAME_TEST_TAG),
             )
             if (phase is ConnectionPhase.Failed) {
                 ConnectionErrorCard(error = phase.error, canRetry = canConnect, onRetry = onConnect)
@@ -121,7 +128,7 @@ fun ConnectFormScreen(
                 Button(
                     onClick = onConnect,
                     enabled = canConnect,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().testTag(CONNECT_ACTION_TEST_TAG),
                 ) {
                     Text(stringResource(R.string.connect_action))
                 }
@@ -145,6 +152,7 @@ private fun ConnectionErrorCard(error: ConnectionError, canRetry: Boolean, onRet
         // Announced by the screen reader when it appears: nothing else tells that connecting failed.
         modifier = Modifier
             .fillMaxWidth()
+            .testTag(CONNECT_ERROR_TEST_TAG)
             .semantics { liveRegion = LiveRegionMode.Polite },
     ) {
         Column(

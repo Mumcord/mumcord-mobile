@@ -23,6 +23,7 @@ import app.mumcord.mobile.R
 import app.mumcord.mobile.session.CertificatePromptState
 
 const val FINGERPRINT_TEST_TAG = "certificate-fingerprint"
+const val CERTIFICATE_TRUST_TEST_TAG = "certificate-trust"
 
 /**
  * Asks whether to trust the server's certificate. It cannot be dismissed by tapping outside or
@@ -50,7 +51,7 @@ fun CertificatePromptDialog(
                 }
             },
             confirmButton = {
-                Button(onClick = onTrust) {
+                Button(onClick = onTrust, modifier = Modifier.testTag(CERTIFICATE_TRUST_TEST_TAG)) {
                     Text(stringResource(R.string.certificate_unknown_trust))
                 }
             },
