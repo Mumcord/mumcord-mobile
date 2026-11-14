@@ -34,10 +34,7 @@ class AndroidVoiceSession(context: Context, private val log: (String) -> Unit) :
         )
         .build()
 
-    private var previousMode: Int? = null
-
     override fun begin() {
-        previousMode = audioManager.mode
         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         // Voice runs also without the focus (for example during a phone call); what happens
         // then is decided by the call handling of a later task.
@@ -48,7 +45,10 @@ class AndroidVoiceSession(context: Context, private val log: (String) -> Unit) :
 
     override fun end() {
         audioManager.abandonAudioFocusRequest(focusRequest)
-        previousMode?.let { audioManager.mode = it }
-        previousMode = null
+        // The system keeps one mode per app and applies a change a moment later, so the mode
+        // read back at the next begin could still be the voice mode of the session that just
+        // ended, and "putting it back" would leave the phone in voice mode for good. Normal
+        // withdraws this app's own wish; what other apps (a phone call) asked for stays.
+        audioManager.mode = AudioManager.MODE_NORMAL
     }
 }

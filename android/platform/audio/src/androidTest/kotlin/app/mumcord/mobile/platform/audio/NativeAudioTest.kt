@@ -56,11 +56,22 @@ class NativeAudioTest {
             controller.setWanted(playback = true, capture = true)
             awaitSettled()
             assertTrue(controller.state.value.playback is StreamState.Running)
-            assertEquals(AudioManager.MODE_IN_COMMUNICATION, audioManager.mode)
+            awaitMode(AudioManager.MODE_IN_COMMUNICATION)
             controller.setWanted(playback = false, capture = false)
             await("the streams to stop") { controller.state.value == AudioState() }
-            assertEquals(mode, audioManager.mode)
+            awaitMode(mode)
         }
+    }
+
+    @Test
+    fun aSessionThatStartsRightAfterAnotherEndedStillLeavesTheVoiceMode() {
+        val mode = audioManager.mode
+        val session = AndroidVoiceSession(context) { }
+        repeat(REPETITIONS) {
+            session.begin()
+            session.end()
+        }
+        awaitMode(mode)
     }
 
     @Test
@@ -95,10 +106,16 @@ class NativeAudioTest {
             (state.capture is StreamState.Running || state.capture is StreamState.Failed)
     }
 
+    /**
+     * The controller reports the streams as stopped before it ends the session, and the system
+     * applies a new mode a moment after it was set, so the mode is waited for.
+     */
+    private fun awaitMode(mode: Int) = await("the audio mode to become $mode") { audioManager.mode == mode }
+
     private fun await(what: String, condition: () -> Boolean) {
         val deadline = System.nanoTime() + TIMEOUT_NANOS
         while (!condition()) {
-            if (System.nanoTime() > deadline) fail("Timed out waiting for $what; state ${controller.state.value}")
+            if (System.nanoTime() > deadline) fail("Timed out waiting for $what; state ${controller.state.value}, audio mode ${audioManager.mode}")
             Thread.sleep(20)
         }
     }
