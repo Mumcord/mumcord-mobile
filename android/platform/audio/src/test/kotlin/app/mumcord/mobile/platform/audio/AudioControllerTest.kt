@@ -70,6 +70,24 @@ class AudioControllerTest {
         kotlinx.coroutines.CoroutineScope(StandardTestDispatcher(scope.testScheduler))
 
     @Test
+    fun aPauseStopsTheSpeakerButKeepsTheVoiceSessionSoThePhoneCanSayWhenItIsOver() = runTest {
+        val controller = controller()
+        controller.setWanted(playback = true, capture = false)
+        runCurrent()
+        val sessionCalls = session.calls.toList()
+
+        controller.setPlaybackPaused(true)
+        runCurrent()
+        assertEquals(StreamState.Stopped, controller.state.value.playback)
+        assertEquals("The session neither ends nor begins again", sessionCalls, session.calls)
+
+        controller.setPlaybackPaused(false)
+        runCurrent()
+        assertEquals(RUNNING, controller.state.value.playback)
+        assertEquals(sessionCalls, session.calls)
+    }
+
+    @Test
     fun nothingRunsUntilTheEngineWantsIt() = runTest {
         val controller = controller()
         runCurrent()

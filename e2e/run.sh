@@ -11,7 +11,9 @@
 #   5. run the scenarios one after the other, each with fresh app data (no remembered server,
 #      certificate or permission answer) and its own state of the local network and the
 #      microphone permission (granted up front, or not, so that the app has to ask), and report
-#      the result. The voice scenarios talk to a second person (and the whisper scenario to
+#      the result. Notifications are granted up front except where the question itself is
+#      tested. The phone call scenario lets this script play the phone network through the
+#      emulator's console. The voice scenarios talk to a second person (and the whisper scenario to
 #      a third who must hear nothing): e2e/voice-peer, the engine itself running on this
 #      machine. What they heard, and for how long, is the other half of each proof.
 #   6. stop the server, and the emulator if this script started it
@@ -52,6 +54,13 @@ HOST_FROM_EMULATOR="10.0.2.2"
 LOCAL_NETWORK_PERMISSION_API=37
 LOCAL_NETWORK_PERMISSION="android.permission.ACCESS_LOCAL_NETWORK"
 MICROPHONE_PERMISSION="android.permission.RECORD_AUDIO"
+# Exists since Android 13. Granted in every scenario except those of the kind "notify", which
+# are about the question itself.
+NOTIFICATION_PERMISSION_API=33
+NOTIFICATION_PERMISSION="android.permission.POST_NOTIFICATIONS"
+# How long the push-to-talk scenario keeps the screen locked; the voice activity scenario uses
+# the test's own default of three minutes.
+LOCK_PTT_SECONDS=60
 # The scenarios: "<local network permission> <microphone permission> <second person> <test>".
 # With "granted" a permission is given up front (most tests need the local network to reach the
 # server on the host, and are not about the microphone); with "ask" the app starts without it
@@ -70,6 +79,12 @@ SCENARIOS=(
   "granted granted ptt ${TEST_PACKAGE}.PushToTalkFlowTest"
   "granted granted mute ${TEST_PACKAGE}.MuteDeafenFlowTest"
   "granted granted whisper ${TEST_PACKAGE}.WhisperFlowTest"
+  "granted granted notify ${TEST_PACKAGE}.NotificationFlowTest#itIsExplainedWithTheFirstSessionThenTheSystemAsksAndAllowingItShowsTheCall"
+  "granted granted notify ${TEST_PACKAGE}.NotificationFlowTest#notNowKeepsTheSessionRunningInTheBackground"
+  "granted granted alone ${TEST_PACKAGE}.CallNotificationFlowTest"
+  "granted granted lock ${TEST_PACKAGE}.BackgroundVoiceFlowTest#withVoiceActivityBothDirectionsKeepWorkingInTheBackgroundAndWhileLocked"
+  "granted granted lockptt ${TEST_PACKAGE}.BackgroundVoiceFlowTest#withPushToTalkThePhoneStaysSilentWhileLockedAndStillPlaysTheOthers"
+  "granted granted call ${TEST_PACKAGE}.PhoneCallFlowTest"
 )
 # A stretch of voice a person heard counts from this length (ms); the engine's own short
 # sounds, like the one for somebody entering the channel, are shorter.
@@ -117,6 +132,7 @@ EMULATOR="${ANDROID_HOME}/emulator/emulator"
 serial=""
 emulator_pid=""
 peer_pids=()
+network_pid=""
 server_started=0
 
 adb_device() {
@@ -152,6 +168,27 @@ start_peer() {
 }
 
 # The lengths (ms) of the stretches of voice a person heard that count as voice, one per line.
+# Plays the phone network for a scenario: the test asks in the device log ("gsm call <number>",
+# "gsm cancel <number>") and the emulator's console, which only the host reaches, does it.
+start_phone_network() {
+  (
+    "${ADB}" -s "${serial}" logcat -v raw -T 1 -s MumcordE2E:I | while read -r word command number; do
+      if [[ "${word}" == "gsm" && "${command}" =~ ^(call|cancel)$ && "${number}" =~ ^[0-9]+$ ]]; then
+        "${ADB}" -s "${serial}" emu gsm "${command}" "${number}" >/dev/null 2>&1 || true
+      fi
+    done
+  ) &
+  network_pid=$!
+}
+
+stop_phone_network() {
+  [[ -n "${network_pid}" ]] || return 0
+  pkill -P "${network_pid}" 2>/dev/null || true
+  kill "${network_pid}" 2>/dev/null || true
+  wait "${network_pid}" 2>/dev/null || true
+  network_pid=""
+}
+
 voice_spans() {
   sed -n 's/^SPAN ms=//p' "$1" | awk -v least="${VOICE_SPAN_MS}" '$1 >= least'
 }
@@ -165,6 +202,30 @@ check_peers() {
   case "${kind}" in
     peer)
       grep '^HEARD' "${PEER_LOG}" || die "the second person did not hear the app, see ${peer_log}"
+      ;;
+    lock)
+      held="$(sed -n 's/^lock: locked_ms=\([0-9]*\).*/\1/p' "${report}" | tr -d '\r')"
+      [[ -n "${held}" ]] || die "the test did not report how long the app was in the background and locked"
+      longest="$(sort -n <<<"${spans}" | tail -n 1)"
+      printf 'e2e: background and lock: %s ms away from the screen, heard without a gap for %s ms\n' \
+        "${held}" "${longest:-0}"
+      ((${longest:-0} >= held)) \
+        || die "the second person did not hear the app for the whole time it was locked, see ${peer_log}"
+      ;;
+    call)
+      printf 'e2e: phone call: the second person heard the app %s times (ms: %s)\n' \
+        "${count}" "$(tr '\n' ' ' <<<"${spans}")"
+      ((count == 2)) || die "the second person should have heard the app before and after the phone call, see ${peer_log}"
+      ;;
+    lockptt)
+      # How exactly the release is timed is the push-to-talk scenario's business. Here the
+      # point is that the one stretch heard is the press, and nothing of the time locked.
+      held="$(sed -n 's/^ptt: held_ms=//p' "${report}" | tr -d '\r')"
+      [[ -n "${held}" ]] || die "the test did not report how long hold-to-talk was held"
+      printf 'e2e: push-to-talk while locked: held %s ms, heard %s times (ms: %s), locked for %s s\n' \
+        "${held}" "${count}" "$(tr '\n' ' ' <<<"${spans}")" "${LOCK_PTT_SECONDS}"
+      ((count == 1)) || die "the second person heard the app ${count} times instead of once, see ${peer_log}"
+      ((spans < held + LOCK_PTT_SECONDS * 1000 / 2)) || die "the app was heard while the screen was locked"
       ;;
     ptt)
       held="$(sed -n 's/^ptt: held_ms=//p' "${report}" | tr -d '\r')"
@@ -211,6 +272,7 @@ cleanup() {
       tail -n 40 "${log}"
     done
   fi
+  stop_phone_network
   if [[ -n "${serial}" ]]; then
     timeout 20 "${ADB}" -s "${serial}" logcat -d >"${OUT_DIR}/logcat.txt" 2>/dev/null
   fi
@@ -309,8 +371,21 @@ run_scenario() {
     adb_device shell pm grant "${APP_PACKAGE}" "${MICROPHONE_PERMISSION}" \
       || die "granting the microphone failed"
   fi
+  if [[ "${peer}" != "notify" ]] && ((device_api >= NOTIFICATION_PERMISSION_API)); then
+    adb_device shell pm grant "${APP_PACKAGE}" "${NOTIFICATION_PERMISSION}" \
+      || die "granting notifications failed"
+  fi
+  local extra=()
   case "${peer}" in
-    alone) ;;
+    alone | notify) ;;
+    lockptt)
+      extra=(-e lockSeconds "${LOCK_PTT_SECONDS}")
+      start_peer "${PEER_LOG}"
+      ;;
+    call)
+      start_phone_network
+      start_peer "${PEER_LOG}"
+      ;;
     whisper)
       start_peer "${PEER_LOG}" --listen-only
       start_peer "${BYSTANDER_LOG}" --name "${BYSTANDER_NAME}" --listen-only
@@ -319,7 +394,7 @@ run_scenario() {
   esac
   timeout "${TEST_TIMEOUT}" "${ADB}" -s "${serial}" shell am instrument -w \
     -e serverHost "${HOST_FROM_EMULATOR}" -e serverPort "${MUMCORD_PORT_BASE}" -e class "${test}" \
-    "${@:5}" "${TEST_PACKAGE}/${RUNNER}" | tee "${report}" || status=$?
+    "${extra[@]}" "${@:5}" "${TEST_PACKAGE}/${RUNNER}" | tee "${report}" || status=$?
   cat "${report}" >>"${OUT_DIR}/instrument.txt"
   if ((status == 124)); then
     # The test still runs, so the screen shows where it hangs.
@@ -332,7 +407,8 @@ run_scenario() {
   if ((status != 0)) || ! grep -Eq '^OK \([1-9][0-9]* tests?\)' "${report}"; then
     die "tests failed, see above and e2e/build/logcat.txt"
   fi
-  if [[ "${peer}" != "alone" ]]; then
+  stop_phone_network
+  if [[ "${peer}" != "alone" && "${peer}" != "notify" ]]; then
     check_peers "${peer}" "${report}"
     stop_peers
   fi

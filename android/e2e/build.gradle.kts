@@ -25,6 +25,8 @@ dependencies {
     // The audio test probe of the app's debug build. Its code is inside the app under test, so
     // the tests only compile against it.
     compileOnly(project(":platform:audio"))
+    // What the user is set to on the server, read from the app under test.
+    compileOnly(project(":platform:call"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui.test.junit4)

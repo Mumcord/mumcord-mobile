@@ -12,6 +12,7 @@ import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.session.CertificatePromptState
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.ui.connect.CertificateSheet
+import app.mumcord.mobile.ui.connect.SessionEndedSheet
 import app.mumcord.mobile.ui.connect.LocalNetworkSheet
 import app.mumcord.mobile.ui.servers.ConnectFailure
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
@@ -98,6 +99,18 @@ class ServerScreensScreenshotTest {
         }
 
     private fun serverList(dark: Boolean) = capture("android-server-list", dark) { ServerList(rows()) }
+
+    // No mockup: the notice after the system closed the app in the middle of a session.
+    private fun sessionEnded(dark: Boolean) = capture("android-session-ended-notice", dark) {
+        Box {
+            ServerList(rows())
+            SessionEndedSheet("Nordlicht", onReconnect = {}, onDismiss = {}, topInsets = top, bottomInsets = bottom)
+        }
+    }
+
+    @Test fun sessionEndedDark() = sessionEnded(dark = true)
+
+    @Test fun sessionEndedLight() = sessionEnded(dark = false)
 
     private fun serverListEmpty(dark: Boolean) = capture("android-server-list-empty", dark) { ServerList(emptyList()) }
 

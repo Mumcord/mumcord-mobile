@@ -30,7 +30,7 @@ class NativeAudioTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
     private val controller = AudioController(
         backend = NativeAudio,
-        session = AndroidVoiceSession(context) { },
+        session = AndroidVoiceSession(context, log = { }),
         microphoneGranted = { true },
         scope = scope,
         log = { },

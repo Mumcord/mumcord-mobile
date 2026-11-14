@@ -10,6 +10,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import app.mumcord.mobile.MumcordApplication
 import app.mumcord.mobile.bridge.SavedServer
+import app.mumcord.mobile.platform.call.SessionEndedNotice
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
@@ -25,6 +26,7 @@ import app.mumcord.mobile.ui.connected.ConnectedLocal
 import app.mumcord.mobile.ui.connected.MicrophoneAccess
 import app.mumcord.mobile.ui.connected.MicrophoneAnswer
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
+import app.mumcord.mobile.ui.connected.NotificationAccess
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.ui.link.linkConfirmState
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
@@ -53,19 +55,32 @@ class AppViewModel(
     private val setupStore: SetupStore,
     private val localNetwork: LocalNetworkGateway,
     private val microphone: MicrophoneAccess,
+    private val notifications: NotificationAccess = NotificationAccess.Never,
+    sessionEnded: SessionEndedNotice? = null,
 ) : ViewModel() {
-    private val local = MutableStateFlow(AppUiState(setupDone = setupStore.firstStartDone))
+    private val local = MutableStateFlow(
+        AppUiState(
+            setupDone = setupStore.firstStartDone,
+            overlay = sessionEnded?.let { Overlay.SessionEnded(it.serverId, it.serverName) },
+        ),
+    )
 
 
     /** The connected screens' own state and actions. */
     val connected = ConnectedController(repository, viewModelScope)
 
     val uiState: StateFlow<AppUiState> =
-        combine(local, repository.state, connected.local, microphone.notice, ::merge)
+        combine(local, repository.state, connected.local, microphone.notice, notifications.explain, ::merge)
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-                merge(local.value, repository.state.value, connected.local.value, microphone.notice.value),
+                merge(
+                    local.value,
+                    repository.state.value,
+                    connected.local.value,
+                    microphone.notice.value,
+                    notifications.explain.value,
+                ),
             )
 
     private fun merge(
@@ -73,10 +88,17 @@ class AppViewModel(
         session: SessionState,
         connectedLocal: ConnectedLocal,
         microphoneNotice: MicrophoneNotice,
+        explainNotifications: Boolean,
     ): AppUiState {
         val merged = ui.copy(session = session)
         return merged.copy(
-            connected = connectedUiState(session, connectedLocal, merged.activeServerName.orEmpty(), microphoneNotice),
+            connected = connectedUiState(
+                session,
+                connectedLocal,
+                merged.activeServerName.orEmpty(),
+                microphoneNotice,
+                explainNotifications,
+            ),
         )
     }
 
@@ -264,8 +286,7 @@ class AppViewModel(
         }
     }
 
-    /** Ends the connection, also while it is still being made. */
-    // ----- microphone -----
+    // ----- microphone and notifications -----
 
     /** The explanation was put away: the user keeps listening and a notice says so. */
     fun microphoneNotNow() = microphone.notNow()
@@ -275,6 +296,19 @@ class AppViewModel(
     /** Back on screen: the permission may have changed in the system settings. */
     fun recheckMicrophone() = microphone.recheck()
 
+    /** The explanation was put away: the session goes on without its notification. */
+    fun notificationsNotNow() = notifications.notNow()
+
+    fun answerNotificationPrompt(granted: Boolean) = notifications.answer(granted)
+
+    /** Connects again to the server of the session that the system cut off. */
+    fun reconnectAfterSessionEnded() {
+        val overlay = local.value.overlay as? Overlay.SessionEnded ?: return
+        dismissOverlay()
+        connect(overlay.serverId)
+    }
+
+    /** Ends the connection, also while it is still being made. */
     fun disconnect() {
         addressCheck?.cancel()
         local.update { it.copy(checkingServerId = null) }
@@ -389,6 +423,8 @@ class AppViewModel(
                     PreferencesSetupStore(application),
                     application.localNetworkGateway,
                     application.voiceAudio,
+                    application.voiceCall.notifications,
+                    application.voiceCall.takeSessionEndedNotice(),
                 )
             }
         }

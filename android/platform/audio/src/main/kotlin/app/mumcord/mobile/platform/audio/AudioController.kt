@@ -42,6 +42,7 @@ class AudioController(
     private val open = mutableMapOf<AudioDirection, Int>()
     private val retries = mutableMapOf<AudioDirection, Job>()
     private var sessionActive = false
+    private var playbackPaused = false
 
     init {
         backend.onLost = { direction, generation -> scope.launch { lost(direction, generation) } }
@@ -65,6 +66,18 @@ class AudioController(
         }
     }
 
+    /**
+     * Stops the speaker for an interruption by the phone (an alarm, a navigation prompt) and
+     * starts it again afterwards. The voice session stays, so the phone can say when the
+     * interruption is over; the engine and the other people notice nothing.
+     */
+    fun setPlaybackPaused(paused: Boolean) {
+        scope.launch {
+            playbackPaused = paused
+            reconcile()
+        }
+    }
+
     /** Looks at the microphone permission again, after the user answered or came back to the app. */
     fun refreshPermission() {
         scope.launch { reconcile() }
@@ -74,10 +87,12 @@ class AudioController(
         wanted.getValue(direction) && direction in handles
 
     private fun reconcile() {
-        val playback = needed(AudioDirection.Playback)
+        val playbackNeeded = needed(AudioDirection.Playback)
+        val playback = playbackNeeded && !playbackPaused
         val captureNeeded = needed(AudioDirection.Capture)
         val capture = captureNeeded && microphoneGranted()
-        if ((playback || capture) && !sessionActive) {
+        val sessionNeeded = playbackNeeded || capture
+        if (sessionNeeded && !sessionActive) {
             // Before the streams: the mode decides which device and processing they get.
             session.begin()
             sessionActive = true
@@ -88,7 +103,7 @@ class AudioController(
             capture,
             if (captureNeeded) StreamState.NoPermission else StreamState.Stopped,
         )
-        if (!playback && !capture && sessionActive) {
+        if (!sessionNeeded && sessionActive) {
             session.end()
             sessionActive = false
         }

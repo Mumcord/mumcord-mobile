@@ -164,6 +164,14 @@
     <string name="microphone_denied_settings">Mumcord may not use the microphone. Tap here and allow “Microphone” for Mumcord in the system settings.</string>
     <string name="microphone_allow">Allow the microphone</string>
     <string name="microphone_open_settings">Open settings</string>
+    <string name="notifications_title">Notifications</string>
+    <string name="notifications_text">Mumcord shows a running voice session as a notification, so that you can mute, deafen and leave without opening the app.</string>
+    <string name="notifications_continue">Continue</string>
+    <string name="notifications_not_now">Not now</string>
+    <string name="session_ended_title">Session ended</string>
+    <string name="session_ended_text">Mumcord was closed by the system while you were connected to %1$s.</string>
+    <string name="session_ended_reconnect">Reconnect</string>
+    <string name="session_ended_close">Close</string>
     <string name="denied_title">The server did not allow that</string>
     <string name="denied_title_channel">You cannot join %1$s</string>
     <string name="denied_text">You do not have permission for this.</string>

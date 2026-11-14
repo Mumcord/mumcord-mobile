@@ -72,8 +72,9 @@ class ConnectedScreenshotTest {
         local: ConnectedLocal,
         session: SessionState = this.session,
         microphone: MicrophoneNotice = MicrophoneNotice.None,
+        explainNotifications: Boolean = false,
     ) = composeRule.captureScreenshot("$name-${if (dark) "dark" else "light"}") {
-        val state = checkNotNull(connectedUiState(session, local, "Nordlicht", microphone))
+        val state = checkNotNull(connectedUiState(session, local, "Nordlicht", microphone, explainNotifications))
         MumcordTheme(darkTheme = dark) {
             Box(Modifier.fillMaxSize()) {
                 ConnectedShell(
@@ -116,6 +117,14 @@ class ConnectedScreenshotTest {
 
     private fun microphoneDenied(dark: Boolean) =
         capture("android-mic-denied", dark, ConnectedLocal(), microphone = MicrophoneNotice.Denied)
+
+    // No mockup: why notifications are wanted, before the system asks.
+    private fun notificationsExplain(dark: Boolean) =
+        capture("android-notify-explain", dark, ConnectedLocal(), explainNotifications = true)
+
+    @Test fun notificationsExplainDark() = notificationsExplain(dark = true)
+
+    @Test fun notificationsExplainLight() = notificationsExplain(dark = false)
 
     @Test fun channelsDark() = channels(dark = true)
 

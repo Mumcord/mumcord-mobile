@@ -19,6 +19,7 @@ import app.mumcord.mobile.ui.connect.ConfirmSwitchSheet
 import app.mumcord.mobile.ui.connect.LocalNetworkSheet
 import app.mumcord.mobile.ui.connect.LocalNetworkSystem
 import app.mumcord.mobile.ui.connect.PasswordSheet
+import app.mumcord.mobile.ui.connect.SessionEndedSheet
 import app.mumcord.mobile.ui.connect.rememberLocalNetworkSystem
 import app.mumcord.mobile.ui.link.InvalidLinkSheet
 import app.mumcord.mobile.ui.link.LinkConfirmSheet
@@ -30,6 +31,8 @@ import app.mumcord.mobile.ui.connected.ConnectedSheetHost
 import app.mumcord.mobile.ui.connected.ConnectedShell
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.MicrophoneSystem
+import app.mumcord.mobile.ui.connected.NotificationSystem
+import app.mumcord.mobile.ui.connected.rememberNotificationSystem
 import app.mumcord.mobile.ui.connected.rememberMicrophoneSystem
 
 /** Connects the screens to the view model; everything below it only gets values and callbacks. */
@@ -38,6 +41,7 @@ fun AppRoute(
     viewModel: AppViewModel,
     localNetwork: LocalNetworkSystem = rememberLocalNetworkSystem(viewModel::answerLocalNetworkPrompt),
     microphone: MicrophoneSystem = rememberMicrophoneSystem(viewModel::answerMicrophonePrompt),
+    notifications: NotificationSystem = rememberNotificationSystem(viewModel::answerNotificationPrompt),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     LifecycleResumeEffect(viewModel) {
@@ -45,7 +49,7 @@ fun AppRoute(
         viewModel.recheckMicrophone()
         onPauseOrDispose { }
     }
-    AppContent(uiState, viewModel, localNetwork, microphone)
+    AppContent(uiState, viewModel, localNetwork, microphone, notifications)
 }
 
 /**
@@ -59,6 +63,7 @@ fun AppContent(
     viewModel: AppViewModel,
     localNetwork: LocalNetworkSystem,
     microphone: MicrophoneSystem,
+    notifications: NotificationSystem = NotificationSystem(ask = {}),
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
@@ -175,6 +180,13 @@ fun AppContent(
                 topInsets = topInsets,
                 bottomInsets = bottomInsets,
             )
+            overlay is Overlay.SessionEnded -> SessionEndedSheet(
+                serverName = overlay.serverName,
+                onReconnect = viewModel::reconnectAfterSessionEnded,
+                onDismiss = viewModel::dismissOverlay,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+            )
             overlay is Overlay.InvalidLink -> InvalidLinkSheet(viewModel::dismissOverlay, topInsets, bottomInsets)
             connectedSheet != null -> ConnectedSheetHost(
                 sheet = connectedSheet,
@@ -183,6 +195,8 @@ fun AppContent(
                 bottomInsets = bottomInsets,
                 onMicrophoneContinue = microphone.ask,
                 onMicrophoneNotNow = viewModel::microphoneNotNow,
+                onNotificationsContinue = notifications.ask,
+                onNotificationsNotNow = viewModel::notificationsNotNow,
             )
         }
     }

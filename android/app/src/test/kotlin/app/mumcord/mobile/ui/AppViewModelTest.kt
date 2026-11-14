@@ -10,6 +10,7 @@ import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
 import app.mumcord.mobile.bridge.ServerState
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.platform.call.SessionEndedNotice
 import app.mumcord.mobile.session.ConnectCall
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
@@ -497,5 +498,34 @@ class AppViewModelTest {
 
         assertEquals(Overlay.InvalidLink, viewModel.ui.overlay)
         assertTrue(engine.connectCalls.isEmpty())
+    }
+
+    // ----- a session the system cut off (FR-5.37) -----
+
+    @Test
+    fun aSessionCutOffByTheSystemIsToldAtTheStartAndOnlyReconnectsWhenAsked() = runTest(dispatcher) {
+        val repository = SessionRepository(
+            { FakeEngine(it, server, servers = listOf(nordlicht, tidepool)).also { e -> engine = e } },
+            backgroundScope,
+            dispatcher,
+            {},
+        )
+        val viewModel = AppViewModel(
+            repository,
+            FakeSetupStore(done = true),
+            localNetwork,
+            FakeMicrophoneAccess(),
+            sessionEnded = SessionEndedNotice(nordlicht.id, nordlicht.name),
+        )
+        backgroundScope.launch { viewModel.uiState.collect() }
+        runCurrent()
+
+        assertEquals(Overlay.SessionEnded(nordlicht.id, nordlicht.name), viewModel.ui.overlay)
+        assertTrue("Nothing reconnects by itself", engine.connectCalls.isEmpty())
+
+        viewModel.reconnectAfterSessionEnded()
+        runCurrent()
+        assertNull(viewModel.ui.overlay)
+        assertEquals(listOf(nordlicht.id), engine.connectCalls.map { it.serverId })
     }
 }

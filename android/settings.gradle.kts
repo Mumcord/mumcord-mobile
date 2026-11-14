@@ -31,6 +31,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "mumcord-mobile"
 
-include(":app", ":design", ":engine", ":platform:audio", ":platform:securestore")
+include(":app", ":design", ":engine", ":platform:audio", ":platform:call", ":platform:securestore")
 // End-to-end tests against the local test server; they only run through e2e/run.sh.
 include(":e2e")

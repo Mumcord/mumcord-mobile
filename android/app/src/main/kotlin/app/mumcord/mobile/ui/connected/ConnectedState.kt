@@ -176,6 +176,9 @@ sealed interface ConnectedSheet {
 
     /** Why the microphone is needed, before the system asks for it. */
     data object Microphone : ConnectedSheet
+
+    /** What the session's notification is for, before the system asks for it. */
+    data object Notifications : ConnectedSheet
 }
 
 /** A refusal by the server; [channelName] and [detail] are untrusted text. */
@@ -204,6 +207,7 @@ fun connectedUiState(
     local: ConnectedLocal,
     serverName: String,
     microphone: MicrophoneNotice = MicrophoneNotice.None,
+    explainNotifications: Boolean = false,
 ): ConnectedUiState? {
     val server = session.server?.takeIf { session.showsServer } ?: return null
     val rows = channelRows(server.root, server.selfChannelId, local.collapsed, if (local.searching) local.query else "")
@@ -221,6 +225,8 @@ fun connectedUiState(
         // Asked when talking first becomes possible; it closes what the user had open, so
         // there is never more than one sheet.
         microphone == MicrophoneNotice.Explain -> ConnectedSheet.Microphone
+        // Asked once the first session runs, after the microphone.
+        explainNotifications -> ConnectedSheet.Notifications
         person != null -> ConnectedSheet.PersonSheet(
             session = person.session,
             name = person.name,

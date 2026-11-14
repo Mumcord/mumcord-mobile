@@ -47,12 +47,16 @@ fun ConnectedSheetHost(
     bottomInsets: WindowInsets,
     onMicrophoneContinue: () -> Unit,
     onMicrophoneNotNow: () -> Unit,
+    onNotificationsContinue: () -> Unit = {},
+    onNotificationsNotNow: () -> Unit = {},
 ) {
     when (sheet) {
         is ConnectedSheet.ChannelPassword -> ChannelPasswordSheet(sheet, actions, topInsets, bottomInsets)
         is ConnectedSheet.PersonSheet -> PersonSheet(sheet, actions, topInsets, bottomInsets)
         is ConnectedSheet.ChannelMenu -> ChannelMenuSheet(sheet, actions, topInsets, bottomInsets)
         ConnectedSheet.Microphone -> MicrophoneSheet(onMicrophoneContinue, onMicrophoneNotNow, topInsets, bottomInsets)
+        ConnectedSheet.Notifications ->
+            NotificationSheet(onNotificationsContinue, onNotificationsNotNow, topInsets, bottomInsets)
     }
 }
 
