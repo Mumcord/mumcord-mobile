@@ -64,8 +64,31 @@ differently on other machines.
 
 ## iOS
 
-The iOS app reads the same three things: `tokens.json` for its colour, type, spacing and radius
-definitions, `icons.json` for the icon shapes, and the font files in `fonts/`.
+`ios/Tools/generate_design.py` generates Swift from `tokens.json` and `icons.json` and copies the
+fonts into `ios/Mumcord/Design/Generated/` (git-ignored, nothing generated is checked in). It
+runs in `scripts/build-ios.sh` before the Xcode project is generated and again as a build phase
+of the app before every compile. `DesignTokenTests` reads the JSON files independently and
+compares them with the generated values, `DesignContrastTests` checks the text and background
+pairs for WCAG AA, and `DesignIconTests` checks that the icon set is complete.
+
+Screens put the theme into the environment with `.mumcordTheme()` (system, dark or light) and
+read `@Environment(\.mumcordTheme)` for `colors`, `opacities` and `shadows`; text uses the
+`TextToken` styles through `LineText` and `ParagraphText`, which follow Dynamic Type; lengths
+come from `MumcordSpace`, `MumcordRadius` and `MumcordSize`, icons from `MumcordIcons`. The
+components in `ios/Mumcord/Design/Components` have the same names as on Android. Screens contain
+no raw colour values.
+
+Debug builds contain the component gallery and the channels reference screen; a debug build
+started with launch arguments opens them (nothing in the app leads there, and release builds do
+not contain them):
+
+```sh
+xcrun simctl launch booted app.mumcord.mobile -mumcordDesignScreen gallery
+xcrun simctl launch booted app.mumcord.mobile -mumcordDesignScreen channels -mumcordDesignTheme light
+```
+
+`DesignReferenceUITests` opens the reference screen in dark and light in the simulator and
+attaches a screenshot of each; CI publishes them as the artifact `ios-screenshots`.
 
 ## Changing a value
 
