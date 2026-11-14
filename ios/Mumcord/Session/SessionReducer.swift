@@ -80,6 +80,12 @@ extension SessionState {
         // store, so that it does not make every screen compare its state.
         case .inputLevelChanged:
             break
+        case .whisperEnded:
+            next.whispersEnded += 1
+        // The identity screens (task 6.5) are the first to follow the identities, the settings
+        // screens (task 8.6) the first to follow the phone settings.
+        case .identitiesChanged, .mobileSettingsChanged:
+            break
         // Messages and unread counts go to `ChatStore` and never reach this state. The rest
         // belongs to the Messages tab.
         case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,

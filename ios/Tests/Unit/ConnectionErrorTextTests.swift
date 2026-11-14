@@ -14,6 +14,12 @@ final class ConnectionErrorTextTests: XCTestCase {
         XCTAssertEqual(ConnectionError.banned.message, Strings.errorBanned)
     }
 
+    func testTheErrorsOfIdentitiesHaveTheirOwnSentence() {
+        XCTAssertEqual(ConnectionError.duplicateIdentity.message, Strings.errorDuplicateIdentity)
+        XCTAssertEqual(ConnectionError.lastIdentity.message, Strings.errorLastIdentity)
+        XCTAssertEqual(ConnectionError.noIdentity.message, Strings.errorNoIdentity)
+    }
+
     func testEveryErrorHasASentenceOfItsOwn() {
         let messages = ConnectionError.allCases.map(\.message)
 

@@ -100,6 +100,7 @@ final class AppModel {
     private func apply(_ state: SessionState) {
         let serversChanged = state.servers != session.servers
         let previousPhase = session.phase
+        let whisperEnded = state.whispersEnded != session.whispersEnded
         session = state
         if serversChanged { ping(state.servers) }
         if !state.showsServer {
@@ -109,6 +110,12 @@ final class AppModel {
         } else if let target = connectedLocal.whisperTarget, state.server?.whisperName(target) == nil {
             // The whisper bar goes away with the person or channel it is for.
             closeWhisper()
+        }
+        if whisperEnded {
+            // The engine ended the whisper by itself and already talks to the channel again,
+            // so there is nothing to stop: only the bar goes away.
+            connectedLocal.whisperHeld = false
+            connectedLocal.whisperTarget = nil
         }
         if state.phase != previousPhase { askSystemAboutLocalNetwork(state) }
         syncChat()

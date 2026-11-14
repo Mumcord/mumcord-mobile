@@ -62,6 +62,28 @@ final class SessionReducerTests: XCTestCase {
         XCTAssertEqual(state.hints.map(\.id), [3, 4, 5])
     }
 
+    func testAWhisperTheEngineEndedIsCounted() {
+        let once = SessionState().fold(.whisperEnded)
+        XCTAssertEqual(once.whispersEnded, 1)
+        XCTAssertEqual(once.fold(.whisperEnded).whispersEnded, 2)
+    }
+
+    func testIdentitiesAndPhoneSettingsDoNotChangeTheStateYet() {
+        let state = fold(connected)
+        XCTAssertEqual(state.fold(.identitiesChanged(identities: [])), state)
+        let settings = MobileSettings(
+            talkModeChosen: true,
+            defaultOutput: .speaker,
+            mobileDataAutoplayStreams: false,
+            mobileDataLoadMedia: true,
+            mobileDataReducedVoice: false,
+            idleDisconnect: false,
+            notifySenderOnly: true,
+            updateCheck: true
+        )
+        XCTAssertEqual(state.fold(.mobileSettingsChanged(settings: settings)), state)
+    }
+
     func testANewSessionIsIdleAndShowsNoServer() {
         let state = SessionState()
         XCTAssertEqual(state.phase, .idle)
@@ -208,6 +230,9 @@ final class SessionReducerTests: XCTestCase {
             (.InvalidInput(detail: "d"), .invalidInput),
             (.SecureStorageUnavailable(detail: "d"), .secureStorageUnavailable),
             (.Io(detail: "d"), .io),
+            (.DuplicateIdentity(detail: "d"), .duplicateIdentity),
+            (.LastIdentity(detail: "d"), .lastIdentity),
+            (.NoIdentity(detail: "d"), .noIdentity),
             (.Internal(detail: "d"), .internalError),
         ]
         XCTAssertEqual(Set(ConnectionError.allCases), Set(mapping.map(\.1)))

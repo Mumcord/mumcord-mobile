@@ -89,6 +89,9 @@
 "error_invalid_input" = "The server address, the port or the name is not valid.";
 "error_secure_storage_unavailable" = "The secure storage of this device is not available, so Mumcord cannot protect your identity.";
 "error_io" = "Mumcord could not read or write its data on this device.";
+"error_duplicate_identity" = "This identity is already on this phone.";
+"error_last_identity" = "You cannot delete your last identity.";
+"error_no_identity" = "Create or import an identity first.";
 "error_internal" = "Something went wrong inside Mumcord.";
 "certificate_unknown_title" = "Trust this server?";
 "certificate_unknown_message" = "Mumcord has not seen this server before and cannot confirm its identity on its own. If you know the server's fingerprint, compare it with the one below.";

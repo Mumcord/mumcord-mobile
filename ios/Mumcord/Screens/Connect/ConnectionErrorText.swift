@@ -17,6 +17,9 @@ extension ConnectionError {
         case .invalidInput: Strings.errorInvalidInput
         case .secureStorageUnavailable: Strings.errorSecureStorageUnavailable
         case .io: Strings.errorIo
+        case .duplicateIdentity: Strings.errorDuplicateIdentity
+        case .lastIdentity: Strings.errorLastIdentity
+        case .noIdentity: Strings.errorNoIdentity
         case .internalError: Strings.errorInternal
         }
     }

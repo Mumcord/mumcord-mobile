@@ -17,6 +17,9 @@ struct SessionState: Equatable {
     var channelPassword: ChannelPasswordPrompt?
     /// The latest thing the server refused, until it is put away.
     var denied: DeniedAction?
+    /// How often the engine ended a whisper by itself (the person left, the connection dropped).
+    /// The whisper bar closes each time it grows.
+    var whispersEnded = 0
     /// Things the app cannot show, newest last; see `withHint`.
     var hints: [UnsupportedHint] = []
     /// The saved talk mode; voice activity until the engine has been asked.

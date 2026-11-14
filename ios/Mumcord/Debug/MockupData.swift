@@ -43,7 +43,9 @@ func person(_ session: UInt32, _ name: String, channelId: UInt32 = 0, isSelf: Bo
         localVolume: 100,
         locallyMuted: false,
         streaming: false,
-        camera: false
+        camera: false,
+        blocked: false,
+        supportsChatRequests: false
     )
 }
 

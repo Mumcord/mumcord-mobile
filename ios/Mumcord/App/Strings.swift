@@ -95,6 +95,9 @@ enum Strings {
     static var errorInvalidInput: String { text("error_invalid_input") }
     static var errorSecureStorageUnavailable: String { text("error_secure_storage_unavailable") }
     static var errorIo: String { text("error_io") }
+    static var errorDuplicateIdentity: String { text("error_duplicate_identity") }
+    static var errorLastIdentity: String { text("error_last_identity") }
+    static var errorNoIdentity: String { text("error_no_identity") }
     static var errorInternal: String { text("error_internal") }
     static var certificateUnknownTitle: String { text("certificate_unknown_title") }
     static var certificateUnknownMessage: String { text("certificate_unknown_message") }

@@ -17,6 +17,9 @@ enum ConnectionError: CaseIterable, Equatable {
     case invalidInput
     case secureStorageUnavailable
     case io
+    case duplicateIdentity
+    case lastIdentity
+    case noIdentity
     case internalError
 }
 
@@ -36,6 +39,9 @@ extension BridgeError {
         case .InvalidInput: .invalidInput
         case .SecureStorageUnavailable: .secureStorageUnavailable
         case .Io: .io
+        case .DuplicateIdentity: .duplicateIdentity
+        case .LastIdentity: .lastIdentity
+        case .NoIdentity: .noIdentity
         case .Internal: .internalError
         }
     }
@@ -47,7 +53,8 @@ extension BridgeError {
              .NameInUse(let detail), .CertificateRejected(let detail), .CertificateChanged(let detail),
              .ServerTooOld(let detail), .Banned(let detail), .NotFound(let detail),
              .PermissionDenied(let detail), .InvalidInput(let detail),
-             .SecureStorageUnavailable(let detail), .Io(let detail), .Internal(let detail):
+             .SecureStorageUnavailable(let detail), .Io(let detail), .DuplicateIdentity(let detail),
+             .LastIdentity(let detail), .NoIdentity(let detail), .Internal(let detail):
             detail
         }
     }

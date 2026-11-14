@@ -188,6 +188,21 @@ final class AppModelVoiceTests: XCTestCase {
         XCTAssertEqual(engine.whisperStops, 1)
     }
 
+    func testAWhisperTheEngineEndedClosesTheBarWithoutStoppingAnything() async {
+        let model = await makeConnected()
+        model.openWhisper(.person(session: Mockup.jonas))
+        model.setWhisperHeld(true)
+        await assertEventually { self.engine.whisperStarts.count == 1 }
+
+        engine.emit(.whisperEnded)
+
+        await assertEventually { self.voice(model)?.whisper == nil }
+        XCTAssertEqual(engine.whisperStops, 0, "the engine has already switched back")
+        // The next whisper works as before.
+        model.openWhisper(.person(session: Mockup.jonas))
+        XCTAssertEqual(voice(model)?.whisper?.held, false)
+    }
+
     func testARefusedWhisperIsShownInTheServersWordsAndTheButtonIsNotHeld() async {
         let model = await makeConnected()
         engine.whisperFailure = .PermissionDenied(detail: "Whispering is not allowed here.")
