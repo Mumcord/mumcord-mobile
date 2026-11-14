@@ -81,6 +81,9 @@ jobs:
                   exported = attachment["exportedFileName"]
                   # "first-screen_0_<uuid>.png" becomes "first-screen.png".
                   name = re.sub(r"_\d+_[0-9A-Fa-f-]{36}(?=\.\w+$)", "", attachment.get("suggestedHumanReadableName") or exported)
+                  # Attachments of a failed test are named after the failure; keep only
+                  # characters an artifact may contain.
+                  name = re.sub(r"[^A-Za-z0-9._ -]", "_", name)
                   shutil.copyfile(source / exported, target / name)
                   print(f"{exported} -> {name}")
           PY

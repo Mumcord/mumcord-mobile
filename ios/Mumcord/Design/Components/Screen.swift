@@ -35,8 +35,10 @@ struct MumcordScreen<Content: View>: View {
         }
         .background { backdrop.ignoresSafeArea() }
         .overlay {
-            Image(uiImage: Grain.image)
-                .resizable(resizingMode: .tile)
+            // Painted as a shape fill: an image view would lie over the whole screen as an
+            // accessibility element and keep UI tests from tapping what is below it.
+            Rectangle()
+                .fill(ImagePaint(image: Image(uiImage: Grain.image)))
                 .opacity(theme.opacities.grain)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
