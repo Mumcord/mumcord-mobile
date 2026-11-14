@@ -72,7 +72,9 @@ class MuteDeafenFlowTest {
         compose.onNodeWithText(TAB_CHAT).performClick()
         compose.onNodeWithContentDescription(MUTE).performClick()
         app.await("the microphone stream to stop after muting") { VoiceChecks.microphoneFramesIn(1_000) == 0L }
-        assertTrue("Listening goes on while muted", VoiceChecks.speakerLoudFor(VoiceChecks.STEADY_POLLS))
+        // Waited for instead of measured once: on a busy emulator a single gap in what the
+        // speaker plays would otherwise fail the test.
+        awaitTheSecondPersonsVoice("while muted")
         compose.onNodeWithContentDescription(UNMUTE).performClick()
         app.await("the microphone stream to run again after unmuting") { VoiceChecks.microphoneFramesIn(500) > 0 }
         // Long enough for the second person to hear the phone as a new stretch of voice.
@@ -104,6 +106,7 @@ class MuteDeafenFlowTest {
         const val UNMUTE = "Unmute microphone"
         const val VOICE_CONNECTED = "Voice connected"
         const val HEARD_AGAIN_MILLIS = 3_000L
-        const val SPAN_END_MILLIS = 1_500L
+        /** Well over the silence after which the second person reports a stretch as over (1 s). */
+        const val SPAN_END_MILLIS = 3_000L
     }
 }

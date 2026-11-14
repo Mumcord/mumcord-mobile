@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.printToString
 import app.mumcord.mobile.ui.connect.CERTIFICATE_TRUST_TEST_TAG
 import app.mumcord.mobile.ui.connected.CHANNEL_ROW_TEST_TAG
 import app.mumcord.mobile.ui.connected.MORE_DISCONNECT_TEST_TAG
@@ -116,11 +118,18 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
         val deadline = System.nanoTime() + TIMEOUT_MILLIS * 1_000_000
         while (!condition()) {
             if (System.nanoTime() > deadline) {
-                throw AssertionError("Timed out after ${TIMEOUT_MILLIS / 1000} s waiting for $what")
+                throw AssertionError("Timed out after ${TIMEOUT_MILLIS / 1000} s waiting for $what. On the screen:\n${screen()}")
             }
             Thread.sleep(POLL_MILLIS)
         }
     }
+
+    /** What the app shows, window by window, to diagnose a failure from the test output. */
+    private fun screen(): String = runCatching {
+        compose.onAllNodes(isRoot()).fetchSemanticsNodes().indices.joinToString("\n") { index ->
+            compose.onAllNodes(isRoot())[index].printToString()
+        }
+    }.getOrElse { error -> "(the screen could not be read: $error)" }
 
     /** The texts of the error banner on the server list, or null while there is none. */
     fun connectError(): String? =
@@ -133,7 +142,11 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
     companion object {
         const val USER_NAME = "e2e-phone"
         const val LOBBY = "Lobby"
-        const val TIMEOUT_MILLIS = 30_000L
+        /**
+         * The longest any step may take. Generous, because the hosted CI emulator is several
+         * times slower than a developer's; a wait ends as soon as what it waits for is there.
+         */
+        const val TIMEOUT_MILLIS = 60_000L
         private const val TAB_MORE = "More"
         private const val LEAVE_SERVER = "Leave server"
 

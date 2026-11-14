@@ -49,8 +49,9 @@ const LISTEN_TIMEOUT: Duration = Duration::from_secs(240);
 /// The longest the peer keeps talking when nobody stops it.
 const TALK_TIMEOUT: Duration = Duration::from_secs(300);
 /// A stretch of voice is over after this long without a loud block. Longer than the pauses
-/// inside the test signal, so one stretch of talking is reported as one span.
-const SPAN_GAP: Duration = Duration::from_millis(600);
+/// inside the test signal and than a dropout of a busy emulator, so one stretch of talking is
+/// reported as one span; shorter than every pause the scenarios make on purpose (3 s and more).
+const SPAN_GAP: Duration = Duration::from_millis(1000);
 
 /// How this person was started.
 struct Options {

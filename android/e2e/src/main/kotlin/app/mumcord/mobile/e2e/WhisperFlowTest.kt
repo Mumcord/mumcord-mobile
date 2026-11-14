@@ -81,6 +81,7 @@ class WhisperFlowTest {
         /** The name of the second `e2e/voice-peer`, who must not hear the whisper. */
         const val BYSTANDER_NAME = "e2e-bystander"
         const val HOLD_MILLIS = 4_000L
-        const val SPAN_END_MILLIS = 1_500L
+        /** Well over the silence after which the second person reports a stretch as over (1 s). */
+        const val SPAN_END_MILLIS = 3_000L
     }
 }
