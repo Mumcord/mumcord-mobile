@@ -37,6 +37,8 @@ import app.mumcord.mobile.ui.connected.MicrophoneAnswer
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.NotificationAccess
 import app.mumcord.mobile.ui.connected.connectedUiState
+import app.mumcord.mobile.platform.call.OutputState
+import app.mumcord.mobile.session.OutputAccess
 import app.mumcord.mobile.ui.link.linkConfirmState
 import app.mumcord.mobile.ui.messages.MessagesController
 import app.mumcord.mobile.ui.messages.MessagesUiState
@@ -71,6 +73,7 @@ class AppViewModel(
     private val notifications: NotificationAccess = NotificationAccess.Never,
     sessionEnded: SessionEndedNotice? = null,
     messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(),
+    private val outputs: OutputAccess = OutputAccess.None,
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -81,28 +84,33 @@ class AppViewModel(
 
 
     /** The connected screens' own state and actions. */
-    val connected = ConnectedController(repository, viewModelScope)
+    val connected = ConnectedController(repository, viewModelScope, outputs)
+
+    /** What the phone says about the session, beside the session itself. */
+    private data class Phone(
+        val microphone: MicrophoneNotice,
+        val explainNotifications: Boolean,
+        val output: OutputState,
+        val askOutput: Boolean,
+    )
+
+    private val phone = combine(microphone.notice, notifications.explain, outputs.state, outputs.asking, ::Phone)
+    private val phoneNow: Phone
+        get() = Phone(microphone.notice.value, notifications.explain.value, outputs.state.value, outputs.asking.value)
 
     val uiState: StateFlow<AppUiState> =
-        combine(local, repository.state, connected.local, microphone.notice, notifications.explain, ::merge)
+        combine(local, repository.state, connected.local, phone, ::merge)
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-                merge(
-                    local.value,
-                    repository.state.value,
-                    connected.local.value,
-                    microphone.notice.value,
-                    notifications.explain.value,
-                ),
+                merge(local.value, repository.state.value, connected.local.value, phoneNow),
             )
 
     private fun merge(
         ui: AppUiState,
         session: SessionState,
         connectedLocal: ConnectedLocal,
-        microphoneNotice: MicrophoneNotice,
-        explainNotifications: Boolean,
+        phone: Phone,
     ): AppUiState {
         val merged = ui.copy(session = session)
         return merged.copy(
@@ -110,8 +118,10 @@ class AppViewModel(
                 session,
                 connectedLocal,
                 merged.activeServerName.orEmpty(),
-                microphoneNotice,
-                explainNotifications,
+                phone.microphone,
+                phone.explainNotifications,
+                phone.output,
+                phone.askOutput,
             ),
         )
     }
@@ -531,6 +541,7 @@ class AppViewModel(
                     application.voiceCall.notifications,
                     application.voiceCall.takeSessionEndedNotice(),
                     application.messageNotificationSettings,
+                    application.voiceOutput,
                 ).also {
                     // Starts with the first screen and then follows the session by itself.
                     application.messageNotifications

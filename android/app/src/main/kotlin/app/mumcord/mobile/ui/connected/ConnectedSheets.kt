@@ -67,6 +67,10 @@ fun ConnectedSheetHost(
         ConnectedSheet.Microphone -> MicrophoneSheet(onMicrophoneContinue, onMicrophoneNotNow, topInsets, bottomInsets)
         ConnectedSheet.Notifications ->
             NotificationSheet(onNotificationsContinue, onNotificationsNotNow, topInsets, bottomInsets)
+        ConnectedSheet.OutputQuestion ->
+            OutputQuestionSheet(actions::answerOutputQuestion, actions::dismissOutputQuestion, topInsets, bottomInsets)
+        is ConnectedSheet.AudioOutput ->
+            AudioOutputSheet(sheet.rows, actions::selectOutput, actions::dismissSheet, topInsets, bottomInsets)
     }
 }
 

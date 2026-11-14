@@ -25,8 +25,14 @@ interface CallActions {
 
     fun toggleDeafen()
 
-    /** Leaves the server, also when the phone system ends the call (a car's hang-up button). */
+    /** Leaves the server, also when the phone system ends the call while no headset is used. */
     fun leave()
+
+    /** A headset's button was pressed once: toggles the microphone, with a sound (FR-5.35). */
+    fun headsetButton()
+
+    /** The phone system muted or unmuted the call's microphone; the session follows it. */
+    fun systemMuted(muted: Boolean)
 }
 
 /** What the foreground service has to do after the session changed from [previous] to [next]. */

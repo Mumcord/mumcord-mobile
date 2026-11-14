@@ -4,6 +4,7 @@ package app.mumcord.mobile.ui.connected
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.bridge.WhisperTarget
+import app.mumcord.mobile.platform.call.AudioOutput
 import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.ServerModel
 import app.mumcord.mobile.session.SessionState
@@ -53,6 +54,8 @@ data class VoiceUiState(
     /** The people of the user's channel in rows, see [voiceTileRows]. */
     val tileRows: List<List<VoiceTile>>,
     val whisper: WhisperBarState?,
+    /** Where the voice is heard, for the chip in the full voice view; null while unknown. */
+    val output: AudioOutput? = null,
 )
 
 /** How many people stand next to each other in the full voice view. */
@@ -96,6 +99,7 @@ fun voiceUiState(
     local: ConnectedLocal,
     serverName: String,
     microphone: MicrophoneNotice,
+    output: AudioOutput? = null,
 ): VoiceUiState? {
     val self = server.people[server.selfSession] ?: return null
     val whisperName = local.whisperTarget?.let(server::whisperName)
@@ -113,5 +117,6 @@ fun voiceUiState(
         whisper = whisperName?.let {
             WhisperBarState(name = it, shout = local.whisperTarget is WhisperTarget.Channel, held = local.whisperHeld)
         },
+        output = output,
     )
 }

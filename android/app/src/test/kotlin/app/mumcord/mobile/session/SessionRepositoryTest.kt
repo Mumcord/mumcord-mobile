@@ -34,7 +34,7 @@ class SessionRepositoryTest {
     private val logs = mutableListOf<String>()
     private var engineStartFailure: Throwable? = null
     private val saved = savedServer(1, "Nordlicht")
-    private val idle = SessionState(servers = listOf(saved), serversLoaded = true)
+    private val idle = SessionState(servers = listOf(saved), serversLoaded = true, mobileSettings = FAKE_MOBILE_SETTINGS)
 
     private suspend fun TestScope.repository(prompt: CertificatePrompt? = this@SessionRepositoryTest.prompt) =
         SessionRepository(

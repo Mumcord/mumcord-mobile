@@ -12,7 +12,9 @@ import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.IBinder
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -27,6 +29,7 @@ import kotlinx.coroutines.launch
  * @param info the session, or null while there is none.
  * @param content opens the app on the voice view when the notification is tapped.
  * @param onInterruption receives what the phone reports about calls; see [Interruptions].
+ * @param treatAsHeadset see [endRequestMeans]; only a debug build ever says true.
  * @param scope lives as long as the process and runs on the main thread.
  */
 class CallSession(
@@ -35,22 +38,64 @@ class CallSession(
     internal val actions: CallActions,
     private val content: PendingIntent,
     private val onInterruption: (InterruptionEvent) -> Unit,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     private val log: (String) -> Unit,
+    private val treatAsHeadset: () -> Boolean = { false },
 ) {
     private val context = context.applicationContext
     private val notifications = this.context.getSystemService(NotificationManager::class.java)
     private val audioManager = this.context.getSystemService(AudioManager::class.java)
+    private val outputState = MutableStateFlow(OutputState())
+    private val devices = DeviceOutputs(this.context, log) { outputState.value = it }
     private val telecom = TelecomCall(
-        this.context,
+        TelecomCallAdder(this.context),
         scope,
         log,
-        onHeld = { held ->
-            this.held = held
-            onInterruption(InterruptionEvent.CallHeld(held))
+        object : CallListener {
+            override fun onHeld(held: Boolean) {
+                this@CallSession.held = held
+                onInterruption(InterruptionEvent.CallHeld(held))
+            }
+
+            override fun onEndRequested(): Boolean =
+                when (endRequestMeans(outputState.value.current, treatAsHeadset())) {
+                    EndRequest.ToggleMute -> {
+                        actions.headsetButton()
+                        true
+                    }
+                    EndRequest.Leave -> {
+                        actions.leave()
+                        false
+                    }
+                }
+
+            override fun onMuted(muted: Boolean) = actions.systemMuted(muted)
+
+            override fun onOutputs(state: OutputState?) {
+                when {
+                    state != null -> {
+                        devices.stop()
+                        outputState.value = state
+                    }
+                    // The session goes on without a call: its outputs are the phone's devices.
+                    shown != null -> devices.start()
+                }
+            }
         },
-        onEndedBySystem = actions::leave,
     )
+
+    /** Where the session's voice is heard and can be moved to; empty while there is no session. */
+    val outputs: AudioOutputs = object : AudioOutputs {
+        override val state: StateFlow<OutputState> = outputState.asStateFlow()
+
+        override fun select(id: String) {
+            // Asked for from any thread; the call and the devices belong to the main thread.
+            scope.launch {
+                telecom.select(id)
+                devices.select(id)
+            }
+        }
+    }
 
     /** The session the service and the notification show; kept until the service has stopped. */
     private var shown: CallInfo? = null
@@ -107,6 +152,8 @@ class CallSession(
     private fun end() {
         audioManager.removeOnModeChangedListener(modeListener)
         telecom.end()
+        devices.stop()
+        outputState.value = OutputState()
         context.stopService(Intent(context, CallSessionService::class.java))
         serviceRunning = false
         shown = null

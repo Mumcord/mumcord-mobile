@@ -74,9 +74,7 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.WhisperEnded -> copy(whispersEnded = whispersEnded + 1)
     // The identity screens (task 6.3) are the first to follow the identities.
     is BridgeEvent.IdentitiesChanged -> this
-    // The settings screens (task 8.5) are the first to follow the phone settings; until then
-    // the one setting in use is read and written by `EngineMessageNotificationSettings`.
-    is BridgeEvent.MobileSettingsChanged -> this
+    is BridgeEvent.MobileSettingsChanged -> copy(mobileSettings = event.settings)
     // Chat phase (tasks 5.2/5.3): the state does not follow chat yet.
     is BridgeEvent.BlockedPeopleChanged,
     is BridgeEvent.ChatMessageReceived,

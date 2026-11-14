@@ -262,25 +262,19 @@ class SessionReducerTest {
     }
 
     @Test
-    fun identitiesAndPhoneSettingsDoNotChangeTheStateYet() {
+    fun identitiesDoNotChangeTheStateYetAndThePhoneSettingsAreKept() {
         val state = SessionState()
         assertEquals(state, state.fold(BridgeEvent.IdentitiesChanged(emptyList())))
-        assertEquals(
-            state,
-            state.fold(
-                BridgeEvent.MobileSettingsChanged(
-                    MobileSettings(
-                        talkModeChosen = true,
-                        defaultOutput = DefaultOutput.SPEAKER,
-                        mobileDataAutoplayStreams = false,
-                        mobileDataLoadMedia = true,
-                        mobileDataReducedVoice = false,
-                        idleDisconnect = false,
-                        notifySenderOnly = true,
-                        updateCheck = true,
-                    ),
-                ),
-            ),
+        val settings = MobileSettings(
+            talkModeChosen = true,
+            defaultOutput = DefaultOutput.SPEAKER,
+            mobileDataAutoplayStreams = false,
+            mobileDataLoadMedia = true,
+            mobileDataReducedVoice = false,
+            idleDisconnect = false,
+            notifySenderOnly = true,
+            updateCheck = true,
         )
+        assertEquals(state.copy(mobileSettings = settings), state.fold(BridgeEvent.MobileSettingsChanged(settings)))
     }
 }

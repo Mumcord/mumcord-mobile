@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.ui.connected
 
+import app.mumcord.mobile.bridge.DefaultOutput
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.session.Outcome
+import app.mumcord.mobile.session.OutputAccess
 import app.mumcord.mobile.session.SessionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +26,7 @@ import kotlinx.coroutines.launch
 class ConnectedController(
     private val repository: SessionRepository,
     private val scope: CoroutineScope,
+    private val outputs: OutputAccess = OutputAccess.None,
 ) {
     private val mutableLocal = MutableStateFlow(ConnectedLocal())
     val local: StateFlow<ConnectedLocal> = mutableLocal.asStateFlow()
@@ -109,8 +112,23 @@ class ConnectedController(
     /** Closes the full voice view; its hold-to-talk button goes with it. */
     fun closeVoice() {
         releaseTalk()
-        mutableLocal.update { it.copy(voiceOpen = false) }
+        mutableLocal.update { it.copy(voiceOpen = false, outputOpen = false) }
     }
+
+    /** Opens the choice of the audio output. */
+    fun openOutput() = mutableLocal.update { it.copy(outputOpen = true) }
+
+    /** Moves the voice to this output at once and closes the choice. */
+    fun selectOutput(id: String) {
+        outputs.select(id)
+        mutableLocal.update { it.copy(outputOpen = false) }
+    }
+
+    /** The answer to "Loudspeaker or earpiece?". */
+    fun answerOutputQuestion(choice: DefaultOutput) = outputs.answer(choice)
+
+    /** Puts the question away unanswered. */
+    fun dismissOutputQuestion() = outputs.dismissQuestion()
 
     /** Mutes or unmutes the user. Unmuting also ends a deafen (the engine does that). */
     fun toggleMute() {
@@ -214,7 +232,9 @@ class ConnectedController(
             repository.dismissChannelPassword()
             mutableLocal.update { it.copy(password = "") }
         } else {
-            mutableLocal.update { it.copy(personSession = null, volumeDraft = null, menuChannelId = null) }
+            mutableLocal.update {
+                it.copy(personSession = null, volumeDraft = null, menuChannelId = null, outputOpen = false)
+            }
         }
     }
 

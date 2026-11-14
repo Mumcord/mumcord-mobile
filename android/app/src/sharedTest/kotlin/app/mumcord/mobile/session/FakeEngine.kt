@@ -54,6 +54,18 @@ import app.mumcord.mobile.bridge.TalkMode
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
+/** The phone settings of a fresh installation, which a [FakeEngine] starts with. */
+val FAKE_MOBILE_SETTINGS = MobileSettings(
+    talkModeChosen = false,
+    defaultOutput = DefaultOutput.ASK,
+    mobileDataAutoplayStreams = false,
+    mobileDataLoadMedia = true,
+    mobileDataReducedVoice = false,
+    idleDisconnect = false,
+    notifySenderOnly = false,
+    updateCheck = true,
+)
+
 /** One call of [FakeEngine.connectServer]. */
 data class ConnectCall(val serverId: Long, val password: String?, val channelPath: List<String>)
 
@@ -352,9 +364,11 @@ class FakeEngine(
         pushToTalkPressed = pressed
     }
 
+    // Unmuting also ends a deafen, as in Mumble.
     override suspend fun setSelfMute(muted: Boolean) {
         selfMuted = muted
-        change(server.selfSession) { it.copy(selfMuted = muted) }
+        if (!muted) selfDeafened = false
+        change(server.selfSession) { it.copy(selfMuted = muted, selfDeafened = it.selfDeafened && muted) }
     }
 
     // Deafening also mutes, as in Mumble.
@@ -665,16 +679,7 @@ class FakeEngine(
     // ----- phone settings -----
 
     @Volatile
-    var mobileSettings = MobileSettings(
-        talkModeChosen = false,
-        defaultOutput = DefaultOutput.ASK,
-        mobileDataAutoplayStreams = false,
-        mobileDataLoadMedia = true,
-        mobileDataReducedVoice = false,
-        idleDisconnect = false,
-        notifySenderOnly = false,
-        updateCheck = true,
-    )
+    var mobileSettings = FAKE_MOBILE_SETTINGS
 
     /** When set, saving the phone settings fails with it. */
     @Volatile

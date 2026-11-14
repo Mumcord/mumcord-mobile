@@ -108,13 +108,14 @@ class SessionRepository(
     /** Reads the saved servers once; later changes arrive as events. A failure can be retried. */
     suspend fun loadServers() {
         if (mutableState.value.serversLoaded) return
-        when (val servers = call("load servers") { it.snapshot().servers to it.talkMode() }) {
+        when (val loaded = call("load servers") { it.snapshot() to it.talkMode() }) {
             // An event that arrived in between is newer than the snapshot.
             is Outcome.Ok -> mutableState.update {
-                val (saved, talkMode) = servers.value
-                if (it.serversLoaded) it.copy(talkMode = talkMode) else it.copy(servers = saved, serversLoaded = true, talkMode = talkMode)
+                val (snapshot, talkMode) = loaded.value
+                val known = it.copy(talkMode = talkMode, mobileSettings = it.mobileSettings ?: snapshot.mobileSettings)
+                if (it.serversLoaded) known else known.copy(servers = snapshot.servers, serversLoaded = true)
             }
-            is Outcome.Failed -> mutableState.update { it.copy(phase = ConnectionPhase.Failed(servers.error)) }
+            is Outcome.Failed -> mutableState.update { it.copy(phase = ConnectionPhase.Failed(loaded.error)) }
         }
     }
 

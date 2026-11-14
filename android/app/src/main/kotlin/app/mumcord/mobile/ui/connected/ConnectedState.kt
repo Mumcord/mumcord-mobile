@@ -3,6 +3,7 @@ package app.mumcord.mobile.ui.connected
 
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.WhisperTarget
+import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.session.ChannelNode
 import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.SessionState
@@ -156,6 +157,8 @@ data class ConnectedLocal(
     val whisperTarget: WhisperTarget? = null,
     /** The hold-to-whisper button is down. */
     val whisperHeld: Boolean = false,
+    /** The choice of the audio output is open. */
+    val outputOpen: Boolean = false,
 )
 
 /** The sheet over the connected screens. At most one at a time. */
@@ -179,6 +182,12 @@ sealed interface ConnectedSheet {
 
     /** What the session's notification is for, before the system asks for it. */
     data object Notifications : ConnectedSheet
+
+    /** "Loudspeaker or earpiece?", asked with the first connection without a headset. */
+    data object OutputQuestion : ConnectedSheet
+
+    /** The choice of the audio output, opened from the voice view. */
+    data class AudioOutput(val rows: List<OutputRow>) : ConnectedSheet
 }
 
 /** A refusal by the server; [channelName] and [detail] are untrusted text. */
@@ -208,6 +217,8 @@ fun connectedUiState(
     serverName: String,
     microphone: MicrophoneNotice = MicrophoneNotice.None,
     explainNotifications: Boolean = false,
+    output: OutputState = OutputState(),
+    askOutput: Boolean = false,
 ): ConnectedUiState? {
     val server = session.server?.takeIf { session.showsServer } ?: return null
     val rows = channelRows(server.root, server.selfChannelId, local.collapsed, if (local.searching) local.query else "")
@@ -215,6 +226,7 @@ fun connectedUiState(
     val prompt = session.channelPassword
     val person = local.personSession?.let(server.people::get)
     val menuChannel = local.menuChannelId?.let(server.channels::get)
+    val outputUi = outputUiState(output)
     val sheet = when {
         // The server waits for the password, so this question comes first.
         prompt != null -> ConnectedSheet.ChannelPassword(
@@ -227,6 +239,9 @@ fun connectedUiState(
         microphone == MicrophoneNotice.Explain -> ConnectedSheet.Microphone
         // Asked once the first session runs, after the microphone.
         explainNotifications -> ConnectedSheet.Notifications
+        // Asked once the voice plays somewhere, after the two permissions.
+        askOutput -> ConnectedSheet.OutputQuestion
+        local.outputOpen && outputUi != null -> ConnectedSheet.AudioOutput(outputUi.rows)
         person != null -> ConnectedSheet.PersonSheet(
             session = person.session,
             name = person.name,
@@ -258,7 +273,7 @@ fun connectedUiState(
         hints = session.hints,
         microphone = microphone.takeIf { it == MicrophoneNotice.Denied || it == MicrophoneNotice.Blocked }
             ?: MicrophoneNotice.None,
-        voice = voiceUiState(session, server, local, serverName, microphone),
+        voice = voiceUiState(session, server, local, serverName, microphone, output.current),
         sheet = sheet,
     )
 }

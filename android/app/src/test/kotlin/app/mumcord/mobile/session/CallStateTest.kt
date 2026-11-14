@@ -2,6 +2,7 @@
 package app.mumcord.mobile.session
 
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.platform.audio.FeedbackTone
 import app.mumcord.mobile.platform.call.CallInfo
 import app.mumcord.mobile.platform.call.InterruptionEffect
 import app.mumcord.mobile.platform.call.InterruptionEvent
@@ -98,6 +99,79 @@ class CallStateTest {
         control.toggleDeafen()
         runCurrent()
         assertTrue("Only the hold button on screen talks", engine.pushToTalkCalls.isEmpty())
+    }
+
+    @Test
+    fun aHeadsetsButtonTogglesTheMicrophoneWithASoundForEachDirection() = runTest(dispatcher) {
+        val repository = connected()
+        val tones = mutableListOf<FeedbackTone>()
+        val control = SessionVoiceControl(repository, backgroundScope, tones::add)
+
+        control.headsetButton()
+        runCurrent()
+        assertTrue(engine.selfMuted)
+        assertEquals(listOf(FeedbackTone.Muted), tones)
+
+        control.headsetButton()
+        runCurrent()
+        assertFalse(engine.selfMuted)
+        assertEquals(listOf(FeedbackTone.Muted, FeedbackTone.Unmuted), tones)
+    }
+
+    @Test
+    fun aHeadsetsButtonEndsADeafenLikeTheMuteButtonAndMakesNoSound() = runTest(dispatcher) {
+        val repository = connected()
+        val tones = mutableListOf<FeedbackTone>()
+        val control = SessionVoiceControl(repository, backgroundScope, tones::add)
+        control.toggleDeafen()
+        runCurrent()
+
+        control.headsetButton()
+        runCurrent()
+
+        assertEquals(SelfVoice(muted = false, deafened = false), control.current())
+        assertTrue("No sound for a deafened user", tones.isEmpty())
+    }
+
+    @Test
+    fun inPushToTalkModeAHeadsetsButtonOnlyTogglesTheMuteAndNeverOpensTheMicrophone() = runTest(dispatcher) {
+        val repository = connected(TalkMode.PUSH_TO_TALK)
+        val control = SessionVoiceControl(repository, backgroundScope)
+
+        control.headsetButton()
+        runCurrent()
+        assertTrue(engine.selfMuted)
+        control.headsetButton()
+        runCurrent()
+        assertFalse(engine.selfMuted)
+
+        assertTrue("Only the hold button on screen talks", engine.pushToTalkCalls.isEmpty())
+    }
+
+    @Test
+    fun withoutASessionAHeadsetsButtonDoesNothing() {
+        assertNull(headsetPress(null))
+        assertNull(systemMute(null, muted = true))
+    }
+
+    @Test
+    fun theSessionFollowsTheMuteOfThePhoneSystem() = runTest(dispatcher) {
+        val repository = connected()
+        val tones = mutableListOf<FeedbackTone>()
+        val control = SessionVoiceControl(repository, backgroundScope, tones::add)
+
+        control.systemMuted(true)
+        runCurrent()
+        assertTrue(engine.selfMuted)
+
+        control.systemMuted(true)
+        runCurrent()
+        assertEquals("Already muted: nothing happens, no second sound", listOf(FeedbackTone.Muted), tones)
+
+        control.systemMuted(false)
+        runCurrent()
+        assertFalse(engine.selfMuted)
+        assertEquals(listOf(FeedbackTone.Muted, FeedbackTone.Unmuted), tones)
     }
 
     @Test

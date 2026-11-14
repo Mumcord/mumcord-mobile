@@ -77,6 +77,7 @@ LOCK_PTT_SECONDS=60
 # who else is on the server and what they have to report (see check_peers): "alone" nobody;
 # "peer" a second person who has to hear the app talk; "ptt" the same, and the app may be heard
 # only for as long as hold-to-talk was held; "mute" the same, heard three separate times;
+# "headset" the same as "mute", the gaps being a headset's button;
 # "whisper" a second person who has to hear the whisper and a third who must hear nothing;
 # "chat" a second person who writes and has to receive what the app wrote, and a third who
 # sends raw markup; "chat-restart" nobody, and the app keeps the data of the scenario before it
@@ -92,6 +93,8 @@ SCENARIOS=(
   "granted granted ptt ${TEST_PACKAGE}.PushToTalkFlowTest"
   "granted granted mute ${TEST_PACKAGE}.MuteDeafenFlowTest"
   "granted granted whisper ${TEST_PACKAGE}.WhisperFlowTest"
+  "granted granted alone ${TEST_PACKAGE}.AudioOutputFlowTest#theVoiceViewShowsTheOutputAndTheSheetListsWhatThePhoneOffers"
+  "granted granted headset ${TEST_PACKAGE}.AudioOutputFlowTest#aHeadsetsButtonTogglesTheMicrophoneInTheBackgroundAndWithTheScreenOff"
   "granted granted notify ${TEST_PACKAGE}.NotificationFlowTest#itIsExplainedWithTheFirstSessionThenTheSystemAsksAndAllowingItShowsTheCall"
   "granted granted notify ${TEST_PACKAGE}.NotificationFlowTest#notNowKeepsTheSessionRunningInTheBackground"
   "granted granted alone ${TEST_PACKAGE}.CallNotificationFlowTest"
@@ -305,8 +308,9 @@ check_peers() {
       # Heard for most of the hold, so the bound above is not met by sending too little.
       ((spans >= held / 2)) || die "the app was heard for less than half of the hold"
       ;;
-    mute)
-      printf 'e2e: mute and deafen: the second person heard the app %s times (ms: %s)\n' \
+    mute | headset)
+      printf 'e2e: %s: the second person heard the app %s times (ms: %s)\n' \
+        "$([[ "${kind}" == mute ]] && echo 'mute and deafen' || echo 'headset button')" \
         "${count}" "$(tr '\n' ' ' <<<"${spans}")"
       ((count == 3)) || die "the second person should have heard the app three separate times, see ${peer_log}"
       ;;

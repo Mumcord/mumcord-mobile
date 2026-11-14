@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import app.mumcord.mobile.design.components.AppBarSample
+import app.mumcord.mobile.design.components.AudioOutputSample
 import app.mumcord.mobile.design.components.BasicsSample
 import app.mumcord.mobile.design.components.ButtonsSample
 import app.mumcord.mobile.design.components.ChannelTreeSample
@@ -45,6 +46,7 @@ fun ComponentGallery(modifier: Modifier = Modifier) {
         "Hold-to-talk button" to { TalkButtonSample() },
         "Voice bar" to { VoiceBarSample() },
         "Voice view: person tile, actions, talk mode switch, level meter" to { VoiceViewSample() },
+        "Audio output: chip, choices, note" to { AudioOutputSample() },
         "Tab bar" to { TabBarSample() },
     )
     Column(

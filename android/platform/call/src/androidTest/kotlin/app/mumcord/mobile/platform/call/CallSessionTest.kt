@@ -53,6 +53,14 @@ class CallSessionTest {
         override fun leave() {
             pressed += "leave"
         }
+
+        override fun headsetButton() {
+            pressed += "headset button"
+        }
+
+        override fun systemMuted(muted: Boolean) {
+            pressed += "system muted $muted"
+        }
     }
 
     private val presses = Presses()

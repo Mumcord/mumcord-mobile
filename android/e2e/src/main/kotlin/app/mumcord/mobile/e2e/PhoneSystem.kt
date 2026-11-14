@@ -97,6 +97,17 @@ class PhoneSystem {
     }
 
     /**
+     * Where the phone system sends the audio of the session's call ("SPEAKER", "EARPIECE"), or
+     * null while it has no call.
+     */
+    fun callRoute(): String? {
+        val telecom = shell("dumpsys telecom")
+        if (!ACTIVE_CALL.containsMatchIn(telecom)) return null
+        // Every change of the route is listed with its call; the last one is where it is now.
+        return CALL_ROUTE.findAll(telecom).lastOrNull()?.groupValues?.get(1)
+    }
+
+    /**
      * How many entries the phone's recent calls have besides those of the simulated caller
      * (whose calls belong there, and stay on the emulator from earlier runs). The voice
      * session must never add one.
@@ -138,6 +149,8 @@ class PhoneSystem {
         const val PHONE_RINGING = 1
         const val PHONE_IN_CALL = 2
         private val CALL_STATE = Regex("""mCallState=(\d)""")
+        private val ACTIVE_CALL = Regex("""\[Call id=[^\n]*state=ACTIVE, tpac=ComponentInfo\{app\.mumcord\.mobile/""")
+        private val CALL_ROUTE = Regex("""Entering audio route: AudioRoute\[Type=TYPE_([A-Z_]+)""")
         private val TYPES = Regex("""types=0x([0-9a-fA-F]+)""")
     }
 }

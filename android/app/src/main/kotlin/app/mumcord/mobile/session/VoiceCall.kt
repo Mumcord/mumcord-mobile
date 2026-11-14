@@ -5,6 +5,8 @@ import android.app.PendingIntent
 import android.content.Context
 import app.mumcord.mobile.platform.audio.AudioController
 import app.mumcord.mobile.platform.audio.AudioFocusChange
+import app.mumcord.mobile.platform.audio.FeedbackTones
+import app.mumcord.mobile.platform.call.AudioOutputs
 import app.mumcord.mobile.platform.call.CallSession
 import app.mumcord.mobile.platform.call.FocusLoss
 import app.mumcord.mobile.platform.call.InterruptionEffect
@@ -32,6 +34,8 @@ import kotlinx.coroutines.launch
  *
  * @param content opens the app on the voice view.
  * @param scope lives as long as the process.
+ * @param tones the sounds that answer a headset's button.
+ * @param treatOutputAsHeadset for tests on a phone without a headset; only a debug build says true.
  */
 class VoiceCall(
     context: Context,
@@ -41,6 +45,8 @@ class VoiceCall(
     content: PendingIntent,
     scope: CoroutineScope,
     log: (String) -> Unit,
+    tones: FeedbackTones = FeedbackTones { },
+    treatOutputAsHeadset: () -> Boolean = { false },
 ) {
     private val markers = SessionMarkerStore(context)
 
@@ -48,7 +54,7 @@ class VoiceCall(
     private var sessionEnded: SessionEndedNotice? =
         sessionEndedNotice(markers.read(), markers.lastExitReason()).also { markers.clear() }
 
-    private val control = SessionVoiceControl(repository, scope)
+    private val control = SessionVoiceControl(repository, scope, tones)
 
     private val interruptions = Interruptions(scope, control::current) { effect ->
         when (effect) {
@@ -67,7 +73,12 @@ class VoiceCall(
         // The service, the notification and the call are the system's, which wants the main thread.
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
         log = log,
+        treatAsHeadset = treatOutputAsHeadset,
     )
+
+    /** Where the session's voice is heard (FR-5.34). */
+    val outputs: AudioOutputs
+        get() = session.outputs
 
     val notifications = NotificationPrompt(notificationGateway, onGranted = session::onAppVisible)
 

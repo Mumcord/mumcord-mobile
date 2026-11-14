@@ -113,21 +113,12 @@ fun VoiceScreen(
                 .semantics { paneTitle = title },
         ) {
             CollapseHandle(actions::closeVoice)
-            Column {
-                BasicText(
-                    text = voice.channelName,
-                    // The mockup's title is one step larger than the app bar title.
-                    style = MumcordTheme.typography.title.copy(color = colors.text, fontSize = 24.sp, lineHeight = 28.8.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.semantics { heading() },
-                )
-                BasicText(
-                    text = voice.statusLine(),
-                    style = MumcordTheme.typography.small.copy(color = colors.textMuted),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(MumcordSpace.s3),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                VoiceTitles(voice, Modifier.weight(1f))
+                voice.output?.let { OutputChip(it, actions::openOutput) }
             }
             VoiceTiles(voice.tileRows, Modifier.weight(1f))
             ConnectedBanners(state, actions::dismissDenied, onMicrophone)
@@ -160,6 +151,28 @@ fun VoiceScreen(
                 InputLevel(actions.inputLevel)
             }
         }
+    }
+}
+
+/** The channel and the state of the connection (`.vhead__titles`). */
+@Composable
+private fun VoiceTitles(voice: VoiceUiState, modifier: Modifier = Modifier) {
+    val colors = MumcordTheme.colors
+    Column(modifier) {
+        BasicText(
+            text = voice.channelName,
+            // The mockup's title is one step larger than the app bar title.
+            style = MumcordTheme.typography.title.copy(color = colors.text, fontSize = 24.sp, lineHeight = 28.8.sp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.semantics { heading() },
+        )
+        BasicText(
+            text = voice.statusLine(),
+            style = MumcordTheme.typography.small.copy(color = colors.textMuted),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

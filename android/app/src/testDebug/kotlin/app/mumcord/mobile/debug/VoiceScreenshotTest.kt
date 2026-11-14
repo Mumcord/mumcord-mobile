@@ -27,6 +27,9 @@ import app.mumcord.mobile.ui.connected.connectedUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import app.mumcord.mobile.platform.call.AudioOutput
+import app.mumcord.mobile.platform.call.OutputKind
+import app.mumcord.mobile.platform.call.OutputState
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
@@ -83,8 +86,12 @@ class VoiceScreenshotTest {
         dark: Boolean,
         local: ConnectedLocal,
         session: SessionState = session(TalkMode.PUSH_TO_TALK),
+        output: OutputState = OutputState(),
+        askOutput: Boolean = false,
     ) = composeRule.captureScreenshot("$name-${if (dark) "dark" else "light"}") {
-        val state = checkNotNull(connectedUiState(session, local, "Nordlicht"))
+        val state = checkNotNull(
+            connectedUiState(session, local, "Nordlicht", output = output, askOutput = askOutput),
+        )
         MumcordTheme(darkTheme = dark) {
             Box(Modifier.fillMaxSize()) {
                 ConnectedShell(
@@ -144,6 +151,48 @@ class VoiceScreenshotTest {
 
     private fun personSheet(dark: Boolean) =
         capture("android-person-sheet-whisper", dark, ConnectedLocal(personSession = MOCKUP_JONAS))
+
+    // The outputs of mockup `04-audio-output`: the voice on the speaker, Bluetooth earbuds
+    // connected, no wired headset.
+    private val mockupOutputs = OutputState(
+        available = listOf(
+            AudioOutput("speaker", OutputKind.Speaker, "Speaker"),
+            AudioOutput("earpiece", OutputKind.Earpiece, "Earpiece"),
+            AudioOutput("buds", OutputKind.Bluetooth, "Lea's Buds"),
+        ),
+        current = AudioOutput("speaker", OutputKind.Speaker, "Speaker"),
+    )
+
+    private fun outputChip(dark: Boolean) =
+        capture("android-voice-view-output-chip", dark, ConnectedLocal(voiceOpen = true), output = mockupOutputs)
+
+    private fun audioOutput(dark: Boolean) = capture(
+        "android-audio-output",
+        dark,
+        ConnectedLocal(voiceOpen = true, outputOpen = true),
+        output = mockupOutputs,
+    )
+
+    // No mockup exists for the first-connect question; it is built from the design system.
+    private fun outputQuestion(dark: Boolean) = capture(
+        "android-audio-output-first-connect",
+        dark,
+        ConnectedLocal(),
+        output = mockupOutputs.copy(available = mockupOutputs.available.take(2)),
+        askOutput = true,
+    )
+
+    @Test fun outputChipDark() = outputChip(dark = true)
+
+    @Test fun outputChipLight() = outputChip(dark = false)
+
+    @Test fun audioOutputDark() = audioOutput(dark = true)
+
+    @Test fun audioOutputLight() = audioOutput(dark = false)
+
+    @Test fun outputQuestionDark() = outputQuestion(dark = true)
+
+    @Test fun outputQuestionLight() = outputQuestion(dark = false)
 
     @Test fun voiceBarDark() = voiceBar(dark = true)
 

@@ -128,7 +128,13 @@ was on the screen in its failure message.
   with a second person on the host (`e2e/voice-peer`); the notification question (allowed,
   and "not now"); the session's notification and its buttons; voice with the app in the
   background and the screen locked, with voice activity (three minutes) and with
-  push-to-talk (one minute, silent while locked); a phone call during a session, for
+  push-to-talk (one minute, silent while locked); the audio output as the emulator has it
+  (a loudspeaker only: no earpiece, so the first-connect question never appears there, and
+  no headset can be plugged in or paired) and a headset's button, pressed with
+  `input keyevent` while the app is in the background and while the screen is off (the
+  debug build's `TestSettings.treatOutputAsHeadset` makes the loudspeaker count as the
+  headset; the device log says how long the phone system took to have the call again:
+  "the call was added again after … ms"); a phone call during a session, for
   which the script plays the phone network through the emulator's console
   (`adb emu gsm call|cancel`; the emulator occasionally loses a call at the moment
   it is answered, also with no app running, so the test then lets the phone ring once more

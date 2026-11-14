@@ -7,21 +7,23 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.util.Log
-import app.mumcord.mobile.session.BridgeEngineFactory
+import app.mumcord.mobile.platform.audio.AndroidFeedbackTones
+import app.mumcord.mobile.platform.audio.AndroidVoiceSession
+import app.mumcord.mobile.platform.audio.AudioController
+import app.mumcord.mobile.platform.audio.NativeAudio
 import app.mumcord.mobile.platform.notify.AndroidMessageNotifier
+import app.mumcord.mobile.session.BridgeEngineFactory
 import app.mumcord.mobile.session.EngineCalls
 import app.mumcord.mobile.session.EngineMessageNotificationSettings
 import app.mumcord.mobile.session.MessageNotificationCenter
 import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.PreferencesStoredSenderOnly
-import app.mumcord.mobile.platform.audio.AndroidVoiceSession
-import app.mumcord.mobile.platform.audio.AudioController
-import app.mumcord.mobile.platform.audio.NativeAudio
 import app.mumcord.mobile.session.SessionRepository
-import app.mumcord.mobile.ui.chat.BridgeImageLoader
-import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.session.VoiceAudio
 import app.mumcord.mobile.session.VoiceCall
+import app.mumcord.mobile.session.VoiceOutput
+import app.mumcord.mobile.ui.chat.BridgeImageLoader
+import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.connect.AndroidLocalNetworkGateway
 import app.mumcord.mobile.ui.connect.LocalNetworkGateway
 import app.mumcord.mobile.ui.connected.AndroidMicrophoneGateway
@@ -92,6 +94,18 @@ class MumcordApplication : Application() {
             ),
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             log = log,
+            tones = AndroidFeedbackTones(log),
+            treatOutputAsHeadset = { TestSettings.treatOutputAsHeadset },
+        )
+    }
+
+    /** Where the voice is heard and the first-connect question. It follows the session by itself too. */
+    val voiceOutput: VoiceOutput by lazy {
+        VoiceOutput(
+            repository = sessionRepository,
+            outputs = voiceCall.outputs,
+            // One thread: the outputs are followed in the order they changed.
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1)),
         )
     }
 
