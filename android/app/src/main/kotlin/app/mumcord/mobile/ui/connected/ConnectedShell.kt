@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -21,6 +20,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import app.mumcord.mobile.R
+import app.mumcord.mobile.ui.messages.MessagesUiState
+import app.mumcord.mobile.ui.messages.MessagesScreen
+import app.mumcord.mobile.ui.messages.MessagesController
+import app.mumcord.mobile.ui.messages.BlockedPeopleScreen
+import app.mumcord.mobile.design.theme.MumcordTheme
+import app.mumcord.mobile.design.components.MumcordToggle
+import app.mumcord.mobile.design.components.MumcordSectionHeader
+import app.mumcord.mobile.design.components.MumcordIcon
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import app.mumcord.mobile.design.components.MumcordAppBar
 import app.mumcord.mobile.design.components.MumcordBanner
 import app.mumcord.mobile.design.components.MumcordBannerTone
@@ -37,16 +46,15 @@ import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.chat.ChatImageSystem
 import app.mumcord.mobile.ui.chat.ChatScreen
 import app.mumcord.mobile.ui.chat.ChatUiState
-import app.mumcord.mobile.ui.common.Paragraph
 
 const val DENIED_BANNER_TEST_TAG = "denied-banner"
 const val MORE_DISCONNECT_TEST_TAG = "more-disconnect"
-const val EMPTY_TAB_TEST_TAG = "empty-tab"
+const val MORE_BLOCKED_TEST_TAG = "more-blocked"
+const val MORE_SENDER_ONLY_TEST_TAG = "more-sender-only"
 
 /**
  * The frame of the app while connected: the selected tab's screen, the banners, the whisper
  * bar, the voice bar and the bottom tab bar; or the full voice view, which covers all of it.
- * Messages is filled by its own task.
  */
 @Composable
 fun ConnectedShell(
@@ -58,11 +66,26 @@ fun ConnectedShell(
     chatBadge: Int,
     chatActions: ChatController,
     chatEnvironment: ChatEnvironment,
+    messages: MessagesUiState,
+    messagesActions: MessagesController,
+    conversation: ChatUiState?,
+    conversationActions: ChatController,
+    onNotificationSettings: () -> Unit,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
 ) {
+    // What is open inside the Messages or More tab closes first, then the tab.
+    val insideTab = messages.canGoBack && when (state.tab) {
+        ConnectedTab.Messages -> !messages.blockedOpen
+        ConnectedTab.More -> messages.blockedOpen
+        else -> false
+    }
     BackHandler(enabled = state.searching || state.tab != ConnectedTab.Channels) {
-        if (state.tab != ConnectedTab.Channels) actions.selectTab(ConnectedTab.Channels) else actions.closeSearch()
+        when {
+            insideTab -> messagesActions.back()
+            state.tab != ConnectedTab.Channels -> actions.selectTab(ConnectedTab.Channels)
+            else -> actions.closeSearch()
+        }
     }
     // Hold to talk and hold to whisper work only while the app is on screen (FR-5.21).
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { actions.releaseHolds() }
@@ -79,12 +102,24 @@ fun ConnectedShell(
                 ConnectedTab.Chat -> if (chat != null) {
                     ChatScreen(chat, chatActions, chatEnvironment.loader, chatEnvironment.clock, topInsets)
                 }
-                ConnectedTab.Messages -> EmptyTabScreen(
-                    stringResource(R.string.tab_messages),
-                    stringResource(R.string.tab_messages_empty),
-                    topInsets,
-                )
-                ConnectedTab.More -> MoreScreen(state.serverName, onDisconnect, topInsets)
+                ConnectedTab.Messages -> when {
+                    messages.open == null ->
+                        MessagesScreen(messages, messagesActions, chatEnvironment.clock, onNotificationSettings, topInsets)
+                    // Null for the moment the conversation is being opened.
+                    conversation != null -> ChatScreen(
+                        conversation,
+                        conversationActions,
+                        chatEnvironment.loader,
+                        chatEnvironment.clock,
+                        topInsets,
+                        onBack = messagesActions::back,
+                    )
+                }
+                ConnectedTab.More -> if (messages.blockedOpen) {
+                    BlockedPeopleScreen(messages, messagesActions, topInsets)
+                } else {
+                    MoreScreen(state.serverName, messages, messagesActions, onDisconnect, topInsets)
+                }
             }
         }
         ConnectedBanners(state, actions::dismissDenied, onMicrophone)
@@ -102,7 +137,13 @@ fun ConnectedShell(
                     contentDescription = chatBadge.takeIf { it > 0 }
                         ?.let { pluralStringResource(R.plurals.chat_tab_unread, it, it) },
                 ),
-                MumcordTab(MumcordIcons.Messages, stringResource(R.string.tab_messages)),
+                MumcordTab(
+                    MumcordIcons.Messages,
+                    stringResource(R.string.tab_messages),
+                    badge = messages.badge.takeIf { it > 0 }?.let(::badgeText),
+                    contentDescription = messages.badge.takeIf { it > 0 }
+                        ?.let { pluralStringResource(R.plurals.messages_tab_unread, it, it) },
+                ),
                 MumcordTab(MumcordIcons.More, stringResource(R.string.tab_more)),
             ),
             selectedIndex = state.tab.ordinal,
@@ -163,21 +204,47 @@ internal fun ConnectedBanners(state: ConnectedUiState, onDismissDenied: () -> Un
     }
 }
 
-/** A tab without content yet: its name and one neutral sentence. */
+/**
+ * The More tab: what belongs to messages (the blocked people and what notifications show),
+ * and leaving the server.
+ */
 @Composable
-private fun EmptyTabScreen(title: String, text: String, topInsets: WindowInsets) {
-    Column(Modifier.fillMaxSize().testTag(EMPTY_TAB_TEST_TAG)) {
-        MumcordAppBar(title = title, large = true, windowInsets = topInsets)
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().padding(MumcordSpace.s6)) {
-            Paragraph(text)
-        }
-    }
-}
-
-@Composable
-private fun MoreScreen(serverName: String, onDisconnect: () -> Unit, topInsets: WindowInsets) {
+private fun MoreScreen(
+    serverName: String,
+    messages: MessagesUiState,
+    messagesActions: MessagesController,
+    onDisconnect: () -> Unit,
+    topInsets: WindowInsets,
+) {
     Column(Modifier.fillMaxSize()) {
         MumcordAppBar(title = stringResource(R.string.tab_more), large = true, windowInsets = topInsets)
+        MumcordSectionHeader(stringResource(R.string.more_section_messages))
+        MumcordList {
+            MumcordListRow(
+                title = stringResource(R.string.more_blocked),
+                icon = MumcordIcons.Shield,
+                trailing = {
+                    MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted)
+                },
+                onClick = messagesActions::openBlocked,
+                modifier = Modifier.testTag(MORE_BLOCKED_TEST_TAG),
+            )
+            MumcordListRow(
+                title = stringResource(R.string.more_sender_only),
+                subtitle = stringResource(R.string.more_sender_only_sub),
+                icon = MumcordIcons.Bell,
+                divider = true,
+                trailing = {
+                    MumcordToggle(
+                        checked = messages.senderOnly,
+                        onCheckedChange = messagesActions::setSenderOnly,
+                        contentDescription = stringResource(R.string.more_sender_only),
+                        modifier = Modifier.testTag(MORE_SENDER_ONLY_TEST_TAG),
+                    )
+                },
+            )
+        }
+        Spacer(Modifier.height(MumcordSpace.s4))
         MumcordList {
             MumcordListRow(
                 title = stringResource(R.string.more_disconnect, serverName),

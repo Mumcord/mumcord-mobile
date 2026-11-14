@@ -9,6 +9,7 @@ import app.mumcord.mobile.bridge.BlockedPerson
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.ChatLimits
 import app.mumcord.mobile.bridge.ChatMessage
+import app.mumcord.mobile.bridge.ChatNotification
 import app.mumcord.mobile.bridge.ChatPage
 import app.mumcord.mobile.bridge.ChatUnread
 import app.mumcord.mobile.bridge.ContentBlock
@@ -20,6 +21,7 @@ import app.mumcord.mobile.bridge.MentionCandidate
 import app.mumcord.mobile.bridge.MessageContent
 import app.mumcord.mobile.bridge.MessageRequest
 import app.mumcord.mobile.bridge.MessageRequests
+import app.mumcord.mobile.bridge.NotificationKind
 import app.mumcord.mobile.bridge.PrivateMessageRule
 import app.mumcord.mobile.bridge.PrivateMessageSettings
 import app.mumcord.mobile.bridge.ReplyQuote
@@ -89,6 +91,19 @@ class FakeEngine(
         private set
     @Volatile var limits = ChatLimits(text = 5000u, image = 131072u, allowHtml = true)
     @Volatile var privateMessageSettings = PrivateMessageSettings(PrivateMessageRule.EVERYONE, false)
+
+    /** The certificates of people who have one: their private chat is stored, by this hash. */
+    val certificates = ConcurrentHashMap<UInt, String>()
+
+    /** When set, a chat request fails with it. */
+    @Volatile
+    var chatRequestFailure: BridgeException? = null
+
+    /** When set, blocking a person fails with it. */
+    @Volatile
+    var blockFailure: BridgeException? = null
+    val chatRequestCalls = CopyOnWriteArrayList<Pair<UInt, String?>>()
+    private var nextBlockId = 1L
     private var nextMessageId = 1
     val certificateAnswers = CopyOnWriteArrayList<Pair<String, Boolean>>()
     val serverInputs = CopyOnWriteArrayList<ServerInput>()
@@ -424,14 +439,55 @@ class FakeEngine(
         return appendOwn(chat, messageContent(url))
     }
 
-    /** A message of somebody else arrives: it is stored, counted as unread and reported. */
+    /**
+     * A message of somebody else arrives: it is stored, counted as unread and reported, and a
+     * private message or a mention in a chat that is not on screen is worth a notification.
+     */
     fun receive(message: ChatMessage) {
         messages.getOrPut(message.chat) { CopyOnWriteArrayList() } += message
         val count = (unread[message.chat] ?: 0u) + 1u
         unread[message.chat] = count
+        listConversation(message, message.senderName, message.senderSession)
         emit(BridgeEvent.ChatUnreadChanged(message.chat, count))
         emit(BridgeEvent.ChatMessageReceived(message))
+        val kind = when {
+            message.chat !is ChatId.Channel -> NotificationKind.PRIVATE_MESSAGE
+            message.mentionsMe -> NotificationKind.MENTION
+            else -> return
+        }
+        if (openChat == message.chat) return
+        val preview = message.content.blocks.filterIsInstance<ContentBlock.Paragraph>()
+            .joinToString(" ") { block -> block.spans.joinToString("") { it.text } }
+        emit(BridgeEvent.ChatNotification(ChatNotification(message.chat, kind, message.senderName, preview, message.id)))
     }
+
+    /** Only conversations with people who have a certificate are stored and listed. */
+    private fun listConversation(message: ChatMessage, peerName: String?, peerSession: UInt?) {
+        val chat = message.chat as? ChatId.Person ?: return
+        val known = conversations.firstOrNull { it.chat == chat }
+        // Their session while they are on the server, as the bridge looks it up.
+        val online = certificates.entries.firstOrNull { it.value == chat.certHash }?.key
+        conversations.removeAll { it.chat == message.chat }
+        conversations.add(
+            0,
+            Conversation(
+                chat = message.chat,
+                peerName = peerName ?: known?.peerName.orEmpty(),
+                peerSession = peerSession ?: online ?: known?.peerSession,
+                last = message,
+                unread = unread[message.chat] ?: 0u,
+            ),
+        )
+    }
+
+    /** Somebody the private message rule holds back wrote or asked for a chat. */
+    fun receiveRequest(request: MessageRequest) {
+        incomingRequests += request
+        emitRequests()
+    }
+
+    private fun emitRequests() =
+        emit(BridgeEvent.MessageRequestsChanged(MessageRequests(incomingRequests.toList(), sentRequests.toList())))
 
     override suspend fun chatImage(chat: ChatId, messageId: String, imageId: String): ImageData =
         chatImages[messageId to imageId] ?: error("no image $imageId in message $messageId")
@@ -444,7 +500,10 @@ class FakeEngine(
 
     override suspend fun chatLimits(): ChatLimits = limits
 
-    override fun chatWith(session: UInt): ChatId = ChatId.Session(session)
+    override fun chatWith(session: UInt): ChatId {
+        if (people[session] == null) throw BridgeException.NotFound("unknown person")
+        return certificates[session]?.let { ChatId.Person(it) } ?: ChatId.Session(session)
+    }
 
     override suspend fun markChatRead(chat: ChatId) {
         markReadCalls += chat
@@ -472,16 +531,24 @@ class FakeEngine(
         MessageRequests(incoming = incomingRequests.toList(), sent = sentRequests.toList())
 
     override suspend fun acceptMessageRequest(id: ULong) {
-        incomingRequests.removeAll { it.id == id }
+        val request = incomingRequests.firstOrNull { it.id == id } ?: throw BridgeException.NotFound("unknown request")
+        incomingRequests.remove(request)
+        emitRequests()
+        // The held messages arrive as messages of the conversation.
+        request.messages.forEach(::receive)
     }
 
     override suspend fun declineMessageRequest(id: ULong) {
-        incomingRequests.removeAll { it.id == id }
+        if (!incomingRequests.removeAll { it.id == id }) throw BridgeException.NotFound("unknown request")
+        emitRequests()
     }
 
     override suspend fun sendChatRequest(session: UInt, note: String?) {
+        chatRequestCalls += session to note
+        chatRequestFailure?.let { throw it }
         val name = server.people.firstOrNull { it.session == session }?.name.orEmpty()
         sentRequests += SentChatRequest(session, name, accepted = false)
+        emitRequests()
     }
 
     override suspend fun privateMessageSettings(): PrivateMessageSettings = privateMessageSettings
@@ -491,12 +558,15 @@ class FakeEngine(
     }
 
     override suspend fun blockPerson(session: UInt) {
+        blockFailure?.let { throw it }
         val name = server.people.firstOrNull { it.session == session }?.name.orEmpty()
-        blocked += BlockedPerson(id = blocked.size + 1L, name = name, serverLabel = "", blockedAtMs = 0)
+        blocked += BlockedPerson(id = nextBlockId++, name = name, serverLabel = "", blockedAtMs = 0)
+        emit(BridgeEvent.BlockedPeopleChanged(blocked.toList()))
     }
 
     override suspend fun unblockPerson(id: Long) {
         blocked.removeAll { it.id == id }
+        emit(BridgeEvent.BlockedPeopleChanged(blocked.toList()))
     }
 
     override suspend fun blockedPeople(): List<BlockedPerson> = blocked.toList()
@@ -509,6 +579,7 @@ class FakeEngine(
             content = content,
         )
         messages.getOrPut(chat) { CopyOnWriteArrayList() } += message
+        listConversation(message, peerName = null, peerSession = null)
         return message
     }
 

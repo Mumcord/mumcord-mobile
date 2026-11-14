@@ -13,6 +13,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.R
+import app.mumcord.mobile.ui.messages.ChatRequestOffer
+import app.mumcord.mobile.ui.messages.MessagesController
+import app.mumcord.mobile.ui.messages.MessagesUiState
+import app.mumcord.mobile.ui.messages.PersonMessaging
 import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.design.components.MumcordIcon
 import app.mumcord.mobile.design.components.MumcordButton
@@ -37,6 +41,9 @@ const val PERSON_MUTE_TEST_TAG = "person-mute"
 const val PERSON_SHEET_TEST_TAG = "person-sheet"
 const val PERSON_WHISPER_TEST_TAG = "person-whisper"
 const val CHANNEL_MENU_SHOUT_TEST_TAG = "channel-menu-shout"
+const val PERSON_MESSAGE_TEST_TAG = "person-message"
+const val PERSON_CHAT_REQUEST_TEST_TAG = "person-chat-request"
+const val PERSON_BLOCK_TEST_TAG = "person-block"
 
 /** Draws the sheet that is open over the connected screens. */
 @Composable
@@ -49,10 +56,13 @@ fun ConnectedSheetHost(
     onMicrophoneNotNow: () -> Unit,
     onNotificationsContinue: () -> Unit = {},
     onNotificationsNotNow: () -> Unit = {},
+    messages: MessagesUiState,
+    messagesActions: MessagesController,
 ) {
     when (sheet) {
         is ConnectedSheet.ChannelPassword -> ChannelPasswordSheet(sheet, actions, topInsets, bottomInsets)
-        is ConnectedSheet.PersonSheet -> PersonSheet(sheet, actions, topInsets, bottomInsets)
+        is ConnectedSheet.PersonSheet ->
+            PersonSheet(sheet, messages.person(sheet.session), actions, messagesActions, topInsets, bottomInsets)
         is ConnectedSheet.ChannelMenu -> ChannelMenuSheet(sheet, actions, topInsets, bottomInsets)
         ConnectedSheet.Microphone -> MicrophoneSheet(onMicrophoneContinue, onMicrophoneNotNow, topInsets, bottomInsets)
         ConnectedSheet.Notifications ->
@@ -93,11 +103,16 @@ private fun ChannelPasswordSheet(
     }
 }
 
-/** Mockup `06-person-sheet`: the head, the two settings that apply to the user only, and whisper. */
+/**
+ * Mockup `06-person-sheet`: the head, the two settings that apply to the user only, private
+ * message and whisper. The card below them, with the chat request and blocking, has no mockup.
+ */
 @Composable
 private fun PersonSheet(
     sheet: ConnectedSheet.PersonSheet,
+    messaging: PersonMessaging,
     actions: ConnectedController,
+    messagesActions: MessagesController,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
 ) {
@@ -132,24 +147,63 @@ private fun PersonSheet(
                 },
             )
         }
-        // A card of its own, as in the mockup, where it follows "Send private message".
         MumcordList(horizontalMargin = 0.dp, background = MumcordTheme.colors.bgHover) {
+            MumcordListRow(
+                title = stringResource(R.string.person_message),
+                icon = MumcordIcons.Message,
+                trailing = { SheetChevron() },
+                onClick = { messagesActions.messagePerson(sheet.session) },
+                modifier = Modifier.testTag(PERSON_MESSAGE_TEST_TAG),
+            )
             MumcordListRow(
                 title = stringResource(R.string.person_whisper, sheet.name),
                 icon = MumcordIcons.Users,
-                trailing = {
-                    MumcordIcon(
-                        MumcordIcons.ChevronRight,
-                        contentDescription = null,
-                        tint = MumcordTheme.colors.textMuted,
-                        size = MumcordSize.iconSm,
-                    )
-                },
+                divider = true,
+                trailing = { SheetChevron() },
                 onClick = { actions.openWhisper(WhisperTarget.Person(sheet.session)) },
                 modifier = Modifier.testTag(PERSON_WHISPER_TEST_TAG),
             )
         }
+        MumcordList(horizontalMargin = 0.dp, background = MumcordTheme.colors.bgHover) {
+            when (messaging.chatRequest) {
+                ChatRequestOffer.Offer -> MumcordListRow(
+                    title = stringResource(R.string.person_chat_request),
+                    icon = MumcordIcons.Send,
+                    trailing = { SheetChevron() },
+                    onClick = { messagesActions.askChatRequest(sheet.session) },
+                    modifier = Modifier.testTag(PERSON_CHAT_REQUEST_TEST_TAG),
+                )
+                // A decline is never told, so there is nothing to tap while it is on its way.
+                ChatRequestOffer.Pending -> MumcordListRow(
+                    title = stringResource(R.string.person_chat_request_pending),
+                    icon = MumcordIcons.Send,
+                    modifier = Modifier.testTag(PERSON_CHAT_REQUEST_TEST_TAG),
+                )
+                ChatRequestOffer.Accepted -> Unit
+            }
+            val blocked = messaging.blockId != null
+            MumcordListRow(
+                title = stringResource(if (blocked) R.string.person_unblock else R.string.person_block),
+                icon = MumcordIcons.Shield,
+                danger = !blocked,
+                divider = messaging.chatRequest != ChatRequestOffer.Accepted,
+                onClick = {
+                    if (blocked) messagesActions.unblockPerson(sheet.session) else messagesActions.askBlock(sheet.session)
+                },
+                modifier = Modifier.testTag(PERSON_BLOCK_TEST_TAG),
+            )
+        }
     }
+}
+
+@Composable
+private fun SheetChevron() {
+    MumcordIcon(
+        MumcordIcons.ChevronRight,
+        contentDescription = null,
+        tint = MumcordTheme.colors.textMuted,
+        size = MumcordSize.iconSm,
+    )
 }
 
 /** What a long press on a channel offers: joining and folding, which are also on the row, and shouting. */

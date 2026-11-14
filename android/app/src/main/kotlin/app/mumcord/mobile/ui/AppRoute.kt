@@ -31,6 +31,8 @@ import app.mumcord.mobile.ui.connect.SessionEndedSheet
 import app.mumcord.mobile.ui.connect.rememberLocalNetworkSystem
 import app.mumcord.mobile.ui.link.InvalidLinkSheet
 import app.mumcord.mobile.ui.link.LinkConfirmSheet
+import app.mumcord.mobile.ui.messages.MessagesSheetHost
+import app.mumcord.mobile.ui.messages.MessagesUiState
 import app.mumcord.mobile.ui.servers.RemoveServerSheet
 import app.mumcord.mobile.ui.servers.ServerFormScreen
 import app.mumcord.mobile.ui.servers.ServerListScreen
@@ -53,21 +55,34 @@ fun AppRoute(
     microphone: MicrophoneSystem = rememberMicrophoneSystem(viewModel::answerMicrophonePrompt),
     notifications: NotificationSystem = rememberNotificationSystem(viewModel::answerNotificationPrompt),
     chatImages: ChatImageSystem = rememberChatImageSystem(
-        onImage = { viewModel.chat.sendImage(it.bytes, it.mime) },
-        onUnreadable = viewModel.chat::imageUnreadable,
+        onImage = { viewModel.activeChat.sendImage(it.bytes, it.mime) },
+        onUnreadable = { viewModel.activeChat.imageUnreadable() },
     ),
     chatImageLoader: ChatImageLoader = (LocalContext.current.applicationContext as MumcordApplication).chatImageLoader,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val chat by viewModel.chatState.collectAsStateWithLifecycle()
     val chatBadge by viewModel.chatBadge.collectAsStateWithLifecycle()
+    val messages by viewModel.messagesState.collectAsStateWithLifecycle()
+    val conversation by viewModel.conversationState.collectAsStateWithLifecycle()
     val chatEnvironment = ChatEnvironment(chatImageLoader, chatImages, rememberChatClock())
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshPings()
         viewModel.recheckMicrophone()
         onPauseOrDispose { }
     }
-    AppContent(uiState, viewModel, localNetwork, microphone, chat, chatBadge, chatEnvironment, notifications)
+    AppContent(
+        uiState,
+        viewModel,
+        localNetwork,
+        microphone,
+        chat,
+        chatBadge,
+        chatEnvironment,
+        notifications,
+        messages = messages,
+        conversation = conversation,
+    )
 }
 
 /**
@@ -85,6 +100,8 @@ fun AppContent(
     chatBadge: Int,
     chatEnvironment: ChatEnvironment,
     notifications: NotificationSystem = NotificationSystem(ask = {}),
+    messages: MessagesUiState? = null,
+    conversation: ChatUiState? = null,
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
@@ -93,11 +110,16 @@ fun AppContent(
     // Questions wait until the first-start setup is done.
     val overlay = uiState.overlay.takeIf { uiState.setupDone }
     val connectedSheet = uiState.connected?.sheet
-    // The chat's sheets and its full-screen picture belong to the Chat tab only.
-    val chatOverlay = chat?.takeIf {
-        uiState.connected?.tab == ConnectedTab.Chat && (it.sheet != null || it.viewer != null || it.urlToOpen != null)
+    val messagesSheet = messages?.sheet.takeIf { uiState.connected != null }
+    // A chat's sheets and its full-screen picture belong to the tab that shows the chat.
+    val shownChat = when (uiState.connected?.tab) {
+        ConnectedTab.Chat -> chat
+        ConnectedTab.Messages -> conversation.takeIf { messages?.open != null }
+        else -> null
     }
-    val sheetOpen = prompt != null || overlay != null || connectedSheet != null ||
+    val chatOverlay = shownChat?.takeIf { it.sheet != null || it.viewer != null || it.urlToOpen != null }
+    val chatOverlayActions = if (uiState.connected?.tab == ConnectedTab.Messages) viewModel.conversation else viewModel.chat
+    val sheetOpen = prompt != null || overlay != null || connectedSheet != null || messagesSheet != null ||
         chatOverlay?.sheet != null || chatOverlay?.viewer != null
     Box(Modifier.fillMaxSize()) {
         // While a sheet is open, the screen behind it is not offered to screen readers.
@@ -144,6 +166,8 @@ fun AppContent(
                     )
                 }
                 AppScreen.Channels -> uiState.connected?.let { connected ->
+                    // Both follow the same session, so they are there together.
+                    if (messages == null) return@let
                     ConnectedShell(
                         state = connected,
                         actions = viewModel.connected,
@@ -157,6 +181,11 @@ fun AppContent(
                         chatBadge = chatBadge,
                         chatActions = viewModel.chat,
                         chatEnvironment = chatEnvironment,
+                        messages = messages,
+                        messagesActions = viewModel.messages,
+                        conversation = conversation,
+                        conversationActions = viewModel.conversation,
+                        onNotificationSettings = notifications.openSettings,
                         topInsets = topInsets,
                         bottomInsets = bottomInsets,
                     )
@@ -218,7 +247,9 @@ fun AppContent(
                 bottomInsets = bottomInsets,
             )
             overlay is Overlay.InvalidLink -> InvalidLinkSheet(viewModel::dismissOverlay, topInsets, bottomInsets)
-            connectedSheet != null -> ConnectedSheetHost(
+            connectedSheet != null && messages != null -> ConnectedSheetHost(
+                messages = messages,
+                messagesActions = viewModel.messages,
                 sheet = connectedSheet,
                 actions = viewModel.connected,
                 topInsets = topInsets,
@@ -228,9 +259,10 @@ fun AppContent(
                 onNotificationsContinue = notifications.ask,
                 onNotificationsNotNow = viewModel::notificationsNotNow,
             )
+            messagesSheet != null -> MessagesSheetHost(messagesSheet, viewModel.messages, topInsets, bottomInsets)
             chatOverlay != null -> ChatOverlays(
                 state = chatOverlay,
-                actions = viewModel.chat,
+                actions = chatOverlayActions,
                 loader = chatEnvironment.loader,
                 images = chatEnvironment.images,
                 topInsets = topInsets,

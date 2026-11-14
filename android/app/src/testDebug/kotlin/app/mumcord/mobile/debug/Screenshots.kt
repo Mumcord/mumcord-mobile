@@ -2,6 +2,18 @@
 
 package app.mumcord.mobile.debug
 
+import app.mumcord.mobile.ui.messages.messagesUiState
+import app.mumcord.mobile.ui.messages.MessagesUiState
+import app.mumcord.mobile.ui.messages.MessagesLocal
+import app.mumcord.mobile.ui.messages.MessagesController
+import app.mumcord.mobile.ui.connected.ConnectedController
+import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
+import app.mumcord.mobile.bridge.MessageRequests
+import app.mumcord.mobile.bridge.MessageRequest
+import app.mumcord.mobile.bridge.Conversation
+import app.mumcord.mobile.bridge.ChatId
+import app.mumcord.mobile.bridge.BlockedPerson
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -85,3 +97,29 @@ fun screenshotChatEnvironment(loader: ChatImageLoader = ChatImageLoader { _, _, 
     )
 
 val MOCKUP_DAY: LocalDate = LocalDate.of(2026, 5, 4)
+
+/** The Messages tab for screenshots: its actions are never called, its state is made from what a test passes. */
+class ScreenshotMessages(repository: SessionRepository, connected: ConnectedController, scope: CoroutineScope) {
+    val actions = MessagesController(repository, connected, InMemoryMessageNotificationSettings(), scope)
+    val conversationActions = screenshotChatController(repository, scope)
+
+    fun state(
+        session: SessionState,
+        local: MessagesLocal = MessagesLocal(),
+        conversations: List<Conversation> = emptyList(),
+        requests: List<MessageRequest> = emptyList(),
+        blocked: List<BlockedPerson> = emptyList(),
+        unread: Map<ChatId, Int> = emptyMap(),
+        notificationsGranted: Boolean = true,
+    ): MessagesUiState = checkNotNull(
+        messagesUiState(
+            session,
+            local,
+            conversations,
+            MessageRequests(incoming = requests, sent = emptyList()),
+            blocked,
+            unread,
+            notificationsGranted,
+        ),
+    )
+}

@@ -10,6 +10,7 @@ import app.mumcord.mobile.bridge.GifFavourite
 import app.mumcord.mobile.bridge.MentionCandidate
 import app.mumcord.mobile.bridge.ReplyQuote
 import app.mumcord.mobile.bridge.SafeLink
+import app.mumcord.mobile.session.ServerModel
 import app.mumcord.mobile.session.SessionState
 import app.mumcord.mobile.session.UnsupportedHint
 import java.time.Instant
@@ -285,10 +286,13 @@ sealed interface ChatSheet {
     data class LinkWarning(val link: SafeLink) : ChatSheet
 }
 
+/** The other person of a private conversation; [online] while they are on the server. */
+data class ChatPeer(val online: Boolean)
+
 /** The chat screen as a value. */
 data class ChatUiState(
     val chat: ChatId,
-    /** The channel's name; untrusted text. */
+    /** The channel's name, or the other person's in a private conversation; untrusted text. */
     val title: String,
     val people: Int,
     val serverName: String,
@@ -315,6 +319,8 @@ data class ChatUiState(
     val viewer: ChatImageSource?,
     val urlToOpen: String?,
     val notice: ChatNotice?,
+    /** Set for a private conversation, null for a channel's chat. */
+    val peer: ChatPeer? = null,
 ) {
     /** Nothing was ever written here, and nothing is on its way. */
     val empty: Boolean
@@ -329,11 +335,63 @@ fun chatUiState(session: SessionState, local: ChatLocal, serverName: String, zon
     val server = session.server?.takeIf { session.showsServer } ?: return null
     val channelId = server.selfChannelId ?: return null
     val chat = local.chat?.takeIf { it == ChatId.Channel(channelId) } ?: return null
+    return chatUiState(
+        chat = chat,
+        local = local,
+        session = session,
+        server = server,
+        title = server.channels[channelId]?.name.orEmpty(),
+        people = server.people.values.count { it.channelId == channelId },
+        serverName = serverName,
+        zone = zone,
+        peer = null,
+    )
+}
+
+/**
+ * A private conversation: the chat with one person, named [peerName]. Null while no server is
+ * shown or [local] is not (yet) about [chat].
+ */
+fun conversationUiState(
+    session: SessionState,
+    local: ChatLocal,
+    chat: ChatId?,
+    peerName: String,
+    peerOnline: Boolean,
+    serverName: String,
+    zone: ZoneId,
+): ChatUiState? {
+    val server = session.server?.takeIf { session.showsServer } ?: return null
+    if (chat == null || chat is ChatId.Channel || local.chat != chat) return null
+    return chatUiState(
+        chat = chat,
+        local = local,
+        session = session,
+        server = server,
+        title = peerName,
+        people = 2,
+        serverName = serverName,
+        zone = zone,
+        peer = ChatPeer(peerOnline),
+    )
+}
+
+private fun chatUiState(
+    chat: ChatId,
+    local: ChatLocal,
+    session: SessionState,
+    server: ServerModel,
+    title: String,
+    people: Int,
+    serverName: String,
+    zone: ZoneId,
+    peer: ChatPeer?,
+): ChatUiState {
     val linkWarning = local.linkWarning
     return ChatUiState(
         chat = chat,
-        title = server.channels[channelId]?.name.orEmpty(),
-        people = server.people.values.count { it.channelId == channelId },
+        title = title,
+        people = people,
         serverName = serverName,
         selfName = server.people[server.selfSession]?.name.orEmpty(),
         rows = chatRows(local.messages, local.pending, session.hints, zone),
@@ -360,6 +418,7 @@ fun chatUiState(session: SessionState, local: ChatLocal, serverName: String, zon
         viewer = local.viewer,
         urlToOpen = local.urlToOpen,
         notice = local.notice,
+        peer = peer,
     )
 }
 

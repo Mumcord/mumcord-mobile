@@ -23,6 +23,9 @@ interface NotificationAccess {
     /** Whether to say why notifications are wanted, before the system asks. */
     val explain: StateFlow<Boolean>
 
+    /** Whether the phone lets the app show notifications; the Messages tab says so when not. */
+    val granted: StateFlow<Boolean>
+
     /** The user put the explanation away without letting the system ask. */
     fun notNow()
 
@@ -32,6 +35,7 @@ interface NotificationAccess {
     /** Used where the question is never put, such as screens drawn without a phone behind them. */
     object Never : NotificationAccess {
         override val explain: StateFlow<Boolean> = MutableStateFlow(false)
+        override val granted: StateFlow<Boolean> = MutableStateFlow(true)
 
         override fun notNow() = Unit
 
@@ -53,16 +57,21 @@ class NotificationPrompt(
     private val mutableExplain = MutableStateFlow(needed())
     override val explain: StateFlow<Boolean> = mutableExplain.asStateFlow()
 
+    private val mutableGranted = MutableStateFlow(gateway.granted())
+    override val granted: StateFlow<Boolean> = mutableGranted.asStateFlow()
+
     override fun notNow() = done()
 
     override fun answer(granted: Boolean) {
         done()
+        mutableGranted.value = granted
         if (granted) onGranted()
     }
 
     /** The app is on screen again: notifications may have been allowed in the system settings. */
     fun recheck() {
         mutableExplain.value = needed()
+        mutableGranted.value = gateway.granted()
     }
 
     private fun done() {

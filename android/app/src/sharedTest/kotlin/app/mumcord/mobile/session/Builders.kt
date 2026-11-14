@@ -7,7 +7,9 @@ import app.mumcord.mobile.bridge.ChannelPermissions
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.ChatMessage
 import app.mumcord.mobile.bridge.ContentBlock
+import app.mumcord.mobile.bridge.Conversation
 import app.mumcord.mobile.bridge.MessageContent
+import app.mumcord.mobile.bridge.MessageRequest
 import app.mumcord.mobile.bridge.ReplyQuote
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SavedServer
@@ -123,4 +125,37 @@ fun chatMessage(
     mentionsMe = false,
     content = content,
     quote = ReplyQuote(name = senderName, snippet = ""),
+)
+
+fun conversation(
+    name: String,
+    text: String,
+    sentAtMs: Long = 0,
+    peerSession: UInt? = null,
+    unread: UInt = 0u,
+    chat: ChatId = ChatId.Person("cert-${name.lowercase()}"),
+) = Conversation(
+    chat = chat,
+    peerName = name,
+    peerSession = peerSession,
+    last = chatMessage("last-$name", chat, name, peerSession, sentAtMs = sentAtMs, content = messageContent(text)),
+    unread = unread,
+)
+
+fun messageRequest(
+    id: ULong,
+    name: String,
+    session: UInt = 90u,
+    note: String? = null,
+    chatRequest: Boolean = note != null,
+    messages: List<ChatMessage> = emptyList(),
+) = MessageRequest(
+    id = id,
+    session = session,
+    name = name,
+    certHash = null,
+    chatRequest = chatRequest,
+    note = note,
+    messages = messages,
+    receivedAtMs = 0,
 )

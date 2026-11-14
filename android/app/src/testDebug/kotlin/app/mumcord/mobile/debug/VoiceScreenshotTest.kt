@@ -63,6 +63,7 @@ class VoiceScreenshotTest {
     )
     private val actions = ConnectedController(repository, scope)
     private val chatActions = screenshotChatController(repository, scope)
+    private val messages = ScreenshotMessages(repository, actions, scope)
 
     private fun session(talkMode: TalkMode, selfMuted: Boolean = false): SessionState {
         val server = mockupVoiceServer()
@@ -95,11 +96,25 @@ class VoiceScreenshotTest {
                     chatBadge = 0,
                     chatActions = chatActions,
                     chatEnvironment = screenshotChatEnvironment(),
+                    messages = messages.state(session),
+                    messagesActions = messages.actions,
+                    conversation = null,
+                    conversationActions = messages.conversationActions,
+                    onNotificationSettings = {},
                     topInsets = top,
                     bottomInsets = bottom,
                 )
                 state.sheet?.let {
-                    ConnectedSheetHost(it, actions, top, bottom, onMicrophoneContinue = {}, onMicrophoneNotNow = {})
+                    ConnectedSheetHost(
+                        it,
+                        actions,
+                        top,
+                        bottom,
+                        onMicrophoneContinue = {},
+                        onMicrophoneNotNow = {},
+                        messages = messages.state(session),
+                        messagesActions = messages.actions,
+                    )
                 }
             }
         }

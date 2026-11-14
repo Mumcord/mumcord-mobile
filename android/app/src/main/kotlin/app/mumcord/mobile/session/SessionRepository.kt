@@ -71,6 +71,9 @@ class SessionRepository(
                     is BridgeEvent.InputLevelChanged -> mutableInputLevel.value = event.percent.toInt()
                     is BridgeEvent.ChatMessageReceived,
                     is BridgeEvent.ChatUnreadChanged,
+                    is BridgeEvent.ChatNotification,
+                    is BridgeEvent.MessageRequestsChanged,
+                    is BridgeEvent.BlockedPeopleChanged,
                     -> chatEvents.trySend(event)
                     else -> events.trySend(event)
                 }
@@ -275,9 +278,9 @@ class SessionRepository(
 
     /**
      * Tells the engine which chat is on screen, or that none is. Never waits; without an engine
-     * there is no chat to open.
+     * there is no chat to open. Only [ChatRepository] decides which chat that is.
      */
-    fun setOpenChat(chat: ChatId?) {
+    internal fun setOpenChat(chat: ChatId?) {
         engine.now { it.setOpenChat(chat) }
     }
 

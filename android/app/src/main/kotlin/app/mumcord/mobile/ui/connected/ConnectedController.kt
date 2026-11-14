@@ -50,6 +50,12 @@ class ConnectedController(
 
     fun selectTab(tab: ConnectedTab) = mutableLocal.update { it.copy(tab = tab) }
 
+    /** Brings a tab in front of whatever is open: a sheet and the full voice view go away. */
+    fun showTab(tab: ConnectedTab) {
+        closeVoice()
+        mutableLocal.update { it.copy(tab = tab, personSession = null, volumeDraft = null, menuChannelId = null) }
+    }
+
     fun toggleCollapsed(channelId: UInt) = mutableLocal.update {
         val collapsed = if (channelId in it.collapsed) it.collapsed - channelId else it.collapsed + channelId
         it.copy(collapsed = collapsed, menuChannelId = null)

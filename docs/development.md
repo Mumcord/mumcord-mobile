@@ -133,7 +133,10 @@ was on the screen in its failure message.
   (`adb emu gsm call|cancel`); and the chat with two more people on the host, `e2e/chat-peer`
   (writes like the desktop app and reports what it receives) and `e2e/raw-chat.py` (sends
   markup a hostile client might send), followed by a restart of the app that must still show
-  the history.
+  the history; and private messages, for which `e2e/chat-peer --private` writes to the phone
+  whenever the test asks for it (notification with sender and text, tap opens the
+  conversation, no notification for the open conversation, "Show sender only", nothing after
+  disconnecting).
 - **Besides the Android toolchain** the machine needs KVM, `git`, Docker with the compose
   plugin, `sqlite3`, `openssl` and `python3`. No Docker network is created; the server uses Docker's
   built-in bridge.

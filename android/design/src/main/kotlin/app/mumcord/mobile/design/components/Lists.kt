@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.design.icons.MumcordIcons
@@ -101,6 +102,8 @@ fun MumcordList(
  * Row of a list (`.row`). Every row but the first of a list sets [divider] to get the line
  * above it.
  *
+ * @param subtitleEmphasis draws the subtitle in the text colour and a medium weight, as for the
+ *   last message of a conversation with unread messages.
  * @param status a third line under the subtitle, such as a state dot with "5 online · 24 ms".
  * @param leading replaces [icon] with other content, such as an avatar or a server tile.
  * @param trailing content at the end: a value, a chevron, a toggle.
@@ -112,6 +115,7 @@ fun MumcordListRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleEmphasis: Boolean = false,
     status: (@Composable RowScope.() -> Unit)? = null,
     icon: ImageVector? = null,
     leading: (@Composable () -> Unit)? = null,
@@ -154,7 +158,13 @@ fun MumcordListRow(
         }
         Column(Modifier.weight(1f)) {
             LineText(title, MumcordTheme.typography.bodyStrong, if (danger) colors.danger else colors.text)
-            if (subtitle != null) LineText(subtitle, MumcordTheme.typography.small, colors.textMuted)
+            if (subtitle != null) {
+                if (subtitleEmphasis) {
+                    LineText(subtitle, MumcordTheme.typography.small.copy(fontWeight = FontWeight.Medium), colors.text)
+                } else {
+                    LineText(subtitle, MumcordTheme.typography.small, colors.textMuted)
+                }
+            }
             if (status != null) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

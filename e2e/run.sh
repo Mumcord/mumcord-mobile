@@ -19,7 +19,9 @@
 #      scenario has two more people: e2e/chat-peer (the bridge, writing as the desktop app
 #      does, and reporting what the phone wrote) and e2e/raw-chat.py (a foreign client that
 #      sends raw script and markup). It is followed by a scenario that starts the app again
-#      with the same app data, after its process was killed, and looks for the history.
+#      with the same app data, after its process was killed, and looks for the history. In
+#      the private message scenario e2e/chat-peer sends the phone a private message whenever
+#      the test asks for one, which is what the notifications are about.
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
@@ -75,7 +77,8 @@ LOCK_PTT_SECONDS=60
 # "whisper" a second person who has to hear the whisper and a third who must hear nothing;
 # "chat" a second person who writes and has to receive what the app wrote, and a third who
 # sends raw markup; "chat-restart" nobody, and the app keeps the data of the scenario before it
-# (its process is killed instead), so it must follow a "chat" scenario.
+# (its process is killed instead), so it must follow a "chat" scenario; "pm" a second person
+# who sends the phone a private message whenever the test asks for one.
 SCENARIOS=(
   "granted granted alone ${TEST_PACKAGE}.ConnectFlowTest"
   "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
@@ -94,6 +97,7 @@ SCENARIOS=(
   "granted granted call ${TEST_PACKAGE}.PhoneCallFlowTest"
   "granted granted chat ${TEST_PACKAGE}.ChatFlowTest#messagesOfOthersAppearAndThePhonesMessagesReachThem"
   "granted granted chat-restart ${TEST_PACKAGE}.ChatFlowTest#theHistoryIsStillThereAfterTheAppWasKilledAndStartedAgain"
+  "granted granted pm ${TEST_PACKAGE}.MessagesFlowTest"
 )
 # A stretch of voice a person heard counts from this length (ms); the engine's own short
 # sounds, like the one for somebody entering the channel, are shorter.
@@ -125,6 +129,8 @@ BYSTANDER_LOG=""
 CHAT_PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/chat-peer"
 CHAT_PEER_LOG="${OUT_DIR}/chat-peer.log"
 RAW_CHAT_LOG="${OUT_DIR}/raw-chat.log"
+# The numbers of the private messages the second person of the "pm" scenario is to send.
+PM_FIFO="${OUT_DIR}/pm-requests"
 # The user name the app connects with in the tests (AppDriver.USER_NAME).
 PHONE_NAME="e2e-phone"
 
@@ -147,6 +153,7 @@ serial=""
 emulator_pid=""
 peer_pids=()
 network_pid=""
+messenger_pid=""
 server_started=0
 
 adb_device() {
@@ -176,7 +183,8 @@ start_person() {
   local log="$1" pid waited=0
   shift
   : >"${log}"
-  "$@" >"${log}" 2>&1 &
+  # PERSON_INPUT: what the person reads as its input; nothing unless the scenario sets it.
+  "$@" <"${PERSON_INPUT:-/dev/null}" >"${log}" 2>&1 &
   pid=$!
   peer_pids+=("${pid}")
   until grep -q '^CONNECTED' "${log}"; do
@@ -209,6 +217,33 @@ stop_phone_network() {
   network_pid=""
 }
 
+# Passes on what the test of the "pm" scenario asks for in the device log ("pm send <n>"): the
+# second person then sends the phone the private message with that number. The pipe is held
+# open here (descriptor 9) so that the second person can keep reading from it.
+start_messenger() {
+  rm -f "${PM_FIFO}"
+  mkfifo "${PM_FIFO}"
+  exec 9<>"${PM_FIFO}"
+  (
+    "${ADB}" -s "${serial}" logcat -v raw -T 1 -s MumcordE2E:I | while read -r word command number; do
+      if [[ "${word}" == "pm" && "${command}" == "send" && "${number}" =~ ^[0-9]+$ ]]; then
+        printf '%s\n' "${number}" >&9
+      fi
+    done
+  ) &
+  messenger_pid=$!
+}
+
+stop_messenger() {
+  [[ -n "${messenger_pid}" ]] || return 0
+  pkill -P "${messenger_pid}" 2>/dev/null || true
+  kill "${messenger_pid}" 2>/dev/null || true
+  wait "${messenger_pid}" 2>/dev/null || true
+  messenger_pid=""
+  exec 9>&-
+  rm -f "${PM_FIFO}"
+}
+
 # The lengths (ms) of the stretches of voice a person heard that count as voice, one per line.
 voice_spans() {
   sed -n 's/^SPAN ms=//p' "$1" | awk -v least="${VOICE_SPAN_MS}" '$1 >= least'
@@ -218,7 +253,7 @@ voice_spans() {
 check_peers() {
   local kind="$1" report="$2" spans count held longest
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
-  if [[ "${kind}" != "chat" ]]; then
+  if [[ "${kind}" != "chat" && "${kind}" != "pm" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -293,6 +328,18 @@ check_peers() {
       done
       printf 'e2e: chat: the second person received the text, the link, the GIF link and the picture of the app\n'
       ;;
+    pm)
+      local number
+      for number in 1 2 3; do
+        grep -qx "PM SENT ${number}" "${CHAT_PEER_LOG}" \
+          || die "the second person did not get private message ${number} out, see e2e/build/chat-peer.log"
+      done
+      # The fourth is asked for after the phone left. Usually there is nobody to send it to
+      # any more; what counts is that the second person tried, and that the phone shows nothing.
+      grep -Eqx 'PM (SENT|FAILED) 4' "${CHAT_PEER_LOG}" \
+        || die "the second person did not try the private message after the phone disconnected, see e2e/build/chat-peer.log"
+      printf 'e2e: pm: the second person sent three private messages and tried a fourth after the phone left\n'
+      ;;
   esac
 }
 
@@ -312,6 +359,7 @@ cleanup() {
     done
   fi
   stop_phone_network
+  stop_messenger
   if [[ -n "${serial}" ]]; then
     timeout 20 "${ADB}" -s "${serial}" logcat -d >"${OUT_DIR}/logcat.txt" 2>/dev/null
   fi
@@ -436,6 +484,10 @@ run_scenario() {
       start_person "${CHAT_PEER_LOG}" "${CHAT_PEER_BINARY}" --phone "${PHONE_NAME}"
       start_person "${RAW_CHAT_LOG}" python3 "${REPO_ROOT}/e2e/raw-chat.py" "${PHONE_NAME}"
       ;;
+    pm)
+      start_messenger
+      PERSON_INPUT="${PM_FIFO}" start_person "${CHAT_PEER_LOG}" "${CHAT_PEER_BINARY}" --phone "${PHONE_NAME}" --private
+      ;;
     whisper)
       start_peer "${PEER_LOG}" --listen-only
       start_peer "${BYSTANDER_LOG}" --name "${BYSTANDER_NAME}" --listen-only
@@ -458,6 +510,7 @@ run_scenario() {
     die "tests failed, see above and e2e/build/logcat.txt"
   fi
   stop_phone_network
+  stop_messenger
   if [[ "${peer}" != "alone" && "${peer}" != "notify" && "${peer}" != "chat-restart" ]]; then
     check_peers "${peer}" "${report}"
     stop_peers

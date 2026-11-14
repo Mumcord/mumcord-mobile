@@ -11,6 +11,11 @@
 //! `RECEIVED from=<name> text=<text> links=<addresses> images=<count>`, which is how the test
 //! run checks what the phone sent. It runs until it is stopped. The server's port comes from
 //! `MUMCORD_PORT_BASE`.
+//!
+//! With `--private` it writes nothing into the channel. It prints `READY` once the phone is
+//! there and then sends the phone one private message, "Private note <n>", for every number
+//! `<n>` it reads as a line from its standard input, and reports `PM SENT <n>`, or
+//! `PM FAILED <n>` when the phone is no longer on the server.
 
 use std::collections::HashMap;
 use std::process::ExitCode;
@@ -96,12 +101,51 @@ fn wait_for<T>(
     }
 }
 
-fn phone_name() -> Result<String, String> {
+/// The phone's user name, and whether to write to it in private instead of into the channel.
+fn arguments() -> Result<(String, bool), String> {
     let mut arguments = std::env::args().skip(1);
-    match (arguments.next().as_deref(), arguments.next()) {
-        (Some("--phone"), Some(name)) => Ok(name),
-        _ => Err("usage: chat-peer --phone <user name of the phone>".into()),
+    match (
+        arguments.next().as_deref(),
+        arguments.next(),
+        arguments.next().as_deref(),
+    ) {
+        (Some("--phone"), Some(name), None) => Ok((name, false)),
+        (Some("--phone"), Some(name), Some("--private")) => Ok((name, true)),
+        _ => Err("usage: chat-peer --phone <user name of the phone> [--private]".into()),
     }
+}
+
+/// Sends the phone one private message per number read from the standard input, until the
+/// input ends.
+fn write_in_private(
+    engine: &MumcordEngine,
+    runtime: &tokio::runtime::Runtime,
+    phone: &str,
+) -> Result<(), String> {
+    println!("READY");
+    for line in std::io::stdin().lines() {
+        let line = line.map_err(|error| format!("reading the next number failed: {error}"))?;
+        let number = line.trim();
+        if number.is_empty() || !number.chars().all(|digit| digit.is_ascii_digit()) {
+            continue;
+        }
+        let session = engine.snapshot().server.and_then(|server| {
+            server
+                .people
+                .iter()
+                .find(|person| person.name == phone)
+                .map(|person| person.session)
+        });
+        let sent = session
+            .and_then(|session| engine.chat_with(session).ok())
+            .is_some_and(|chat| {
+                runtime
+                    .block_on(engine.send_message(chat, format!("Private note {number}"), None))
+                    .is_ok()
+            });
+        println!("PM {} {number}", if sent { "SENT" } else { "FAILED" });
+    }
+    Ok(())
 }
 
 /// One line about a received message: its text, the addresses of its links and its pictures.
@@ -130,7 +174,7 @@ fn report(message: &ChatMessage) -> String {
 }
 
 fn run() -> Result<(), String> {
-    let phone = phone_name()?;
+    let (phone, private) = arguments()?;
     let port = std::env::var("MUMCORD_PORT_BASE")
         .ok()
         .and_then(|port| port.parse().ok())
@@ -199,6 +243,14 @@ fn run() -> Result<(), String> {
             return Err(format!("{phone} did not enter {CHANNEL}"));
         }
         std::thread::sleep(POLL);
+    }
+
+    if private {
+        write_in_private(&engine, &runtime, &phone)?;
+        // The input ended; stay on the server until stopped, as in the other mode.
+        loop {
+            std::thread::sleep(Duration::from_secs(60));
+        }
     }
 
     let chat = ChatId::Channel {

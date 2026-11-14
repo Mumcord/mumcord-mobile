@@ -2,7 +2,9 @@
 package app.mumcord.mobile.ui.connected
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.WindowInsets
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -22,20 +25,31 @@ import app.mumcord.mobile.ui.common.SheetOverlay
 const val NOTIFICATIONS_CONTINUE_TEST_TAG = "notifications-continue"
 const val NOTIFICATIONS_NOT_NOW_TEST_TAG = "notifications-not-now"
 
-/** The one thing only the system can do for the notification permission: [ask] shows its question. */
-class NotificationSystem(val ask: () -> Unit)
+/**
+ * What only the system can do for the notification permission: [ask] shows its question,
+ * [openSettings] the app's notification page in the system settings.
+ */
+class NotificationSystem(val ask: () -> Unit, val openSettings: () -> Unit = {})
 
 /** The real system prompt; whether the user allowed notifications goes to [onAnswer]. */
 @Composable
 fun rememberNotificationSystem(onAnswer: (Boolean) -> Unit): NotificationSystem {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission(), onAnswer)
-    return remember(launcher) {
+    val context = LocalContext.current
+    return remember(launcher, context) {
         NotificationSystem(
             ask = {
                 // Before Android 13 there is nothing to ask; the question is then never shown.
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
+            },
+            openSettings = {
+                context.startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
             },
         )
     }

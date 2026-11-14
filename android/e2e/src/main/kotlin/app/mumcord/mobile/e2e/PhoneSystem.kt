@@ -53,8 +53,16 @@ class PhoneSystem {
         device.pressBack()
     }
 
-    /** A view of the open shade with exactly [text], or null after waiting in vain. */
-    fun inShade(text: String, timeoutMillis: Long = SystemDialog.TIMEOUT_MILLIS): UiObject2? {
+    /**
+     * A view of the open shade with exactly [text], or null after waiting in vain. With
+     * [systemOnly] only the system's own views count: the app stays visible behind the shade,
+     * and a text it shows itself must not be taken for a notification.
+     */
+    fun inShade(
+        text: String,
+        timeoutMillis: Long = SystemDialog.TIMEOUT_MILLIS,
+        systemOnly: Boolean = false,
+    ): UiObject2? {
         // The system draws a button's icon into its label and writes labels its own way
         // (capitals, kinds of spaces).
         val label = Pattern.compile(
@@ -63,7 +71,9 @@ class PhoneSystem {
         )
         val deadline = System.nanoTime() + timeoutMillis * 1_000_000
         while (System.nanoTime() < deadline) {
-            (device.findObject(By.text(label)) ?: device.findObject(By.desc(label)))?.let { return it }
+            val byText = if (systemOnly) By.pkg(SYSTEM_UI_PACKAGE).text(label) else By.text(label)
+            val byDescription = if (systemOnly) By.pkg(SYSTEM_UI_PACKAGE).desc(label) else By.desc(label)
+            (device.findObject(byText) ?: device.findObject(byDescription))?.let { return it }
             Thread.sleep(POLL_MILLIS)
         }
         return null
@@ -118,6 +128,7 @@ class PhoneSystem {
 
     companion object {
         const val APP_PACKAGE = "app.mumcord.mobile"
+        private const val SYSTEM_UI_PACKAGE = "com.android.systemui"
         const val CALLER = "5550100"
         private const val SERVICE = "app.mumcord.mobile.platform.call.CallSessionService"
         private const val POLL_MILLIS = 100L

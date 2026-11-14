@@ -24,12 +24,17 @@ import kotlinx.coroutines.launch
  * What the user does in one chat: reading back, writing, replying, sending pictures and GIFs.
  * It follows [openChat] (the chat to show, or null) and [shown] (its screen is the one the user
  * looks at), so the same controller serves the channel chat and a private conversation.
+ *
+ * @param keepDraft what was typed stays when another chat is opened. Right for the channel
+ *   chat, which follows the user from channel to channel; a private conversation must not hand
+ *   its text to the next person.
  */
 class ChatController(
     private val chats: ChatRepository,
     openChat: Flow<ChatId?>,
     shown: Flow<Boolean>,
     private val scope: CoroutineScope,
+    private val keepDraft: Boolean = true,
 ) {
     private val mutableLocal = MutableStateFlow(ChatLocal())
     val local: StateFlow<ChatLocal> = mutableLocal.asStateFlow()
@@ -61,14 +66,15 @@ class ChatController(
     private fun open(chat: ChatId?) {
         pageJob?.cancel()
         mentionJob?.cancel()
-        // What was typed is kept: joining another channel must not throw a text away.
         mutableLocal.update {
+            // What was typed is kept: joining another channel must not throw a text away.
+            val keep = keepDraft || it.chat == chat
             ChatLocal(
                 chat = chat,
                 loading = chat != null,
-                draft = it.draft,
-                cursor = it.cursor,
-                draftRevision = it.draftRevision,
+                draft = if (keep) it.draft else "",
+                cursor = if (keep) it.cursor else 0,
+                draftRevision = if (keep) it.draftRevision else it.draftRevision + 1,
                 visible = it.visible,
             )
         }
@@ -134,7 +140,7 @@ class ChatController(
 
     private fun syncOpenChat() {
         val state = mutableLocal.value
-        chats.setOpenChat(state.chat.takeIf { state.visible })
+        chats.setOpenChat(this, state.chat.takeIf { state.visible })
     }
 
     /** Messages count as read once the newest one was on screen in front of the user. */

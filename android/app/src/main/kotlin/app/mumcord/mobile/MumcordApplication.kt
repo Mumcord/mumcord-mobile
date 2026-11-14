@@ -8,7 +8,11 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.util.Log
 import app.mumcord.mobile.session.BridgeEngineFactory
+import app.mumcord.mobile.platform.notify.AndroidMessageNotifier
 import app.mumcord.mobile.session.EngineCalls
+import app.mumcord.mobile.session.MessageNotificationCenter
+import app.mumcord.mobile.session.MessageNotificationSettings
+import app.mumcord.mobile.session.PreferencesMessageNotificationSettings
 import app.mumcord.mobile.platform.audio.AndroidVoiceSession
 import app.mumcord.mobile.platform.audio.AudioController
 import app.mumcord.mobile.platform.audio.NativeAudio
@@ -78,7 +82,7 @@ class MumcordApplication : Application() {
             context = this,
             repository = sessionRepository,
             audio = audioController,
-            notificationGateway = AndroidNotificationGateway(this),
+            notificationGateway = notificationGateway,
             content = PendingIntent.getActivity(
                 this,
                 0,
@@ -89,6 +93,35 @@ class MumcordApplication : Application() {
             log = log,
         )
     }
+
+    /** Notifications for private messages and mentions. It follows the session by itself too. */
+    val messageNotifications: MessageNotificationCenter by lazy {
+        MessageNotificationCenter(
+            repository = sessionRepository,
+            notifier = AndroidMessageNotifier(this) { key ->
+                PendingIntent.getActivity(
+                    this,
+                    0,
+                    // The identifier makes the intents of two conversations different ones.
+                    Intent(this, MainActivity::class.java)
+                        .setAction(MainActivity.ACTION_OPEN_CHAT)
+                        .setIdentifier(key)
+                        .putExtra(MainActivity.EXTRA_CHAT, key),
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                )
+            },
+            settings = messageNotificationSettings,
+            permitted = notificationGateway::granted,
+            // One thread: notifications are shown and removed in the order things happened.
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1)),
+        )
+    }
+
+    val messageNotificationSettings: MessageNotificationSettings by lazy {
+        PreferencesMessageNotificationSettings(this)
+    }
+
+    private val notificationGateway by lazy { AndroidNotificationGateway(this) }
 
     private companion object {
         const val LOG_TAG = "Mumcord"

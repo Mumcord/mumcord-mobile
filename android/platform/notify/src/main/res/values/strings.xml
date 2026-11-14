@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<resources>
+    <string name="message_channel_name">Messages</string>
+    <string name="message_channel_description">Private messages and mentions while you are connected</string>
+    <string name="message_new">New message</string>
+    <string name="message_you">You</string>
+</resources>

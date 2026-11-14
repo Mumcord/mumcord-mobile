@@ -15,6 +15,8 @@ import app.mumcord.mobile.platform.call.SessionEndedNotice
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
+import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
+import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.session.SessionState
@@ -22,6 +24,7 @@ import app.mumcord.mobile.ui.chat.ChatController
 import app.mumcord.mobile.ui.chat.ChatUiState
 import app.mumcord.mobile.ui.chat.chatTabBadge
 import app.mumcord.mobile.ui.chat.chatUiState
+import app.mumcord.mobile.ui.chat.conversationUiState
 import app.mumcord.mobile.ui.connect.LocalNetworkAnswer
 import app.mumcord.mobile.ui.connect.LocalNetworkGateway
 import app.mumcord.mobile.ui.connect.LocalNetworkStep
@@ -35,6 +38,9 @@ import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.NotificationAccess
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.ui.link.linkConfirmState
+import app.mumcord.mobile.ui.messages.MessagesController
+import app.mumcord.mobile.ui.messages.MessagesUiState
+import app.mumcord.mobile.ui.messages.messagesUiState
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
 import app.mumcord.mobile.ui.servers.ServerFormState
 import app.mumcord.mobile.ui.servers.toPingState
@@ -64,6 +70,7 @@ class AppViewModel(
     private val microphone: MicrophoneAccess,
     private val notifications: NotificationAccess = NotificationAccess.Never,
     sessionEnded: SessionEndedNotice? = null,
+    messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(),
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -131,6 +138,74 @@ class AppViewModel(
         combine(repository.chat.unread, repository.state, connected.local) { unread, session, connectedLocal ->
             chatTabBadge(unread, session, chatTabOpen = connectedLocal.tab == ConnectedTab.Chat)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
+
+    /** The Messages tab, message requests, chat requests and blocking. */
+    val messages = MessagesController(repository, connected, messageSettings, viewModelScope)
+
+    val messagesState: StateFlow<MessagesUiState?> = combine(
+        combine(repository.state, messages.local, ::Pair),
+        repository.chat.conversations,
+        combine(repository.chat.requests, repository.chat.blocked, ::Pair),
+        repository.chat.unread,
+        notifications.granted,
+    ) { (session, messagesLocal), conversations, (requests, blocked), unread, granted ->
+        messagesUiState(session, messagesLocal, conversations, requests, blocked, unread, granted)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), currentMessagesState())
+
+    private fun currentMessagesState(): MessagesUiState? = messagesUiState(
+        repository.state.value,
+        messages.local.value,
+        repository.chat.conversations.value,
+        repository.chat.requests.value,
+        repository.chat.blocked.value,
+        repository.chat.unread.value,
+        notifications.granted.value,
+    )
+
+    /** The open private conversation: the same chat screen as the Chat tab, for one person. */
+    val conversation = ChatController(
+        chats = repository.chat,
+        openChat = messages.local.map { it.open?.chat },
+        shown = combine(connected.local, messages.local) { connectedLocal, messagesLocal ->
+            connectedLocal.tab == ConnectedTab.Messages && !connectedLocal.voiceOpen && messagesLocal.open != null
+        },
+        scope = viewModelScope,
+        keepDraft = false,
+    )
+
+    val conversationState: StateFlow<ChatUiState?> =
+        combine(
+            repository.state,
+            conversation.local,
+            messagesState,
+            uiState.map { it.activeServerName.orEmpty() }.distinctUntilChanged(),
+        ) { session, chatLocal, messagesUi, serverName ->
+            val open = messagesUi?.open
+            conversationUiState(
+                session = session,
+                local = chatLocal,
+                chat = open?.chat,
+                peerName = open?.name.orEmpty(),
+                peerOnline = messagesUi?.openOnline == true,
+                serverName = serverName,
+                zone = ZoneId.systemDefault(),
+            )
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    /** The chat controller of the tab on screen; pictures the user picks go to it. */
+    val activeChat: ChatController
+        get() = if (connected.local.value.tab == ConnectedTab.Messages) conversation else chat
+
+    /** A message notification was tapped: a mention opens the Chat tab, a private message its conversation. */
+    fun openChat(chat: ChatId) {
+        if (!repository.state.value.showsServer) return
+        if (chat is ChatId.Channel) {
+            connected.showTab(ConnectedTab.Chat)
+        } else {
+            connected.showTab(ConnectedTab.Messages)
+            messages.openConversation(chat)
+        }
+    }
 
     /** The last connect, so "Try again" and the password retry keep a link's channel. */
     private var lastTarget: ConnectTarget? = null
@@ -455,7 +530,11 @@ class AppViewModel(
                     application.voiceAudio,
                     application.voiceCall.notifications,
                     application.voiceCall.takeSessionEndedNotice(),
-                )
+                    application.messageNotificationSettings,
+                ).also {
+                    // Starts with the first screen and then follows the session by itself.
+                    application.messageNotifications
+                }
             }
         }
     }

@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import app.mumcord.mobile.design.theme.MumcordTheme
+import app.mumcord.mobile.session.chatFromNotificationKey
 import app.mumcord.mobile.ui.AppRoute
 import app.mumcord.mobile.ui.AppViewModel
 
@@ -42,6 +43,10 @@ class MainActivity : ComponentActivity() {
     private fun openLink(intent: Intent) {
         // The session's notification was tapped: show the voice view.
         if (intent.action == ACTION_OPEN_VOICE) viewModel.connected.openVoice()
+        // A message notification was tapped: show its chat.
+        if (intent.action == ACTION_OPEN_CHAT) {
+            intent.getStringExtra(EXTRA_CHAT)?.let(::chatFromNotificationKey)?.let(viewModel::openChat)
+        }
         if (intent.action != Intent.ACTION_VIEW) return
         val url = intent.dataString ?: return
         viewModel.openLink(url)
@@ -49,5 +54,9 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_OPEN_VOICE = "app.mumcord.mobile.action.OPEN_VOICE"
+        const val ACTION_OPEN_CHAT = "app.mumcord.mobile.action.OPEN_CHAT"
+
+        /** The notification key of the chat to open, see `ChatId.notificationKey`. */
+        const val EXTRA_CHAT = "app.mumcord.mobile.extra.CHAT"
     }
 }

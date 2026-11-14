@@ -56,6 +56,7 @@ class ConnectedScreenshotTest {
     private val repository = SessionRepository({ error("no engine in screenshots") }, scope, Dispatchers.Unconfined, log = {})
     private val actions = ConnectedController(repository, scope)
     private val chatActions = screenshotChatController(repository, scope)
+    private val messages = ScreenshotMessages(repository, actions, scope)
 
     private val session = listOf(
         BridgeEvent.ConnectionChanged(ConnectionState.Connected),
@@ -85,11 +86,25 @@ class ConnectedScreenshotTest {
                     chatBadge = 0,
                     chatActions = chatActions,
                     chatEnvironment = screenshotChatEnvironment(),
+                    messages = messages.state(session),
+                    messagesActions = messages.actions,
+                    conversation = null,
+                    conversationActions = messages.conversationActions,
+                    onNotificationSettings = {},
                     topInsets = top,
                     bottomInsets = bottom,
                 )
                 state.sheet?.let {
-                    ConnectedSheetHost(it, actions, top, bottom, onMicrophoneContinue = {}, onMicrophoneNotNow = {})
+                    ConnectedSheetHost(
+                        it,
+                        actions,
+                        top,
+                        bottom,
+                        onMicrophoneContinue = {},
+                        onMicrophoneNotNow = {},
+                        messages = messages.state(session),
+                        messagesActions = messages.actions,
+                    )
                 }
             }
         }
@@ -111,8 +126,6 @@ class ConnectedScreenshotTest {
         capture("android-channel-search", dark, ConnectedLocal(searching = true, query = "mi"))
 
     private fun more(dark: Boolean) = capture("android-more", dark, ConnectedLocal(tab = ConnectedTab.More))
-
-    private fun emptyTab(dark: Boolean) = capture("android-tab-empty", dark, ConnectedLocal(tab = ConnectedTab.Messages))
 
     // No mockup exists for the two microphone states; they are built from the design system.
     private fun microphoneExplain(dark: Boolean) =
@@ -157,7 +170,4 @@ class ConnectedScreenshotTest {
 
     @Test fun moreLight() = more(dark = false)
 
-    @Test fun emptyTabDark() = emptyTab(dark = true)
-
-    @Test fun emptyTabLight() = emptyTab(dark = false)
 }

@@ -81,6 +81,7 @@ class ChatScreenshotTest {
     private val repository = SessionRepository({ error("no engine in screenshots") }, scope, Dispatchers.Unconfined, log = {})
     private val actions = ConnectedController(repository, scope)
     private val chatActions = screenshotChatController(repository, scope)
+    private val messagesTab = ScreenshotMessages(repository, actions, scope)
 
     private val lobby = ChatId.Channel(MOCKUP_LOBBY)
 
@@ -183,6 +184,11 @@ class ChatScreenshotTest {
                         chatBadge = 0,
                         chatActions = chatActions,
                         chatEnvironment = environment,
+                        messages = messagesTab.state(session),
+                        messagesActions = messagesTab.actions,
+                        conversation = null,
+                        conversationActions = messagesTab.conversationActions,
+                        onNotificationSettings = {},
                         topInsets = top,
                         bottomInsets = bottom,
                     )

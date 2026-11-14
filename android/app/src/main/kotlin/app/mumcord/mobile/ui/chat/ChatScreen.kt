@@ -131,20 +131,30 @@ fun ChatScreen(
     loader: ChatImageLoader,
     clock: ChatClock,
     topInsets: WindowInsets,
+    onBack: (() -> Unit)? = null,
 ) {
     LifecycleResumeEffect(actions) {
         actions.setResumed(true)
         onPauseOrDispose { actions.setResumed(false) }
     }
     Column(Modifier.fillMaxSize().testTag(CHAT_SCREEN_TEST_TAG).keyboardPadding()) {
+        val peer = state.peer
         MumcordAppBar(
-            title = stringResource(R.string.chat_title, state.title),
+            // A person's name stands as it is; only a channel gets the "#".
+            title = if (peer == null) stringResource(R.string.chat_title, state.title) else state.title,
             border = true,
+            onBack = onBack,
+            backContentDescription = stringResource(R.string.conversation_back),
             windowInsets = topInsets,
             subtitle = {
-                MumcordDot()
+                MumcordDot(off = peer?.online == false)
                 MumcordAppBarSubtitle(
-                    pluralStringResource(R.plurals.chat_subtitle, state.people, state.people, state.serverName),
+                    when {
+                        peer == null ->
+                            pluralStringResource(R.plurals.chat_subtitle, state.people, state.people, state.serverName)
+                        peer.online -> stringResource(R.string.conversation_online, state.serverName)
+                        else -> stringResource(R.string.conversation_offline, state.serverName)
+                    },
                 )
             },
         )
