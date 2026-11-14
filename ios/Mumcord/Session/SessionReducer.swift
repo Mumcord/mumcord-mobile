@@ -80,7 +80,8 @@ extension SessionState {
         // store, so that it does not make every screen compare its state.
         case .inputLevelChanged:
             break
-        // Chat phase: messages, unread counts, message requests and blocked people.
+        // Messages and unread counts go to `ChatStore` and never reach this state. The rest
+        // belongs to the Messages tab.
         case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,
              .blockedPeopleChanged:
             break

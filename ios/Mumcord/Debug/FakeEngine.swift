@@ -43,6 +43,19 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _whisperStops = 0
     private var _whisperFailure: BridgeError?
     private var _levelOnConnect: UInt8?
+    private var _messages: [ChatId: [ChatMessage]] = [:]
+    private var _unread: [ChatId: UInt32] = [:]
+    private var _gifFavourites: [GifFavourite] = []
+    private var _mentionNames: [MentionCandidate] = []
+    private var _chatImages: [String: ImageData] = [:]
+    private var _remoteImages: [String: ImageData] = [:]
+    private var _openChatCalls: [ChatId?] = []
+    private var _markReadCalls: [ChatId] = []
+    private var _pageFailure: BridgeError?
+    private var _sendFailure: BridgeError?
+    private var _limits = ChatLimits(text: 5000, image: 131_072, allowHtml: true)
+    private var _loadMediaCalls: [Bool] = []
+    private var nextMessageId = 1
     /// The user's own mute before a deafen, which comes back when the deafen ends.
     private var mutedBeforeDeafen = false
     private var people: [UInt32: Person]
@@ -365,6 +378,194 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
             hasPassword: hasPassword,
             identityId: input.identityId
         )
+    }
+
+    // MARK: Chat
+
+    /// The messages of each chat, oldest first.
+    var messages: [ChatId: [ChatMessage]] {
+        get { locked { _messages } }
+        set { locked { _messages = newValue } }
+    }
+
+    /// Unread messages per chat as the engine has them before the app asks.
+    var unread: [ChatId: UInt32] {
+        get { locked { _unread } }
+        set { locked { _unread = newValue } }
+    }
+
+    var storedGifFavourites: [GifFavourite] {
+        get { locked { _gifFavourites } }
+        set { locked { _gifFavourites = newValue } }
+    }
+
+    /// Who the `@` autocomplete can offer.
+    var mentionNames: [MentionCandidate] {
+        get { locked { _mentionNames } }
+        set { locked { _mentionNames = newValue } }
+    }
+
+    /// The pictures sent inside messages, by `imageKey`.
+    var chatImages: [String: ImageData] {
+        get { locked { _chatImages } }
+        set { locked { _chatImages = newValue } }
+    }
+
+    /// The pictures on the web, by address.
+    var remoteImages: [String: ImageData] {
+        get { locked { _remoteImages } }
+        set { locked { _remoteImages = newValue } }
+    }
+
+    /// While set, reading a page of a chat fails with it.
+    var pageFailure: BridgeError? {
+        get { locked { _pageFailure } }
+        set { locked { _pageFailure = newValue } }
+    }
+
+    /// While set, sending anything to a chat fails with it.
+    var sendFailure: BridgeError? {
+        get { locked { _sendFailure } }
+        set { locked { _sendFailure = newValue } }
+    }
+
+    var limits: ChatLimits {
+        get { locked { _limits } }
+        set { locked { _limits = newValue } }
+    }
+
+    /// Every chat the app reported as on screen, and nil for none, in order.
+    var openChatCalls: [ChatId?] { locked { _openChatCalls } }
+    var markReadCalls: [ChatId] { locked { _markReadCalls } }
+    /// What every request for a picture from the web said about loading media.
+    var loadMediaCalls: [Bool] { locked { _loadMediaCalls } }
+
+    static func imageKey(messageId: String, imageId: String) -> String {
+        "\(messageId)/\(imageId)"
+    }
+
+    /// A message of somebody else arrives: it is stored, counted as unread and reported.
+    func receive(_ message: ChatMessage) {
+        let count: UInt32 = locked {
+            _messages[message.chat, default: []].append(message)
+            let count = (_unread[message.chat] ?? 0) + 1
+            _unread[message.chat] = count
+            return count
+        }
+        emit(.chatUnreadChanged(chat: message.chat, count: count))
+        emit(.chatMessageReceived(message: message))
+    }
+
+    func chatUnreadSnapshot() -> [ChatUnread] {
+        locked { _unread.map { ChatUnread(chat: $0.key, count: $0.value) } }
+    }
+
+    func chatPage(chat: ChatId, before: String?, limit: UInt32) async throws -> ChatPage {
+        try locked {
+            if let failure = _pageFailure { throw failure }
+            let all = _messages[chat] ?? []
+            let end = before.flatMap { id in all.firstIndex { $0.id == id } } ?? all.count
+            let start = max(0, end - Int(limit))
+            return ChatPage(messages: Array(all[start..<end]), hasMore: start > 0)
+        }
+    }
+
+    func sendMessage(chat: ChatId, text: String, replyTo: ReplyQuote?) async throws -> ChatMessage {
+        try locked {
+            if let failure = _sendFailure { throw failure }
+            return appendOwn(chat, MessageContent(reply: replyTo, blocks: [.paragraph(spans: [span(text)])], truncated: false))
+        }
+    }
+
+    func sendImage(chat: ChatId, bytes: Data, mime: String) async throws -> ChatMessage {
+        try locked {
+            if let failure = _sendFailure { throw failure }
+            let imageId = "image-\(nextMessageId)"
+            let image = ImageRef.embedded(imageId: imageId, mime: mime, width: 1, height: 1, byteLen: UInt32(bytes.count), animated: false)
+            let message = appendOwn(chat, MessageContent(reply: nil, blocks: [.image(image: image)], truncated: false))
+            _chatImages[Self.imageKey(messageId: message.id, imageId: imageId)] =
+                ImageData(bytes: bytes, mime: mime, width: 1, height: 1, animated: false)
+            return message
+        }
+    }
+
+    func sendGifFavourite(chat: ChatId, url: String) async throws -> ChatMessage {
+        try locked {
+            if let failure = _sendFailure { throw failure }
+            return appendOwn(chat, messageContent(url))
+        }
+    }
+
+    /// Call with the lock held.
+    private func appendOwn(_ chat: ChatId, _ content: MessageContent) -> ChatMessage {
+        let message = chatMessage(
+            id: "own-\(nextMessageId)",
+            chat: chat,
+            senderName: people[server.selfSession]?.name ?? "",
+            own: true,
+            sentAtMs: Int64(Date().timeIntervalSince1970 * 1000),
+            content: content
+        )
+        nextMessageId += 1
+        _messages[chat, default: []].append(message)
+        return message
+    }
+
+    func chatImage(chat: ChatId, messageId: String, imageId: String) async throws -> ImageData {
+        try locked {
+            guard let image = _chatImages[Self.imageKey(messageId: messageId, imageId: imageId)] else {
+                throw BridgeError.NotFound(detail: "no such image")
+            }
+            return image
+        }
+    }
+
+    func loadRemoteImage(url: String, loadMedia: Bool) async throws -> ImageData? {
+        locked {
+            _loadMediaCalls.append(loadMedia)
+            return loadMedia ? _remoteImages[url] : nil
+        }
+    }
+
+    func mentionCandidates(query: String, limit: UInt32) -> [MentionCandidate] {
+        locked {
+            let matching = _mentionNames.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }
+            return Array(matching.prefix(Int(limit)))
+        }
+    }
+
+    func chatLimits() async throws -> ChatLimits {
+        locked { _limits }
+    }
+
+    func markChatRead(chat: ChatId) async throws {
+        let had: Bool = locked {
+            _markReadCalls.append(chat)
+            return _unread.removeValue(forKey: chat) != nil
+        }
+        if had {
+            emit(.chatUnreadChanged(chat: chat, count: 0))
+        }
+    }
+
+    func setOpenChat(chat: ChatId?) {
+        locked { _openChatCalls.append(chat) }
+    }
+
+    func gifFavourites() async throws -> [GifFavourite] {
+        locked { _gifFavourites }
+    }
+
+    func addGifFavourite(url: String) async throws {
+        locked {
+            if !_gifFavourites.contains(where: { $0.url == url }) {
+                _gifFavourites.append(GifFavourite(url: url, addedAtMs: 0, lastUsedAtMs: 0))
+            }
+        }
+    }
+
+    func removeGifFavourite(url: String) async throws {
+        locked { _gifFavourites.removeAll { $0.url == url } }
     }
 
     private func finishConnecting() {

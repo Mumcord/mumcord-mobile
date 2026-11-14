@@ -28,6 +28,9 @@ final class SessionStore: @unchecked Sendable {
     private let engine: EngineHolder
     private let log: @Sendable (String) -> Void
     private let linkParser: @Sendable (String) throws -> MumbleLink
+    /// Chat messages and unread counts as the engine reports them, for `ChatStore`, its one
+    /// reader. They never pass through the state, so chat traffic does not redraw the channels.
+    let chatEvents: AsyncStream<BridgeEvent>
 
     /// - Parameters:
     ///   - log: receives short technical messages; never names, addresses, passwords or other
@@ -44,16 +47,26 @@ final class SessionStore: @unchecked Sendable {
         // queues the event, and a single reader keeps them in order.
         let (events, queue) = AsyncStream<BridgeEvent>.makeStream()
         engine = EngineHolder(factory: engineFactory, listener: QueueingListener(queue: queue))
+        // A reader that is behind loses the oldest events instead of holding ever more of them.
+        let (chatEvents, chatQueue) = AsyncStream<BridgeEvent>.makeStream(
+            bufferingPolicy: .bufferingNewest(Self.chatEventBuffer)
+        )
+        self.chatEvents = chatEvents
         Task.detached { [weak self] in
             for await event in events {
-                if case .inputLevelChanged(let percent) = event {
+                switch event {
+                case .inputLevelChanged(let percent):
                     self?.publishInputLevel(Int(percent))
-                } else {
+                case .chatMessageReceived, .chatUnreadChanged:
+                    chatQueue.yield(event)
+                default:
                     self?.update { $0.fold(event) }
                 }
             }
         }
     }
+
+    private static let chatEventBuffer = 256
 
     /// The latest state.
     var state: SessionState {
@@ -237,6 +250,12 @@ final class SessionStore: @unchecked Sendable {
         engineNow()?.stopWhisper()
     }
 
+    /// Tells the engine which chat is on screen, or that none is. Never waits; without an
+    /// engine there is nobody to tell.
+    func setOpenChat(_ chat: ChatId?) {
+        engineNow()?.setOpenChat(chat: chat)
+    }
+
     private func engineNow() -> EngineClient? {
         lock.lock()
         defer { lock.unlock() }
@@ -365,7 +384,8 @@ final class SessionStore: @unchecked Sendable {
         }
     }
 
-    private func call<Value>(
+    /// Runs a command on the engine, creating it on first use. `name` is what the log calls it.
+    func call<Value>(
         _ name: String,
         _ command: (EngineClient) async throws -> Value
     ) async -> Outcome<Value> {
@@ -377,6 +397,14 @@ final class SessionStore: @unchecked Sendable {
             return failed(name, error)
         }
     }
+
+    #if DEBUG
+    /// Shows a hint for something the app cannot show. Nothing in the engine reports these
+    /// yet, so only debug launches and tests put one on screen.
+    func showHint(_ hint: UnsupportedHint) {
+        update { $0.withHint(hint) }
+    }
+    #endif
 
     private func failed<Value>(_ command: String, _ error: Error) -> Outcome<Value> {
         let kind: ConnectionError

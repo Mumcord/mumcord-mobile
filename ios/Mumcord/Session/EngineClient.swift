@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import Foundation
 import MumcordBridge
 
 /// The part of the engine the app uses so far. A protocol of its own instead of the generated
@@ -26,10 +27,30 @@ protocol EngineClient: AnyObject, Sendable {
     func setSelfDeaf(deafened: Bool) async throws
     func startWhisper(target: WhisperTarget) async throws
     func stopWhisper()
+
+    /// Unread messages per chat as they are when asked; later changes arrive as events.
+    func chatUnreadSnapshot() -> [ChatUnread]
+    func chatPage(chat: ChatId, before: String?, limit: UInt32) async throws -> ChatPage
+    func sendMessage(chat: ChatId, text: String, replyTo: ReplyQuote?) async throws -> ChatMessage
+    func sendImage(chat: ChatId, bytes: Data, mime: String) async throws -> ChatMessage
+    func sendGifFavourite(chat: ChatId, url: String) async throws -> ChatMessage
+    func chatImage(chat: ChatId, messageId: String, imageId: String) async throws -> ImageData
+    func loadRemoteImage(url: String, loadMedia: Bool) async throws -> ImageData?
+    func mentionCandidates(query: String, limit: UInt32) -> [MentionCandidate]
+    func chatLimits() async throws -> ChatLimits
+    func markChatRead(chat: ChatId) async throws
+    func setOpenChat(chat: ChatId?)
+    func gifFavourites() async throws -> [GifFavourite]
+    func addGifFavourite(url: String) async throws
+    func removeGifFavourite(url: String) async throws
 }
 
 extension MumcordEngine: EngineClient {
     func savedServers() -> [SavedServer] {
         snapshot().servers
+    }
+
+    func chatUnreadSnapshot() -> [ChatUnread] {
+        snapshot().chatUnread
     }
 }
