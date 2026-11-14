@@ -181,13 +181,13 @@ class ChatUiFlowTest {
         type("Do not lose me")
         compose.onNodeWithTag(CHAT_SEND_TEST_TAG).performClick()
         await { shown(CHAT_RETRY_TEST_TAG) }
-        compose.onNodeWithText("Do not lose me").assertIsDisplayed()
-        compose.onNodeWithText("Not sent.").assertIsDisplayed()
+        awaitDisplayed("Do not lose me")
+        awaitDisplayed("Not sent.")
 
         engine.sendFailure = null
         compose.onNodeWithTag(CHAT_RETRY_TEST_TAG).performClick()
         await { own().size == 1 && !shown(CHAT_RETRY_TEST_TAG) }
-        compose.onNodeWithText("Do not lose me").assertIsDisplayed()
+        awaitDisplayed("Do not lose me")
     }
 
     @Test
@@ -351,6 +351,19 @@ class ChatUiFlowTest {
     private fun shown(tag: String): Boolean = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
     private fun exists(text: String): Boolean = compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()
+
+    /**
+     * A message that was just added is in the list at once but on the screen only when the list
+     * has scrolled to it, so being displayed is waited for.
+     */
+    private fun awaitDisplayed(text: String) = await {
+        try {
+            compose.onNodeWithText(text).assertIsDisplayed()
+            true
+        } catch (_: AssertionError) {
+            false
+        }
+    }
 
     private fun await(condition: () -> Boolean) = compose.waitUntil(TIMEOUT_MILLIS, condition)
 
