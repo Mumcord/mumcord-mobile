@@ -28,15 +28,20 @@
 #   E2E_SCENARIO          run only the scenarios whose test name contains this text
 #   E2E_AVD               emulator device to start (default mumcord-test)
 #   E2E_BOOT_TIMEOUT      seconds the emulator may take to boot (default 300)
-#   E2E_TEST_TIMEOUT      seconds one scenario may take (default 600)
+#   E2E_TEST_TIMEOUT      seconds one scenario may take (default 300; a scenario takes well
+#                         under a minute, so this only ends one that hangs)
+#   E2E_RELEASE_BOUND_MS  how much longer than a hold the app may be heard (default 200)
 #
-# Logs of the run (test output, app log, emulator log, second person) land in e2e/build/.
+# Logs of the run land in e2e/build/: the test output (instrument.txt), the device log of all
+# scenarios (logcat.txt), the emulator log, what each other person reported
+# (voice-peer-<scenario>.log, voice-bystander-<scenario>.log) and, for a scenario that hung,
+# the screen at that moment (hung-screen.png, hung-screen.xml).
 set -euo pipefail
 
 export MUMCORD_PORT_BASE="${MUMCORD_PORT_BASE:-64838}"
 AVD="${E2E_AVD:-mumcord-test}"
 BOOT_TIMEOUT="${E2E_BOOT_TIMEOUT:-300}"
-TEST_TIMEOUT="${E2E_TEST_TIMEOUT:-600}"
+TEST_TIMEOUT="${E2E_TEST_TIMEOUT:-300}"
 
 APP_PACKAGE="app.mumcord.mobile"
 TEST_PACKAGE="app.mumcord.mobile.e2e"
@@ -70,11 +75,18 @@ SCENARIOS=(
 # sounds, like the one for somebody entering the channel, are shorter.
 VOICE_SPAN_MS=1000
 # AC-5.6: after hold-to-talk is released, the app may be heard for at most this much longer.
-RELEASE_BOUND_MS=200
+# What is compared is the time the finger was down, measured in the emulator, with the stretch
+# of voice the second person played, measured on this machine: 200 ms holds on a developer
+# machine. Where the emulator shares few cores with everything else (the hosted CI runner), a
+# stall of either side at the end of the stretch adds to it, so CI allows more (see the
+# workflow); a button that does not stop the voice is heard for seconds longer either way.
+RELEASE_BOUND_MS="${E2E_RELEASE_BOUND_MS:-200}"
 # The name of the third person, who must not hear a whisper.
 BYSTANDER_NAME="e2e-bystander"
-# Seconds the second person may take to connect to the test server.
-PEER_CONNECT_TIMEOUT=40
+# Seconds the second person may take to connect to the test server and enter its channel.
+PEER_CONNECT_TIMEOUT=90
+# The device keeps this much of its log, enough for all scenarios of a run.
+LOGCAT_BUFFER=16M
 # Port of the emulator this script starts; its adb name follows from it.
 EMULATOR_PORT=5554
 
@@ -83,8 +95,9 @@ OUT_DIR="${REPO_ROOT}/e2e/build"
 APP_APK="${REPO_ROOT}/android/app/build/outputs/apk/debug/app-debug.apk"
 TEST_APK="${REPO_ROOT}/android/e2e/build/outputs/apk/debug/e2e-debug.apk"
 PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/voice-peer"
-PEER_LOG="${OUT_DIR}/voice-peer.log"
-BYSTANDER_LOG="${OUT_DIR}/voice-bystander.log"
+# What the other people of the running scenario report; set by run_scenario.
+PEER_LOG=""
+BYSTANDER_LOG=""
 
 step() {
   printf '\ne2e: %s\n' "$*"
@@ -131,7 +144,8 @@ start_peer() {
   peer_pids+=("${pid}")
   until grep -q '^CONNECTED' "${log}"; do
     kill -0 "${pid}" 2>/dev/null || die "a second person ended early, see ${log#"${REPO_ROOT}/"}"
-    ((waited < PEER_CONNECT_TIMEOUT)) || die "a second person did not connect within ${PEER_CONNECT_TIMEOUT} s"
+    ((waited < PEER_CONNECT_TIMEOUT)) \
+      || die "a second person did not connect within ${PEER_CONNECT_TIMEOUT} s, see ${log#"${REPO_ROOT}/"}"
     sleep 1
     waited=$((waited + 1))
   done
@@ -145,16 +159,17 @@ voice_spans() {
 # The other half of the proof: what the other people received from the app.
 check_peers() {
   local kind="$1" report="$2" spans count held longest
+  local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
   spans="$(voice_spans "${PEER_LOG}")"
   count="$(grep -c . <<<"${spans}" || true)"
   case "${kind}" in
     peer)
-      grep '^HEARD' "${PEER_LOG}" || die "the second person did not hear the app, see e2e/build/voice-peer.log"
+      grep '^HEARD' "${PEER_LOG}" || die "the second person did not hear the app, see ${peer_log}"
       ;;
     ptt)
       held="$(sed -n 's/^ptt: held_ms=//p' "${report}" | tr -d '\r')"
       [[ -n "${held}" ]] || die "the test did not report how long hold-to-talk was held"
-      ((count == 1)) || die "the second person heard the app ${count} times instead of once, see e2e/build/voice-peer.log"
+      ((count == 1)) || die "the second person heard the app ${count} times instead of once, see ${peer_log}"
       printf 'e2e: push-to-talk: held %s ms, heard for %s ms (allowed: at most %s ms longer)\n' \
         "${held}" "${spans}" "${RELEASE_BOUND_MS}"
       ((spans <= held + RELEASE_BOUND_MS)) || die "the app was heard longer than hold-to-talk was held"
@@ -164,7 +179,7 @@ check_peers() {
     mute)
       printf 'e2e: mute and deafen: the second person heard the app %s times (ms: %s)\n' \
         "${count}" "$(tr '\n' ' ' <<<"${spans}")"
-      ((count == 3)) || die "the second person should have heard the app three separate times, see e2e/build/voice-peer.log"
+      ((count == 3)) || die "the second person should have heard the app three separate times, see ${peer_log}"
       ;;
     whisper)
       held="$(sed -n 's/^whisper: held_ms=//p' "${report}" | tr -d '\r')"
@@ -172,11 +187,11 @@ check_peers() {
       longest="$(sed -n 's/^SPAN ms=//p' "${BYSTANDER_LOG}" | sort -n | tail -n 1)"
       printf 'e2e: whisper: held %s ms, the person whispered to heard %s ms, the third person at most %s ms\n' \
         "${held}" "${spans:-0}" "${longest:-0}"
-      ((count == 1)) || die "the person whispered to heard the app ${count} times instead of once, see e2e/build/voice-peer.log"
+      ((count == 1)) || die "the person whispered to heard the app ${count} times instead of once, see ${peer_log}"
       ((spans >= held / 2 && spans <= held + RELEASE_BOUND_MS)) \
         || die "the whisper was not heard for as long as its button was held"
       [[ -z "$(voice_spans "${BYSTANDER_LOG}")" ]] \
-        || die "the third person heard the whisper, see e2e/build/voice-bystander.log"
+        || die "the third person heard the whisper, see ${bystander_log}"
       ;;
   esac
 }
@@ -187,6 +202,15 @@ cleanup() {
   set +e
   step "cleaning up"
   stop_peers
+  if ((status != 0)); then
+    # What the other people reported belongs next to the failure, not only into a file.
+    local log
+    for log in "${PEER_LOG}" "${BYSTANDER_LOG}"; do
+      [[ -s "${log}" ]] || continue
+      printf 'e2e: the end of %s:\n' "${log#"${REPO_ROOT}/"}"
+      tail -n 40 "${log}"
+    done
+  fi
   if [[ -n "${serial}" ]]; then
     timeout 20 "${ADB}" -s "${serial}" logcat -d >"${OUT_DIR}/logcat.txt" 2>/dev/null
   fi
@@ -228,10 +252,16 @@ start_emulator() {
     sleep 2
     waited=$((waited + 2))
   done
+  # No animations: a system dialog that slides in takes a tap only once it has arrived.
+  local scale
+  for scale in window_animation_scale transition_animation_scale animator_duration_scale; do
+    adb_device shell settings put global "${scale}" 0 || die "switching off the animations failed"
+  done
 }
 
 mkdir -p "${OUT_DIR}"
-rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" "${PEER_LOG}" "${BYSTANDER_LOG}"
+rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" \
+  "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.*
 trap cleanup EXIT
 
 step "building the app and the tests"
@@ -257,12 +287,15 @@ adb_device uninstall "${TEST_PACKAGE}" >/dev/null 2>&1 || true
 adb_device uninstall "${APP_PACKAGE}" >/dev/null 2>&1 || true
 timeout 120 "${ADB}" -s "${serial}" install "${APP_APK}" >/dev/null || die "installing the app failed"
 timeout 120 "${ADB}" -s "${serial}" install "${TEST_APK}" >/dev/null || die "installing the tests failed"
+adb_device logcat -G "${LOGCAT_BUFFER}" || true
 adb_device logcat -c || true
 device_api="$(adb_device shell getprop ro.build.version.sdk | tr -d '\r')"
 
 # Runs one scenario: fresh app data, the permissions as the scenario wants them, then its test.
 run_scenario() {
   local permission="$1" microphone="$2" peer="$3" test="$4" report="${OUT_DIR}/instrument-scenario.txt" status=0
+  PEER_LOG="${OUT_DIR}/voice-peer-${peer}.log"
+  BYSTANDER_LOG="${OUT_DIR}/voice-bystander-${peer}.log"
   step "scenario: ${test##*.} (local network: ${permission}, microphone: ${microphone}, second person: ${peer})"
   # Clearing the data also takes back every permission and forgets earlier answers to prompts.
   adb_device shell pm clear "${APP_PACKAGE}" >/dev/null || die "clearing the app data failed"
@@ -289,7 +322,10 @@ run_scenario() {
     "${@:5}" "${TEST_PACKAGE}/${RUNNER}" | tee "${report}" || status=$?
   cat "${report}" >>"${OUT_DIR}/instrument.txt"
   if ((status == 124)); then
-    die "the scenario did not finish within ${TEST_TIMEOUT} s"
+    # The test still runs, so the screen shows where it hangs.
+    timeout 20 "${ADB}" -s "${serial}" exec-out screencap -p >"${OUT_DIR}/hung-screen.png" 2>/dev/null || true
+    timeout 20 "${ADB}" -s "${serial}" exec-out uiautomator dump /dev/tty >"${OUT_DIR}/hung-screen.xml" 2>/dev/null || true
+    die "the scenario did not finish within ${TEST_TIMEOUT} s, see e2e/build/hung-screen.png and logcat.txt"
   fi
   # "am instrument" exits with 0 even when tests fail, so the verdict comes from its report.
   # A run that passed ends with "OK (N tests)"; a run in which nothing was executed does not count.
