@@ -67,6 +67,8 @@ jobs:
         run: |
           scripts/setup-android.sh --no-emulator
           scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
+          # The runner image points this at its own SDK; Gradle refuses two different locations.
+          echo "ANDROID_SDK_ROOT=${HOME}/Android/Sdk" >> "$GITHUB_ENV"
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -148,6 +150,8 @@ jobs:
         run: |
           scripts/setup-android.sh
           scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
+          # The runner image points this at its own SDK; Gradle refuses two different locations.
+          echo "ANDROID_SDK_ROOT=${HOME}/Android/Sdk" >> "$GITHUB_ENV"
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
