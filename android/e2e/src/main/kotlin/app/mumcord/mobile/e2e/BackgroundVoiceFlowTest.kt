@@ -80,7 +80,8 @@ class BackgroundVoiceFlowTest {
      */
     private fun listenFor(millis: Long, where: String): Long {
         val framesBefore = AudioProbe.frames(AudioDirection.Capture)
-        val end = System.nanoTime() + millis * 1_000_000
+        val start = System.nanoTime()
+        val end = start + millis * 1_000_000
         var checks = 0
         var gaps = 0
         var gapsInARow = 0
@@ -91,6 +92,9 @@ class BackgroundVoiceFlowTest {
             } else {
                 gaps += 1
                 gapsInARow += 1
+                // When it happened, for the device checklist: a gap right at a change (home
+                // screen, lock) may be the app's own.
+                VoiceChecks.report("gap $where at ${(System.nanoTime() - start) / 1_000_000} ms after it began")
                 assertTrue(
                     "The second person was not heard $where for $gapsInARow checks in a row (check $checks)",
                     gapsInARow < MAX_GAPS_IN_A_ROW,
