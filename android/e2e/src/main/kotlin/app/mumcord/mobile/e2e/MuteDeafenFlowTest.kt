@@ -106,7 +106,7 @@ class MuteDeafenFlowTest {
         const val UNMUTE = "Unmute microphone"
         const val VOICE_CONNECTED = "Voice connected"
         const val HEARD_AGAIN_MILLIS = 3_000L
-        /** Well over the silence after which the second person reports a stretch as over (1 s). */
+        /** Well over the silence after which the second person reports a stretch as over (0.6 s). */
         const val SPAN_END_MILLIS = 3_000L
     }
 }

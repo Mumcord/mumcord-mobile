@@ -84,7 +84,7 @@ class PushToTalkFlowTest {
 
         /** Six seconds: three times what the second person needs to answer. */
         const val QUIET_POLLS_BEFORE_HOLDING = 24
-        /** Well over the silence after which the second person reports a stretch as over (1 s). */
+        /** Well over the silence after which the second person reports a stretch as over (0.6 s). */
         const val SPAN_END_MILLIS = 3_000L
     }
 }
