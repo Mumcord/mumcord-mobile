@@ -19,6 +19,13 @@ class ConnectionErrorTextTest {
     }
 
     @Test
+    fun theErrorsOfIdentitiesHaveTheirOwnSentence() {
+        assertEquals(R.string.error_duplicate_identity, ConnectionError.DuplicateIdentity.messageRes())
+        assertEquals(R.string.error_last_identity, ConnectionError.LastIdentity.messageRes())
+        assertEquals(R.string.error_no_identity, ConnectionError.NoIdentity.messageRes())
+    }
+
+    @Test
     fun everyErrorHasASentenceOfItsOwn() {
         val messages = ConnectionError.entries.map { it.messageRes() }
 

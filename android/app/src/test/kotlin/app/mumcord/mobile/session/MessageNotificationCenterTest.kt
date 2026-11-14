@@ -91,7 +91,7 @@ class MessageNotificationCenterTest {
     @Test
     fun withShowSenderOnlyTheTextIsLeftOut() = runTest(dispatcher) {
         connected()
-        settings.senderOnly = true
+        settings.setSenderOnly(true)
 
         engine.receive(privateMessage("m1", "nobody else should read this"))
         runCurrent()

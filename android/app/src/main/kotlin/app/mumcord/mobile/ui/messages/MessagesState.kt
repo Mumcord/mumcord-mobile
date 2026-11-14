@@ -8,6 +8,7 @@ import app.mumcord.mobile.bridge.ChatMessage
 import app.mumcord.mobile.bridge.ContentBlock
 import app.mumcord.mobile.bridge.Conversation
 import app.mumcord.mobile.bridge.MessageRequests
+import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.session.ServerModel
 import app.mumcord.mobile.session.SessionState
 import app.mumcord.mobile.ui.chat.plainText
@@ -46,12 +47,6 @@ data class MessagesLocal(
     val requestNote: String = "",
     val requestSending: Boolean = false,
     val requestError: ChatRequestError? = null,
-    /**
-     * People blocked during this connection, with the id of their entry in the blocked list.
-     * The engine does not say which person on the server an older entry belongs to, so only
-     * these can be unblocked from the person sheet.
-     */
-    val blockIds: Map<UInt, Long> = emptyMap(),
     /** The list of blocked people is open on the More tab. */
     val blockedOpen: Boolean = false,
     /** Notifications name the sender and leave the message out. */
@@ -104,10 +99,22 @@ enum class ChatRequestOffer {
 
     /** The other person accepted, or wrote first: nothing to ask for. */
     Accepted,
+
+    /** Their app does not understand chat requests (another Mumble client): nothing to offer. */
+    Unsupported,
+    ;
+
+    /** The person sheet has a row for it. */
+    val shown: Boolean
+        get() = this == Offer || this == Pending
 }
 
 /** What the person sheet shows about messages and blocking for one person. */
-data class PersonMessaging(val blockId: Long?, val chatRequest: ChatRequestOffer)
+data class PersonMessaging(
+    /** Blocked by the user, on this connection or an earlier one: the sheet offers "Unblock". */
+    val blocked: Boolean,
+    val chatRequest: ChatRequestOffer,
+)
 
 /** A question in a bottom sheet that belongs to messages and blocking. */
 sealed interface MessagesSheet {
@@ -144,21 +151,25 @@ data class MessagesUiState(
     val blocked: List<BlockedRow>,
     val blockedOpen: Boolean,
     val senderOnly: Boolean,
-    private val blockIds: Map<UInt, Long>,
+    private val people: Map<UInt, Person>,
     private val sentRequests: Map<UInt, Boolean>,
 ) {
     /** Something on the Messages or More tab that the back button closes before it leaves the tab. */
     val canGoBack: Boolean
         get() = open != null || page != MessagesPage.List || searching || blockedOpen
 
-    fun person(session: UInt): PersonMessaging = PersonMessaging(
-        blockId = blockIds[session],
-        chatRequest = when (sentRequests[session]) {
-            null -> ChatRequestOffer.Offer
-            false -> ChatRequestOffer.Pending
-            true -> ChatRequestOffer.Accepted
-        },
-    )
+    fun person(session: UInt): PersonMessaging {
+        val person = people[session]
+        return PersonMessaging(
+            blocked = person?.blocked == true,
+            chatRequest = when {
+                person?.supportsChatRequests != true -> ChatRequestOffer.Unsupported
+                sentRequests[session] == null -> ChatRequestOffer.Offer
+                sentRequests[session] == false -> ChatRequestOffer.Pending
+                else -> ChatRequestOffer.Accepted
+            },
+        )
+    }
 }
 
 /** The Messages tab and the blocking screens as a value, or null while no server is shown. */
@@ -209,7 +220,7 @@ fun messagesUiState(
         blocked = blocked.map { BlockedRow(it.id, it.name, it.serverLabel) },
         blockedOpen = local.blockedOpen,
         senderOnly = local.senderOnly,
-        blockIds = local.blockIds,
+        people = server.people,
         sentRequests = requests.sent.associate { it.session to it.accepted },
     )
 }

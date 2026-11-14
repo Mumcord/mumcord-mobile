@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
-import app.mumcord.mobile.bridge.BlockedPerson
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.design.theme.MumcordTheme
+import app.mumcord.mobile.session.blockedPerson
 import app.mumcord.mobile.session.MOCKUP_ANNA
 import app.mumcord.mobile.session.MOCKUP_BEN
 import app.mumcord.mobile.session.MOCKUP_JONAS
@@ -219,7 +219,7 @@ class MessagesScreenshotTest {
         messages.state(
             session,
             MessagesLocal(blockedOpen = true),
-            blocked = listOf(BlockedPerson(1, "Troll42", "Nordlicht", 0), BlockedPerson(2, "Spammer", "Nordlicht", 0)),
+            blocked = listOf(blockedPerson(1, "Troll42"), blockedPerson(2, "Spammer")),
         )
     }
 

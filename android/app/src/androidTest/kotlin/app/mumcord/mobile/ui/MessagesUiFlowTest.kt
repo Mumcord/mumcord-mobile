@@ -303,7 +303,7 @@ class MessagesUiFlowTest {
 
         compose.onNodeWithTag(MORE_SENDER_ONLY_TEST_TAG).performClick()
 
-        await("the switch to be kept") { settings.senderOnly }
+        await("the switch to be kept") { settings.senderOnly.value }
         // Blocked people leave no dead end: back returns to More.
         compose.onNodeWithTag(MORE_BLOCKED_TEST_TAG).performClick()
         await("the blocked people") { shown(BLOCKED_SCREEN_TEST_TAG) }

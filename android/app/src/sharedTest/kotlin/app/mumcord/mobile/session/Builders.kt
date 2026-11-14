@@ -2,6 +2,7 @@
 
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.BlockedPerson
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.ChannelPermissions
 import app.mumcord.mobile.bridge.ChatId
@@ -49,6 +50,8 @@ fun person(
     name: String,
     channelId: UInt = 0u,
     isSelf: Boolean = false,
+    blocked: Boolean = false,
+    supportsChatRequests: Boolean = false,
 ) = Person(
     session = session,
     channelId = channelId,
@@ -64,6 +67,8 @@ fun person(
     locallyMuted = false,
     streaming = false,
     camera = false,
+    blocked = blocked,
+    supportsChatRequests = supportsChatRequests,
 )
 
 fun serverState(
@@ -158,4 +163,19 @@ fun messageRequest(
     note = note,
     messages = messages,
     receivedAtMs = 0,
+)
+
+/** A block; [session] is the person on the server it covers right now, if they are there. */
+fun blockedPerson(
+    id: Long,
+    name: String,
+    serverLabel: String = "Nordlicht",
+    session: UInt? = null,
+) = BlockedPerson(
+    id = id,
+    name = name,
+    serverLabel = serverLabel,
+    blockedAtMs = 0,
+    certHash = null,
+    session = session,
 )

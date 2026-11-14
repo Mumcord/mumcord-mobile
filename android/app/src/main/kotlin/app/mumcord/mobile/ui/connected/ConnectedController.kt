@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -44,6 +45,13 @@ class ConnectedController(
             repository.state.collect { session ->
                 val target = mutableLocal.value.whisperTarget ?: return@collect
                 if (session.server?.whisperName(target) == null) closeWhisper()
+            }
+        }
+        // The engine ended the whisper by itself and already talks to the channel again, so
+        // there is nothing to stop: only the bar goes away.
+        scope.launch {
+            repository.state.map { it.whispersEnded }.distinctUntilChanged().drop(1).collect {
+                mutableLocal.update { it.copy(whisperTarget = null, whisperHeld = false) }
             }
         }
     }

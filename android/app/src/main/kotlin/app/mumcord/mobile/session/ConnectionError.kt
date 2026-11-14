@@ -19,6 +19,9 @@ enum class ConnectionError {
     InvalidInput,
     SecureStorageUnavailable,
     Io,
+    DuplicateIdentity,
+    LastIdentity,
+    NoIdentity,
     Internal,
 }
 
@@ -36,6 +39,9 @@ fun BridgeException.toConnectionError(): ConnectionError = when (this) {
     is BridgeException.InvalidInput -> ConnectionError.InvalidInput
     is BridgeException.SecureStorageUnavailable -> ConnectionError.SecureStorageUnavailable
     is BridgeException.Io -> ConnectionError.Io
+    is BridgeException.DuplicateIdentity -> ConnectionError.DuplicateIdentity
+    is BridgeException.LastIdentity -> ConnectionError.LastIdentity
+    is BridgeException.NoIdentity -> ConnectionError.NoIdentity
     is BridgeException.Internal -> ConnectionError.Internal
 }
 
@@ -55,5 +61,8 @@ val BridgeException.detail: String
         is BridgeException.InvalidInput -> detail
         is BridgeException.SecureStorageUnavailable -> detail
         is BridgeException.Io -> detail
+        is BridgeException.DuplicateIdentity -> detail
+        is BridgeException.LastIdentity -> detail
+        is BridgeException.NoIdentity -> detail
         is BridgeException.Internal -> detail
     }

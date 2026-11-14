@@ -32,7 +32,7 @@ class MessagesController(
     private val scope: CoroutineScope,
 ) {
     private val chats: ChatRepository = repository.chat
-    private val mutableLocal = MutableStateFlow(MessagesLocal(senderOnly = settings.senderOnly))
+    private val mutableLocal = MutableStateFlow(MessagesLocal(senderOnly = settings.senderOnly.value))
     val local: StateFlow<MessagesLocal> = mutableLocal.asStateFlow()
 
     init {
@@ -53,12 +53,9 @@ class MessagesController(
                 if (none) mutableLocal.update { if (it.page == MessagesPage.Requests) it.copy(page = MessagesPage.List) else it }
             }
         }
-        // A block that was lifted elsewhere (the blocked list) is no longer one of this connection.
+        // The setting is read from the engine, which can take longer than drawing the switch.
         scope.launch {
-            chats.blocked.collect { blocked ->
-                val ids = blocked.mapTo(HashSet()) { it.id }
-                mutableLocal.update { local -> local.copy(blockIds = local.blockIds.filterValues { it in ids }) }
-            }
+            settings.senderOnly.collect { senderOnly -> mutableLocal.update { it.copy(senderOnly = senderOnly) } }
         }
     }
 
@@ -170,34 +167,28 @@ class MessagesController(
     fun confirmBlock() {
         val session = mutableLocal.value.blockSession ?: return
         scope.launch {
-            val before = chats.readBlocked()
             if (chats.block(session) is Outcome.Failed) {
                 mutableLocal.update { if (it.blockSession == session) it.copy(blockFailed = true) else it }
                 return@launch
             }
-            val after = chats.readBlocked()
-            // The new entry is this person's; it is what "Unblock" needs.
-            val added = if (before is Outcome.Ok && after is Outcome.Ok) {
-                val known = before.value.mapTo(HashSet()) { it.id }
-                after.value.map { it.id }.filterNot { it in known }.singleOrNull()
-            } else {
-                null
-            }
-            mutableLocal.update {
-                it.copy(
-                    blockSession = if (it.blockSession == session) null else it.blockSession,
-                    blockIds = if (added != null) it.blockIds + (session to added) else it.blockIds,
-                )
-            }
+            chats.readBlocked()
+            mutableLocal.update { if (it.blockSession == session) it.copy(blockSession = null) else it }
             // Their conversation is no longer one to show unread messages of.
             chats.refreshConversations()
         }
     }
 
-    /** Lifts the block of a person who was blocked during this connection. */
+    /**
+     * Lifts every block that covers a person on the server. The list is read first: which
+     * person an entry covers changes as people come and go.
+     */
     fun unblockPerson(session: UInt) {
-        val id = mutableLocal.value.blockIds[session] ?: return
-        unblock(id)
+        scope.launch {
+            val blocked = chats.readBlocked()
+            if (blocked !is Outcome.Ok) return@launch repository.reportFailure()
+            blocked.value.filter { it.session == session }.forEach { report(chats.unblock(it.id)) }
+            chats.readBlocked()
+        }
     }
 
     /** Lifts a block of the blocked list. */
@@ -221,8 +212,7 @@ class MessagesController(
     // ----- notifications -----
 
     fun setSenderOnly(senderOnly: Boolean) {
-        settings.senderOnly = senderOnly
-        mutableLocal.update { it.copy(senderOnly = senderOnly) }
+        settings.setSenderOnly(senderOnly)
     }
 
     private fun report(outcome: Outcome<Unit>) {

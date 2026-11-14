@@ -9,7 +9,9 @@ import app.mumcord.mobile.bridge.ContentBlock
 import app.mumcord.mobile.bridge.Conversation
 import app.mumcord.mobile.bridge.ImageRef
 import app.mumcord.mobile.bridge.MessageRequests
+import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SentChatRequest
+import app.mumcord.mobile.session.blockedPerson
 import app.mumcord.mobile.session.MOCKUP_ANNA
 import app.mumcord.mobile.session.MOCKUP_BEN
 import app.mumcord.mobile.session.MOCKUP_JONAS
@@ -167,17 +169,41 @@ class MessagesStateTest {
     }
 
     @Test
-    fun thePersonSheetOffersAChatRequestUntilOneWasSentAndUnblockOnlyForBlocksOfThisConnection() {
+    fun thePersonSheetOffersAChatRequestUntilOneWasSent() {
         val requests = MessageRequests(
             incoming = emptyList(),
             sent = listOf(SentChatRequest(MOCKUP_BEN, "Ben", accepted = false), SentChatRequest(MOCKUP_MIRA, "Mira", accepted = true)),
         )
-        val ui = state(MessagesLocal(blockIds = mapOf(MOCKUP_JONAS to 4L)), requests = requests)
+        val ui = state(requests = requests)
 
-        assertEquals(PersonMessaging(blockId = null, chatRequest = ChatRequestOffer.Offer), ui.person(MOCKUP_ANNA))
+        assertEquals(PersonMessaging(blocked = false, chatRequest = ChatRequestOffer.Offer), ui.person(MOCKUP_ANNA))
         assertEquals(ChatRequestOffer.Pending, ui.person(MOCKUP_BEN).chatRequest)
         assertEquals(ChatRequestOffer.Accepted, ui.person(MOCKUP_MIRA).chatRequest)
-        assertEquals(4L, ui.person(MOCKUP_JONAS).blockId)
+    }
+
+    private fun sessionWith(session: UInt, change: (Person) -> Person): SessionState =
+        this.session.fold(BridgeEvent.PersonChanged(change(checkNotNull(this.session.server).people.getValue(session))))
+
+    @Test
+    fun thePersonSheetOffersUnblockForEveryoneTheEngineCallsBlocked() {
+        val blocked = sessionWith(MOCKUP_JONAS) { it.copy(blocked = true) }
+        val ui = checkNotNull(messagesUiState(blocked, MessagesLocal(), emptyList(), none, emptyList(), emptyMap(), true))
+
+        assertTrue(ui.person(MOCKUP_JONAS).blocked)
+        assertFalse(ui.person(MOCKUP_ANNA).blocked)
+    }
+
+    @Test
+    fun aChatRequestIsOfferedOnlyToPeopleWhoseAppUnderstandsIt() {
+        val otherClient = sessionWith(MOCKUP_ANNA) { it.copy(supportsChatRequests = false) }
+        val ui = checkNotNull(messagesUiState(otherClient, MessagesLocal(), emptyList(), none, emptyList(), emptyMap(), true))
+
+        assertEquals(ChatRequestOffer.Unsupported, ui.person(MOCKUP_ANNA).chatRequest)
+        assertFalse(ui.person(MOCKUP_ANNA).chatRequest.shown)
+        assertEquals(ChatRequestOffer.Offer, ui.person(MOCKUP_BEN).chatRequest)
+        assertTrue(ui.person(MOCKUP_BEN).chatRequest.shown)
+        assertFalse(ChatRequestOffer.Accepted.shown)
+        assertTrue(ChatRequestOffer.Pending.shown)
     }
 
     @Test
@@ -197,7 +223,7 @@ class MessagesStateTest {
     fun blockedPeopleNotificationsAndTheSwitchArePassedOn() {
         val ui = state(
             MessagesLocal(blockedOpen = true, senderOnly = true),
-            blocked = listOf(BlockedPerson(3, "Troll", "Nordlicht", 0)),
+            blocked = listOf(blockedPerson(3, "Troll")),
             granted = false,
         )
 

@@ -10,9 +10,10 @@ import android.util.Log
 import app.mumcord.mobile.session.BridgeEngineFactory
 import app.mumcord.mobile.platform.notify.AndroidMessageNotifier
 import app.mumcord.mobile.session.EngineCalls
+import app.mumcord.mobile.session.EngineMessageNotificationSettings
 import app.mumcord.mobile.session.MessageNotificationCenter
 import app.mumcord.mobile.session.MessageNotificationSettings
-import app.mumcord.mobile.session.PreferencesMessageNotificationSettings
+import app.mumcord.mobile.session.PreferencesStoredSenderOnly
 import app.mumcord.mobile.platform.audio.AndroidVoiceSession
 import app.mumcord.mobile.platform.audio.AudioController
 import app.mumcord.mobile.platform.audio.NativeAudio
@@ -118,7 +119,11 @@ class MumcordApplication : Application() {
     }
 
     val messageNotificationSettings: MessageNotificationSettings by lazy {
-        PreferencesMessageNotificationSettings(this)
+        EngineMessageNotificationSettings(
+            repository = sessionRepository,
+            stored = PreferencesStoredSenderOnly(this),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+        )
     }
 
     private val notificationGateway by lazy { AndroidNotificationGateway(this) }

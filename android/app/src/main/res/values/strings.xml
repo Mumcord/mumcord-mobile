@@ -100,6 +100,9 @@
     <string name="error_invalid_input">The server address, the port or the name is not valid.</string>
     <string name="error_secure_storage_unavailable">The secure storage of this device is not available, so Mumcord cannot protect your identity.</string>
     <string name="error_io">Mumcord could not read or write its data on this device.</string>
+    <string name="error_duplicate_identity">This identity is already on this phone.</string>
+    <string name="error_last_identity">You cannot delete your last identity.</string>
+    <string name="error_no_identity">Create or import an identity first.</string>
     <string name="error_internal">Something went wrong inside Mumcord.</string>
 
     <!-- Local network permission (Android 17 and later) -->

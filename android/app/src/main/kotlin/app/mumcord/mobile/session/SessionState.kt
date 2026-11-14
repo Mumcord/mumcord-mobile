@@ -29,6 +29,11 @@ data class SessionState(
     val audio: AudioWanted = AudioWanted(capture = false, playback = false),
     /** How the user talks; voice activity until the saved choice has been read. */
     val talkMode: TalkMode = TalkMode.VOICE_ACTIVITY,
+    /**
+     * How often the engine ended a whisper by itself (the person left, the connection dropped).
+     * The whisper bar closes each time it grows.
+     */
+    val whispersEnded: Int = 0,
     /** Things the app cannot show, newest last; see [withHint]. */
     val hints: List<UnsupportedHint> = emptyList(),
 ) {

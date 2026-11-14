@@ -7,6 +7,7 @@ import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.EngineListener
+import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.MumbleLink
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
@@ -138,6 +139,20 @@ class SessionRepository(
         call("set talk mode") { it.setTalkMode(mode) }.also { saved ->
             if (saved is Outcome.Ok) mutableState.update { it.copy(talkMode = mode) }
         }
+
+    /** The phone settings as the engine keeps them, or null when they cannot be read. */
+    suspend fun mobileSettings(): MobileSettings? =
+        when (val settings = call("read phone settings") { it.mobileSettings() }) {
+            is Outcome.Ok -> settings.value
+            is Outcome.Failed -> null
+        }
+
+    /**
+     * Changes the phone settings. Reading and writing are one command, so a change of one
+     * setting never writes back an old value of another.
+     */
+    suspend fun updateMobileSettings(change: (MobileSettings) -> MobileSettings): Outcome<Unit> =
+        call("save phone settings") { it.setMobileSettings(change(it.mobileSettings())) }
 
     /** The target of a `mumble://` link. Nothing is saved or connected by reading it. */
     fun parseLink(url: String): Outcome<MumbleLink> =

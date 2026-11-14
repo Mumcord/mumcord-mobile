@@ -15,6 +15,7 @@ const val MOCKUP_JONAS = 5u
 /**
  * The server of mockup `02-channels`: Nordlicht with Lobby (Anna, Ben talking, Lea = the user),
  * Gaming (Mira sharing her screen, Jonas muted and deafened), the locked Music and AFK.
+ * Everybody uses Mumcord, so they can be sent a chat request.
  */
 fun mockupServer(): ServerState = serverState(
     selfSession = MOCKUP_LEA,
@@ -26,11 +27,11 @@ fun mockupServer(): ServerState = serverState(
         channel(MOCKUP_AFK, "AFK", parentId = MOCKUP_ROOT, position = 3),
     ),
     people = listOf(
-        person(1u, "Anna", channelId = MOCKUP_LOBBY),
-        person(MOCKUP_BEN, "Ben", channelId = MOCKUP_LOBBY).copy(talking = true),
+        person(1u, "Anna", channelId = MOCKUP_LOBBY, supportsChatRequests = true),
+        person(MOCKUP_BEN, "Ben", channelId = MOCKUP_LOBBY, supportsChatRequests = true).copy(talking = true),
         person(MOCKUP_LEA, "Lea", channelId = MOCKUP_LOBBY, isSelf = true),
-        person(4u, "Mira", channelId = MOCKUP_GAMING).copy(streaming = true),
-        person(MOCKUP_JONAS, "Jonas", channelId = MOCKUP_GAMING).copy(selfMuted = true, selfDeafened = true),
+        person(4u, "Mira", channelId = MOCKUP_GAMING, supportsChatRequests = true).copy(streaming = true),
+        person(MOCKUP_JONAS, "Jonas", channelId = MOCKUP_GAMING, supportsChatRequests = true).copy(selfMuted = true, selfDeafened = true),
     ),
 )
 

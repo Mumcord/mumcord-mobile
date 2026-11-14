@@ -2,7 +2,9 @@
 package app.mumcord.mobile.ui.messages
 
 import app.mumcord.mobile.bridge.BridgeException
+import app.mumcord.mobile.bridge.ServerState
 import app.mumcord.mobile.bridge.ChatId
+import app.mumcord.mobile.session.blockedPerson
 import app.mumcord.mobile.session.FakeEngine
 import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
 import app.mumcord.mobile.session.MOCKUP_ANNA
@@ -64,10 +66,13 @@ class MessagesControllerTest {
     fun tearDown() = Dispatchers.resetMain()
 
     /** A view model that is connected to the mockup server; Anna and Ben have certificates. */
-    private fun TestScope.connected(configure: (FakeEngine) -> Unit = {}): AppViewModel {
+    private fun TestScope.connected(
+        server: ServerState = mockupServer(),
+        configure: (FakeEngine) -> Unit = {},
+    ): AppViewModel {
         val repository = SessionRepository(
             engineFactory = { listener ->
-                FakeEngine(listener, mockupServer(), servers = listOf(savedServer(1, "Nordlicht")))
+                FakeEngine(listener, server, servers = listOf(savedServer(1, "Nordlicht")))
                     .also {
                         it.certificates[MOCKUP_ANNA] = "cert-anna"
                         it.certificates[MOCKUP_BEN] = "cert-ben"
@@ -446,32 +451,63 @@ class MessagesControllerTest {
 
         assertNull(viewModel.ui.sheet)
         assertEquals(listOf("Jonas"), viewModel.ui.blocked.map { it.name })
-        val blockId = viewModel.ui.person(MOCKUP_JONAS).blockId
-        assertEquals(engine.blocked.single().id, blockId)
+        assertTrue(viewModel.ui.person(MOCKUP_JONAS).blocked)
+        assertFalse(viewModel.ui.person(MOCKUP_ANNA).blocked)
 
         viewModel.messages.unblockPerson(MOCKUP_JONAS)
         runCurrent()
 
         assertTrue(engine.blocked.isEmpty())
         assertTrue(viewModel.ui.blocked.isEmpty())
-        assertNull(viewModel.ui.person(MOCKUP_JONAS).blockId)
+        assertFalse(viewModel.ui.person(MOCKUP_JONAS).blocked)
+    }
+
+    /** The mockup server with Jonas blocked on an earlier connection, as the engine reports it. */
+    private fun serverWithJonasBlocked(): ServerState = mockupServer().let { server ->
+        server.copy(people = server.people.map { if (it.session == MOCKUP_JONAS) it.copy(blocked = true) else it })
+    }
+
+    private val earlierBlock = blockedPerson(40, "Jonas", session = MOCKUP_JONAS)
+
+    @Test
+    fun aBlockOfAnEarlierConnectionIsLiftedFromThePersonsSheet() = runTest(dispatcher) {
+        val viewModel = connected(serverWithJonasBlocked()) { it.blocked += earlierBlock }
+        assertTrue("the sheet offers Unblock", viewModel.ui.person(MOCKUP_JONAS).blocked)
+
+        viewModel.messages.unblockPerson(MOCKUP_JONAS)
+        runCurrent()
+
+        assertTrue(engine.blocked.isEmpty())
+        assertFalse(viewModel.ui.person(MOCKUP_JONAS).blocked)
+        assertNull("nothing failed", viewModel.uiState.value.connected?.denied)
     }
 
     @Test
-    fun aBlockOfAnEarlierConnectionIsListedAndLiftedFromTheBlockedListOnly() = runTest(dispatcher) {
-        val viewModel = connected {
-            it.blocked += app.mumcord.mobile.bridge.BlockedPerson(40, "Jonas", "Nordlicht", 0)
+    fun unblockingAPersonLeavesTheBlocksOfOtherPeopleAlone() = runTest(dispatcher) {
+        val viewModel = connected(serverWithJonasBlocked()) {
+            it.blocked += earlierBlock
+            it.blocked += earlierBlock.copy(id = 41, name = "Nora", session = null)
         }
+
+        viewModel.messages.unblockPerson(MOCKUP_JONAS)
+        runCurrent()
+
+        assertEquals(listOf(41L), engine.blocked.map { it.id })
+    }
+
+    @Test
+    fun aBlockOfAnEarlierConnectionIsListedAndLiftedFromTheBlockedList() = runTest(dispatcher) {
+        val viewModel = connected(serverWithJonasBlocked()) { it.blocked += earlierBlock }
         viewModel.messages.openBlocked()
         runCurrent()
 
         assertTrue(viewModel.ui.blockedOpen)
         assertEquals(listOf(BlockedRow(40, "Jonas", "Nordlicht")), viewModel.ui.blocked)
-        assertNull("the engine does not say who on the server that is", viewModel.ui.person(MOCKUP_JONAS).blockId)
 
         viewModel.messages.unblock(40)
         runCurrent()
         assertTrue(viewModel.ui.blocked.isEmpty())
+        assertFalse(viewModel.ui.person(MOCKUP_JONAS).blocked)
 
         viewModel.messages.back()
         runCurrent()
@@ -489,7 +525,7 @@ class MessagesControllerTest {
         viewModel.messages.unblock(id)
         runCurrent()
 
-        assertNull(viewModel.ui.person(MOCKUP_JONAS).blockId)
+        assertFalse(viewModel.ui.person(MOCKUP_JONAS).blocked)
     }
 
     @Test
@@ -500,7 +536,7 @@ class MessagesControllerTest {
         runCurrent()
 
         assertEquals(MessagesSheet.BlockConfirm(MOCKUP_JONAS, "Jonas", failed = true), viewModel.ui.sheet)
-        assertNull(viewModel.ui.person(MOCKUP_JONAS).blockId)
+        assertFalse(viewModel.ui.person(MOCKUP_JONAS).blocked)
     }
 
     // ----- notifications -----
@@ -513,7 +549,7 @@ class MessagesControllerTest {
         viewModel.messages.setSenderOnly(true)
         runCurrent()
 
-        assertTrue(settings.senderOnly)
+        assertTrue(settings.senderOnly.value)
         assertTrue(viewModel.ui.senderOnly)
     }
 }

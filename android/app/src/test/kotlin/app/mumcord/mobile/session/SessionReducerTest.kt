@@ -5,6 +5,8 @@ package app.mumcord.mobile.session
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ChannelPasswordState
 import app.mumcord.mobile.bridge.BridgeException
+import app.mumcord.mobile.bridge.DefaultOutput
+import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.CertificatePrompt
 import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.bridge.ServerState
@@ -243,9 +245,42 @@ class SessionReducerTest {
             BridgeException.InvalidInput("d") to ConnectionError.InvalidInput,
             BridgeException.SecureStorageUnavailable("d") to ConnectionError.SecureStorageUnavailable,
             BridgeException.Io("d") to ConnectionError.Io,
+            BridgeException.DuplicateIdentity("d") to ConnectionError.DuplicateIdentity,
+            BridgeException.LastIdentity("d") to ConnectionError.LastIdentity,
+            BridgeException.NoIdentity("d") to ConnectionError.NoIdentity,
             BridgeException.Internal("d") to ConnectionError.Internal,
         )
         assertEquals(ConnectionError.entries.toSet(), mapping.values.toSet())
         mapping.forEach { (exception, error) -> assertEquals(error, exception.toConnectionError()) }
+    }
+
+    @Test
+    fun aWhisperTheEngineEndedIsCounted() {
+        val once = SessionState().fold(BridgeEvent.WhisperEnded)
+        assertEquals(1, once.whispersEnded)
+        assertEquals(2, once.fold(BridgeEvent.WhisperEnded).whispersEnded)
+    }
+
+    @Test
+    fun identitiesAndPhoneSettingsDoNotChangeTheStateYet() {
+        val state = SessionState()
+        assertEquals(state, state.fold(BridgeEvent.IdentitiesChanged(emptyList())))
+        assertEquals(
+            state,
+            state.fold(
+                BridgeEvent.MobileSettingsChanged(
+                    MobileSettings(
+                        talkModeChosen = true,
+                        defaultOutput = DefaultOutput.SPEAKER,
+                        mobileDataAutoplayStreams = false,
+                        mobileDataLoadMedia = true,
+                        mobileDataReducedVoice = false,
+                        idleDisconnect = false,
+                        notifySenderOnly = true,
+                        updateCheck = true,
+                    ),
+                ),
+            ),
+        )
     }
 }

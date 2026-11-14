@@ -248,6 +248,28 @@ class VoiceControllerTest {
     }
 
     @Test
+    fun aWhisperTheEngineEndedClosesTheBarWithoutStoppingAnything() = runTest(dispatcher) {
+        val viewModel = connected()
+        viewModel.connected.openWhisper(WhisperTarget.Person(MOCKUP_JONAS))
+        viewModel.connected.setWhisperHeld(true)
+        runCurrent()
+        assertTrue(viewModel.voice.whisper!!.held)
+        val callsBefore = engine.whisperCalls.toList()
+
+        engine.emit(BridgeEvent.WhisperEnded)
+        runCurrent()
+
+        assertNull(viewModel.voice.whisper)
+        assertFalse(viewModel.connected.local.value.whisperHeld)
+        assertEquals("the engine has already switched back", callsBefore, engine.whisperCalls.toList())
+
+        // The next whisper works as before.
+        viewModel.connected.openWhisper(WhisperTarget.Person(MOCKUP_JONAS))
+        runCurrent()
+        assertFalse(viewModel.voice.whisper!!.held)
+    }
+
+    @Test
     fun aRefusedWhisperIsShownInTheServersWordsAndTheButtonIsNotHeld() = runTest(dispatcher) {
         val viewModel = connected()
         engine.whisperFailure = BridgeException.PermissionDenied("Whispering is not allowed here.")

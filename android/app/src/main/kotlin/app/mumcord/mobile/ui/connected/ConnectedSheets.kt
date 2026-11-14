@@ -179,14 +179,14 @@ private fun PersonSheet(
                     icon = MumcordIcons.Send,
                     modifier = Modifier.testTag(PERSON_CHAT_REQUEST_TEST_TAG),
                 )
-                ChatRequestOffer.Accepted -> Unit
+                ChatRequestOffer.Accepted, ChatRequestOffer.Unsupported -> Unit
             }
-            val blocked = messaging.blockId != null
+            val blocked = messaging.blocked
             MumcordListRow(
                 title = stringResource(if (blocked) R.string.person_unblock else R.string.person_block),
                 icon = MumcordIcons.Shield,
                 danger = !blocked,
-                divider = messaging.chatRequest != ChatRequestOffer.Accepted,
+                divider = messaging.chatRequest.shown,
                 onClick = {
                     if (blocked) messagesActions.unblockPerson(sheet.session) else messagesActions.askBlock(sheet.session)
                 },

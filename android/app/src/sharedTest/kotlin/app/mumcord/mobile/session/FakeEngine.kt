@@ -42,6 +42,13 @@ import app.mumcord.mobile.bridge.PasswordInput
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
+import app.mumcord.mobile.bridge.DefaultOutput
+import app.mumcord.mobile.bridge.Identity
+import app.mumcord.mobile.bridge.MobileSettings
+import app.mumcord.mobile.bridge.PublicServer
+import app.mumcord.mobile.bridge.PublicServerPage
+import app.mumcord.mobile.bridge.PublicServerQuery
+import app.mumcord.mobile.bridge.TransferScan
 import app.mumcord.mobile.bridge.ServerState
 import app.mumcord.mobile.bridge.TalkMode
 import java.util.concurrent.ConcurrentHashMap
@@ -214,6 +221,8 @@ class FakeEngine(
             chatUnread = unread.map { (chat, count) -> ChatUnread(chat, count) },
             openChat = openChat,
             whispering = false,
+            identities = identities.toList(),
+            mobileSettings = mobileSettings,
         )
 
     override suspend fun addServer(input: ServerInput): SavedServer {
@@ -560,16 +569,143 @@ class FakeEngine(
     override suspend fun blockPerson(session: UInt) {
         blockFailure?.let { throw it }
         val name = server.people.firstOrNull { it.session == session }?.name.orEmpty()
-        blocked += BlockedPerson(id = nextBlockId++, name = name, serverLabel = "", blockedAtMs = 0)
+        blocked += BlockedPerson(
+            id = nextBlockId++,
+            name = name,
+            serverLabel = "",
+            blockedAtMs = 0,
+            certHash = certificates[session],
+            session = session,
+        )
         emit(BridgeEvent.BlockedPeopleChanged(blocked.toList()))
+        change(session) { it.copy(blocked = true) }
     }
 
+    // As the engine: the person stays blocked while another entry still covers them.
     override suspend fun unblockPerson(id: Long) {
-        blocked.removeAll { it.id == id }
+        val lifted = blocked.filter { it.id == id }
+        blocked.removeAll(lifted)
         emit(BridgeEvent.BlockedPeopleChanged(blocked.toList()))
+        lifted.mapNotNull { it.session }.distinct().forEach { session ->
+            if (blocked.none { it.session == session }) change(session) { it.copy(blocked = false) }
+        }
     }
 
     override suspend fun blockedPeople(): List<BlockedPerson> = blocked.toList()
+
+    // ----- identities -----
+
+    /** The identities on the phone; the certificates themselves are not part of the fake. */
+    val identities = CopyOnWriteArrayList<Identity>()
+    private var nextIdentityId = 1L
+
+    override suspend fun identities(): List<Identity> = identities.toList()
+
+    override suspend fun createIdentity(name: String, label: String?): Identity = addIdentity(name, label)
+
+    override suspend fun ensureDefaultIdentity(name: String): Identity =
+        identities.firstOrNull { it.isDefault } ?: addIdentity(name, label = null)
+
+    /** The file's bytes stand for the certificate: the same file twice is the same identity. */
+    override suspend fun importIdentity(data: ByteArray, password: String, label: String?): Identity {
+        val fingerprint = data.joinToString("") { "%02x".format(it) }
+        if (identities.any { it.fingerprint == fingerprint }) throw BridgeException.DuplicateIdentity("already there")
+        return addIdentity(name = label.orEmpty(), label = label, fingerprint = fingerprint)
+    }
+
+    override suspend fun exportIdentity(identityId: Long, password: String): ByteArray =
+        identity(identityId).fingerprint.encodeToByteArray()
+
+    override suspend fun renameIdentity(identityId: Long, label: String): Identity {
+        val renamed = identity(identityId).copy(label = label)
+        identities.replaceAll { if (it.id == identityId) renamed else it }
+        emitIdentities()
+        return renamed
+    }
+
+    override suspend fun setDefaultIdentity(identityId: Long) {
+        identity(identityId)
+        identities.replaceAll { it.copy(isDefault = it.id == identityId) }
+        emitIdentities()
+    }
+
+    override suspend fun deleteIdentity(identityId: Long) {
+        val deleted = identity(identityId)
+        if (identities.size == 1) throw BridgeException.LastIdentity("the only identity")
+        identities.remove(deleted)
+        // There is always a default one.
+        if (deleted.isDefault) identities[0] = identities[0].copy(isDefault = true)
+        emitIdentities()
+    }
+
+    private fun addIdentity(name: String, label: String?, fingerprint: String = "fingerprint-$nextIdentityId"): Identity {
+        val identity = Identity(
+            id = nextIdentityId++,
+            label = label ?: name,
+            commonName = name,
+            fingerprint = fingerprint,
+            createdMs = 0,
+            isDefault = identities.isEmpty(),
+            serverIds = emptyList(),
+        )
+        identities += identity
+        emitIdentities()
+        return identity
+    }
+
+    private fun identity(id: Long): Identity =
+        identities.firstOrNull { it.id == id } ?: throw BridgeException.NotFound("no identity $id")
+
+    private fun emitIdentities() = emit(BridgeEvent.IdentitiesChanged(identities.toList()))
+
+    /** The fake reads no QR codes: a transfer needs the real bridge and is tested there. */
+    override fun newTransfer(): TransferScan =
+        throw BridgeException.Internal("the fake engine has no transfer")
+
+    // ----- phone settings -----
+
+    @Volatile
+    var mobileSettings = MobileSettings(
+        talkModeChosen = false,
+        defaultOutput = DefaultOutput.ASK,
+        mobileDataAutoplayStreams = false,
+        mobileDataLoadMedia = true,
+        mobileDataReducedVoice = false,
+        idleDisconnect = false,
+        notifySenderOnly = false,
+        updateCheck = true,
+    )
+
+    /** When set, saving the phone settings fails with it. */
+    @Volatile
+    var mobileSettingsFailure: BridgeException? = null
+
+    override fun mobileSettings(): MobileSettings = mobileSettings
+
+    override suspend fun setMobileSettings(settings: MobileSettings) {
+        mobileSettingsFailure?.let { throw it }
+        mobileSettings = settings
+        emit(BridgeEvent.MobileSettingsChanged(settings))
+    }
+
+    // ----- public servers -----
+
+    /** The public server list as the directory would give it. */
+    val publicServers = CopyOnWriteArrayList<PublicServer>()
+
+    override suspend fun publicServers(query: PublicServerQuery): PublicServerPage {
+        val matching = publicServers.filter {
+            it.name.contains(query.search, ignoreCase = true) &&
+                (query.countryCode == null || it.countryCode == query.countryCode)
+        }
+        return PublicServerPage(
+            servers = matching.drop(query.offset.toInt()).take(query.limit.toInt()),
+            total = matching.size.toUInt(),
+        )
+    }
+
+    /** No public server answers a ping in the fake. */
+    override suspend fun pingPublicServer(host: String, port: UShort): ServerPing? = null
 
     private fun appendOwn(chat: ChatId, content: MessageContent): ChatMessage {
         val message = chatMessage(

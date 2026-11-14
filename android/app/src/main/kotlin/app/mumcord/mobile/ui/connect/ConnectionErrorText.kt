@@ -22,5 +22,8 @@ fun ConnectionError.messageRes(): Int = when (this) {
     ConnectionError.InvalidInput -> R.string.error_invalid_input
     ConnectionError.SecureStorageUnavailable -> R.string.error_secure_storage_unavailable
     ConnectionError.Io -> R.string.error_io
+    ConnectionError.DuplicateIdentity -> R.string.error_duplicate_identity
+    ConnectionError.LastIdentity -> R.string.error_last_identity
+    ConnectionError.NoIdentity -> R.string.error_no_identity
     ConnectionError.Internal -> R.string.error_internal
 }

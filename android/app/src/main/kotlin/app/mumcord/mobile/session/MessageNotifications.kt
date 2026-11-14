@@ -9,30 +9,90 @@ import app.mumcord.mobile.bridge.NotificationKind
 import app.mumcord.mobile.platform.notify.MessageNotice
 import app.mumcord.mobile.platform.notify.MessageNotifier
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * The settings of message notifications. The one place they are read and written, so they can
- * move into the engine's settings (`notify_sender_only`) once the bridge has them.
+ * The settings of message notifications. The one place they are read and written.
  */
 interface MessageNotificationSettings {
     /** "Show sender only": notifications name who wrote and leave the message out (FR-5.55). */
-    var senderOnly: Boolean
+    val senderOnly: StateFlow<Boolean>
+
+    fun setSenderOnly(senderOnly: Boolean)
 }
 
-/** Kept in the app's own preferences on the phone. */
-class PreferencesMessageNotificationSettings(context: Context) : MessageNotificationSettings {
+/** The "Show sender only" choice an earlier version of the app kept on the phone itself. */
+interface StoredSenderOnly {
+    /** The stored choice, or null when there is none (any more). */
+    fun read(): Boolean?
+
+    fun clear()
+}
+
+/** The app's own preferences, where the choice lived before the engine had the setting. */
+class PreferencesStoredSenderOnly(context: Context) : StoredSenderOnly {
     private val preferences = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-    override var senderOnly: Boolean
-        get() = preferences.getBoolean(KEY_SENDER_ONLY, false)
-        set(value) = preferences.edit { putBoolean(KEY_SENDER_ONLY, value) }
+    override fun read(): Boolean? =
+        if (preferences.contains(KEY_SENDER_ONLY)) preferences.getBoolean(KEY_SENDER_ONLY, false) else null
+
+    override fun clear() = preferences.edit { remove(KEY_SENDER_ONLY) }
 
     private companion object {
         const val FILE = "message_notifications"
         const val KEY_SENDER_ONLY = "sender_only"
+    }
+}
+
+/**
+ * Kept in the engine's phone settings (`notifySenderOnly`), next to all other settings. A
+ * choice [stored] by an earlier version is moved there once and then forgotten on the phone.
+ *
+ * The engine reports changed settings as an event that the state does not follow yet (see
+ * the reducer); this switch is the only thing that changes the setting, so the value read at
+ * the start and the user's own changes are all there is to know.
+ *
+ * @param scope lives as long as the process.
+ */
+class EngineMessageNotificationSettings(
+    private val repository: SessionRepository,
+    private val stored: StoredSenderOnly,
+    private val scope: CoroutineScope,
+) : MessageNotificationSettings {
+    private val mutableSenderOnly = MutableStateFlow(stored.read() ?: false)
+    override val senderOnly: StateFlow<Boolean> = mutableSenderOnly.asStateFlow()
+
+    // The user's choice is newer than what the engine is still being asked for.
+    @Volatile
+    private var chosen = false
+
+    init {
+        scope.launch {
+            val earlier = stored.read()
+            if (earlier != null) {
+                save(earlier)
+            } else {
+                val settings = repository.mobileSettings() ?: return@launch
+                if (!chosen) mutableSenderOnly.value = settings.notifySenderOnly
+            }
+        }
+    }
+
+    override fun setSenderOnly(senderOnly: Boolean) {
+        chosen = true
+        mutableSenderOnly.value = senderOnly
+        scope.launch { save(senderOnly) }
+    }
+
+    /** A failure is logged by the repository; the stored choice then stays for the next start. */
+    private suspend fun save(senderOnly: Boolean) {
+        val saved = repository.updateMobileSettings { it.copy(notifySenderOnly = senderOnly) }
+        if (saved is Outcome.Ok) stored.clear()
     }
 }
 
@@ -107,7 +167,7 @@ class MessageNotificationCenter(
         val key = chat.notificationKey()
         val line = MessageNotice.Line(
             sender = notification.senderName,
-            text = notification.preview.takeIf { it.isNotEmpty() && !settings.senderOnly },
+            text = notification.preview.takeIf { it.isNotEmpty() && !settings.senderOnly.value },
             atMillis = now(),
         )
         val lines = (shown[key].orEmpty() + line).takeLast(MAX_LINES)
@@ -150,4 +210,11 @@ class MessageNotificationCenter(
 }
 
 /** Kept for the life of the process only: for screens drawn without a phone behind them, and tests. */
-class InMemoryMessageNotificationSettings(override var senderOnly: Boolean = false) : MessageNotificationSettings
+class InMemoryMessageNotificationSettings(senderOnly: Boolean = false) : MessageNotificationSettings {
+    private val mutableSenderOnly = MutableStateFlow(senderOnly)
+    override val senderOnly: StateFlow<Boolean> = mutableSenderOnly.asStateFlow()
+
+    override fun setSenderOnly(senderOnly: Boolean) {
+        mutableSenderOnly.value = senderOnly
+    }
+}
