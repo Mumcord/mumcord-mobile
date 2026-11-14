@@ -200,7 +200,7 @@ scripts/build-ios.sh --test
 
 # The steps CI runs in separate jobs: build once, then run one test group from the products
 scripts/build-ios.sh --build-for-testing
-scripts/build-ios.sh --test-without-building flows
+scripts/build-ios.sh --test-without-building core
 
 # Another simulator
 IOS_SIMULATOR="iPhone 17 Pro" scripts/build-ios.sh --test
