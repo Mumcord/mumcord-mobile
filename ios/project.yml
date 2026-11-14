@@ -37,6 +37,9 @@ targets:
       - sdk: AudioToolbox.framework
       - sdk: AVFAudio.framework
       - sdk: CoreAudio.framework
+      # Network path monitoring and the system's DNS resolver settings.
+      - sdk: Network.framework
+      - sdk: libresolv.tbd
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile.bridge
