@@ -11,3 +11,4 @@
 - iOS app project with Keychain storage (this device only)
 - Android: Mumcord look in dark and light (colours, fonts, icons and base components shared with the desktop app), following the system setting and the system font size
 - Bridge: saved servers, server ping, connect by saved server, channel passwords, per-person volume and mute, talking and stream state, `mumble://` link parsing, talk mode setting
+- Android: first-start talk mode choice, server list with people online and latency, add, edit and remove servers, certificate warnings, connection errors with retry, one server at a time, and `mumble://` links that connect only after confirmation

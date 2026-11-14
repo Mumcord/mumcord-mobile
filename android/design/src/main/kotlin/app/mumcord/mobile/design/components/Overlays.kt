@@ -33,6 +33,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import app.mumcord.mobile.design.icons.MumcordIcons
@@ -92,7 +93,8 @@ enum class MumcordBannerTone { Info, Warning, Danger }
 
 /**
  * Hint banner (`.banner`) with a 16 dp margin at the sides: an icon in the colour of its
- * [tone], an optional bold [title] and the hint [text].
+ * [tone], an optional bold [title] and the hint [text]. Inside a bottom sheet, which has its
+ * own margin, [horizontalMargin] is zero.
  */
 @Composable
 fun MumcordBanner(
@@ -101,6 +103,7 @@ fun MumcordBanner(
     title: String? = null,
     icon: ImageVector = MumcordIcons.Info,
     tone: MumcordBannerTone = MumcordBannerTone.Info,
+    horizontalMargin: Dp = MumcordSpace.s4,
 ) {
     val colors = MumcordTheme.colors
     val shape = RoundedCornerShape(MumcordRadius.card)
@@ -114,7 +117,7 @@ fun MumcordBanner(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = MumcordSpace.s4, vertical = MumcordSpace.s2)
+            .padding(horizontal = horizontalMargin, vertical = MumcordSpace.s2)
             .background(colors.bgSelected, shape)
             .border(1.dp, colors.border, shape)
             .padding(start = MumcordSpace.s4 + 1.dp, top = MumcordSpace.s3 + 1.dp, end = MumcordSpace.s3 + 1.dp, bottom = MumcordSpace.s3 + 1.dp)

@@ -14,6 +14,7 @@ import app.mumcord.mobile.design.components.ButtonsSample
 import app.mumcord.mobile.design.components.ChannelTreeSample
 import app.mumcord.mobile.design.components.ChatSample
 import app.mumcord.mobile.design.components.ControlsSample
+import app.mumcord.mobile.design.components.FieldsSample
 import app.mumcord.mobile.design.components.ListsSample
 import app.mumcord.mobile.design.components.MumcordSectionHeader
 import app.mumcord.mobile.design.components.OverlaysSample
@@ -37,6 +38,7 @@ fun ComponentGallery(modifier: Modifier = Modifier) {
         "Stream tile" to { StreamTileSample() },
         "Lists" to { ListsSample() },
         "Chat" to { ChatSample() },
+        "Text field" to { FieldsSample() },
         "Toggle, slider, chips, segmented control" to { ControlsSample() },
         "Hint banner, bottom sheet" to { OverlaysSample() },
         "Hold-to-talk button" to { TalkButtonSample() },

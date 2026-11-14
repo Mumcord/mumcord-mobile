@@ -1,0 +1,150 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
+package app.mumcord.mobile.ui
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import app.mumcord.mobile.session.ConnectionPhase
+import app.mumcord.mobile.ui.connect.CertificateSheet
+import app.mumcord.mobile.ui.connect.ConfirmSwitchSheet
+import app.mumcord.mobile.ui.connect.PasswordSheet
+import app.mumcord.mobile.ui.link.InvalidLinkSheet
+import app.mumcord.mobile.ui.link.LinkConfirmSheet
+import app.mumcord.mobile.ui.servers.ConnectFailure
+import app.mumcord.mobile.ui.servers.RemoveServerSheet
+import app.mumcord.mobile.ui.servers.ServerFormScreen
+import app.mumcord.mobile.ui.servers.ServerListScreen
+import app.mumcord.mobile.ui.setup.TalkModeChoiceScreen
+import app.mumcord.mobile.ui.slice.ChannelTreeScreen
+
+/** Connects the screens to the view model; everything below it only gets values and callbacks. */
+@Composable
+fun AppRoute(viewModel: AppViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refreshPings()
+        onPauseOrDispose { }
+    }
+    AppContent(uiState, viewModel)
+}
+
+/**
+ * The screen that follows from the state, and over it at most one sheet: the certificate
+ * question first (the connection waits for it), otherwise the open question of [Overlay].
+ */
+@Composable
+fun AppContent(
+    uiState: AppUiState,
+    viewModel: AppViewModel,
+    topInsets: WindowInsets = WindowInsets.statusBars,
+    bottomInsets: WindowInsets = WindowInsets.navigationBars,
+) {
+    val session = uiState.session
+    val prompt = session.certificatePrompt
+    // Questions wait until the first-start setup is done.
+    val overlay = uiState.overlay.takeIf { uiState.setupDone }
+    val sheetOpen = prompt != null || overlay != null
+    Box(Modifier.fillMaxSize()) {
+        // While a sheet is open, the screen behind it is not offered to screen readers.
+        Box(if (sheetOpen) Modifier.clearAndSetSemantics { } else Modifier) {
+            when (uiState.screen) {
+                AppScreen.TalkModeChoice -> TalkModeChoiceScreen(
+                    selected = uiState.talkModeChoice,
+                    saving = uiState.setupSaving,
+                    error = uiState.setupError,
+                    onSelect = viewModel::selectTalkMode,
+                    onContinue = viewModel::confirmTalkMode,
+                    topInsets = topInsets,
+                    bottomInsets = bottomInsets,
+                )
+                AppScreen.ServerList -> {
+                    BackHandler(enabled = uiState.editing, onBack = viewModel::toggleEditing)
+                    ServerListScreen(
+                        rows = uiState.serverRows,
+                        loaded = session.serversLoaded,
+                        editing = uiState.editing,
+                        failure = (session.phase as? ConnectionPhase.Failed)?.let {
+                            ConnectFailure(it.error, uiState.activeServerName)
+                        },
+                        onConnect = viewModel::connect,
+                        onCancelConnect = viewModel::disconnect,
+                        onAdd = viewModel::openAddServer,
+                        onToggleEditing = viewModel::toggleEditing,
+                        onEdit = viewModel::openEditServer,
+                        onRemove = viewModel::requestRemove,
+                        onRetry = viewModel::retry,
+                        onDismissError = viewModel::dismissError,
+                        topInsets = topInsets,
+                        bottomInsets = bottomInsets,
+                    )
+                }
+                AppScreen.ServerForm -> uiState.form?.let { form ->
+                    BackHandler(onBack = viewModel::closeForm)
+                    ServerFormScreen(
+                        form = form,
+                        onChange = viewModel::changeForm,
+                        onSave = viewModel::saveForm,
+                        onBack = viewModel::closeForm,
+                        topInsets = topInsets,
+                        bottomInsets = bottomInsets,
+                    )
+                }
+                AppScreen.Channels -> session.server?.let { server ->
+                    ChannelTreeScreen(rows = server.rows, phase = session.phase, onDisconnect = viewModel::disconnect)
+                }
+            }
+        }
+        when {
+            prompt != null -> CertificateSheet(
+                prompt = prompt,
+                onTrust = { viewModel.answerCertificatePrompt(prompt.fingerprint, true) },
+                onReject = { viewModel.answerCertificatePrompt(prompt.fingerprint, false) },
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+            )
+            overlay is Overlay.ConfirmSwitch -> ConfirmSwitchSheet(
+                currentName = overlay.currentName,
+                targetName = overlay.targetName,
+                onConfirm = viewModel::confirmSwitch,
+                onDismiss = viewModel::dismissOverlay,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+            )
+            overlay is Overlay.ConfirmRemove -> RemoveServerSheet(
+                serverName = overlay.server.name,
+                onConfirm = viewModel::confirmRemove,
+                onDismiss = viewModel::dismissOverlay,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+            )
+            overlay is Overlay.EnterPassword -> PasswordSheet(
+                serverName = overlay.serverName,
+                password = overlay.password,
+                onPasswordChange = viewModel::changePassword,
+                onConnect = viewModel::submitPassword,
+                onDismiss = viewModel::dismissOverlay,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+            )
+            overlay is Overlay.Link -> LinkConfirmSheet(
+                state = overlay.state,
+                onUsernameChange = viewModel::changeLinkUsername,
+                onConnect = viewModel::confirmLink,
+                onDismiss = viewModel::dismissOverlay,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+            )
+            overlay is Overlay.InvalidLink -> InvalidLinkSheet(viewModel::dismissOverlay, topInsets, bottomInsets)
+        }
+    }
+}

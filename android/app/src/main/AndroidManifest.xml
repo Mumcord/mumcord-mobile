@@ -6,8 +6,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!--
         Since Android 17 a server on the local network (home or office, private addresses) can
-        only be reached with this permission. The first slice only declares it; asking for it
-        with an explanation when such an address is used is a follow-up task.
+        only be reached with this permission. It is only declared so far; asking for it with an
+        explanation when such an address is used is a follow-up task.
     -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
 
@@ -22,10 +22,19 @@
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- mumble:// links from other apps. The app shows the target and asks before connecting. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mumble" />
             </intent-filter>
         </activity>
     </application>

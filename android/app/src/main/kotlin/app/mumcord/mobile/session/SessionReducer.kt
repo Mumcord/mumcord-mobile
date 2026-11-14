@@ -8,11 +8,14 @@ import app.mumcord.mobile.bridge.ConnectionState
 /** Folds one engine event into the state. Pure, so it can run on any thread and be tested. */
 fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.ConnectionChanged -> when (val connection = event.state) {
-        // The end of a connection also ends its certificate question and forgets its server.
-        is ConnectionState.Disconnected -> SessionState(
+        // The end of a connection also ends its certificate question and forgets its channels.
+        is ConnectionState.Disconnected -> copy(
             phase = connection.error
                 ?.let { ConnectionPhase.Failed(it.toConnectionError()) }
                 ?: ConnectionPhase.Idle,
+            certificatePrompt = null,
+            server = null,
+            activeServerId = activeServerId.takeIf { connection.error != null },
         )
         ConnectionState.Connecting -> copy(phase = ConnectionPhase.Connecting)
         ConnectionState.Connected ->
@@ -51,9 +54,9 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.PersonRemoved -> copy(
         server = server?.let { it.copy(people = it.people - event.session) },
     )
-    // No UI for these yet: the server list (task 2.4) and channel passwords and denials (task 2.5) use them.
+    is BridgeEvent.ServersChanged -> copy(servers = event.servers, serversLoaded = true)
+    // No UI for these yet: channel passwords and denials (task 2.5) use them.
     is BridgeEvent.ActionDenied,
     is BridgeEvent.ChannelPasswordChanged,
-    is BridgeEvent.ServersChanged,
     -> this
 }

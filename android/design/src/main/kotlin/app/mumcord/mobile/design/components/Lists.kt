@@ -101,6 +101,7 @@ fun MumcordList(
  * Row of a list (`.row`). Every row but the first of a list sets [divider] to get the line
  * above it.
  *
+ * @param status a third line under the subtitle, such as a state dot with "5 online · 24 ms".
  * @param leading replaces [icon] with other content, such as an avatar or a server tile.
  * @param trailing content at the end: a value, a chevron, a toggle.
  * @param tall the taller variant for rows with a tile.
@@ -111,6 +112,7 @@ fun MumcordListRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    status: (@Composable RowScope.() -> Unit)? = null,
     icon: ImageVector? = null,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
@@ -153,6 +155,13 @@ fun MumcordListRow(
         Column(Modifier.weight(1f)) {
             LineText(title, MumcordTheme.typography.bodyStrong, if (danger) colors.danger else colors.text)
             if (subtitle != null) LineText(subtitle, MumcordTheme.typography.small, colors.textMuted)
+            if (status != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    content = status,
+                )
+            }
         }
         if (trailing != null) {
             Row(
@@ -164,7 +173,7 @@ fun MumcordListRow(
     }
 }
 
-/** Small muted text for the end of a list row, such as the current value of a setting. */
+/** Small muted text for the end or the status line of a list row, such as the current value of a setting. */
 @Composable
 fun MumcordListRowValue(text: String, modifier: Modifier = Modifier) {
     LineText(text, MumcordTheme.typography.small, MumcordTheme.colors.textMuted, modifier)
@@ -205,7 +214,11 @@ internal fun ListsSample() {
         )
         MumcordListRow(
             title = "Nordlicht",
-            subtitle = "nordlicht.example · 5 online",
+            subtitle = "nordlicht.example",
+            status = {
+                MumcordDot()
+                MumcordListRowValue("5 online · 24 ms")
+            },
             leading = { MumcordTile("NO", brand = true) },
             divider = true,
             tall = true,

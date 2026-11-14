@@ -172,6 +172,31 @@ class SessionReducerTest {
     }
 
     @Test
+    fun theServerListSurvivesTheEndOfAConnection() {
+        val servers = listOf(savedServer(1, "Nordlicht"), savedServer(2, "Tidepool"))
+        val state = fold(
+            BridgeEvent.ServersChanged(servers),
+            *connected,
+            BridgeEvent.ConnectionChanged(ConnectionState.Disconnected(null)),
+        )
+        assertEquals(SessionState(servers = servers, serversLoaded = true), state)
+    }
+
+    @Test
+    fun theFailedServerIsRememberedForTheRetryAndForgottenAfterAPlainDisconnect() {
+        val connecting = SessionState(phase = ConnectionPhase.Connecting, activeServerId = 2)
+
+        val failed = connecting.fold(
+            BridgeEvent.ConnectionChanged(ConnectionState.Disconnected(BridgeException.NameInUse("taken"))),
+        )
+        assertEquals(2L, failed.activeServerId)
+        assertEquals(ConnectionPhase.Failed(ConnectionError.NameInUse), failed.phase)
+
+        val ended = connecting.fold(BridgeEvent.ConnectionChanged(ConnectionState.Disconnected(null)))
+        assertNull(ended.activeServerId)
+    }
+
+    @Test
     fun everyEngineErrorMapsToItsOwnConnectionError() {
         val mapping = mapOf(
             BridgeException.NotConnected("d") to ConnectionError.NotConnected,

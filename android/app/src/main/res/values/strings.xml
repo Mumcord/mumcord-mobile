@@ -2,19 +2,91 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <resources>
     <string name="app_name" translatable="false">Mumcord</string>
-    <string name="engine_version">Engine %1$s</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
 
-    <string name="connect_title">Connect to a server</string>
-    <string name="connect_address_label">Server address</string>
-    <string name="connect_port_label">Port</string>
-    <string name="connect_port_invalid">Enter a number between 1 and 65535.</string>
-    <string name="connect_username_label">Your name</string>
-    <string name="connect_action">Connect</string>
-    <string name="connect_in_progress">Connecting…</string>
-    <string name="connect_cancel">Cancel</string>
+    <string name="talk_mode_title">How do you want to talk?</string>
+    <string name="talk_mode_subtitle">Pick what fits how you use Mumcord.</string>
+    <string name="talk_mode_voice_activity">Voice activity</string>
+    <string name="talk_mode_voice_activity_text">Your mic opens when you speak.</string>
+    <string name="talk_mode_perk_noise_suppression">Noise suppression on</string>
+    <string name="talk_mode_perk_hands_free">Hands-free</string>
+    <string name="talk_mode_push_to_talk">Push-to-talk</string>
+    <string name="talk_mode_push_to_talk_text">Hold a button to talk. Works while the app is open.</string>
+    <string name="talk_mode_perk_hold">Only sends when you hold</string>
+    <string name="talk_mode_continue">Continue</string>
+    <string name="talk_mode_change_later">You can change this any time in Settings</string>
 
-    <string name="error_title">Could not connect</string>
+    <string name="servers_title">Servers</string>
+    <string name="servers_favourites">Favourites</string>
+    <string name="servers_edit">Edit</string>
+    <string name="servers_done">Done</string>
+    <string name="servers_connect">Connect</string>
+    <!-- Screen-reader text of a row's Connect button; %1$s is the server's name. -->
+    <string name="servers_connect_description">Connect to %1$s</string>
+    <string name="servers_cancel_description">Cancel connecting to %1$s</string>
+    <string name="servers_edit_description">Edit %1$s</string>
+    <string name="servers_remove_description">Remove %1$s</string>
+    <string name="servers_connecting">Connecting…</string>
+    <!-- People online and latency of a server, e.g. "5 online · 24 ms". -->
+    <plurals name="servers_online">
+        <item quantity="one">%1$d online · %2$d ms</item>
+        <item quantity="other">%1$d online · %2$d ms</item>
+    </plurals>
+    <string name="servers_offline">Offline</string>
+    <string name="servers_add">Add server</string>
+    <string name="servers_empty_title">No servers yet</string>
+    <string name="servers_empty_text">Add a Mumble server to start talking.</string>
+
+    <string name="form_add_title">Add server</string>
+    <string name="form_edit_title">Edit server</string>
+    <string name="form_address_label">Address</string>
+    <string name="form_address_placeholder" translatable="false">mumble.example.org</string>
+    <string name="form_address_missing">Enter the address of the server.</string>
+    <string name="form_port_label">Port</string>
+    <string name="form_port_invalid">Enter a number between 1 and 65535.</string>
+    <string name="form_name_label">Name</string>
+    <string name="form_name_hint">Optional. Leave empty to show the address.</string>
+    <string name="form_username_label">User name</string>
+    <string name="form_username_hint">The name others see on this server.</string>
+    <string name="form_username_missing">Enter the name you want to use on this server.</string>
+    <string name="form_password_label">Server password</string>
+    <string name="form_password_hint">Optional. Kept in the secure storage of this phone.</string>
+    <string name="form_password_saved">A password is saved. Leave empty to keep it.</string>
+    <string name="form_password_will_be_removed">The saved password is removed when you save.</string>
+    <string name="form_password_remove">Remove saved password</string>
+    <string name="form_password_keep">Keep saved password</string>
+    <string name="form_save">Save</string>
+    <string name="form_save_failed">Could not save.</string>
+
+    <string name="password_title">Server password</string>
+    <string name="password_text">%1$s needs a password. It is used for this connection only.</string>
+    <string name="password_label">Password</string>
+
+    <string name="switch_title">Switch server?</string>
+    <string name="switch_text">You are connected to %1$s. Connecting to %2$s disconnects you there first.</string>
+    <string name="switch_confirm">Disconnect and connect</string>
+
+    <string name="remove_title">Remove server?</string>
+    <string name="remove_text">%1$s is removed from your list, together with its saved password.</string>
+    <string name="remove_confirm">Remove</string>
+
+    <string name="link_title">Open this server?</string>
+    <string name="link_text">A link wants to connect you to a Mumble server.</string>
+    <string name="link_server">Server</string>
+    <string name="link_channel">Channel</string>
+    <string name="link_username">User name</string>
+    <string name="link_will_add">This server will be added to your list.</string>
+    <string name="link_invalid_title">Link not usable</string>
+    <string name="link_invalid_text">This is not a valid Mumble link.</string>
+
+    <string name="error_title">Something went wrong.</string>
+    <!-- %1$s is the server's name. -->
+    <string name="error_title_server">Could not connect to %1$s.</string>
     <string name="error_retry">Try again</string>
+    <string name="error_dismiss">Dismiss</string>
+    <string name="error_enter_password">Enter password</string>
     <string name="error_not_connected">You are not connected to a server.</string>
     <string name="error_server_unreachable">The server could not be reached. Check the address, the port and your internet connection.</string>
     <string name="error_wrong_password">The server needs a password, or the password was wrong.</string>
@@ -34,13 +106,12 @@
     <string name="certificate_unknown_message">Mumcord has not seen this server before and cannot confirm its identity on its own. If you know the server\'s fingerprint, compare it with the one below.</string>
     <string name="certificate_fingerprint_label">Certificate fingerprint (SHA-256)</string>
     <string name="certificate_unknown_trust">Trust and connect</string>
-    <string name="certificate_unknown_reject">Do not connect</string>
-    <string name="certificate_changed_title">Warning: this server\'s identity has changed</string>
+    <string name="certificate_reject">Do not connect</string>
+    <string name="certificate_changed_title">Server identity changed</string>
     <string name="certificate_changed_message">The server presents a different certificate than the one you trusted before. Someone may be trying to intercept your connection. Only continue if the server\'s operator has confirmed the change.</string>
     <string name="certificate_changed_previous_label">Fingerprint trusted so far</string>
     <string name="certificate_changed_new_label">New fingerprint</string>
     <string name="certificate_changed_trust">Trust the new certificate</string>
-    <string name="certificate_changed_reject">Do not connect</string>
 
     <string name="channels_title">Channels</string>
     <string name="channels_disconnect">Disconnect</string>

@@ -5,6 +5,7 @@ package app.mumcord.mobile.session
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.ChannelPermissions
 import app.mumcord.mobile.bridge.Person
+import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerState
 
 // Builders with defaults, so a new field in the bridge types does not touch every test.
@@ -62,3 +63,20 @@ fun serverState(
     channels: List<Channel>,
     people: List<Person>,
 ) = ServerState(selfSession = selfSession, channels = channels, people = people)
+
+fun savedServer(
+    id: Long,
+    name: String,
+    address: String = "${name.lowercase().replace(" ", "")}.example",
+    port: UShort = 64738u,
+    username: String = "Me",
+    hasPassword: Boolean = false,
+) = SavedServer(
+    id = id,
+    name = name,
+    address = address,
+    port = port,
+    username = username,
+    hasPassword = hasPassword,
+    identityId = null,
+)

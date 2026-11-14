@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.design.theme.tokenShadow
+import app.mumcord.mobile.design.tokens.MumcordRadius
 import app.mumcord.mobile.design.tokens.MumcordSize
 import app.mumcord.mobile.design.tokens.MumcordSpace
 
@@ -156,6 +158,32 @@ fun MumcordIconButton(
     }
 }
 
+/**
+ * The floating main action of a screen (`.fab`), such as "Add server". The screen places it in
+ * its bottom end corner. [contentDescription] is what TalkBack reads and must name the action.
+ */
+@Composable
+fun MumcordFab(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = MumcordTheme.colors
+    val shape = RoundedCornerShape(MumcordRadius.sheet)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .tokenShadow(MumcordTheme.shadows.primaryGlow, shape)
+            .size(60.dp)
+            .clip(shape)
+            .background(colors.primaryBg)
+            .clickable(role = Role.Button, onClick = onClick),
+    ) {
+        MumcordIcon(icon, contentDescription = contentDescription, tint = colors.primaryText, size = MumcordSize.iconLg)
+    }
+}
+
 @Preview(name = "Buttons dark")
 @Composable
 private fun ButtonsDarkPreview() {
@@ -194,4 +222,5 @@ internal fun ButtonsSample() {
         large = true,
         modifier = padded,
     )
+    MumcordFab(MumcordIcons.Plus, contentDescription = "Add server", onClick = {}, modifier = padded)
 }

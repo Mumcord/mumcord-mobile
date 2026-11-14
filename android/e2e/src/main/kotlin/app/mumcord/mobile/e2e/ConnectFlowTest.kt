@@ -4,30 +4,35 @@ package app.mumcord.mobile.e2e
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import app.mumcord.mobile.MainActivity
-import app.mumcord.mobile.ui.slice.CERTIFICATE_TRUST_TEST_TAG
+import app.mumcord.mobile.ui.connect.CERTIFICATE_TRUST_TEST_TAG
+import app.mumcord.mobile.ui.servers.CONNECT_ERROR_TEST_TAG
+import app.mumcord.mobile.ui.servers.FORM_SAVE_TEST_TAG
+import app.mumcord.mobile.ui.servers.SERVER_ADD_TEST_TAG
+import app.mumcord.mobile.ui.servers.SERVER_CONNECT_TEST_TAG
+import app.mumcord.mobile.ui.setup.TALK_MODE_CONTINUE_TEST_TAG
+import app.mumcord.mobile.ui.setup.TALK_MODE_PUSH_TO_TALK_TEST_TAG
 import app.mumcord.mobile.ui.slice.CHANNELS_DISCONNECT_TEST_TAG
 import app.mumcord.mobile.ui.slice.CHANNEL_ROW_TEST_TAG
-import app.mumcord.mobile.ui.slice.CONNECT_ACTION_TEST_TAG
-import app.mumcord.mobile.ui.slice.CONNECT_ADDRESS_TEST_TAG
-import app.mumcord.mobile.ui.slice.CONNECT_ERROR_TEST_TAG
-import app.mumcord.mobile.ui.slice.CONNECT_PORT_TEST_TAG
-import app.mumcord.mobile.ui.slice.CONNECT_USERNAME_TEST_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
 /**
- * The first slice in the real app with the real engine against the local test server. Expects
- * freshly installed app data (e2e/run.sh installs the app anew), so the server is unknown.
+ * First start, the server list and connecting in the real app with the real engine against the
+ * local test server. Expects freshly installed app data (e2e/run.sh installs the app anew), so
+ * the setup has not run, no server is saved and the server's certificate is unknown.
  */
 class ConnectFlowTest {
     @get:Rule(order = 0)
@@ -37,18 +42,28 @@ class ConnectFlowTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun connectTrustTheCertificateSeeTheChannelsAndConnectAgainWithoutBeingAsked() {
-        connect()
+    fun firstStartAddAServerConnectTrustTheCertificateSeeTheChannelsAndConnectAgainWithoutBeingAsked() {
+        // First start: the talk mode has to be chosen, nothing is picked for the user.
+        awaitOrFail("the talk mode choice") { exists(TALK_MODE_CONTINUE_TEST_TAG) }
+        compose.onNodeWithTag(TALK_MODE_CONTINUE_TEST_TAG).assertIsNotEnabled()
+        compose.onNodeWithTag(TALK_MODE_PUSH_TO_TALK_TEST_TAG).performClick()
+        compose.onNodeWithTag(TALK_MODE_CONTINUE_TEST_TAG).performClick()
+
+        awaitOrFail("the empty server list") { exists(SERVER_ADD_TEST_TAG) }
+        addServer()
+        awaitOrFail("the saved server in the list") { exists(SERVER_CONNECT_TEST_TAG) }
+
+        compose.onNodeWithTag(SERVER_CONNECT_TEST_TAG).performClick()
         awaitOrFail("the certificate question") { exists(CERTIFICATE_TRUST_TEST_TAG) }
         compose.onNodeWithTag(CERTIFICATE_TRUST_TEST_TAG).performClick()
         awaitOrFail("the channel list") { channelNames().size > TestServer.SEEDED_CHANNELS.size }
         assertSeededChannels()
 
         compose.onNodeWithTag(CHANNELS_DISCONNECT_TEST_TAG).performClick()
-        awaitOrFail("the connect form after disconnecting") { exists(CONNECT_ACTION_TEST_TAG) }
+        awaitOrFail("the server list after disconnecting") { exists(SERVER_CONNECT_TEST_TAG) }
 
         // The certificate was trusted above and is remembered: no second question.
-        connect()
+        compose.onNodeWithTag(SERVER_CONNECT_TEST_TAG).performClick()
         awaitOrFail("the channel list on the second connect") {
             exists(CERTIFICATE_TRUST_TEST_TAG) || channelNames().size > TestServer.SEEDED_CHANNELS.size
         }
@@ -56,15 +71,17 @@ class ConnectFlowTest {
         assertSeededChannels()
 
         compose.onNodeWithTag(CHANNELS_DISCONNECT_TEST_TAG).performClick()
-        awaitOrFail("the connect form after disconnecting") { exists(CONNECT_ACTION_TEST_TAG) }
+        awaitOrFail("the server list after disconnecting") { exists(SERVER_CONNECT_TEST_TAG) }
     }
 
-    private fun connect() {
+    private fun addServer() {
         val server = requireServer.server
-        compose.onNodeWithTag(CONNECT_ADDRESS_TEST_TAG).performTextReplacement(server.host)
-        compose.onNodeWithTag(CONNECT_PORT_TEST_TAG).performTextReplacement(server.port.toString())
-        compose.onNodeWithTag(CONNECT_USERNAME_TEST_TAG).performTextReplacement(USER_NAME)
-        compose.onNodeWithTag(CONNECT_ACTION_TEST_TAG).performClick()
+        compose.onNodeWithTag(SERVER_ADD_TEST_TAG).performClick()
+        awaitOrFail("the add server form") { exists(FORM_SAVE_TEST_TAG) }
+        compose.onNodeWithContentDescription(FIELD_ADDRESS).performTextReplacement(server.host)
+        compose.onNodeWithContentDescription(FIELD_PORT).performTextReplacement(server.port.toString())
+        compose.onNodeWithContentDescription(FIELD_USER_NAME).performTextReplacement(USER_NAME)
+        compose.onNodeWithTag(FORM_SAVE_TEST_TAG).performScrollTo().performClick()
     }
 
     /** The first row is the root channel, whose name is the server's own; the rest is seeded. */
@@ -97,7 +114,7 @@ class ConnectFlowTest {
         }
     }
 
-    /** The texts of the error card on the connect form, or null while there is none. */
+    /** The texts of the error banner on the server list, or null while there is none. */
     private fun connectError(): String? =
         compose.onAllNodes(hasAnyAncestor(hasTestTag(CONNECT_ERROR_TEST_TAG)), useUnmergedTree = true)
             .fetchSemanticsNodes()
@@ -107,6 +124,11 @@ class ConnectFlowTest {
 
     private companion object {
         const val USER_NAME = "e2e-phone"
+
+        // The labels of the form fields, which is how a screen reader finds them too.
+        const val FIELD_ADDRESS = "Address"
+        const val FIELD_PORT = "Port"
+        const val FIELD_USER_NAME = "User name"
         const val TIMEOUT_MILLIS = 30_000L
         const val POLL_MILLIS = 100L
     }

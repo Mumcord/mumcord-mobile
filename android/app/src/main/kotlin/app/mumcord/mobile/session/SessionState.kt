@@ -4,12 +4,21 @@ package app.mumcord.mobile.session
 
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.Person
+import app.mumcord.mobile.bridge.SavedServer
 
 /** Everything the screens need to know about the one connection, as an immutable value. */
 data class SessionState(
     val phase: ConnectionPhase = ConnectionPhase.Idle,
     val certificatePrompt: CertificatePromptState? = null,
     val server: ServerModel? = null,
+    /** The server list in its saved order; empty until [serversLoaded]. */
+    val servers: List<SavedServer> = emptyList(),
+    val serversLoaded: Boolean = false,
+    /**
+     * The saved server of the current connection or attempt. It stays set after a failure, so
+     * the error can name the server and "Try again" knows where to connect.
+     */
+    val activeServerId: Long? = null,
 ) {
     /** True once the server's channels are known and the connection is still alive. */
     val showsServer: Boolean

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-package app.mumcord.mobile.ui.slice
+package app.mumcord.mobile.ui.connect
 
 import androidx.annotation.StringRes
 import app.mumcord.mobile.R

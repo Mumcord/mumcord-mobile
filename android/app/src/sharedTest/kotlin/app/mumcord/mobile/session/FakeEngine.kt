@@ -16,46 +16,94 @@ import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
 import app.mumcord.mobile.bridge.ServerState
 import app.mumcord.mobile.bridge.TalkMode
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
+/** One call of [FakeEngine.connectServer]. */
+data class ConnectCall(val serverId: Long, val password: String?, val channelPath: List<String>)
+
 /**
- * Stands in for the engine and behaves like it along the connect flow: connecting asks the
- * certificate question (when [prompt] is set), trusting it delivers [server], and every end of
- * a connection is reported as an event.
+ * Stands in for the engine and behaves like it: it keeps a server list, answers pings from
+ * [pings], and along the connect flow asks the certificate question (when [prompt] is set),
+ * delivers [server] once trusted, and reports every end of a connection as an event.
  */
 class FakeEngine(
     private val listener: EngineListener,
     private val server: ServerState,
     private val prompt: CertificatePrompt? = null,
+    servers: List<SavedServer> = emptyList(),
 ) : MumcordEngineInterface {
-    val connectRequests = CopyOnWriteArrayList<ConnectRequest>()
+    val connectCalls = CopyOnWriteArrayList<ConnectCall>()
     val certificateAnswers = CopyOnWriteArrayList<Pair<String, Boolean>>()
+    val serverInputs = CopyOnWriteArrayList<ServerInput>()
+    val pingRequests = CopyOnWriteArrayList<Long>()
+    var disconnects = 0
+        private set
 
-    /** Thrown by the next [connect] instead of connecting. */
+    /** What each server answers to a ping; a server without an entry does not answer. */
+    val pings = ConcurrentHashMap<Long, ServerPing>()
+
+    /** Thrown by the next [connectServer] instead of connecting. */
     @Volatile
     var connectFailure: BridgeException? = null
+
+    /** Thrown by the next [addServer] or [updateServer]. */
+    @Volatile
+    var saveFailure: BridgeException? = null
+
+    /** Thrown by the next [setTalkMode]. */
+    @Volatile
+    var talkModeFailure: BridgeException? = null
+
+    /** When set, the server refuses every connection without exactly this password. */
+    @Volatile
+    var requiredPassword: String? = null
+
+    @Volatile
+    var talkMode = TalkMode.VOICE_ACTIVITY
+        private set
 
     @Volatile
     private var connection: ConnectionState = ConnectionState.Disconnected(null)
 
+    @Volatile
+    private var connectedServerId: Long? = null
+
+    private val savedServers = CopyOnWriteArrayList(servers)
+    private var nextServerId = (servers.maxOfOrNull { it.id } ?: 0L) + 1
+
     fun emit(event: BridgeEvent) {
-        if (event is BridgeEvent.ConnectionChanged) connection = event.state
+        if (event is BridgeEvent.ConnectionChanged) {
+            connection = event.state
+            if (event.state is ConnectionState.Disconnected) connectedServerId = null
+        }
         listener.onEvent(event)
     }
 
-    override suspend fun connect(request: ConnectRequest) {
+    override suspend fun connectServer(serverId: Long, password: String?, channelPath: List<String>) {
         connectFailure?.let {
             connectFailure = null
             throw it
         }
-        connectRequests += request
+        if (savedServers.none { it.id == serverId }) throw BridgeException.NotFound("no server $serverId")
+        if (connection !is ConnectionState.Disconnected) throw BridgeException.InvalidInput("already connected")
+        connectCalls += ConnectCall(serverId, password, channelPath)
+        connectedServerId = serverId
         emit(BridgeEvent.ConnectionChanged(ConnectionState.Connecting))
-        if (prompt != null) {
-            emit(BridgeEvent.CertificatePromptRequired(prompt))
-        } else {
-            finishConnecting()
+        when {
+            requiredPassword != null && password != requiredPassword -> emit(
+                BridgeEvent.ConnectionChanged(
+                    ConnectionState.Disconnected(BridgeException.WrongPassword("wrong password")),
+                ),
+            )
+            prompt != null -> emit(BridgeEvent.CertificatePromptRequired(prompt))
+            else -> finishConnecting()
         }
     }
+
+    // The call of the first slice, which the app no longer uses.
+    override suspend fun connect(request: ConnectRequest): Unit =
+        throw BridgeException.Internal("connect is not used by the app")
 
     override suspend fun answerCertificatePrompt(fingerprint: String, trust: Boolean) {
         certificateAnswers += fingerprint to trust
@@ -71,6 +119,7 @@ class FakeEngine(
     }
 
     override suspend fun disconnect() {
+        disconnects++
         emit(BridgeEvent.ConnectionChanged(ConnectionState.Disconnected(null)))
     }
 
@@ -78,29 +127,35 @@ class FakeEngine(
         BridgeSnapshot(
             servers = savedServers.toList(),
             connection = connection,
-            connectedServerId = null,
+            connectedServerId = connectedServerId,
             certificatePrompt = null,
             server = null,
         )
 
-    private val savedServers = CopyOnWriteArrayList<SavedServer>()
-    private var nextServerId = 1L
-
-    @Volatile
-    private var talkMode = TalkMode.VOICE_ACTIVITY
-
-    override suspend fun addServer(input: ServerInput): SavedServer =
-        input.toSaved(nextServerId++).also {
+    override suspend fun addServer(input: ServerInput): SavedServer {
+        failSaveOnce()
+        serverInputs += input
+        return input.toSaved(nextServerId++, hadPassword = false).also {
             savedServers += it
             emit(BridgeEvent.ServersChanged(savedServers.toList()))
         }
+    }
 
     override suspend fun updateServer(serverId: Long, input: ServerInput): SavedServer {
+        failSaveOnce()
         val index = savedServers.indexOfFirst { it.id == serverId }
         if (index < 0) throw BridgeException.NotFound("no server $serverId")
-        return input.toSaved(serverId).also {
+        serverInputs += input
+        return input.toSaved(serverId, hadPassword = savedServers[index].hasPassword).also {
             savedServers[index] = it
             emit(BridgeEvent.ServersChanged(savedServers.toList()))
+        }
+    }
+
+    private fun failSaveOnce() {
+        saveFailure?.let {
+            saveFailure = null
+            throw it
         }
     }
 
@@ -116,12 +171,9 @@ class FakeEngine(
         emit(BridgeEvent.ServersChanged(savedServers.toList()))
     }
 
-    override suspend fun pingServer(serverId: Long, refresh: Boolean): ServerPing? = null
-
-    override suspend fun connectServer(serverId: Long, password: String?, channelPath: List<String>) {
-        val saved = savedServers.firstOrNull { it.id == serverId }
-            ?: throw BridgeException.NotFound("no server $serverId")
-        connect(ConnectRequest(saved.address, saved.port, saved.username, password))
+    override suspend fun pingServer(serverId: Long, refresh: Boolean): ServerPing? {
+        pingRequests += serverId
+        return pings[serverId]
     }
 
     override suspend fun joinChannel(channelId: UInt, password: String?) = Unit
@@ -133,16 +185,24 @@ class FakeEngine(
     override suspend fun talkMode(): TalkMode = talkMode
 
     override suspend fun setTalkMode(mode: TalkMode) {
+        talkModeFailure?.let {
+            talkModeFailure = null
+            throw it
+        }
         talkMode = mode
     }
 
-    private fun ServerInput.toSaved(id: Long) = SavedServer(
+    private fun ServerInput.toSaved(id: Long, hadPassword: Boolean) = SavedServer(
         id = id,
         name = name.ifEmpty { address },
         address = address,
         port = port,
         username = username,
-        hasPassword = password is PasswordInput.Set,
+        hasPassword = when (password) {
+            is PasswordInput.Set -> true
+            PasswordInput.Clear -> false
+            PasswordInput.Keep -> hadPassword
+        },
         identityId = identityId,
     )
 
