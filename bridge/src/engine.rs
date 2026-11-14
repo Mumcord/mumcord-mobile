@@ -16,6 +16,7 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::audio_abi::Endpoint;
+use crate::chat::SharedChat;
 use crate::convert;
 use crate::error::BridgeError;
 use crate::events::{self, BridgeEvent, Connection, EngineListener, SharedConnection, lock};
@@ -53,8 +54,9 @@ async fn saved_servers(engine: &Engine) -> Result<Vec<SavedServer>, BridgeError>
 /// The Mumcord engine of the app. Create one per process and keep it for the app's lifetime.
 #[derive(uniffi::Object)]
 pub struct MumcordEngine {
-    engine: Engine,
-    connection: SharedConnection,
+    pub(crate) engine: Engine,
+    pub(crate) connection: SharedConnection,
+    pub(crate) chat: SharedChat,
     servers: ServerList,
     /// Ping answers of the listed servers, kept for a while so a redrawn list does not ask again.
     pings: Arc<ServerQueries>,
@@ -113,13 +115,18 @@ impl MumcordEngine {
         })
         .map_err(|_| BridgeError::internal("reading the server list failed"))??;
         let connection = SharedConnection::default();
+        let chat = SharedChat::default();
         let (stop_events, stop) = oneshot::channel();
         let (own_events, own) = mpsc::unbounded_channel();
         events::spawn_pump(
             handle.clone(),
             receiver,
             own,
-            connection.clone(),
+            events::PumpState {
+                engine: engine.clone(),
+                connection: connection.clone(),
+                chat: chat.clone(),
+            },
             listener,
             stop,
         )
@@ -127,6 +134,7 @@ impl MumcordEngine {
         Ok(Arc::new(Self {
             engine,
             connection,
+            chat,
             servers: ServerList {
                 servers: Arc::new(Mutex::new(listed)),
                 gate: Arc::default(),
@@ -516,6 +524,10 @@ impl MumcordEngine {
         let connected = lock(&self.connection).server;
         // Asked before the connection is locked: the engine must not be called under that lock.
         let synced = connected.and_then(|server| self.engine.snapshot_of(server));
+        let (chat_unread, open_chat) = {
+            let chat = lock(&self.chat);
+            (chat.unread_list(), chat.open.clone())
+        };
         let mut connection = lock(&self.connection);
         // The connection may have ended or changed meanwhile; its state then has no server.
         let server = synced
@@ -528,6 +540,8 @@ impl MumcordEngine {
             certificate_prompt: connection.certificate_prompt.clone(),
             server,
             audio: connection.audio,
+            chat_unread,
+            open_chat,
             whispering: connection.server.is_some()
                 && self.engine.dsp_controls().voice_target() != 0,
         }
@@ -537,7 +551,7 @@ impl MumcordEngine {
 impl MumcordEngine {
     /// Runs a command on the bridge runtime, so the caller's thread is never blocked and the
     /// command finishes even if the caller stops waiting.
-    async fn run<T: Send + 'static>(
+    pub(crate) async fn run<T: Send + 'static>(
         &self,
         command: impl Future<Output = Result<T, BridgeError>> + Send + 'static,
     ) -> Result<T, BridgeError> {

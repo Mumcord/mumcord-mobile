@@ -71,4 +71,10 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
         },
     )
     is BridgeEvent.ActionDenied -> copy(denied = DeniedAction(event.channelId, event.detail))
+    // Chat phase (tasks 5.2/5.3): the state does not follow chat yet.
+    is BridgeEvent.BlockedPeopleChanged,
+    is BridgeEvent.ChatMessageReceived,
+    is BridgeEvent.ChatNotification,
+    is BridgeEvent.ChatUnreadChanged,
+    is BridgeEvent.MessageRequestsChanged -> this
 }

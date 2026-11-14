@@ -9,6 +9,16 @@
 //! hands in its secure storage as a [`SecureStorage`]. Engine types never appear in the
 //! bindings; the mapping lives in `convert`.
 //!
+//! # Chat
+//!
+//! Message content crosses the bridge as [`MessageContent`], a small closed model (text runs
+//! with a fixed set of styles, checked `http`/`https` links, quotes, code, images by reference),
+//! never as HTML: the engine sanitises what the server sends, and the bridge keeps only what the
+//! model knows, so an app cannot be made to interpret markup. History is read in pages
+//! ([`MumcordEngine::chat_page`]), new messages arrive as [`BridgeEvent::ChatMessageReceived`],
+//! image bytes are fetched on demand, and [`BridgeEvent::ChatNotification`] names the messages
+//! worth a system notification. Names, message text and addresses are never logged.
+//!
 //! # Threads
 //!
 //! The bridge owns one tokio runtime. `async` methods run on it and never block the caller.
@@ -59,6 +69,7 @@
 #[cfg(target_os = "android")]
 mod android;
 mod audio_abi;
+mod chat;
 mod convert;
 mod engine;
 mod error;
@@ -69,6 +80,12 @@ mod types;
 pub use audio_abi::{
     mumcord_audio_capture_push_f32, mumcord_audio_capture_push_i16,
     mumcord_audio_playback_pull_f32, mumcord_audio_playback_pull_i16,
+};
+pub use chat::{
+    BlockedPerson, ChatId, ChatLimits, ChatMessage, ChatNotification, ChatPage, ChatUnread,
+    ContentBlock, Conversation, GifFavourite, ImageData, ImageRef, LinkKind, MentionCandidate,
+    MessageContent, MessageRequest, MessageRequests, NotificationKind, PrivateMessageRule,
+    PrivateMessageSettings, ReplyQuote, SafeLink, SentChatRequest, Span,
 };
 pub use engine::MumcordEngine;
 pub use error::BridgeError;

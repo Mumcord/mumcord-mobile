@@ -3,6 +3,7 @@
 //! Records and enums of the bridge interface. They are the bridge's own types; the engine's
 //! types are mapped onto them in `convert`.
 
+use crate::chat::{ChatId, ChatUnread};
 use crate::error::BridgeError;
 
 /// Start-up settings of [`MumcordEngine`](crate::MumcordEngine).
@@ -282,6 +283,10 @@ pub struct BridgeSnapshot {
     pub server: Option<ServerState>,
     /// The platform audio streams the engine needs right now.
     pub audio: AudioWanted,
+    /// The chats with unread messages on the current connection.
+    pub chat_unread: Vec<ChatUnread>,
+    /// The chat on screen, as the app last told with `set_open_chat`.
+    pub open_chat: Option<ChatId>,
     /// A whisper or shout is being held (`start_whisper`); normal talking is paused meanwhile.
     pub whispering: bool,
 }

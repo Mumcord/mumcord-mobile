@@ -5,6 +5,25 @@ package app.mumcord.mobile.session
 import app.mumcord.mobile.bridge.AudioEndpoints
 import app.mumcord.mobile.bridge.AudioWanted
 import app.mumcord.mobile.bridge.BridgeEvent
+import app.mumcord.mobile.bridge.BlockedPerson
+import app.mumcord.mobile.bridge.ChatId
+import app.mumcord.mobile.bridge.ChatLimits
+import app.mumcord.mobile.bridge.ChatMessage
+import app.mumcord.mobile.bridge.ChatPage
+import app.mumcord.mobile.bridge.ChatUnread
+import app.mumcord.mobile.bridge.ContentBlock
+import app.mumcord.mobile.bridge.Conversation
+import app.mumcord.mobile.bridge.GifFavourite
+import app.mumcord.mobile.bridge.ImageData
+import app.mumcord.mobile.bridge.ImageRef
+import app.mumcord.mobile.bridge.MentionCandidate
+import app.mumcord.mobile.bridge.MessageContent
+import app.mumcord.mobile.bridge.MessageRequest
+import app.mumcord.mobile.bridge.MessageRequests
+import app.mumcord.mobile.bridge.PrivateMessageRule
+import app.mumcord.mobile.bridge.PrivateMessageSettings
+import app.mumcord.mobile.bridge.ReplyQuote
+import app.mumcord.mobile.bridge.SentChatRequest
 import app.mumcord.mobile.bridge.EchoCancellation
 import app.mumcord.mobile.bridge.VoiceSettings
 import app.mumcord.mobile.bridge.WhisperTarget
@@ -43,6 +62,25 @@ class FakeEngine(
     talkMode: TalkMode = TalkMode.VOICE_ACTIVITY,
 ) : MumcordEngineInterface {
     val connectCalls = CopyOnWriteArrayList<ConnectCall>()
+
+    // Chat state the tests fill and read. Messages are kept oldest first.
+    val messages = ConcurrentHashMap<ChatId, MutableList<ChatMessage>>()
+    val unread = ConcurrentHashMap<ChatId, UInt>()
+    val gifFavourites = CopyOnWriteArrayList<GifFavourite>()
+    val conversations = CopyOnWriteArrayList<Conversation>()
+    val incomingRequests = CopyOnWriteArrayList<MessageRequest>()
+    val sentRequests = CopyOnWriteArrayList<SentChatRequest>()
+    val blocked = CopyOnWriteArrayList<BlockedPerson>()
+    val mentionNames = CopyOnWriteArrayList<MentionCandidate>()
+    val chatImages = ConcurrentHashMap<Pair<String, String>, ImageData>()
+    val remoteImages = ConcurrentHashMap<String, ImageData>()
+    val openChatCalls = CopyOnWriteArrayList<ChatId?>()
+
+    @Volatile var openChat: ChatId? = null
+        private set
+    @Volatile var limits = ChatLimits(text = 5000u, image = 131072u, allowHtml = true)
+    @Volatile var privateMessageSettings = PrivateMessageSettings(PrivateMessageRule.EVERYONE, false)
+    private var nextMessageId = 1
     val certificateAnswers = CopyOnWriteArrayList<Pair<String, Boolean>>()
     val serverInputs = CopyOnWriteArrayList<ServerInput>()
     val pingRequests = CopyOnWriteArrayList<Long>()
@@ -149,6 +187,8 @@ class FakeEngine(
             certificatePrompt = null,
             server = null,
             audio = AudioWanted(false, false),
+            chatUnread = unread.map { (chat, count) -> ChatUnread(chat, count) },
+            openChat = openChat,
             whispering = false,
         )
 
@@ -347,6 +387,105 @@ class FakeEngine(
         },
         identityId = identityId,
     )
+
+    override suspend fun chatPage(chat: ChatId, before: String?, limit: UInt): ChatPage {
+        val all = messages[chat].orEmpty().toList()
+        val end = before?.let { id -> all.indexOfFirst { it.id == id }.takeIf { it >= 0 } } ?: all.size
+        val start = maxOf(0, end - limit.toInt())
+        return ChatPage(messages = all.subList(start, end), hasMore = start > 0)
+    }
+
+    override suspend fun sendMessage(chat: ChatId, text: String, replyTo: ReplyQuote?): ChatMessage =
+        appendOwn(chat, MessageContent(reply = replyTo, blocks = listOf(ContentBlock.Paragraph(listOf(span(text)))), truncated = false))
+
+    override suspend fun sendImage(chat: ChatId, bytes: ByteArray, mime: String): ChatMessage {
+        val imageId = "image-${nextMessageId}"
+        val image = ImageRef.Embedded(imageId, mime, 1u, 1u, bytes.size.toUInt(), false)
+        return appendOwn(chat, MessageContent(null, listOf(ContentBlock.Image(image)), false)).also {
+            chatImages[it.id to imageId] = ImageData(bytes, mime, 1u, 1u, false)
+        }
+    }
+
+    override suspend fun sendGifFavourite(chat: ChatId, url: String): ChatMessage =
+        appendOwn(chat, messageContent(url))
+
+    override suspend fun chatImage(chat: ChatId, messageId: String, imageId: String): ImageData =
+        chatImages[messageId to imageId] ?: error("no image $imageId in message $messageId")
+
+    override suspend fun loadRemoteImage(url: String, loadMedia: Boolean): ImageData? =
+        remoteImages[url].takeIf { loadMedia }
+
+    override fun mentionCandidates(query: String, limit: UInt): List<MentionCandidate> =
+        mentionNames.filter { it.name.contains(query, ignoreCase = true) }.take(limit.toInt())
+
+    override suspend fun chatLimits(): ChatLimits = limits
+
+    override fun chatWith(session: UInt): ChatId = ChatId.Session(session)
+
+    override suspend fun markChatRead(chat: ChatId) {
+        unread.remove(chat)
+    }
+
+    override fun setOpenChat(chat: ChatId?) {
+        openChat = chat
+        openChatCalls += chat
+    }
+
+    override suspend fun gifFavourites(): List<GifFavourite> = gifFavourites.toList()
+
+    override suspend fun addGifFavourite(url: String) {
+        if (gifFavourites.none { it.url == url }) gifFavourites += GifFavourite(url, addedAtMs = 0, lastUsedAtMs = 0)
+    }
+
+    override suspend fun removeGifFavourite(url: String) {
+        gifFavourites.removeAll { it.url == url }
+    }
+
+    override suspend fun privateConversations(): List<Conversation> = conversations.toList()
+
+    override suspend fun messageRequests(): MessageRequests =
+        MessageRequests(incoming = incomingRequests.toList(), sent = sentRequests.toList())
+
+    override suspend fun acceptMessageRequest(id: ULong) {
+        incomingRequests.removeAll { it.id == id }
+    }
+
+    override suspend fun declineMessageRequest(id: ULong) {
+        incomingRequests.removeAll { it.id == id }
+    }
+
+    override suspend fun sendChatRequest(session: UInt, note: String?) {
+        val name = server.people.firstOrNull { it.session == session }?.name.orEmpty()
+        sentRequests += SentChatRequest(session, name, accepted = false)
+    }
+
+    override suspend fun privateMessageSettings(): PrivateMessageSettings = privateMessageSettings
+
+    override suspend fun setPrivateMessageSettings(settings: PrivateMessageSettings) {
+        privateMessageSettings = settings
+    }
+
+    override suspend fun blockPerson(session: UInt) {
+        val name = server.people.firstOrNull { it.session == session }?.name.orEmpty()
+        blocked += BlockedPerson(id = blocked.size + 1L, name = name, serverLabel = "", blockedAtMs = 0)
+    }
+
+    override suspend fun unblockPerson(id: Long) {
+        blocked.removeAll { it.id == id }
+    }
+
+    override suspend fun blockedPeople(): List<BlockedPerson> = blocked.toList()
+
+    private fun appendOwn(chat: ChatId, content: MessageContent): ChatMessage {
+        val message = chatMessage(
+            id = "own-${nextMessageId++}",
+            chat = chat,
+            own = true,
+            content = content,
+        )
+        messages.getOrPut(chat) { CopyOnWriteArrayList() } += message
+        return message
+    }
 
     private fun finishConnecting() {
         emit(BridgeEvent.ConnectionChanged(ConnectionState.Connected))

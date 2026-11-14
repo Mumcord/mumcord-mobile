@@ -22,6 +22,12 @@ required-features = ["bindgen"]
 bindgen = ["uniffi/cli"]
 
 [dependencies]
+# Chat: the versions the engine already uses, so no second copy ends up in the library.
+base64 = "0.23"
+html5ever = "0.40"
+icu_normalizer = { version = "2", default-features = false, features = ["compiled_data"] }
+icu_properties = { version = "2", default-features = false, features = ["compiled_data"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 mumcord-audio.workspace = true
 mumcord-engine.workspace = true
 mumcord-store.workspace = true

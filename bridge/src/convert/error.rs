@@ -25,7 +25,8 @@ impl From<EngineError> for BridgeError {
             ErrorKind::CertificateRejected => Self::CertificateRejected { detail },
             ErrorKind::CertificateChanged => Self::CertificateChanged { detail },
             ErrorKind::ServerTooOld => Self::ServerTooOld { detail },
-            ErrorKind::InvalidInput => Self::InvalidInput { detail },
+            // A message above the server's size limit, found here or refused by the server.
+            ErrorKind::InvalidInput | ErrorKind::MessageTooLarge => Self::InvalidInput { detail },
             ErrorKind::SecureStorageUnavailable => Self::SecureStorageUnavailable { detail },
             ErrorKind::Io => Self::Io { detail },
             // Kinds of features the bridge does not offer yet keep their message.

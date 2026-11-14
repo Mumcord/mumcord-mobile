@@ -6,10 +6,15 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use mumcord_engine::{EngineEvent, EventReceiver, ServerId, Snapshot, TaggedEvent, UserView};
+use mumcord_engine::{
+    Engine, EngineEvent, EventReceiver, ServerId, Snapshot, TaggedEvent, UserView,
+};
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
 
+use crate::chat::{
+    self, BlockedPerson, ChatId, ChatMessage, ChatNotification, MessageRequests, SharedChat,
+};
 use crate::convert::{self, PersonFlags};
 use crate::types::{
     AudioWanted, CertificatePrompt, Channel, ChannelPasswordState, ConnectionState, Person,
@@ -71,6 +76,29 @@ pub enum BridgeEvent {
     /// gain. Sent while voice is running, at most 20 times a second and only when it changed.
     InputLevelChanged {
         percent: u8,
+    },
+    /// A new message arrived in a chat (not an own one: `send_message` returns that). Messages
+    /// of a chat arrive in order.
+    ChatMessageReceived {
+        message: ChatMessage,
+    },
+    /// The unread count of a chat changed. The sums are the badges of the Chat tab (channels)
+    /// and the Messages tab (people).
+    ChatUnreadChanged {
+        chat: ChatId,
+        count: u32,
+    },
+    /// A message worth a system notification. Sent after its `ChatMessageReceived`.
+    ChatNotification {
+        notification: ChatNotification,
+    },
+    /// The message requests changed.
+    MessageRequestsChanged {
+        requests: MessageRequests,
+    },
+    /// The list of blocked people changed.
+    BlockedPeopleChanged {
+        people: Vec<BlockedPerson>,
     },
 }
 
@@ -141,6 +169,23 @@ impl Connection {
                 camera: self.camera.contains(&session),
             },
         )
+    }
+
+    /// The user themself, once the server is synced.
+    pub(crate) fn own_user(&self) -> Option<&UserView> {
+        self.self_session.and_then(|own| self.people.get(&own))
+    }
+
+    pub(crate) fn people(&self) -> impl Iterator<Item = &UserView> {
+        self.people.values()
+    }
+
+    /// The session of the person with this certificate, when they are on the server.
+    pub(crate) fn session_of(&self, cert_hash: &str) -> Option<u32> {
+        self.people
+            .values()
+            .find(|user| user.cert_hash.as_deref() == Some(cert_hash))
+            .map(|user| user.session)
     }
 
     /// The name of a person, as the engine's whisper targets want it.
@@ -347,19 +392,31 @@ fn apply(connection: &mut Connection, event: EngineEvent) -> Vec<BridgeEvent> {
     }
 }
 
+/// What the event thread works on.
+pub(crate) struct PumpState {
+    pub(crate) engine: Engine,
+    pub(crate) connection: SharedConnection,
+    pub(crate) chat: SharedChat,
+}
+
 /// Starts the bridge thread that delivers events to `listener` until `stop` is dropped or the
 /// engine is gone: the engine's events and the bridge's `own` ones (the server list).
 pub(crate) fn spawn_pump(
     runtime: Handle,
     mut events: EventReceiver,
     mut own: mpsc::UnboundedReceiver<BridgeEvent>,
-    connection: SharedConnection,
+    state: PumpState,
     listener: Arc<dyn EngineListener>,
     mut stop: oneshot::Receiver<()>,
 ) -> std::io::Result<()> {
     std::thread::Builder::new()
         .name("mumcord-bridge-events".into())
         .spawn(move || {
+            let PumpState {
+                engine,
+                connection,
+                chat,
+            } = state;
             // Only waits on channels, so it keeps working while the runtime shuts down.
             runtime.block_on(async {
                 loop {
@@ -367,8 +424,19 @@ pub(crate) fn spawn_pump(
                         _ = &mut stop => break,
                         event = events.recv_tagged() => {
                             let Some(event) = event else { break };
+                            // The block list belongs to the identity, not to a server: the engine
+                            // names none for it.
+                            let of_connection = event.0 == lock(&connection).server
+                                || matches!(event.1, EngineEvent::BlockedUsersChanged(_));
+                            let for_chat = (of_connection && chat::wants(&event.1))
+                                .then(|| event.1.clone());
                             for event in translate(&connection, event) {
                                 listener.on_event(event);
+                            }
+                            if let Some(event) = for_chat {
+                                for event in chat::handle(&engine, &connection, &chat, event).await {
+                                    listener.on_event(event);
+                                }
                             }
                         }
                         // The sender lives as long as the engine object, which also holds `stop`.

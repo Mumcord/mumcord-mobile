@@ -18,3 +18,4 @@
 - Bridge: voice controls (push-to-talk, mute, deafen, whisper and shout, level meter, noise suppression and gain switches) and a real-time audio path for the apps' microphone and speaker
 - Android: voice is audible. The phone's speaker and microphone run in voice-call mode with the system's echo cancellation; the microphone is asked for when you can first talk, with a one-sentence reason, and listening works without it
 - Android: voice bar on every tab (talk indicator, mute, deafen, leave) and the full voice view with the people in your channel, the talk mode switch, hold-to-talk or the microphone level, and whisper to a person or shout to a channel with a hold button
+- Bridge: channel chat, private messages, history, images, GIF favourites, mentions, replies, message requests and blocking, with server content delivered only as a safe structured form

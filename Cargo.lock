@@ -2537,6 +2537,11 @@ dependencies = [
 name = "mumcord-mobile-bridge"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "html5ever",
+ "icu_normalizer",
+ "icu_properties",
+ "image",
  "jni",
  "mumcord-audio",
  "mumcord-engine",
