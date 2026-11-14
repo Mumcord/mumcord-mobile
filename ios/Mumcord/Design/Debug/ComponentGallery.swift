@@ -129,7 +129,6 @@ private struct ChannelTreeSample: View {
                 MumcordAvatar(initials: "L", colorSlot: index + 1, size: size)
             }
         }
-        .frame(maxWidth: .infinity)
         .padding(.horizontal, MumcordSpace.s4)
     }
 }

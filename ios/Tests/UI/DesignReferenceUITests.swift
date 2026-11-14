@@ -28,12 +28,16 @@ final class DesignReferenceUITests: XCTestCase {
         attachScreenshot(of: app, name: "ios-gallery-dark-1")
         let lastGroup = app.staticTexts["TAB BAR"]
         var page = 1
+        // Dragged along the left edge: the talk button and the slider keep a touch that starts
+        // on them for themselves.
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8))
+        let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.3))
         while !lastGroup.isHittable && page < 12 {
-            app.swipeUp(velocity: .slow)
+            from.press(forDuration: 0.1, thenDragTo: to)
             page += 1
             attachScreenshot(of: app, name: "ios-gallery-dark-\(page)")
         }
-        XCTAssertTrue(lastGroup.exists, "the gallery does not reach its last group")
+        XCTAssertTrue(lastGroup.isHittable, "the gallery does not scroll to its last group")
     }
 
     private func attachScreenshot(of app: XCUIApplication, name: String) {
