@@ -5,8 +5,8 @@ import UIKit
 
 /// Single-line text field of a form (`.label` over `.field`): the `label` above, the field with
 /// a focus ring while it is being edited, and below it the `error` in the danger colour or else
-/// the `hint`. VoiceOver reads the label and the error with the field. `password` hides the
-/// typed characters. The text is taken as typed: no autocorrection, no automatic capitals.
+/// the `hint`. VoiceOver reads the label with the field and the error as the text after it.
+/// `password` hides the typed characters. The text is taken as typed: no autocorrection, no automatic capitals.
 struct MumcordTextField: View {
     private let value: String
     private let onValueChange: (String) -> Void
@@ -67,7 +67,6 @@ struct MumcordTextField: View {
                 .focused($focused)
                 .onSubmit { onSubmit?() }
                 .accessibilityLabel(label)
-                .accessibilityHint(error ?? "")
                 .padding(.horizontal, MumcordSpace.s4)
                 .frame(maxWidth: .infinity, minHeight: MumcordSize.touchVisual, alignment: .leading)
                 .background(colors.bgElevated, in: shape)
@@ -86,9 +85,7 @@ struct MumcordTextField: View {
                 .contentShape(Rectangle())
                 .onTapGesture { focused = true }
             if let error {
-                // The error is already read with the field.
                 ParagraphText(error, style: .small, color: colors.danger)
-                    .accessibilityHidden(true)
             } else if let hint {
                 ParagraphText(hint, style: .small, color: colors.textMuted)
             }

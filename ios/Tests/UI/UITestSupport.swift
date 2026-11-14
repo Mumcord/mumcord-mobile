@@ -122,9 +122,10 @@ extension XCTestCase {
     }
 
     /// Puts the keyboard away with its own return key, which does not change what was typed. Best
-    /// effort: a keyboard without such a key (the number pad) stays.
+    /// effort: a keyboard without such a key (the number pad) or with a key that acts (Go, Search,
+    /// Next) stays.
     func dismissKeyboard(in app: XCUIApplication) {
-        let keys = ["Done", "Return", "return", "Go", "Search", "search", "Next"]
+        let keys = ["Done", "done", "Return", "return"]
         var attempts = 0
         while app.keyboards.firstMatch.exists && attempts < 6 {
             guard let key = keys.map({ app.keyboards.buttons[$0] }).first(where: { $0.exists }) else { return }
