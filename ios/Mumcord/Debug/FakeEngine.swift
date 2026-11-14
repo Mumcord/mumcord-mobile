@@ -39,7 +39,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _talkMode = TalkMode.voiceActivity
     private var people: [UInt32: Person]
     private var connection = ConnectionState.disconnected(error: nil)
-    private var savedServers: [SavedServer]
+    private var storedServers: [SavedServer]
     private var nextServerId: Int64
 
     init(
@@ -52,7 +52,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         self.server = server
         self.prompt = prompt
         people = Dictionary(server.people.map { ($0.session, $0) }, uniquingKeysWith: { _, last in last })
-        savedServers = servers
+        storedServers = servers
         nextServerId = (servers.map(\.id).max() ?? 0) + 1
     }
 
@@ -128,7 +128,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
                 _connectFailure = nil
                 throw failure
             }
-            guard savedServers.contains(where: { $0.id == serverId }) else {
+            guard storedServers.contains(where: { $0.id == serverId }) else {
                 throw BridgeError.NotFound(detail: "no server \(serverId)")
             }
             guard case .disconnected = connection else {
@@ -162,7 +162,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     }
 
     func savedServers() -> [SavedServer] {
-        locked { savedServers }
+        locked { storedServers }
     }
 
     func addServer(input: ServerInput) async throws -> SavedServer {
@@ -171,8 +171,8 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
             _serverInputs.append(input)
             let saved = Self.saved(input, id: nextServerId, hadPassword: false)
             nextServerId += 1
-            savedServers.append(saved)
-            return (saved, savedServers)
+            storedServers.append(saved)
+            return (saved, storedServers)
         }
         emit(.serversChanged(servers: all))
         return saved
@@ -181,13 +181,13 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     func updateServer(serverId: Int64, input: ServerInput) async throws -> SavedServer {
         let (saved, all): (SavedServer, [SavedServer]) = try locked {
             try failSaveOnce()
-            guard let index = savedServers.firstIndex(where: { $0.id == serverId }) else {
+            guard let index = storedServers.firstIndex(where: { $0.id == serverId }) else {
                 throw BridgeError.NotFound(detail: "no server \(serverId)")
             }
             _serverInputs.append(input)
-            let saved = Self.saved(input, id: serverId, hadPassword: savedServers[index].hasPassword)
-            savedServers[index] = saved
-            return (saved, savedServers)
+            let saved = Self.saved(input, id: serverId, hadPassword: storedServers[index].hasPassword)
+            storedServers[index] = saved
+            return (saved, storedServers)
         }
         emit(.serversChanged(servers: all))
         return saved
@@ -203,11 +203,11 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func removeServer(serverId: Int64) async throws {
         let all: [SavedServer] = try locked {
-            guard let index = savedServers.firstIndex(where: { $0.id == serverId }) else {
+            guard let index = storedServers.firstIndex(where: { $0.id == serverId }) else {
                 throw BridgeError.NotFound(detail: "no server \(serverId)")
             }
-            savedServers.remove(at: index)
-            return savedServers
+            storedServers.remove(at: index)
+            return storedServers
         }
         emit(.serversChanged(servers: all))
     }
