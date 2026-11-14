@@ -74,9 +74,11 @@ final class AppScreenshotUITests: XCTestCase {
         save.tapCenter()
         expectAppears(app.element(containing: "Enter a number between 1 and 65535."))
         expectAppears(app.element(containing: "Enter the name you want to use on this server."))
-        // The form's keyboard has no key that only closes it; dragging the form down does, and
-        // a second drag brings the first field back to the top.
-        app.swipeDown()
+        // The form's keyboard has no key that only closes it; dragging the form down into the
+        // keyboard does, and a second drag brings the first field back to the top.
+        let top = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        let bottom = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.98))
+        top.press(forDuration: 0.1, thenDragTo: bottom)
         app.swipeDown()
         capture(app, "server-form", theme: theme)
     }

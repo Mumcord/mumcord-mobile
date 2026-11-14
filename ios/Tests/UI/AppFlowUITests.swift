@@ -221,6 +221,11 @@ final class AppFlowUITests: XCTestCase {
         // One server at a time: the running connection is only ended after a confirmation.
         expectAppears(app.element("Switch server?"))
         tapWhenReady(app.element("switch-confirm"))
+        // The question replaces the link sheet in place; a touch that lands while the sheet is
+        // still settling is lost, so it is repeated once.
+        if !app.element("Switch server?").waitForNonExistence(timeout: 3), app.element("switch-confirm").exists {
+            app.element("switch-confirm").tapCenter()
+        }
 
         expectGone(app.element("Switch server?"))
         expectAppears(app.element("Channels"))
