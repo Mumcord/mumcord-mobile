@@ -1,9 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import org.cyclonedx.gradle.CyclonedxDirectTask
+import org.cyclonedx.model.Component
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.cyclonedx)
 }
+
+// The release workflow passes the version of the tag (scripts/release-version.sh); every other
+// build keeps the defaults.
+val appVersionName = providers.gradleProperty("mumcord.versionName").getOrElse("0.1.0")
+val appVersionCode = providers.gradleProperty("mumcord.versionCode").map(String::toInt).getOrElse(1)
 
 // The screenshot tests run with every `test`, where they only draw the screens into
 // build/outputs/screenshots. `recordScreenshots` writes them to docs/images/screenshots, and
@@ -27,8 +36,8 @@ android {
         applicationId = "app.mumcord.mobile"
         minSdk = 31
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -111,6 +120,19 @@ dependencies {
     androidTestImplementation(libs.espresso.core)
     // Provides the empty Activity the Compose test rule starts the screens in.
     debugImplementation(libs.compose.ui.test.manifest)
+}
+
+// The Android libraries of the release APK for its SBOM and third-party notices
+// (scripts/generate-sbom.sh, scripts/generate-notices.sh): only what the release build packages.
+tasks.named<CyclonedxDirectTask>("cyclonedxDirectBom") {
+    includeConfigs = listOf("releaseRuntimeClasspath")
+    projectType = Component.Type.APPLICATION
+    componentName = "mumcord-mobile"
+    componentVersion = appVersionName
+    includeLicenseText = true
+    includeBuildSystem = false
+    failOnUnresolvedDependencies = true
+    xmlOutput.unsetConvention()
 }
 
 for (name in listOf("recordScreenshots", "verifyScreenshots")) {

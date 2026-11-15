@@ -25,6 +25,9 @@
             <artifact name="camera-camera2-1.6.2.module">
                 <sha256 value="4694b995fbb4934e5e1e3cedabef426e799a510cfc179b659c4e9632f6b2fe75" origin="downloaded from Google's Maven repository" />
             </artifact>
+            <artifact name="camera-camera2-1.6.2.pom">
+                <sha256 value="23020a27494b69f7b77c3c1598923789bfada5c145d31d0893fae1ee895213df" origin="downloaded from Google's Maven repository" />
+            </artifact>
         </component>
         <component group="androidx.camera" name="camera-camera2-pipe" version="1.6.2">
             <artifact name="camera-camera2-pipe-1.6.2.aar">
@@ -32,6 +35,9 @@
             </artifact>
             <artifact name="camera-camera2-pipe-1.6.2.module">
                 <sha256 value="5470741b0a6fe88e560e7d929097e2ec60e7406aef09b48ab900b0befa102c0f" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="camera-camera2-pipe-1.6.2.pom">
+                <sha256 value="c3bc970a6a0657ff9b6df2cd8241098746f8e54bc5b74e56899050d76fdb9f66" origin="downloaded from Google's Maven repository" />
             </artifact>
         </component>
         <component group="androidx.camera" name="camera-compose" version="1.6.2">
@@ -41,6 +47,9 @@
             <artifact name="camera-compose-1.6.2.module">
                 <sha256 value="1883d0f5a553d55c6fffdd37c1a4eb1a73198edaf11ac347ce3f62abc217beb1" origin="downloaded from Google's Maven repository" />
             </artifact>
+            <artifact name="camera-compose-1.6.2.pom">
+                <sha256 value="be0bd4c261da09c6e7fab81bbbcb5f3434b079bfb4ef4643202b5fc5660b3d69" origin="downloaded from Google's Maven repository" />
+            </artifact>
         </component>
         <component group="androidx.camera" name="camera-core" version="1.6.2">
             <artifact name="camera-core-1.6.2.aar">
@@ -48,6 +57,9 @@
             </artifact>
             <artifact name="camera-core-1.6.2.module">
                 <sha256 value="bee75b4ef561862030702a51f692057e034ae1f600f3091b2a5e5a89856ab410" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="camera-core-1.6.2.pom">
+                <sha256 value="cddb5bb0653654d8b7c2833484f4684d881dc7509411132e73a5fb4b167fd13c" origin="downloaded from Google's Maven repository" />
             </artifact>
         </component>
         <component group="androidx.camera" name="camera-lifecycle" version="1.6.2">
@@ -57,6 +69,9 @@
             <artifact name="camera-lifecycle-1.6.2.module">
                 <sha256 value="bd7fd00cb9de0f2ce8c3400b52504cf7691590bb29a1550a71b58255e483ff47" origin="downloaded from Google's Maven repository" />
             </artifact>
+            <artifact name="camera-lifecycle-1.6.2.pom">
+                <sha256 value="7562a6960db6bd8f46441c3467a2b51d33b98ece1c118ac30538dd6c54b49ce0" origin="downloaded from Google's Maven repository" />
+            </artifact>
         </component>
         <component group="androidx.camera.featurecombinationquery" name="featurecombinationquery" version="1.6.2">
             <artifact name="featurecombinationquery-1.6.2.aar">
@@ -64,6 +79,9 @@
             </artifact>
             <artifact name="featurecombinationquery-1.6.2.module">
                 <sha256 value="4f6edda1492eaa928cfe7516d8efd097ed2f59ee4cedf1bec2d3345a3d6137fd" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="featurecombinationquery-1.6.2.pom">
+                <sha256 value="a8e3d3e223d274beb4109073489eb6c67f264c6e32e84920eb81ea0851864e1b" origin="downloaded from Google's Maven repository" />
             </artifact>
         </component>
         <component group="androidx.camera.viewfinder" name="viewfinder-compose" version="1.6.2">
@@ -73,6 +91,9 @@
             <artifact name="viewfinder-compose-1.6.2.module">
                 <sha256 value="c730eb5cf60b4b0346816216edb37d798a080b3e8d74d26abc6fc3d2d924e824" origin="downloaded from Google's Maven repository" />
             </artifact>
+            <artifact name="viewfinder-compose-1.6.2.pom">
+                <sha256 value="3149dbd18a7ee197a69c6d878d60615911d27766cb70f937234ba90e54bf0fb0" origin="downloaded from Google's Maven repository" />
+            </artifact>
         </component>
         <component group="androidx.camera.viewfinder" name="viewfinder-core" version="1.6.2">
             <artifact name="viewfinder-core-1.6.2.aar">
@@ -80,6 +101,9 @@
             </artifact>
             <artifact name="viewfinder-core-1.6.2.module">
                 <sha256 value="2601f63486c98da65bf418f22822a54aa8eea821f3cd948013934392c65a7dd8" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="viewfinder-core-1.6.2.pom">
+                <sha256 value="09621c05c0cf16a66243b565aa1f914f300bcc30487d39363a17170bda338f34" origin="downloaded from Google's Maven repository" />
             </artifact>
         </component>
         <component group="com.google.zxing" name="core" version="3.5.4">

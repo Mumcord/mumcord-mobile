@@ -37,6 +37,8 @@ roborazzi = "1.79.0"
 # version in Cargo.lock (the build checks it); its files are pinned by checksum in
 # gradle/verification-metadata.xml.
 rustls-platform-verifier = "0.2.0"
+# Writes the SBOM of the Android libraries in the APK for each release (Apache-2.0).
+cyclonedx = "3.6.1"
 
 [libraries]
 compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
@@ -76,3 +78,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 android-test = { id = "com.android.test", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+cyclonedx = { id = "org.cyclonedx.bom", version.ref = "cyclonedx" }
