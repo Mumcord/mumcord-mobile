@@ -20,9 +20,9 @@ use mumcord_engine::store::transfer::{
 
 use crate::transfer::TransferScan;
 use crate::{
-    BridgeError, BridgeEvent, DefaultOutput, EngineConfig, EngineListener, Identity,
-    MobileSettings, MumcordEngine, PasswordInput, SecureStorage, SecureStorageError, ServerInput,
-    TalkMode, TransferError, TransferProgress, TransferSkipReason,
+    AppSettings, BanInput, BridgeError, BridgeEvent, DefaultOutput, EngineConfig, EngineListener,
+    Identity, MobileSettings, MumcordEngine, PasswordInput, SecureStorage, SecureStorageError,
+    ServerInput, TalkMode, TransferError, TransferProgress, TransferSkipReason,
 };
 
 #[derive(Default)]
@@ -648,4 +648,93 @@ async fn the_phone_settings_are_saved_and_survive_a_restart() {
         TalkMode::PushToTalk
     );
     restarted.remove();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn the_shared_settings_are_saved_checked_and_survive_a_restart() {
+    let name = "app-settings";
+    let phone = Phone::fresh(name);
+    let defaults = AppSettings {
+        language: None,
+        link_previews: true,
+        history_max_age_days: None,
+        notify_private_messages: true,
+        notify_mentions: true,
+    };
+    assert_eq!(phone.engine.app_settings(), defaults);
+
+    let changed = AppSettings {
+        language: Some("fr".into()),
+        link_previews: false,
+        history_max_age_days: Some(30),
+        notify_private_messages: false,
+        notify_mentions: false,
+    };
+    phone
+        .engine
+        .set_app_settings(changed.clone())
+        .await
+        .expect("changed");
+    let reported = phone.wait("the app settings", |event| match event {
+        BridgeEvent::AppSettingsChanged { settings } => Some(settings),
+        _ => None,
+    });
+    assert_eq!(reported, changed);
+
+    let unknown = AppSettings {
+        language: Some("tlh".into()),
+        ..changed.clone()
+    };
+    let refused = phone.engine.set_app_settings(unknown).await;
+    assert!(is_kind(&refused, "InvalidInput"));
+    assert_eq!(phone.engine.app_settings(), changed);
+
+    let storage = phone.storage.clone();
+    drop(phone);
+    let restarted = Phone::open(name, storage);
+    assert_eq!(restarted.engine.app_settings(), changed);
+    restarted.remove();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn profile_and_moderation_need_a_connection_and_the_log_is_empty_without_one() {
+    let phone = Phone::fresh("offline-moderation");
+    assert_eq!(phone.engine.activity_log(), []);
+    let not_connected =
+        |result: Result<(), BridgeError>| matches!(result, Err(BridgeError::NotConnected { .. }));
+    assert!(not_connected(
+        phone.engine.person_profile(1).await.map(drop)
+    ));
+    assert!(not_connected(
+        phone.engine.set_own_comment("hi".into()).await
+    ));
+    assert!(not_connected(phone.engine.set_own_avatar(None).await));
+    assert!(not_connected(
+        phone.engine.move_person(1, 0).await.map(drop)
+    ));
+    assert!(not_connected(
+        phone.engine.set_server_mute(1, true).await.map(drop)
+    ));
+    assert!(not_connected(
+        phone.engine.set_server_deafen(1, true).await.map(drop)
+    ));
+    assert!(not_connected(
+        phone.engine.kick_person(1, None).await.map(drop)
+    ));
+    assert!(not_connected(phone.engine.ban_target(1).await.map(drop)));
+    let ban = BanInput {
+        reason: None,
+        duration_secs: 0,
+        by_certificate: true,
+        by_address: false,
+        remove_now: true,
+        force: false,
+        quick: false,
+    };
+    assert!(not_connected(
+        phone.engine.ban_person(1, ban).await.map(drop)
+    ));
+    // No avatar file is left behind by a refused change.
+    assert_eq!(phone.identity_files(), 0);
+    phone.remove();
 }

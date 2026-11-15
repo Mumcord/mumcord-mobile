@@ -396,6 +396,29 @@ fn notification(message: &ChatMessage, open: Option<&ChatId>) -> Option<ChatNoti
     })
 }
 
+/// A profile comment (sanitised HTML from the engine) in the safe content model, with its
+/// embedded images. Profiles use the chat's model, so an app shows both the same way.
+pub(crate) fn comment_content(html: &str) -> (MessageContent, Vec<(String, ImageData)>) {
+    let parsed = content::parse(html);
+    (parsed.content, parsed.images)
+}
+
+/// The image of an avatar `data:` address; `None` when it is no image the bridge passes on.
+pub(crate) fn avatar_image(data_url: &str) -> Option<ImageData> {
+    images::from_data_url(data_url).ok()
+}
+
+/// The comment the user typed as Mumble HTML: the text escaped, line breaks as `<br>`. Plain
+/// text, not Markdown: the edit field shows the comment as plain text again, so what is saved
+/// reads back unchanged.
+pub(crate) fn comment_html(text: &str) -> String {
+    text.trim()
+        .lines()
+        .map(|line| wire::escape_html(line.trim_end()))
+        .collect::<Vec<_>>()
+        .join("<br>")
+}
+
 /// Whether the chat has something to do with this engine event; only those are kept for it.
 pub(crate) fn wants(event: &EngineEvent) -> bool {
     matches!(
@@ -522,6 +545,18 @@ mod live_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_typed_comment_is_escaped_text_with_its_line_breaks() {
+        assert_eq!(
+            comment_html("  Playing <late> & loud  \nAsk me!\n"),
+            "Playing &lt;late&gt; &amp; loud<br>Ask me!"
+        );
+        assert_eq!(comment_html("   \n "), "");
+        // What is saved reads back as the same text.
+        let html = comment_html("one\ntwo");
+        assert_eq!(mumcord_engine::plain_text::plain_lines(&html), "one\ntwo");
+    }
 
     fn message(chat: ChatId, mentions_me: bool) -> ChatMessage {
         let parsed = content::parse("hello <b>there</b>");

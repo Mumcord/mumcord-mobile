@@ -45,6 +45,20 @@
 //! of being fetched by each reader. The public server list is read in pages
 //! ([`MumcordEngine::public_servers`]); the engine downloads it only when the app asks.
 //!
+//! [`AppSettings`] (language, chat, the notification switches) are the settings the phone shares
+//! with the desktop's settings model; changes arrive as [`BridgeEvent::AppSettingsChanged`]. A
+//! notification switched off there never arrives as [`BridgeEvent::ChatNotification`].
+//!
+//! # Profile, moderation and the activity log
+//!
+//! [`MumcordEngine::person_profile`] reads a person's comment (in the chat's safe content model)
+//! and avatar; the user edits their own on the connected server, and
+//! [`BridgeEvent::ProfileChanged`] says when a shown profile should be read again. Moderation
+//! (move, server mute and deafen, kick, ban) follows the server's permission answers in
+//! [`Channel::permissions`]; the server decides and its refusal comes back as `PermissionDenied`.
+//! The activity log of the connection ([`MumcordEngine::activity_log`],
+//! [`BridgeEvent::ActivityAdded`]) is kept in memory and ends with the connection.
+//!
 //! # Threads
 //!
 //! The bridge owns one tokio runtime. `async` methods run on it and never block the caller.
@@ -111,6 +125,7 @@
 //! and the same with `--language swift`. Kotlin package `app.mumcord.mobile.bridge`, Swift
 //! module `MumcordBridge` (`uniffi.toml`).
 
+mod activity;
 #[cfg(target_os = "android")]
 mod android;
 mod audio_abi;
@@ -122,6 +137,8 @@ mod events;
 mod identities;
 #[cfg(test)]
 mod local_tests;
+mod moderation;
+mod profile;
 mod public_servers;
 mod storage;
 mod transfer;
@@ -146,11 +163,12 @@ pub use transfer::{
     TransferPreview, TransferProgress, TransferScan, TransferServerPreview, TransferSkipReason,
 };
 pub use types::{
-    AudioConfig, AudioEndpoints, AudioWanted, BridgeSnapshot, CertificatePrompt, Channel,
-    ChannelPasswordState, ChannelPermissions, ConnectRequest, ConnectionState, DefaultOutput,
-    EchoCancellation, EngineConfig, Identity, MobileSettings, MumbleLink, PasswordInput, Person,
-    PublicServer, PublicServerPage, PublicServerQuery, SavedServer, ServerInput, ServerPing,
-    ServerState, TalkMode, VoiceSettings, WhisperTarget,
+    ActivityEntry, ActivityKind, AppSettings, AudioConfig, AudioEndpoints, AudioWanted, BanInput,
+    BanResult, BanTarget, BridgeSnapshot, CertificatePrompt, Channel, ChannelPasswordState,
+    ChannelPermissions, ConnectRequest, ConnectionState, DefaultOutput, EchoCancellation,
+    EngineConfig, Identity, MobileSettings, MumbleLink, PasswordInput, Person, Profile,
+    ProfileImage, PublicServer, PublicServerPage, PublicServerQuery, SavedServer, ServerInput,
+    ServerPing, ServerState, TalkMode, VoiceSettings, WhisperTarget,
 };
 
 uniffi::setup_scaffolding!();

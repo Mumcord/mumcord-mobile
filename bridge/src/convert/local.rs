@@ -2,13 +2,20 @@
 
 //! What is kept on the phone itself: identities, the phone settings, the public server list.
 
-use mumcord_engine::IdentityView;
 use mumcord_engine::public_servers::PublicServer as EnginePublicServer;
 use mumcord_engine::store::{
-    DefaultOutput as StoreDefaultOutput, MobileSettings as StoreMobileSettings,
+    DefaultOutput as StoreDefaultOutput, MobileSettings as StoreMobileSettings, NotificationMode,
 };
+use mumcord_engine::{IdentityView, Settings};
 
-use crate::types::{DefaultOutput, Identity, MobileSettings, PublicServer};
+use crate::error::BridgeError;
+use crate::types::{AppSettings, DefaultOutput, Identity, MobileSettings, PublicServer};
+
+/// The 24 languages of the desktop translations (the official EU languages), ISO 639-1.
+const LANGUAGES: [&str; 24] = [
+    "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "ga", "hr", "hu", "it", "lt", "lv",
+    "mt", "nl", "pl", "pt", "ro", "sk", "sl", "sv",
+];
 
 pub(crate) fn identity(view: IdentityView) -> Identity {
     Identity {
@@ -60,6 +67,40 @@ pub(crate) fn store_mobile_settings(
         notify_sender_only: settings.notify_sender_only,
         update_check: settings.update_check,
     }
+}
+
+pub(crate) fn app_settings(settings: &Settings) -> AppSettings {
+    AppSettings {
+        language: settings.language.clone(),
+        link_previews: settings.link_previews,
+        history_max_age_days: settings.history_max_age_days,
+        notify_private_messages: settings.notifications != NotificationMode::Off,
+        notify_mentions: settings.sounds.mention_notify,
+    }
+}
+
+/// `saved` with what the app handed in. The phone has one kind of notification, the system's:
+/// private messages map to the desktop's message notifications, which are switched on as
+/// "both" (toasts and system notifications) when they were off and are kept otherwise.
+pub(crate) fn store_app_settings(
+    settings: AppSettings,
+    mut saved: Settings,
+) -> Result<Settings, BridgeError> {
+    if let Some(language) = &settings.language
+        && !LANGUAGES.contains(&language.as_str())
+    {
+        return Err(BridgeError::invalid("unknown language"));
+    }
+    saved.language = settings.language;
+    saved.link_previews = settings.link_previews;
+    saved.history_max_age_days = settings.history_max_age_days;
+    if !settings.notify_private_messages {
+        saved.notifications = NotificationMode::Off;
+    } else if saved.notifications == NotificationMode::Off {
+        saved.notifications = NotificationMode::Both;
+    }
+    saved.sounds.mention_notify = settings.notify_mentions;
+    Ok(saved)
 }
 
 pub(crate) fn public_server(server: &EnginePublicServer) -> PublicServer {
@@ -114,6 +155,64 @@ mod tests {
             assert_eq!(
                 mobile_settings(&store_mobile_settings(settings, &saved)),
                 settings
+            );
+        }
+    }
+
+    fn app(language: Option<&str>) -> AppSettings {
+        AppSettings {
+            language: language.map(str::to_owned),
+            link_previews: false,
+            history_max_age_days: Some(30),
+            notify_private_messages: false,
+            notify_mentions: false,
+        }
+    }
+
+    #[test]
+    fn the_app_settings_map_both_ways() {
+        let saved = Settings::default();
+        for settings in [
+            app(Some("de")),
+            app(None),
+            AppSettings {
+                link_previews: true,
+                history_max_age_days: None,
+                notify_private_messages: true,
+                notify_mentions: true,
+                ..app(Some("ga"))
+            },
+        ] {
+            let stored = store_app_settings(settings.clone(), saved.clone()).expect("store");
+            assert_eq!(app_settings(&stored), settings);
+        }
+    }
+
+    #[test]
+    fn switching_private_messages_on_keeps_a_chosen_desktop_mode() {
+        let saved = Settings {
+            notifications: NotificationMode::InApp,
+            ..Settings::default()
+        };
+        let on = AppSettings {
+            notify_private_messages: true,
+            ..app(None)
+        };
+        let stored = store_app_settings(on.clone(), saved).expect("store");
+        assert_eq!(stored.notifications, NotificationMode::InApp);
+        let off = store_app_settings(app(None), stored).expect("store");
+        assert_eq!(off.notifications, NotificationMode::Off);
+        let again = store_app_settings(on, off).expect("store");
+        assert_eq!(again.notifications, NotificationMode::Both);
+    }
+
+    #[test]
+    fn unknown_languages_are_refused() {
+        for language in ["xx", "DE", "de-AT", ""] {
+            let refused = store_app_settings(app(Some(language)), Settings::default());
+            assert!(
+                matches!(refused, Err(BridgeError::InvalidInput { .. })),
+                "{language}"
             );
         }
     }

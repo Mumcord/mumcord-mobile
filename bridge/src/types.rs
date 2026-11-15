@@ -3,7 +3,7 @@
 //! Records and enums of the bridge interface. They are the bridge's own types; the engine's
 //! types are mapped onto them in `convert`.
 
-use crate::chat::{ChatId, ChatUnread};
+use crate::chat::{ChatId, ChatUnread, ImageData, MessageContent};
 use crate::error::BridgeError;
 
 /// Start-up settings of [`MumcordEngine`](crate::MumcordEngine).
@@ -144,6 +144,122 @@ pub struct MobileSettings {
     pub notify_sender_only: bool,
     /// Android: look for a newer version once a day.
     pub update_check: bool,
+}
+
+/// The settings the phone shares with the desktop's settings model: chat, notifications and
+/// language. Saved in the engine's database.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct AppSettings {
+    /// App language as an ISO 639-1 code of one of the 24 languages; `None` follows the phone.
+    pub language: Option<String>,
+    /// Show link previews in chat; the engine then fetches linked pages itself.
+    pub link_previews: bool,
+    /// Chat history older than this many days is deleted; `None` keeps it.
+    pub history_max_age_days: Option<u32>,
+    /// Private messages raise a system notification ([`BridgeEvent::ChatNotification`](crate::BridgeEvent::ChatNotification)).
+    pub notify_private_messages: bool,
+    /// Mentions raise a system notification.
+    pub notify_mentions: bool,
+}
+
+/// What a person's profile shows. The comment is the server's text, sanitised by the engine and
+/// reduced to the safe content model; the avatar is image bytes as the server holds them.
+#[derive(Clone, PartialEq, Eq, uniffi::Record)]
+pub struct Profile {
+    pub comment: Option<MessageContent>,
+    /// The comment as plain text, for the edit field (line breaks kept, formatting dropped).
+    pub comment_text: String,
+    /// The images embedded in the comment, by the `image_id` of its `ImageRef::Embedded`.
+    pub comment_images: Vec<ProfileImage>,
+    pub avatar: Option<ImageData>,
+}
+
+/// An image embedded in a profile comment.
+#[derive(Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ProfileImage {
+    pub image_id: String,
+    pub image: ImageData,
+}
+
+/// What the ban dialog needs to know about a person before banning them.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct BanTarget {
+    /// The address the server reported (only to admins); `None` when it did not. Personal data:
+    /// shown to the admin, never logged.
+    pub address: Option<String>,
+    /// How long the person has been connected, when the server reported it.
+    pub online_secs: Option<u64>,
+    /// The server lets the user read its ban list: a ban with its own length and targets is
+    /// possible. Otherwise only the server's default ban is (`BanInput::quick`).
+    pub ban_list_readable: bool,
+    /// The person has a certificate, so "Ban by certificate" can be on.
+    pub has_certificate: bool,
+    pub can_kick: bool,
+    pub can_ban: bool,
+}
+
+/// A ban as the dialog sends it (Spec 10, FR-10.12, FR-10.13).
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct BanInput {
+    /// Shown to the person; `None` or blank for none.
+    pub reason: Option<String>,
+    /// Seconds; 0 is permanent. Ignored by the quick ban, which uses the server's own length.
+    pub duration_secs: u32,
+    pub by_certificate: bool,
+    /// Bans the person's single address (/32 or /128).
+    pub by_address: bool,
+    /// After saving the ban the person is kicked with the same reason (needs the kick right).
+    pub remove_now: bool,
+    /// "Save mine anyway" after [`BanResult::Conflict`].
+    pub force: bool,
+    /// The server's own "remove with ban" (default length, certificate and address), for
+    /// servers whose ban list cannot be read ([`BanTarget::ban_list_readable`] is false).
+    pub quick: bool,
+}
+
+/// What a ban produced.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum BanResult {
+    /// The entry is on the server's ban list; `removed` when the server confirmed the person
+    /// was taken off (otherwise they are stopped on their next connect).
+    Saved { removed: bool },
+    /// The server's own ban with its default length.
+    QuickBanned,
+    /// The entry changed on the server meanwhile (another admin): ask, then send again with
+    /// `force` or give up.
+    Conflict,
+}
+
+/// What an activity entry reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum ActivityKind {
+    /// The user connected; the first entry of every connection.
+    Connected,
+    /// A person came onto the server, into `channel_id`.
+    Joined,
+    /// A person left the server. Kicks and bans look the same for now.
+    Left,
+    /// A person moved to `channel_id`.
+    Moved,
+    StreamStarted,
+    StreamStopped,
+}
+
+/// One entry of the activity log (Spec 11): kept for the connection only, 200 at most.
+#[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
+pub struct ActivityEntry {
+    /// Rises with every entry of the bridge's lifetime.
+    pub id: u64,
+    pub kind: ActivityKind,
+    pub session: u32,
+    /// The person's name as the server sent it (untrusted); the last known one for `Left`.
+    pub name: String,
+    pub is_self: bool,
+    /// The channel of a join, a move or a stream start, while it is known.
+    pub channel_id: Option<u32>,
+    pub channel_name: Option<String>,
+    /// When the bridge saw it, in milliseconds since the Unix epoch.
+    pub at_ms: i64,
 }
 
 /// A server of the public server list. Everything in it is untrusted text.

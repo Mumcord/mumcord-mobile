@@ -87,6 +87,9 @@ extension SessionState {
         // The identity screens (task 6.5) are the first to follow the identities.
         case .identitiesChanged:
             break
+        // Profile, activity log and settings screens (task 8.6) follow these themselves.
+        case .profileChanged, .activityAdded, .appSettingsChanged:
+            break
         // Messages and unread counts go to `ChatStore` and never reach this state. The rest
         // belongs to the Messages tab.
         case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,

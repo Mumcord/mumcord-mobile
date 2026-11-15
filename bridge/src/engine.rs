@@ -23,8 +23,8 @@ use crate::identities;
 use crate::public_servers::PublicList;
 use crate::storage::{SecureStorage, StorageBackend};
 use crate::types::{
-    AudioEndpoints, BridgeSnapshot, ConnectRequest, EngineConfig, Identity, MobileSettings,
-    SavedServer, ServerInput, ServerPing, TalkMode, VoiceSettings, WhisperTarget,
+    AppSettings, AudioEndpoints, BridgeSnapshot, ConnectRequest, EngineConfig, Identity,
+    MobileSettings, SavedServer, ServerInput, ServerPing, TalkMode, VoiceSettings, WhisperTarget,
 };
 
 /// What is saved on the phone as the app last got it (the server list, the identities, the
@@ -34,9 +34,11 @@ pub(crate) struct Saved {
     servers: Arc<Mutex<Vec<SavedServer>>>,
     identities: Arc<Mutex<Vec<Identity>>>,
     mobile: Arc<Mutex<MobileSettings>>,
+    /// Also read by the event thread, which holds back the notifications switched off here.
+    pub(crate) app: Arc<Mutex<AppSettings>>,
     /// Serialises the commands that change the lists, so every change is reported in order.
     pub(crate) gate: Arc<tokio::sync::Mutex<()>>,
-    events: mpsc::UnboundedSender<BridgeEvent>,
+    pub(crate) events: mpsc::UnboundedSender<BridgeEvent>,
 }
 
 impl Saved {
@@ -74,6 +76,17 @@ impl Saved {
             let _ = self
                 .events
                 .send(BridgeEvent::MobileSettingsChanged { settings });
+        }
+    }
+
+    /// Takes over the shared settings as they were just saved and reports them when they
+    /// changed.
+    fn set_app(&self, settings: AppSettings) {
+        let changed = std::mem::replace(&mut *lock(&self.app), settings.clone()) != settings;
+        if changed {
+            let _ = self
+                .events
+                .send(BridgeEvent::AppSettingsChanged { settings });
         }
     }
 }
@@ -160,7 +173,9 @@ impl MumcordEngine {
                 .join()
         })
         .map_err(|_| BridgeError::internal("reading the server list failed"))??;
-        let mobile = convert::mobile_settings(&engine.settings()?.mobile);
+        let settings = engine.settings()?;
+        let mobile = convert::mobile_settings(&settings.mobile);
+        let app = Arc::new(Mutex::new(convert::app_settings(&settings)));
         let connection = SharedConnection::default();
         let chat = SharedChat::default();
         let (stop_events, stop) = oneshot::channel();
@@ -173,6 +188,7 @@ impl MumcordEngine {
                 engine: engine.clone(),
                 connection: connection.clone(),
                 chat: chat.clone(),
+                app: app.clone(),
             },
             listener,
             stop,
@@ -186,6 +202,7 @@ impl MumcordEngine {
                 servers: Arc::new(Mutex::new(listed)),
                 identities: Arc::new(Mutex::new(known)),
                 mobile: Arc::new(Mutex::new(mobile)),
+                app,
                 gate: Arc::default(),
                 events: own_events,
             },
@@ -433,6 +450,27 @@ impl MumcordEngine {
         .await
     }
 
+    /// The settings shared with the desktop's settings model: language, chat and
+    /// notifications.
+    pub fn app_settings(&self) -> AppSettings {
+        lock(&self.saved.app).clone()
+    }
+
+    /// Saves them; they arrive as [`BridgeEvent::AppSettingsChanged`]. Fails with
+    /// `InvalidInput` for a language that is not one of the 24. A changed history age deletes
+    /// older chat history soon after.
+    pub async fn set_app_settings(&self, settings: AppSettings) -> Result<(), BridgeError> {
+        let (engine, saved) = (self.engine.clone(), self.saved.clone());
+        self.run(async move {
+            let _gate = saved.gate.lock().await;
+            let all = convert::store_app_settings(settings, engine.settings()?)?;
+            let all = engine.update_settings(all).await?;
+            saved.set_app(convert::app_settings(&all));
+            Ok(())
+        })
+        .await
+    }
+
     /// The handles the app's audio threads pass to the C functions of
     /// `bridge/include/mumcord_audio.h`. The same values for the engine object's whole life.
     pub fn audio_endpoints(&self) -> AudioEndpoints {
@@ -651,7 +689,7 @@ fn unknown_server() -> BridgeError {
     }
 }
 
-fn connected_server(connection: &SharedConnection) -> Result<ServerId, BridgeError> {
+pub(crate) fn connected_server(connection: &SharedConnection) -> Result<ServerId, BridgeError> {
     lock(connection)
         .server
         .ok_or_else(BridgeError::not_connected)

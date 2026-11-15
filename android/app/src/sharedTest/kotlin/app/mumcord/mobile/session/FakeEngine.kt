@@ -2,7 +2,13 @@
 
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.ActivityEntry
+import app.mumcord.mobile.bridge.AppSettings
 import app.mumcord.mobile.bridge.AudioEndpoints
+import app.mumcord.mobile.bridge.BanInput
+import app.mumcord.mobile.bridge.BanResult
+import app.mumcord.mobile.bridge.BanTarget
+import app.mumcord.mobile.bridge.Profile
 import app.mumcord.mobile.bridge.AudioWanted
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BlockedPerson
@@ -728,6 +734,76 @@ class FakeEngine(
         mobileSettings = settings
         emit(BridgeEvent.MobileSettingsChanged(settings))
     }
+
+    // ----- shared settings -----
+
+    var appSettings = AppSettings(
+        language = null,
+        linkPreviews = true,
+        historyMaxAgeDays = null,
+        notifyPrivateMessages = true,
+        notifyMentions = true,
+    )
+
+    override fun appSettings(): AppSettings = appSettings
+
+    override suspend fun setAppSettings(settings: AppSettings) {
+        appSettings = settings
+        emit(BridgeEvent.AppSettingsChanged(settings))
+    }
+
+    // ----- profile, moderation, activity -----
+
+    var profile = Profile(comment = null, commentText = "", commentImages = emptyList(), avatar = null)
+    val moderationCalls = CopyOnWriteArrayList<String>()
+    var activity: List<ActivityEntry> = emptyList()
+
+    override suspend fun personProfile(session: UInt): Profile = profile
+
+    override suspend fun setOwnComment(text: String) {
+        profile = profile.copy(commentText = text)
+        emit(BridgeEvent.ProfileChanged(server.selfSession))
+    }
+
+    override suspend fun setOwnAvatar(image: ByteArray?) {
+        emit(BridgeEvent.ProfileChanged(server.selfSession))
+    }
+
+    override suspend fun movePerson(session: UInt, channelId: UInt): Boolean {
+        moderationCalls += "move $session $channelId"
+        return true
+    }
+
+    override suspend fun setServerMute(session: UInt, muted: Boolean): Boolean {
+        moderationCalls += "mute $session $muted"
+        return true
+    }
+
+    override suspend fun setServerDeafen(session: UInt, deafened: Boolean): Boolean {
+        moderationCalls += "deafen $session $deafened"
+        return true
+    }
+
+    override suspend fun kickPerson(session: UInt, reason: String?): Boolean {
+        moderationCalls += "kick $session"
+        return true
+    }
+
+    override suspend fun banTarget(session: UInt): BanTarget = BanTarget(
+        address = null,
+        onlineSecs = null,
+        banListReadable = true,
+        hasCertificate = true,
+        canKick = true,
+        canBan = true,
+    )
+
+    override suspend fun banPerson(session: UInt, ban: BanInput): BanResult {
+        moderationCalls += "ban $session"
+        return BanResult.Saved(removed = true)
+    }
+
+    override fun activityLog(): List<ActivityEntry> = activity
 
     // ----- public servers -----
 

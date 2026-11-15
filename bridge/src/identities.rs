@@ -15,9 +15,9 @@ use crate::engine::{MumcordEngine, Saved};
 use crate::error::BridgeError;
 use crate::types::Identity;
 
-/// The folder below the engine's folder that `.p12` data passes through. The engine reads and
-/// writes identity files by path only, so the bytes of an import or export are a file here for
-/// the length of the call.
+/// The folder below the engine's folder that `.p12` data and avatar images pass through. The
+/// engine reads and writes these files by path only, so the bytes are a file here for the
+/// length of the call.
 const FILES_DIR: &str = "identity-io";
 /// The file name is the label an imported certificate without a name and without a typed label
 /// gets (the engine falls back to it).
@@ -46,7 +46,8 @@ pub(crate) async fn ensure_default(
     Ok(convert::identity(created))
 }
 
-/// Removes what an import or export left behind when the app was ended in the middle of it.
+/// Removes what an import, an export or an avatar change left behind when the app was ended in
+/// the middle of it.
 pub(crate) fn sweep(data_dir: &Path) {
     match std::fs::remove_dir_all(data_dir.join(FILES_DIR)) {
         Ok(()) => {}
@@ -56,20 +57,20 @@ pub(crate) fn sweep(data_dir: &Path) {
     }
 }
 
-/// A file for one import or export, in a folder of its own that only the app's user can open.
-/// Both are removed when the value is dropped, on every way out of the command.
-struct PrivateFile {
+/// A file for one import, export or avatar, in a folder of its own that only the app's user can
+/// open. Both are removed when the value is dropped, on every way out of the command.
+pub(crate) struct PrivateFile {
     dir: PathBuf,
-    path: PathBuf,
+    pub(crate) path: PathBuf,
 }
 
 impl PrivateFile {
-    /// Creates the file with `content`; an export starts with an empty one, so the engine
-    /// writes into a file that already has the right permissions.
-    fn create(data_dir: &Path, content: &[u8]) -> Result<Self, BridgeError> {
+    /// Creates the file `name` with `content`; an export starts with an empty one, so the
+    /// engine writes into a file that already has the right permissions.
+    pub(crate) fn create(data_dir: &Path, name: &str, content: &[u8]) -> Result<Self, BridgeError> {
         let failed = |e: std::io::Error| BridgeError::Io {
             // Without the path: it names the app's private folder.
-            detail: format!("preparing the identity file failed: {:?}", e.kind()),
+            detail: format!("preparing a private file failed: {:?}", e.kind()),
         };
         let number = NEXT_FILE.fetch_add(1, Ordering::Relaxed);
         let dir = data_dir
@@ -82,7 +83,7 @@ impl PrivateFile {
         builder.create(&dir).map_err(failed)?;
         // From here on dropping removes the folder again.
         let file = Self {
-            path: dir.join(FILE_NAME),
+            path: dir.join(name),
             dir,
         };
         let mut options = std::fs::OpenOptions::new();
@@ -99,7 +100,7 @@ impl PrivateFile {
 impl Drop for PrivateFile {
     fn drop(&mut self) {
         if let Err(e) = std::fs::remove_dir_all(&self.dir) {
-            tracing::warn!(kind = ?e.kind(), "removing an identity file failed");
+            tracing::warn!(kind = ?e.kind(), "removing a private file failed");
         }
     }
 }
@@ -158,7 +159,7 @@ impl MumcordEngine {
         );
         self.run(async move {
             let _gate = saved.gate.lock().await;
-            let file = PrivateFile::create(&data_dir, &data)?;
+            let file = PrivateFile::create(&data_dir, FILE_NAME, &data)?;
             let password = Some(password).filter(|password| !password.is_empty());
             let imported = engine
                 .identity_import(file.path.clone(), password, label)
@@ -183,7 +184,7 @@ impl MumcordEngine {
             if password.is_empty() {
                 return Err(BridgeError::invalid("the export password is empty"));
             }
-            let file = PrivateFile::create(&data_dir, &[])?;
+            let file = PrivateFile::create(&data_dir, FILE_NAME, &[])?;
             engine
                 .identity_export(identity_id, file.path.clone(), password)
                 .await?;
@@ -257,7 +258,7 @@ mod tests {
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&data_dir);
-        let file = PrivateFile::create(&data_dir, b"content").expect("file");
+        let file = PrivateFile::create(&data_dir, FILE_NAME, b"content").expect("file");
         let mode = |path: &Path| {
             std::fs::metadata(path)
                 .expect("metadata")
@@ -269,7 +270,7 @@ mod tests {
         assert_eq!(mode(&file.dir), 0o700);
         assert_eq!(std::fs::read(&file.path).expect("content"), b"content");
         // A second file never shares the folder of the first.
-        let second = PrivateFile::create(&data_dir, b"").expect("second file");
+        let second = PrivateFile::create(&data_dir, "avatar", b"").expect("second file");
         assert_ne!(second.dir, file.dir);
         let (first_dir, second_dir) = (file.dir.clone(), second.dir.clone());
         drop(file);

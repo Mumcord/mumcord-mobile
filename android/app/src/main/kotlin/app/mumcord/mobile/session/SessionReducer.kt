@@ -87,6 +87,10 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.WhisperEnded -> copy(whispersEnded = whispersEnded + 1)
     is BridgeEvent.IdentitiesChanged -> copy(identities = event.identities)
     is BridgeEvent.MobileSettingsChanged -> copy(mobileSettings = event.settings)
+    // Profile, activity log and settings screens (tasks 8.3 to 8.5) follow these themselves.
+    is BridgeEvent.ProfileChanged,
+    is BridgeEvent.ActivityAdded,
+    is BridgeEvent.AppSettingsChanged -> this
     // Chat phase (tasks 5.2/5.3): the state does not follow chat yet.
     is BridgeEvent.BlockedPeopleChanged,
     is BridgeEvent.ChatMessageReceived,

@@ -13,13 +13,16 @@ use mumcord_engine::{
 use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
 
+use crate::activity::ActivityLog;
 use crate::chat::{
-    self, BlockedPerson, ChatId, ChatMessage, ChatNotification, MessageRequests, SharedChat,
+    self, BlockedPerson, ChatId, ChatMessage, ChatNotification, MessageRequests, NotificationKind,
+    SharedChat,
 };
 use crate::convert::{self, PersonFlags};
 use crate::types::{
-    AudioWanted, CertificatePrompt, Channel, ChannelPasswordState, ConnectionState, Identity,
-    MobileSettings, Person, SavedServer, ServerState,
+    ActivityEntry, ActivityKind, AppSettings, AudioWanted, CertificatePrompt, Channel,
+    ChannelPasswordState, ConnectionState, Identity, MobileSettings, Person, SavedServer,
+    ServerState,
 };
 
 /// A change of the state. Apply it to the last [`BridgeSnapshot`](crate::BridgeSnapshot), or
@@ -113,6 +116,20 @@ pub enum BridgeEvent {
     MobileSettingsChanged {
         settings: MobileSettings,
     },
+    /// The comment or the avatar of a person may have changed: fetch it again with
+    /// [`MumcordEngine::person_profile`](crate::MumcordEngine::person_profile) where it is shown.
+    /// Can arrive more than once for one change.
+    ProfileChanged {
+        session: u32,
+    },
+    /// A new entry of the activity log; the log keeps the last 200 of the connection.
+    ActivityAdded {
+        entry: ActivityEntry,
+    },
+    /// The settings after `set_app_settings`.
+    AppSettingsChanged {
+        settings: AppSettings,
+    },
 }
 
 /// Receives the events; implemented by the app (Kotlin, Swift). Called on one bridge thread, in
@@ -144,6 +161,11 @@ pub(crate) struct Connection {
     input_level: u8,
     /// The people the user blocked, with every identity; read when the connection starts.
     pub(crate) blocked: Vec<BlockedUser>,
+    /// Channel names by id, for the activity log.
+    channel_names: HashMap<u32, String>,
+    pub(crate) activity: ActivityLog,
+    /// Whether the address the server reported for a person to `ban_target` is IPv6.
+    pub(crate) ban_addresses_v6: HashMap<u32, bool>,
 }
 
 impl Default for Connection {
@@ -161,6 +183,9 @@ impl Default for Connection {
             audio: AudioWanted::default(),
             input_level: 0,
             blocked: Vec::new(),
+            channel_names: HashMap::new(),
+            activity: ActivityLog::default(),
+            ban_addresses_v6: HashMap::new(),
         }
     }
 }
@@ -259,6 +284,11 @@ impl Connection {
     pub(crate) fn server_state(&mut self, snapshot: Snapshot) -> ServerState {
         self.self_session = Some(snapshot.self_session);
         self.people = snapshot.users.into_iter().map(|u| (u.session, u)).collect();
+        self.channel_names = snapshot
+            .channels
+            .iter()
+            .map(|channel| (channel.id, channel.name.clone()))
+            .collect();
         let mut people: Vec<Person> = self.people.values().map(|u| self.person(u)).collect();
         people.sort_unstable_by_key(|person| person.session);
         ServerState {
@@ -270,6 +300,50 @@ impl Connection {
                 .collect(),
             people,
         }
+    }
+
+    /// Whether the server's first sync is done: only changes after it are activity.
+    fn synced(&self) -> bool {
+        self.self_session.is_some()
+    }
+
+    /// Adds an activity entry about `user` and returns its event.
+    fn activity(
+        &mut self,
+        kind: ActivityKind,
+        user: &UserView,
+        channel: Option<u32>,
+    ) -> BridgeEvent {
+        let is_self = self.self_session == Some(user.session);
+        let channel = channel.map(|id| (id, self.channel_names.get(&id).cloned()));
+        BridgeEvent::ActivityAdded {
+            entry: self.activity.add(kind, user, is_self, channel),
+        }
+    }
+
+    /// The activity of the streams that started (`true`) or stopped between `before` and
+    /// `after`.
+    fn stream_activity(&mut self, before: &HashSet<u32>, after: &HashSet<u32>) -> Vec<BridgeEvent> {
+        if !self.synced() {
+            return Vec::new();
+        }
+        let mut changes: Vec<(u32, bool)> = after
+            .difference(before)
+            .map(|&session| (session, true))
+            .chain(before.difference(after).map(|&session| (session, false)))
+            .collect();
+        changes.sort_unstable();
+        changes
+            .into_iter()
+            .filter_map(|(session, started)| {
+                let user = self.people.get(&session)?.clone();
+                Some(if started {
+                    self.activity(ActivityKind::StreamStarted, &user, Some(user.channel_id))
+                } else {
+                    self.activity(ActivityKind::StreamStopped, &user, None)
+                })
+            })
+            .collect()
     }
 
     /// The people whose flag changed between `before` and `after`, as events.
@@ -364,27 +438,76 @@ fn apply(connection: &mut Connection, event: EngineEvent) -> Vec<BridgeEvent> {
             connection.certificate_prompt = Some(prompt.clone());
             one(BridgeEvent::CertificatePromptRequired { prompt })
         }
-        EngineEvent::ServerSynced(snapshot) => one(BridgeEvent::ServerSynced {
-            server: connection.server_state(*snapshot),
-        }),
-        EngineEvent::ChannelUpserted(channel) => one(BridgeEvent::ChannelsChanged {
-            channels: vec![convert::channel(channel)],
-        }),
-        EngineEvent::ChannelsUpserted(channels) => one(BridgeEvent::ChannelsChanged {
-            channels: channels.into_iter().map(convert::channel).collect(),
-        }),
-        EngineEvent::ChannelRemoved(id) => one(BridgeEvent::ChannelRemoved { id }),
+        EngineEvent::ServerSynced(snapshot) => {
+            // A sync after a reconnect starts the log again, as on the desktop.
+            connection.activity = ActivityLog::default();
+            let server = connection.server_state(*snapshot);
+            let mut events = vec![BridgeEvent::ServerSynced { server }];
+            if let Some(own) = connection.own_user().cloned() {
+                events.push(connection.activity(ActivityKind::Connected, &own, None));
+            }
+            events
+        }
+        EngineEvent::ChannelUpserted(channel) => {
+            connection
+                .channel_names
+                .insert(channel.id, channel.name.clone());
+            one(BridgeEvent::ChannelsChanged {
+                channels: vec![convert::channel(channel)],
+            })
+        }
+        EngineEvent::ChannelsUpserted(channels) => {
+            for channel in &channels {
+                connection
+                    .channel_names
+                    .insert(channel.id, channel.name.clone());
+            }
+            one(BridgeEvent::ChannelsChanged {
+                channels: channels.into_iter().map(convert::channel).collect(),
+            })
+        }
+        EngineEvent::ChannelRemoved(id) => {
+            connection.channel_names.remove(&id);
+            one(BridgeEvent::ChannelRemoved { id })
+        }
         EngineEvent::UserUpserted(user) => {
             let person = connection.person(&user);
-            connection.people.insert(user.session, user);
-            one(BridgeEvent::PersonChanged { person })
+            let before = connection.people.insert(user.session, user.clone());
+            let mut events = vec![BridgeEvent::PersonChanged { person }];
+            // The engine tells a changed avatar by its hash, a comment only by whether there is
+            // one: a replaced comment is told by the command that replaced it (own profile).
+            if before.as_ref().is_some_and(|before| {
+                before.avatar_hash != user.avatar_hash
+                    || before.has_avatar != user.has_avatar
+                    || before.has_comment != user.has_comment
+            }) {
+                events.push(BridgeEvent::ProfileChanged {
+                    session: user.session,
+                });
+            }
+            if connection.synced() {
+                let channel = Some(user.channel_id);
+                match before {
+                    None => events.push(connection.activity(ActivityKind::Joined, &user, channel)),
+                    Some(before) if before.channel_id != user.channel_id => {
+                        events.push(connection.activity(ActivityKind::Moved, &user, channel));
+                    }
+                    Some(_) => {}
+                }
+            }
+            events
         }
         EngineEvent::UserRemoved(session) => {
-            connection.people.remove(&session);
+            let gone = connection.people.remove(&session);
             connection.talking.remove(&session);
             connection.streaming.remove(&session);
             connection.camera.remove(&session);
-            one(BridgeEvent::PersonRemoved { session })
+            connection.ban_addresses_v6.remove(&session);
+            let mut events = vec![BridgeEvent::PersonRemoved { session }];
+            if let Some(gone) = gone.filter(|_| connection.synced()) {
+                events.push(connection.activity(ActivityKind::Left, &gone, None));
+            }
+            events
         }
         EngineEvent::TalkStateChanged { session, talking } => {
             let changed = if talking {
@@ -402,7 +525,10 @@ fn apply(connection: &mut Connection, event: EngineEvent) -> Vec<BridgeEvent> {
         EngineEvent::ScreenSharesChanged(shares) => {
             let after = shares.iter().map(|share| share.session).collect();
             let before = std::mem::replace(&mut connection.streaming, after);
-            connection.changed_people(&before, &connection.streaming)
+            let after = connection.streaming.clone();
+            let mut events = connection.changed_people(&before, &after);
+            events.extend(connection.stream_activity(&before, &after));
+            events
         }
         EngineEvent::CameraRoomChanged(room) => {
             let after = room.tiles.iter().map(|tile| tile.sharer).collect();
@@ -437,11 +563,25 @@ fn apply(connection: &mut Connection, event: EngineEvent) -> Vec<BridgeEvent> {
     }
 }
 
+/// Whether the event may go to the app: a system notification only while its kind is
+/// switched on in the settings.
+fn notifies(settings: &AppSettings, event: &BridgeEvent) -> bool {
+    match event {
+        BridgeEvent::ChatNotification { notification } => match notification.kind {
+            NotificationKind::PrivateMessage => settings.notify_private_messages,
+            NotificationKind::Mention => settings.notify_mentions,
+        },
+        _ => true,
+    }
+}
+
 /// What the event thread works on.
 pub(crate) struct PumpState {
     pub(crate) engine: Engine,
     pub(crate) connection: SharedConnection,
     pub(crate) chat: SharedChat,
+    /// The notification switches of the app settings.
+    pub(crate) app: Arc<Mutex<AppSettings>>,
 }
 
 /// Starts the bridge thread that delivers events to `listener` until `stop` is dropped or the
@@ -461,6 +601,7 @@ pub(crate) fn spawn_pump(
                 engine,
                 connection,
                 chat,
+                app,
             } = state;
             // Only waits on channels, so it keeps working while the runtime shuts down.
             runtime.block_on(async {
@@ -480,7 +621,9 @@ pub(crate) fn spawn_pump(
                             }
                             if let Some(event) = for_chat {
                                 for event in chat::handle(&engine, &connection, &chat, event).await {
-                                    listener.on_event(event);
+                                    if notifies(&lock(&app), &event) {
+                                        listener.on_event(event);
+                                    }
                                 }
                             }
                         }
@@ -593,7 +736,12 @@ mod tests {
         let mut other = user(6);
         other.self_mute = true;
         let events = translate(&connection, (Some(1), EngineEvent::UserUpserted(other)));
-        assert_eq!(events.len(), 1);
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, BridgeEvent::AudioWantedChanged { .. })),
+            "{events:?}"
+        );
     }
 
     #[test]
@@ -651,9 +799,10 @@ mod tests {
         );
     }
 
-    /// The single person event `event` leads to.
+    /// The single person event `event` leads to, next to its activity entry.
     fn person_of(connection: &SharedConnection, event: EngineEvent) -> Person {
-        let events = translate(connection, (Some(1), event));
+        let mut events = translate(connection, (Some(1), event));
+        events.retain(|event| !matches!(event, BridgeEvent::ActivityAdded { .. }));
         match events.as_slice() {
             [BridgeEvent::PersonChanged { person }] => person.clone(),
             other => panic!("unexpected events {other:?}"),
@@ -955,5 +1104,197 @@ mod tests {
                 state: ChannelPasswordState::Required
             }]
         );
+    }
+
+    /// The activity entries among `events`.
+    fn activity(events: &[BridgeEvent]) -> Vec<ActivityEntry> {
+        events
+            .iter()
+            .filter_map(|event| match event {
+                BridgeEvent::ActivityAdded { entry } => Some(entry.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn named_channels(connection: &SharedConnection) {
+        let mut connection = lock(connection);
+        connection.channel_names.insert(1, "Lobby".into());
+        connection.channel_names.insert(2, "Gaming".into());
+    }
+
+    #[test]
+    fn joins_moves_and_leaves_after_the_sync_are_activity() {
+        let connection = synced(user(5));
+        named_channels(&connection);
+        let upsert =
+            |user: UserView| translate(&connection, (Some(1), EngineEvent::UserUpserted(user)));
+
+        let joined = activity(&upsert(user(6)));
+        assert_eq!(joined.len(), 1);
+        assert_eq!(joined[0].kind, ActivityKind::Joined);
+        assert_eq!((joined[0].session, joined[0].name.as_str()), (6, "user6"));
+        assert!(!joined[0].is_self);
+        assert_eq!(joined[0].channel_id, Some(1));
+        assert_eq!(joined[0].channel_name.as_deref(), Some("Lobby"));
+
+        // A change that is no move is no activity.
+        let mut muted = user(6);
+        muted.self_mute = true;
+        assert_eq!(activity(&upsert(muted)), []);
+
+        let mut moved = user(6);
+        moved.channel_id = 2;
+        let entry = activity(&upsert(moved));
+        assert_eq!(entry[0].kind, ActivityKind::Moved);
+        assert_eq!(entry[0].channel_name.as_deref(), Some("Gaming"));
+
+        let mut own = user(5);
+        own.channel_id = 2;
+        assert!(activity(&upsert(own))[0].is_self);
+
+        let left = activity(&translate(
+            &connection,
+            (Some(1), EngineEvent::UserRemoved(6)),
+        ));
+        assert_eq!(left[0].kind, ActivityKind::Left);
+        assert_eq!(left[0].name, "user6");
+        assert_eq!(left[0].channel_id, None);
+        // A session nobody knew leaves no entry.
+        assert_eq!(
+            activity(&translate(
+                &connection,
+                (Some(1), EngineEvent::UserRemoved(9))
+            )),
+            []
+        );
+
+        let log = lock(&connection).activity.newest_first();
+        let kinds: Vec<ActivityKind> = log.iter().map(|entry| entry.kind).collect();
+        assert_eq!(
+            kinds,
+            [
+                ActivityKind::Left,
+                ActivityKind::Moved,
+                ActivityKind::Moved,
+                ActivityKind::Joined
+            ]
+        );
+        assert!(log.windows(2).all(|pair| pair[0].id > pair[1].id));
+    }
+
+    #[test]
+    fn the_state_before_the_sync_is_no_activity() {
+        let connection = connected_to(1);
+        let events = translate(&connection, (Some(1), EngineEvent::UserUpserted(user(6))));
+        assert_eq!(activity(&events), []);
+        assert_eq!(
+            activity(&translate(
+                &connection,
+                (Some(1), EngineEvent::UserRemoved(6))
+            )),
+            []
+        );
+    }
+
+    #[test]
+    fn the_log_keeps_the_last_200_entries_and_ends_with_the_connection() {
+        let connection = synced(user(5));
+        for session in 10..120 {
+            translate(
+                &connection,
+                (Some(1), EngineEvent::UserUpserted(user(session))),
+            );
+            translate(&connection, (Some(1), EngineEvent::UserRemoved(session)));
+        }
+        let log = lock(&connection).activity.newest_first();
+        assert_eq!(log.len(), crate::activity::MAX_ENTRIES);
+        assert_eq!((log[0].kind, log[0].session), (ActivityKind::Left, 119));
+        assert_eq!(log.last().map(|entry| entry.session), Some(20));
+
+        let ended = EngineEvent::StateChanged(ConnState::Disconnected { error: None });
+        translate(&connection, (Some(1), ended));
+        assert_eq!(lock(&connection).activity.newest_first(), []);
+    }
+
+    #[test]
+    fn streams_that_start_and_stop_are_activity() {
+        let connection = synced(user(5));
+        named_channels(&connection);
+        for session in [6, 7] {
+            translate(
+                &connection,
+                (Some(1), EngineEvent::UserUpserted(user(session))),
+            );
+        }
+        let entries = {
+            let mut connection = lock(&connection);
+            let started = connection.stream_activity(&HashSet::from([7]), &HashSet::from([6]));
+            activity(&started)
+        };
+        let seen: Vec<(ActivityKind, u32)> = entries
+            .iter()
+            .map(|entry| (entry.kind, entry.session))
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                (ActivityKind::StreamStarted, 6),
+                (ActivityKind::StreamStopped, 7)
+            ]
+        );
+        assert_eq!(entries[0].channel_name.as_deref(), Some("Lobby"));
+        assert_eq!(entries[1].channel_id, None);
+    }
+
+    #[test]
+    fn a_changed_avatar_or_comment_is_told_as_a_profile_change() {
+        let connection = synced(user(5));
+        translate(&connection, (Some(1), EngineEvent::UserUpserted(user(6))));
+        let profile_changed = |user: UserView| {
+            translate(&connection, (Some(1), EngineEvent::UserUpserted(user)))
+                .contains(&BridgeEvent::ProfileChanged { session: 6 })
+        };
+        let mut avatar = user(6);
+        avatar.has_avatar = true;
+        avatar.avatar_hash = Some("aa".into());
+        assert!(profile_changed(avatar.clone()));
+        assert!(!profile_changed(avatar.clone()));
+        avatar.avatar_hash = Some("bb".into());
+        assert!(profile_changed(avatar.clone()));
+        avatar.has_comment = true;
+        assert!(profile_changed(avatar.clone()));
+        avatar.channel_id = 2;
+        assert!(!profile_changed(avatar));
+    }
+
+    #[test]
+    fn notifications_follow_their_switches() {
+        let notification = |kind| BridgeEvent::ChatNotification {
+            notification: ChatNotification {
+                chat: ChatId::Channel { channel_id: 1 },
+                kind,
+                sender_name: "Maya".into(),
+                preview: "hi".into(),
+                message_id: "1".into(),
+            },
+        };
+        let settings = |private, mentions| AppSettings {
+            language: None,
+            link_previews: true,
+            history_max_age_days: None,
+            notify_private_messages: private,
+            notify_mentions: mentions,
+        };
+        let pm = notification(NotificationKind::PrivateMessage);
+        let mention = notification(NotificationKind::Mention);
+        assert!(notifies(&settings(true, false), &pm));
+        assert!(!notifies(&settings(true, false), &mention));
+        assert!(!notifies(&settings(false, true), &pm));
+        assert!(notifies(&settings(false, true), &mention));
+        assert!(notifies(
+            &settings(false, false),
+            &BridgeEvent::WhisperEnded
+        ));
     }
 }
