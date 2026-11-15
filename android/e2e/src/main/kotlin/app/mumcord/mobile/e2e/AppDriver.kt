@@ -2,8 +2,10 @@
 
 package app.mumcord.mobile.e2e
 
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -17,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.printToString
 import app.mumcord.mobile.ui.chat.CHAT_SCREEN_TEST_TAG
@@ -41,7 +44,14 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
         compose.onNodeWithTag(IDENTITY_CREATE_TEST_TAG).performScrollTo().performClick()
         awaitOrFail("the new identity sheet") { exists(IDENTITY_CREATE_CONFIRM_TEST_TAG) }
         compose.onNodeWithContentDescription(FIELD_IDENTITY_NAME).performTextReplacement(USER_NAME)
-        compose.onNodeWithTag(IDENTITY_CREATE_CONFIRM_TEST_TAG).performClick()
+        // Typing opens the keyboard, which lifts the sheet by its height while it slides in.
+        // A tap aims at where the button is when it is prepared; on a slow emulator the sheet
+        // moves before the tap arrives, and the tap lands on the scrim, which closes the sheet
+        // without an identity. Activating the button as a screen reader does is independent of
+        // where the button is at that moment.
+        compose.onNodeWithTag(IDENTITY_CREATE_CONFIRM_TEST_TAG)
+            .assertIsEnabled()
+            .performSemanticsAction(SemanticsActions.OnClick)
     }
 
     /**
