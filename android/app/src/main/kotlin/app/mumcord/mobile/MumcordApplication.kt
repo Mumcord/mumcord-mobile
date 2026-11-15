@@ -32,6 +32,8 @@ import app.mumcord.mobile.session.VoiceOutput
 import app.mumcord.mobile.session.loadMedia
 import app.mumcord.mobile.ui.chat.BridgeImageLoader
 import app.mumcord.mobile.ui.chat.ChatImageLoader
+import app.mumcord.mobile.ui.camera.AndroidCameraGateway
+import app.mumcord.mobile.ui.camera.CameraGateway
 import app.mumcord.mobile.ui.connect.AndroidLocalNetworkGateway
 import app.mumcord.mobile.ui.connect.LocalNetworkGateway
 import app.mumcord.mobile.ui.connected.AndroidMicrophoneGateway
@@ -61,6 +63,8 @@ class MumcordApplication : Application() {
     }
 
     val localNetworkGateway: LocalNetworkGateway by lazy { AndroidLocalNetworkGateway(this) }
+
+    val cameraGateway: CameraGateway by lazy { AndroidCameraGateway(this) }
 
     private val log: (String) -> Unit = { message -> Log.w(LOG_TAG, message) }
 

@@ -4,6 +4,7 @@ package app.mumcord.mobile.session
 
 import app.mumcord.mobile.bridge.AudioWanted
 import app.mumcord.mobile.bridge.Channel
+import app.mumcord.mobile.bridge.Identity
 import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SavedServer
@@ -35,6 +36,8 @@ data class SessionState(
      * The whisper bar closes each time it grows.
      */
     val whispersEnded: Int = 0,
+    /** The identities on the phone, the default one first; null until they were read. */
+    val identities: List<Identity>? = null,
     /** The phone settings as the engine keeps them; null until they have been read. */
     val mobileSettings: MobileSettings? = null,
     /** Things the app cannot show, newest last; see [withHint]. */

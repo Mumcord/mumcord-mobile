@@ -23,6 +23,8 @@ import app.mumcord.mobile.ui.chat.CHAT_SCREEN_TEST_TAG
 import app.mumcord.mobile.ui.connect.CERTIFICATE_TRUST_TEST_TAG
 import app.mumcord.mobile.ui.connected.CHANNEL_ROW_TEST_TAG
 import app.mumcord.mobile.ui.connected.MORE_DISCONNECT_TEST_TAG
+import app.mumcord.mobile.ui.identities.IDENTITY_CREATE_CONFIRM_TEST_TAG
+import app.mumcord.mobile.ui.identities.IDENTITY_CREATE_TEST_TAG
 import app.mumcord.mobile.ui.servers.CONNECT_ERROR_TEST_TAG
 import app.mumcord.mobile.ui.servers.FORM_SAVE_TEST_TAG
 import app.mumcord.mobile.ui.servers.SERVER_ADD_TEST_TAG
@@ -33,13 +35,27 @@ import org.junit.Assert.assertEquals
 
 /** The steps in the real app that several end-to-end tests share. */
 class AppDriver(private val compose: ComposeTestRule, private val server: TestServer) {
-    /** First start: the talk mode has to be chosen, nothing is picked for the user. */
+    /** First start begins with the identity: a new one is created on the phone. */
+    fun createIdentity() {
+        awaitOrFail("the identity step of the first start") { exists(IDENTITY_CREATE_TEST_TAG) }
+        compose.onNodeWithTag(IDENTITY_CREATE_TEST_TAG).performScrollTo().performClick()
+        awaitOrFail("the new identity sheet") { exists(IDENTITY_CREATE_CONFIRM_TEST_TAG) }
+        compose.onNodeWithContentDescription(FIELD_IDENTITY_NAME).performTextReplacement(USER_NAME)
+        compose.onNodeWithTag(IDENTITY_CREATE_CONFIRM_TEST_TAG).performClick()
+    }
+
+    /**
+     * First start: an identity is created unless there is one already (a test that brought
+     * its own), then the talk mode has to be chosen; nothing is picked for the user.
+     */
     fun chooseTalkMode(mode: String = TALK_MODE_PUSH_TO_TALK_TEST_TAG) {
+        awaitOrFail("the first start") { exists(IDENTITY_CREATE_TEST_TAG) || exists(TALK_MODE_CONTINUE_TEST_TAG) }
+        if (exists(IDENTITY_CREATE_TEST_TAG)) createIdentity()
         awaitOrFail("the talk mode choice") { exists(TALK_MODE_CONTINUE_TEST_TAG) }
         compose.onNodeWithTag(TALK_MODE_CONTINUE_TEST_TAG).assertIsNotEnabled()
         compose.onNodeWithTag(mode).performClick()
         compose.onNodeWithTag(TALK_MODE_CONTINUE_TEST_TAG).performClick()
-        awaitOrFail("the empty server list") { exists(SERVER_ADD_TEST_TAG) }
+        awaitOrFail("the server list") { exists(SERVER_ADD_TEST_TAG) }
     }
 
     fun addServer() {
@@ -92,7 +108,8 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
 
     /** Leaves the server through the More tab. */
     fun disconnect() {
-        compose.onNodeWithText(TAB_MORE).performClick()
+        // On the More tab its title is a second "More" next to the tab's.
+        if (!exists(MORE_DISCONNECT_TEST_TAG)) compose.onNodeWithText(TAB_MORE).performClick()
         awaitOrFail("the More tab") { exists(MORE_DISCONNECT_TEST_TAG) }
         compose.onNodeWithTag(MORE_DISCONNECT_TEST_TAG).performClick()
         awaitOrFail("the server list after disconnecting") { exists(SERVER_CONNECT_TEST_TAG) }
@@ -164,6 +181,7 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
         private const val FIELD_ADDRESS = "Address"
         private const val FIELD_PORT = "Port"
         private const val FIELD_USER_NAME = "User name"
+        private const val FIELD_IDENTITY_NAME = "Name on servers"
         private const val POLL_MILLIS = 100L
     }
 }

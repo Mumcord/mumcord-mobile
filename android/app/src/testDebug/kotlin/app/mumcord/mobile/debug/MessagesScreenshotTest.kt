@@ -141,6 +141,7 @@ class MessagesScreenshotTest {
                     conversation = conversation,
                     conversationActions = messages.conversationActions,
                     onNotificationSettings = {},
+                    onIdentities = {},
                     topInsets = top,
                     bottomInsets = bottom,
                 )

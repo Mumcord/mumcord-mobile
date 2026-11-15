@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+        Scanning the QR codes of a transfer from the desktop app. The app asks for it, with an
+        explanation, when the scanner is opened. A phone without a camera can still install the
+        app: identities can also be created or imported from a file.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
+</manifest>

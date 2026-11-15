@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <!--
-    Checksum pin for the one dependency that does not come from Google's repository or Maven
-    Central: the Kotlin companion library of rustls-platform-verifier, published in a GitHub
-    branch (see settings.gradle.kts). A changed file fails the build. Everything else is trusted
-    as before; the trust rule matches every group except org.rustls.
+    Checksum pins: the one dependency that does not come from Google's repository or Maven
+    Central (the Kotlin companion library of rustls-platform-verifier, published in a GitHub
+    branch, see settings.gradle.kts), and the camera and QR code libraries of the scanner
+    (CameraX and ZXing), which see every picture of the camera. A changed file fails the build.
+    Everything else is trusted as before; the trust rule matches every group except these.
 -->
 <verification-metadata xmlns="https://schema.gradle.org/dependency-verification"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -13,10 +14,87 @@
         <verify-metadata>true</verify-metadata>
         <verify-signatures>false</verify-signatures>
         <trusted-artifacts>
-            <trust group="^(?!org\.rustls$).*$" regex="true" />
+            <trust group="^(?!org\.rustls$|androidx\.camera(\..*)?$|com\.google\.zxing$).*$" regex="true" />
         </trusted-artifacts>
     </configuration>
     <components>
+        <component group="androidx.camera" name="camera-camera2" version="1.6.2">
+            <artifact name="camera-camera2-1.6.2.aar">
+                <sha256 value="5a55014ed96feda81a37799faf9f96150025a4434699d55caa1cdebf2ae07e20" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="camera-camera2-1.6.2.module">
+                <sha256 value="4694b995fbb4934e5e1e3cedabef426e799a510cfc179b659c4e9632f6b2fe75" origin="downloaded from Google's Maven repository" />
+            </artifact>
+        </component>
+        <component group="androidx.camera" name="camera-camera2-pipe" version="1.6.2">
+            <artifact name="camera-camera2-pipe-1.6.2.aar">
+                <sha256 value="b357bd94fd4273ff88f453f7e712a22e100adc932324fc6b51fbe9ef9cf45515" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="camera-camera2-pipe-1.6.2.module">
+                <sha256 value="5470741b0a6fe88e560e7d929097e2ec60e7406aef09b48ab900b0befa102c0f" origin="downloaded from Google's Maven repository" />
+            </artifact>
+        </component>
+        <component group="androidx.camera" name="camera-compose" version="1.6.2">
+            <artifact name="camera-compose-1.6.2.aar">
+                <sha256 value="575f20d727fd25a41d984bff6ae1f5855ffb2262cfc089e06d32639c17e07654" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="camera-compose-1.6.2.module">
+                <sha256 value="1883d0f5a553d55c6fffdd37c1a4eb1a73198edaf11ac347ce3f62abc217beb1" origin="downloaded from Google's Maven repository" />
+            </artifact>
+        </component>
+        <component group="androidx.camera" name="camera-core" version="1.6.2">
+            <artifact name="camera-core-1.6.2.aar">
+                <sha256 value="ebd66f090414f4c12f23a55b5023aeee1b096da8a06c02a0b6fb3520c4ddadf6" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="camera-core-1.6.2.module">
+                <sha256 value="bee75b4ef561862030702a51f692057e034ae1f600f3091b2a5e5a89856ab410" origin="downloaded from Google's Maven repository" />
+            </artifact>
+        </component>
+        <component group="androidx.camera" name="camera-lifecycle" version="1.6.2">
+            <artifact name="camera-lifecycle-1.6.2.aar">
+                <sha256 value="b7b701a3c6838bc7c4acd1372140e889fdf9681bf833ebfc638fdbe28ed5fa32" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="camera-lifecycle-1.6.2.module">
+                <sha256 value="bd7fd00cb9de0f2ce8c3400b52504cf7691590bb29a1550a71b58255e483ff47" origin="downloaded from Google's Maven repository" />
+            </artifact>
+        </component>
+        <component group="androidx.camera.featurecombinationquery" name="featurecombinationquery" version="1.6.2">
+            <artifact name="featurecombinationquery-1.6.2.aar">
+                <sha256 value="2321cfd29678e3128284d1622bb6b06e0fecd2c2e69140471ab00e8616e622c2" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="featurecombinationquery-1.6.2.module">
+                <sha256 value="4f6edda1492eaa928cfe7516d8efd097ed2f59ee4cedf1bec2d3345a3d6137fd" origin="downloaded from Google's Maven repository" />
+            </artifact>
+        </component>
+        <component group="androidx.camera.viewfinder" name="viewfinder-compose" version="1.6.2">
+            <artifact name="viewfinder-compose-1.6.2.aar">
+                <sha256 value="99380a2f0060dc8ea4964cee031da652392c72b4fe9afdc9f8e63edeaddb5bec" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="viewfinder-compose-1.6.2.module">
+                <sha256 value="c730eb5cf60b4b0346816216edb37d798a080b3e8d74d26abc6fc3d2d924e824" origin="downloaded from Google's Maven repository" />
+            </artifact>
+        </component>
+        <component group="androidx.camera.viewfinder" name="viewfinder-core" version="1.6.2">
+            <artifact name="viewfinder-core-1.6.2.aar">
+                <sha256 value="e5271d1afa8062794464655e5031fb2532275b4a7d65648a6354a8a6b958550d" origin="downloaded from Google's Maven repository" />
+            </artifact>
+            <artifact name="viewfinder-core-1.6.2.module">
+                <sha256 value="2601f63486c98da65bf418f22822a54aa8eea821f3cd948013934392c65a7dd8" origin="downloaded from Google's Maven repository" />
+            </artifact>
+        </component>
+        <component group="com.google.zxing" name="core" version="3.5.4">
+            <artifact name="core-3.5.4.jar">
+                <sha256 value="71de5d89341b5fcf5dd89da7f44e84d825d0e084cdf3ec77c9abe26b0f0ceb13" origin="downloaded from Maven Central" />
+            </artifact>
+            <artifact name="core-3.5.4.pom">
+                <sha256 value="502c7368ae869f15428c020a2432eec9dde7436454f3edd1816e0d4b3d0609bf" origin="downloaded from Maven Central" />
+            </artifact>
+        </component>
+        <component group="com.google.zxing" name="zxing-parent" version="3.5.4">
+            <artifact name="zxing-parent-3.5.4.pom">
+                <sha256 value="9133f322d86101c5c478c08ea3d6734dc376423937ddab1aa2a06aae24fc85c9" origin="downloaded from Maven Central" />
+            </artifact>
+        </component>
         <component group="org.rustls" name="rustls-platform-verifier" version="0.2.0">
             <artifact name="rustls-platform-verifier-0.2.0.aar">
                 <sha256 value="aa021794230fbc2f0be355999e2cf67398dd563de066a2e17001ffbd0b69101b" origin="downloaded from the repository in settings.gradle.kts" />

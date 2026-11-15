@@ -189,6 +189,7 @@ class ChatScreenshotTest {
                         conversation = null,
                         conversationActions = messagesTab.conversationActions,
                         onNotificationSettings = {},
+                        onIdentities = {},
                         topInsets = top,
                         bottomInsets = bottom,
                     )

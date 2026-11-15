@@ -8,12 +8,14 @@ import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.bridge.EngineListener
+import app.mumcord.mobile.bridge.Identity
 import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.MumbleLink
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.bridge.TransferScan
 import app.mumcord.mobile.bridge.VoiceSettings
 import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.bridge.parseMumbleLink
@@ -144,7 +146,8 @@ class SessionRepository(
             is Outcome.Ok -> mutableState.update {
                 val (snapshot, talkMode) = loaded.value
                 val known = it.copy(talkMode = talkMode, mobileSettings = it.mobileSettings ?: snapshot.mobileSettings)
-                if (it.serversLoaded) known else known.copy(servers = snapshot.servers, serversLoaded = true)
+                val identified = known.copy(identities = it.identities ?: snapshot.identities)
+                if (it.serversLoaded) identified else identified.copy(servers = snapshot.servers, serversLoaded = true)
             }
             is Outcome.Failed -> mutableState.update { it.copy(phase = ConnectionPhase.Failed(loaded.error)) }
         }
@@ -167,6 +170,40 @@ class SessionRepository(
         }
 
     /** Saves the talk mode; the engine applies it at once. */
+    // ----- identities -----
+
+    /** A new certificate with [name] inside; the label is the name. */
+    suspend fun createIdentity(name: String): Outcome<Identity> =
+        call("create identity") { it.createIdentity(name, null) }
+
+    /** The bytes of a `.p12` file as an additional identity, labelled with the name inside it. */
+    suspend fun importIdentity(data: ByteArray, password: String): Outcome<Identity> =
+        call("import identity") { it.importIdentity(data, password, null) }
+
+    /** The identity as the bytes of a `.p12` file protected with [password]. */
+    suspend fun exportIdentity(identityId: Long, password: String): Outcome<ByteArray> =
+        call("export identity") { it.exportIdentity(identityId, password) }
+
+    suspend fun setDefaultIdentity(identityId: Long): Outcome<Unit> =
+        call("set default identity") { it.setDefaultIdentity(identityId) }
+
+    suspend fun deleteIdentity(identityId: Long): Outcome<Unit> =
+        call("delete identity") { it.deleteIdentity(identityId) }
+
+    /** A new "Send to your phone" scan, or null when the engine could not be started. */
+    suspend fun newTransfer(): TransferScan? =
+        when (val scan = call("start transfer") { it.newTransfer() }) {
+            is Outcome.Ok -> scan.value
+            is Outcome.Failed -> null
+        }
+
+    /**
+     * A step of a transfer that waits (checking the typed code, importing). It runs where the
+     * engine's commands run, for the reason [EngineCalls] gives, and off the main thread: the
+     * check of the code is slow on purpose.
+     */
+    suspend fun <T> transferStep(step: suspend () -> T): T = engine.call { step() }
+
     suspend fun setTalkMode(mode: TalkMode): Outcome<Unit> =
         call("set talk mode") { it.setTalkMode(mode) }.also { saved ->
             if (saved is Outcome.Ok) mutableState.update { it.copy(talkMode = mode) }

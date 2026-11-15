@@ -42,8 +42,8 @@
         <!--
             Hands the system camera app the file for a photo the user takes for the chat. Not
             exported: other apps only reach a file through the one-time grant of that request.
-            The app itself has no CAMERA permission and must not declare one, or Android would
-            demand it for the camera app's capture request too.
+            The app has the CAMERA permission for scanning QR codes, so Android demands it for
+            the camera app's capture request too: the chat asks for it before taking a photo.
         -->
         <provider
             android:name="androidx.core.content.FileProvider"

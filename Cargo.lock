@@ -2668,6 +2668,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mumcord-transfer-maker"
+version = "0.1.0"
+dependencies = [
+ "mumcord-store",
+]
+
+[[package]]
 name = "mumcord-voice-peer"
 version = "0.1.0"
 dependencies = [

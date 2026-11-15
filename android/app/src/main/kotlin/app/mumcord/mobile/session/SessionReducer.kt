@@ -85,8 +85,7 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     )
     is BridgeEvent.ActionDenied -> copy(denied = DeniedAction(event.channelId, event.detail))
     is BridgeEvent.WhisperEnded -> copy(whispersEnded = whispersEnded + 1)
-    // The identity screens (task 6.3) are the first to follow the identities.
-    is BridgeEvent.IdentitiesChanged -> this
+    is BridgeEvent.IdentitiesChanged -> copy(identities = event.identities)
     is BridgeEvent.MobileSettingsChanged -> copy(mobileSettings = event.settings)
     // Chat phase (tasks 5.2/5.3): the state does not follow chat yet.
     is BridgeEvent.BlockedPeopleChanged,

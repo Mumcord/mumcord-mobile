@@ -91,6 +91,7 @@ class ConnectedScreenshotTest {
                     conversation = null,
                     conversationActions = messages.conversationActions,
                     onNotificationSettings = {},
+                    onIdentities = {},
                     topInsets = top,
                     bottomInsets = bottom,
                 )

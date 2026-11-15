@@ -8,6 +8,7 @@ import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.SessionState
 import app.mumcord.mobile.ui.connected.ConnectedUiState
+import app.mumcord.mobile.ui.identities.IdentitiesUiState
 import app.mumcord.mobile.ui.link.LinkConfirmState
 import app.mumcord.mobile.ui.servers.ConnectFailure
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
@@ -17,7 +18,17 @@ import app.mumcord.mobile.ui.servers.ServerRow
 import app.mumcord.mobile.ui.servers.serverRows
 
 /** The full-screen destinations. Which one shows follows from the state, see [AppUiState.screen]. */
-enum class AppScreen { TalkModeChoice, ServerList, ServerForm, Channels }
+enum class AppScreen {
+    /** First start, before the identities were read: nothing to show yet. */
+    Starting,
+    IdentitySetup,
+    TalkModeChoice,
+    ServerList,
+    ServerForm,
+    Channels,
+    Identities,
+    Scan,
+}
 
 /** Where to connect: a saved server, a password for this attempt only, a channel from a link. */
 data class ConnectTarget(
@@ -72,10 +83,19 @@ data class AppUiState(
     val localNetworkSuspectServerId: Long? = null,
     /** The connected screens, or null while no server is shown. */
     val connected: ConnectedUiState? = null,
+    /** The identity screens and the scan of a transfer. */
+    val identities: IdentitiesUiState = IdentitiesUiState(),
 ) {
     val screen: AppScreen
         get() = when {
-            !setupDone -> AppScreen.TalkModeChoice
+            identities.scan != null -> AppScreen.Scan
+            // First start (FR-5.1): an identity first, then the talk mode.
+            !setupDone -> when {
+                !identities.known && session.phase !is ConnectionPhase.Failed -> AppScreen.Starting
+                identities.rows.isEmpty() -> AppScreen.IdentitySetup
+                else -> AppScreen.TalkModeChoice
+            }
+            identities.open -> AppScreen.Identities
             connected != null -> AppScreen.Channels
             form != null -> AppScreen.ServerForm
             else -> AppScreen.ServerList

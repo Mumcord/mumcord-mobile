@@ -6,6 +6,7 @@ import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ChannelPasswordState
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.DefaultOutput
+import app.mumcord.mobile.bridge.Identity
 import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.CertificatePrompt
 import app.mumcord.mobile.bridge.ConnectionState
@@ -262,9 +263,11 @@ class SessionReducerTest {
     }
 
     @Test
-    fun identitiesDoNotChangeTheStateYetAndThePhoneSettingsAreKept() {
+    fun theIdentitiesFollowTheEngineAndThePhoneSettingsAreKept() {
         val state = SessionState()
-        assertEquals(state, state.fold(BridgeEvent.IdentitiesChanged(emptyList())))
+        assertNull("not known before they were read", state.identities)
+        assertEquals(emptyList<Identity>(), state.fold(BridgeEvent.IdentitiesChanged(emptyList())).identities)
+        assertEquals(listOf(FAKE_IDENTITY), state.fold(BridgeEvent.IdentitiesChanged(listOf(FAKE_IDENTITY))).identities)
         val settings = MobileSettings(
             talkModeChosen = true,
             defaultOutput = DefaultOutput.SPEAKER,

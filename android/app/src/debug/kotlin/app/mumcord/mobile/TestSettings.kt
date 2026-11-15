@@ -2,6 +2,7 @@
 package app.mumcord.mobile
 
 import app.mumcord.mobile.session.IdleTimes
+import kotlinx.coroutines.flow.Flow
 
 /**
  * What only the automated tests may change, in debug builds; the product has the same object
@@ -22,4 +23,11 @@ object TestSettings {
      */
     @Volatile
     var idleTimes: IdleTimes = IdleTimes()
+
+    /**
+     * The emulator's camera cannot be shown a QR code: when set, the scanner reads these texts
+     * instead of opening the camera.
+     */
+    @Volatile
+    var qrTexts: Flow<String>? = null
 }

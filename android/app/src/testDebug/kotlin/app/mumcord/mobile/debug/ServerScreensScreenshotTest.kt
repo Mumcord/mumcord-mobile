@@ -69,6 +69,7 @@ class ServerScreensScreenshotTest {
             onConnect = {},
             onCancelConnect = {},
             onAdd = {},
+            onScan = {},
             onToggleEditing = {},
             onEdit = {},
             onRemove = {},

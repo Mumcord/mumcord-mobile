@@ -58,6 +58,7 @@ const val SERVER_ADD_TEST_TAG = "server-add"
 const val CONNECT_ERROR_TEST_TAG = "connect-error"
 const val LOCAL_NETWORK_SETTINGS_TEST_TAG = "local-network-settings"
 const val CONNECT_RETRY_TEST_TAG = "connect-retry"
+const val SERVER_SCAN_TEST_TAG = "server-scan"
 
 /** What the local network permission has to do with a failed connection. */
 enum class LocalNetworkHint {
@@ -91,6 +92,7 @@ fun ServerListScreen(
     onConnect: (Long) -> Unit,
     onCancelConnect: () -> Unit,
     onAdd: () -> Unit,
+    onScan: () -> Unit,
     onToggleEditing: () -> Unit,
     onEdit: (Long) -> Unit,
     onRemove: (Long) -> Unit,
@@ -106,7 +108,7 @@ fun ServerListScreen(
         when {
             // Nothing to show before the list is read; an empty state would flash by.
             !loaded -> Unit
-            rows.isEmpty() -> EmptyState(onAdd, Modifier.weight(1f).windowInsetsPadding(bottomInsets))
+            rows.isEmpty() -> EmptyState(onAdd, onScan, Modifier.weight(1f).windowInsetsPadding(bottomInsets))
             else -> Box(Modifier.weight(1f).windowInsetsPadding(bottomInsets)) {
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                     MumcordSectionHeader(
@@ -288,7 +290,7 @@ private fun FailureBanner(
 }
 
 @Composable
-private fun EmptyState(onAdd: () -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyState(onAdd: () -> Unit, onScan: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(MumcordSpace.s4, Alignment.CenterVertically),
@@ -311,6 +313,14 @@ private fun EmptyState(onAdd: () -> Unit, modifier: Modifier = Modifier) {
             onClick = onAdd,
             icon = MumcordIcons.Plus,
             modifier = Modifier.testTag(SERVER_ADD_TEST_TAG),
+        )
+        // The server list of the desktop app can come with a transfer (FR-5.66).
+        MumcordButton(
+            text = stringResource(R.string.identities_scan),
+            onClick = onScan,
+            style = MumcordButtonStyle.Secondary,
+            icon = MumcordIcons.QrCode,
+            modifier = Modifier.testTag(SERVER_SCAN_TEST_TAG),
         )
     }
 }

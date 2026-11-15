@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
@@ -39,6 +40,7 @@ fun MumcordAppBar(
     border: Boolean = false,
     onBack: (() -> Unit)? = null,
     backContentDescription: String = "",
+    backIcon: ImageVector = MumcordIcons.ChevronLeft,
     windowInsets: WindowInsets = WindowInsets.statusBars,
     leading: (@Composable () -> Unit)? = null,
     subtitle: (@Composable RowScope.() -> Unit)? = null,
@@ -65,7 +67,7 @@ fun MumcordAppBar(
             .padding(start = if (onBack != null) 6.dp else 16.dp, top = if (large) 10.dp else 6.dp, end = 8.dp, bottom = 6.dp),
     ) {
         if (onBack != null) {
-            MumcordIconButton(MumcordIcons.ChevronLeft, contentDescription = backContentDescription, onClick = onBack)
+            MumcordIconButton(backIcon, contentDescription = backContentDescription, onClick = onBack)
         }
         leading?.invoke()
         Column(Modifier.weight(1f)) {

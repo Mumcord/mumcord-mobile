@@ -40,6 +40,10 @@ import app.mumcord.mobile.ui.connected.NotificationAccess
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.session.OutputAccess
+import app.mumcord.mobile.ui.camera.CameraGateway
+import app.mumcord.mobile.ui.identities.IdentitiesController
+import app.mumcord.mobile.ui.identities.IdentitiesLocal
+import app.mumcord.mobile.ui.identities.identitiesUiState
 import app.mumcord.mobile.ui.link.linkConfirmState
 import app.mumcord.mobile.ui.messages.MessagesController
 import app.mumcord.mobile.ui.messages.MessagesUiState
@@ -77,6 +81,7 @@ class AppViewModel(
     messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(),
     private val outputs: OutputAccess = OutputAccess.None,
     private val idle: IdleAccess = IdleAccess.Never,
+    camera: CameraGateway = CameraGateway.Never,
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -106,6 +111,9 @@ class AppViewModel(
     /** The connected screens' own state and actions. */
     val connected = ConnectedController(repository, viewModelScope, outputs)
 
+    /** The identity screens and the scan of a transfer from the desktop app. */
+    val identities = IdentitiesController(repository, viewModelScope, camera)
+
     /** What the phone says about the session, beside the session itself. */
     private data class Phone(
         val microphone: MicrophoneNotice,
@@ -119,11 +127,11 @@ class AppViewModel(
         get() = Phone(microphone.notice.value, notifications.explain.value, outputs.state.value, outputs.asking.value)
 
     val uiState: StateFlow<AppUiState> =
-        combine(local, repository.state, connected.local, phone, ::merge)
+        combine(local, repository.state, connected.local, phone, identities.local, ::merge)
             .stateIn(
                 viewModelScope,
                 SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-                merge(local.value, repository.state.value, connected.local.value, phoneNow),
+                merge(local.value, repository.state.value, connected.local.value, phoneNow, identities.local.value),
             )
 
     private fun merge(
@@ -131,8 +139,9 @@ class AppViewModel(
         session: SessionState,
         connectedLocal: ConnectedLocal,
         phone: Phone,
+        identitiesLocal: IdentitiesLocal,
     ): AppUiState {
-        val merged = ui.copy(session = session)
+        val merged = ui.copy(session = session, identities = identitiesUiState(session, identitiesLocal))
         return merged.copy(
             connected = connectedUiState(
                 session,
@@ -570,6 +579,7 @@ class AppViewModel(
                     application.messageNotificationSettings,
                     application.voiceOutput,
                     application.idleDisconnect,
+                    application.cameraGateway,
                 ).also {
                     // Start with the first screen and then follow the session by themselves.
                     application.networkSession

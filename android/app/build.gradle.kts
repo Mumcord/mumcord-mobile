@@ -86,6 +86,7 @@ dependencies {
     implementation(project(":platform:call"))
     implementation(project(":platform:network"))
     implementation(project(":platform:notify"))
+    implementation(project(":platform:scanner"))
     implementation(project(":platform:securestore"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

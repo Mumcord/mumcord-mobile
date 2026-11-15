@@ -111,6 +111,86 @@ class AppViewModelTest {
     // ----- first-start setup -----
 
     @Test
+    fun aFreshInstallAsksForAnIdentityFirstThenTheTalkModeThenShowsTheServerList() = runTest(dispatcher) {
+        val viewModel = AppViewModel(
+            SessionRepository(
+                { FakeEngine(it, server, identities = emptyList()).also { e -> engine = e } },
+                backgroundScope,
+                dispatcher,
+                {},
+            ),
+            FakeSetupStore(done = false),
+            localNetwork,
+            FakeMicrophoneAccess(),
+        )
+        // Nothing is shown before the identities were read: no screen flashes by.
+        assertEquals(AppScreen.Starting, viewModel.ui.screen)
+        backgroundScope.launch { viewModel.uiState.collect() }
+        runCurrent()
+        assertEquals(AppScreen.IdentitySetup, viewModel.ui.screen)
+
+        viewModel.identities.openCreate()
+        viewModel.identities.changeCreateName("Lea")
+        viewModel.identities.create()
+        runCurrent()
+        assertEquals(listOf("Lea"), engine.identities.map { it.label })
+        assertEquals(AppScreen.TalkModeChoice, viewModel.ui.screen)
+
+        viewModel.selectTalkMode(TalkMode.VOICE_ACTIVITY)
+        viewModel.confirmTalkMode()
+        runCurrent()
+        assertEquals(AppScreen.ServerList, viewModel.ui.screen)
+    }
+
+    @Test
+    fun theScanOfTheFirstStartStaysOpenUntilTheUserClosesItAndThenTheTalkModeFollows() = runTest(dispatcher) {
+        val viewModel = AppViewModel(
+            SessionRepository(
+                { FakeEngine(it, server, identities = emptyList()).also { e -> engine = e } },
+                backgroundScope,
+                dispatcher,
+                {},
+            ),
+            FakeSetupStore(done = false),
+            localNetwork,
+            FakeMicrophoneAccess(),
+        )
+        backgroundScope.launch { viewModel.uiState.collect() }
+        runCurrent()
+
+        viewModel.identities.openScan()
+        runCurrent()
+        assertEquals(AppScreen.Scan, viewModel.ui.screen)
+        // The transfer brought an identity: its summary stays until it is closed.
+        engine.createIdentity("Desktop", null)
+        runCurrent()
+        assertEquals(AppScreen.Scan, viewModel.ui.screen)
+
+        viewModel.identities.closeScan()
+        runCurrent()
+        assertEquals(AppScreen.TalkModeChoice, viewModel.ui.screen)
+    }
+
+    @Test
+    fun theIdentityListOpensOverTheConnectedScreensAndClosesBackToThem() = runTest(dispatcher) {
+        val viewModel = viewModel()
+        viewModel.connect(nordlicht.id)
+        runCurrent()
+        assertEquals(AppScreen.Channels, viewModel.ui.screen)
+
+        viewModel.identities.open()
+        runCurrent()
+        assertEquals(AppScreen.Identities, viewModel.ui.screen)
+        assertEquals(listOf("Lea"), viewModel.ui.identities.rows.map { it.label })
+        // Both saved servers name no identity, so they use the default one.
+        assertEquals(2, viewModel.ui.identities.rows.single().serverCount)
+
+        viewModel.identities.close()
+        runCurrent()
+        assertEquals(AppScreen.Channels, viewModel.ui.screen)
+    }
+
+    @Test
     fun firstStartShowsTheTalkModeChoiceWithNothingPicked() = runTest(dispatcher) {
         val viewModel = AppViewModel(
             SessionRepository({ FakeEngine(it, server).also { e -> engine = e } }, backgroundScope, dispatcher, {}),

@@ -21,7 +21,12 @@
 #      sends raw script and markup). It is followed by a scenario that starts the app again
 #      with the same app data, after its process was killed, and looks for the history. In
 #      the private message scenario e2e/chat-peer sends the phone a private message whenever
-#      the test asks for one, which is what the notifications are about.
+#      the test asks for one, which is what the notifications are about. The identity
+#      scenario is watched by e2e/identity-watch.py, a foreign client that reports whether the
+#      server saw the same certificate on every connect. For the transfer scenario
+#      e2e/transfer-maker makes a transfer with the engine as the desktop app does (a new
+#      identity and a new code in every run); its QR code texts and its code reach the test
+#      as an argument and are written to no file and no log.
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
@@ -89,7 +94,9 @@ LOCK_PTT_SECONDS=60
 # "chat" a second person who writes and has to receive what the app wrote, and a third who
 # sends raw markup; "chat-restart" nobody, and the app keeps the data of the scenario before it
 # (its process is killed instead), so it must follow a "chat" scenario; "pm" a second person
-# who sends the phone a private message whenever the test asks for one.
+# who sends the phone a private message whenever the test asks for one; "identity" a second
+# person who has to see the same certificate each time the phone connects; "transfer" nobody,
+# and the test gets a transfer made for this run (the camera permission is asked for in it).
 SCENARIOS=(
   "granted granted alone ${TEST_PACKAGE}.ConnectFlowTest"
   "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
@@ -114,6 +121,8 @@ SCENARIOS=(
   "granted granted chat ${TEST_PACKAGE}.ChatFlowTest#messagesOfOthersAppearAndThePhonesMessagesReachThem"
   "granted granted chat-restart ${TEST_PACKAGE}.ChatFlowTest#theHistoryIsStillThereAfterTheAppWasKilledAndStartedAgain"
   "granted granted pm ${TEST_PACKAGE}.MessagesFlowTest"
+  "granted granted identity ${TEST_PACKAGE}.IdentityFlowTest"
+  "granted granted transfer ${TEST_PACKAGE}.TransferFlowTest"
 )
 # A stretch of voice a person heard counts from this length (ms); the engine's own short
 # sounds, like the one for somebody entering the channel, are shorter.
@@ -150,6 +159,8 @@ BYSTANDER_LOG=""
 CHAT_PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/chat-peer"
 CHAT_PEER_LOG="${OUT_DIR}/chat-peer.log"
 RAW_CHAT_LOG="${OUT_DIR}/raw-chat.log"
+IDENTITY_WATCH_LOG="${OUT_DIR}/identity-watch.log"
+TRANSFER_MAKER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/transfer-maker"
 # The numbers of the private messages the second person of the "pm" scenario is to send.
 PM_FIFO="${OUT_DIR}/pm-requests"
 # The user name the app connects with in the tests (AppDriver.USER_NAME).
@@ -294,7 +305,8 @@ voice_spans() {
 check_peers() {
   local kind="$1" report="$2" spans count held longest lost
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
-  if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" ]]; then
+  if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" \
+    && "${kind}" != "identity" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -377,6 +389,15 @@ check_peers() {
       [[ -z "$(voice_spans "${BYSTANDER_LOG}")" ]] \
         || die "the third person heard the whisper, see ${bystander_log}"
       ;;
+    identity)
+      # The second connect may still be on its way to the second person.
+      sleep 2
+      grep -qx 'FIRST 1' "${IDENTITY_WATCH_LOG}" \
+        || die "the second person did not see the phone's certificate, see e2e/build/identity-watch.log"
+      grep -qx 'SAME 2' "${IDENTITY_WATCH_LOG}" \
+        || die "the server did not see the same certificate on the second connect, see e2e/build/identity-watch.log"
+      printf 'e2e: identity: the server saw the same certificate on both connects\n'
+      ;;
     chat)
       grep -q '^SENT' "${CHAT_PEER_LOG}" || die "the second person did not get its messages out, see e2e/build/chat-peer.log"
       grep -q '^RAW SENT' "${RAW_CHAT_LOG}" || die "the raw markup was not sent, see e2e/build/raw-chat.log"
@@ -417,7 +438,7 @@ cleanup() {
   if ((status != 0)); then
     # What the other people reported belongs next to the failure, not only into a file.
     local log
-    for log in "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}"; do
+    for log in "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}"; do
       [[ -s "${log}" ]] || continue
       printf 'e2e: the end of %s:\n' "${log#"${REPO_ROOT}/"}"
       tail -n 40 "${log}"
@@ -433,7 +454,10 @@ cleanup() {
     timeout 20 "${ADB}" -s "${serial}" shell \
       'svc data enable; svc wifi enable; for id in $(cmd wifi list-networks | grep AndroidWifi | cut -d" " -f1); do cmd wifi forget-network "$id"; done; dumpsys deviceidle unforce; dumpsys battery reset' \
       >/dev/null 2>&1
-    timeout 20 "${ADB}" -s "${serial}" logcat -d >"${OUT_DIR}/logcat.txt" 2>/dev/null
+    # adbd logs every shell command it runs; the transfer argument (the code with its QR code
+    # texts) must not reach the file.
+    timeout 20 "${ADB}" -s "${serial}" logcat -d 2>/dev/null \
+      | sed -E 's/-e transfer [^ ]+/-e transfer (removed)/g' >"${OUT_DIR}/logcat.txt"
   fi
   if [[ -n "${emulator_pid}" ]]; then
     timeout 10 "${ADB}" -s "${serial}" emu kill >/dev/null 2>&1
@@ -482,7 +506,7 @@ start_emulator() {
 
 mkdir -p "${OUT_DIR}"
 rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" \
-  "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.* "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}"
+  "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.* "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}"
 trap cleanup EXIT
 if [[ -n "${EVIDENCE_DIR}" ]]; then
   mkdir -p "${EVIDENCE_DIR}"
@@ -492,10 +516,12 @@ fi
 
 step "building the app and the tests"
 (cd "${REPO_ROOT}/android" && ./gradlew --console=plain --quiet :app:assembleDebug :e2e:assembleDebug)
-(cd "${REPO_ROOT}" && cargo build --locked --quiet --package mumcord-voice-peer --package mumcord-chat-peer)
+(cd "${REPO_ROOT}" && cargo build --locked --quiet --package mumcord-voice-peer --package mumcord-chat-peer \
+  --package mumcord-transfer-maker)
 [[ -x "${PEER_BINARY}" ]] || die "the second person's program was not built at ${PEER_BINARY}"
 [[ -x "${CHAT_PEER_BINARY}" ]] || die "the chat person's program was not built at ${CHAT_PEER_BINARY}"
-command -v python3 >/dev/null 2>&1 || die "python3 is required for the raw chat message"
+[[ -x "${TRANSFER_MAKER_BINARY}" ]] || die "the transfer maker was not built at ${TRANSFER_MAKER_BINARY}"
+command -v python3 >/dev/null 2>&1 || die "python3 is required for the raw chat message and the identity watcher"
 
 step "starting the test server on port ${MUMCORD_PORT_BASE}"
 server_started=1
@@ -549,6 +575,17 @@ run_scenario() {
   local extra=()
   case "${peer}" in
     alone | notify | chat-restart | gap | idle) ;;
+    identity)
+      start_person "${IDENTITY_WATCH_LOG}" python3 "${REPO_ROOT}/e2e/identity-watch.py" "${PHONE_NAME}"
+      ;;
+    transfer)
+      # Base64 keeps the QR code texts whole on their way through the device's shell. The
+      # transfer is valid for two minutes, so it is made right before its test starts.
+      local made
+      made="$("${TRANSFER_MAKER_BINARY}" "${HOST_FROM_EMULATOR}" "${MUMCORD_PORT_BASE}")" \
+        || die "making the transfer failed"
+      extra=(-e transfer "$(base64 -w0 <<<"${made}")")
+      ;;
     lockptt)
       extra=(-e lockSeconds "${LOCK_PTT_SECONDS}")
       start_peer "${PEER_LOG}"
@@ -593,7 +630,7 @@ run_scenario() {
   fi
   stop_phone_network
   stop_messenger
-  if [[ "${peer}" != "alone" && "${peer}" != "notify" && "${peer}" != "chat-restart" ]]; then
+  if [[ "${peer}" != "alone" && "${peer}" != "notify" && "${peer}" != "chat-restart" && "${peer}" != "transfer" ]]; then
     check_peers "${peer}" "${report}"
     stop_peers
   fi

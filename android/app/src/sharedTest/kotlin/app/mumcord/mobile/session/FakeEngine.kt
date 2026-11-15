@@ -55,6 +55,20 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** The phone settings of a fresh installation, which a [FakeEngine] starts with. */
+/** The identity a phone has after its first start; a fingerprint has 40 hex digits. */
+val FAKE_IDENTITY = Identity(
+    id = 1,
+    label = "Lea",
+    commonName = "Lea",
+    fingerprint = "4fa91c7ed208b36a".padEnd(40, '5'),
+    createdMs = 0,
+    isDefault = true,
+    serverIds = emptyList(),
+)
+
+/** The name inside every identity file of the fake. */
+const val IMPORTED_NAME = "Imported"
+
 val FAKE_MOBILE_SETTINGS = MobileSettings(
     talkModeChosen = false,
     defaultOutput = DefaultOutput.ASK,
@@ -81,6 +95,7 @@ class FakeEngine(
     private val prompt: CertificatePrompt? = null,
     servers: List<SavedServer> = emptyList(),
     talkMode: TalkMode = TalkMode.VOICE_ACTIVITY,
+    identities: List<Identity> = listOf(FAKE_IDENTITY),
 ) : MumcordEngineInterface {
     val connectCalls = CopyOnWriteArrayList<ConnectCall>()
 
@@ -615,8 +630,8 @@ class FakeEngine(
     // ----- identities -----
 
     /** The identities on the phone; the certificates themselves are not part of the fake. */
-    val identities = CopyOnWriteArrayList<Identity>()
-    private var nextIdentityId = 1L
+    val identities = CopyOnWriteArrayList(identities)
+    private var nextIdentityId = (identities.maxOfOrNull { it.id } ?: 0L) + 1
 
     override suspend fun identities(): List<Identity> = identities.toList()
 
@@ -627,13 +642,25 @@ class FakeEngine(
 
     /** The file's bytes stand for the certificate: the same file twice is the same identity. */
     override suspend fun importIdentity(data: ByteArray, password: String, label: String?): Identity {
+        // As the bridge: a wrong password and a file without an identity are the same failure.
+        if (password != filePassword) throw BridgeException.InvalidInput("wrong password or no identity")
         val fingerprint = data.joinToString("") { "%02x".format(it) }
         if (identities.any { it.fingerprint == fingerprint }) throw BridgeException.DuplicateIdentity("already there")
-        return addIdentity(name = label.orEmpty(), label = label, fingerprint = fingerprint)
+        return addIdentity(name = label ?: IMPORTED_NAME, label = label, fingerprint = fingerprint)
     }
 
-    override suspend fun exportIdentity(identityId: Long, password: String): ByteArray =
-        identity(identityId).fingerprint.encodeToByteArray()
+    /** The password every identity file of the fake has; empty for none. */
+    @Volatile
+    var filePassword = ""
+
+    override suspend fun exportIdentity(identityId: Long, password: String): ByteArray {
+        exportError?.let { throw it }
+        return identity(identityId).fingerprint.encodeToByteArray()
+    }
+
+    /** When set, exporting fails with it. */
+    @Volatile
+    var exportError: BridgeException? = null
 
     override suspend fun renameIdentity(identityId: Long, label: String): Identity {
         val renamed = identity(identityId).copy(label = label)
@@ -677,9 +704,12 @@ class FakeEngine(
 
     private fun emitIdentities() = emit(BridgeEvent.IdentitiesChanged(identities.toList()))
 
-    /** The fake reads no QR codes: a transfer needs the real bridge and is tested there. */
+    /** The scan the next "Scan from desktop app" gets; without one the engine has no transfer. */
+    @Volatile
+    var transfer: TransferScan? = null
+
     override fun newTransfer(): TransferScan =
-        throw BridgeException.Internal("the fake engine has no transfer")
+        transfer ?: throw BridgeException.Internal("the fake engine has no transfer")
 
     // ----- phone settings -----
 

@@ -30,7 +30,8 @@ import java.io.InputStream
 
 /**
  * Where pictures to send come from: the system's photo picker and the system's camera app.
- * Both hand the app one picture and need no permission.
+ * Both hand the app one picture. The picker needs no permission; the camera app does, see
+ * [rememberChatImageSystem].
  */
 class ChatImageSystem(val pickPhoto: () -> Unit, val takePhoto: () -> Unit)
 
@@ -42,15 +43,23 @@ class PickedImage(val bytes: ByteArray, val mime: String)
  * when it could not be read or no camera app exists.
  *
  * The camera is used through the capture intent of the system's camera app, which writes the
- * photo into a file of this app. That needs no CAMERA permission, as long as the app does not
- * declare it; so the manifest does not.
+ * photo into a file of this app. The app declares the CAMERA permission for its QR scanner,
+ * and Android then refuses the capture intent until that permission is granted. So without it
+ * ([cameraGranted]) taking a photo calls [onCameraNeeded] instead, which asks for the camera and
+ * takes the photo again once it is allowed.
  */
 @Composable
-fun rememberChatImageSystem(onImage: (PickedImage) -> Unit, onUnreadable: () -> Unit): ChatImageSystem {
+fun rememberChatImageSystem(
+    onImage: (PickedImage) -> Unit,
+    onUnreadable: () -> Unit,
+    cameraGranted: () -> Boolean,
+    onCameraNeeded: () -> Unit,
+): ChatImageSystem {
     val context = LocalContext.current.applicationContext
     val scope = rememberCoroutineScope()
     val currentOnImage by rememberUpdatedState(onImage)
     val currentOnUnreadable by rememberUpdatedState(onUnreadable)
+    val currentOnCameraNeeded by rememberUpdatedState(onCameraNeeded)
     val read: (Uri) -> Unit = { uri ->
         scope.launch {
             val image = withContext(Dispatchers.IO) { readImage(context, uri) }
@@ -72,7 +81,11 @@ fun rememberChatImageSystem(onImage: (PickedImage) -> Unit, onUnreadable: () -> 
             pickPhoto = {
                 picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
             },
-            takePhoto = {
+            takePhoto = takePhoto@{
+                if (!cameraGranted()) {
+                    currentOnCameraNeeded()
+                    return@takePhoto
+                }
                 try {
                     val uri = captureTarget(context)
                     captureUri = uri

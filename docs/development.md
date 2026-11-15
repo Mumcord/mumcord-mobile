@@ -154,7 +154,24 @@ was on the screen in its failure message.
   the history; and private messages, for which `e2e/chat-peer --private` writes to the phone
   whenever the test asks for it (notification with sender and text, tap opens the
   conversation, no notification for the open conversation, "Show sender only", nothing after
-  disconnecting).
+  disconnecting); the identity created at the first start, which `e2e/identity-watch.py` (a
+  foreign client on the host) must see with the same certificate on two connects; and
+  "Scan from desktop app" with a transfer that `e2e/transfer-maker` makes for the run with
+  the engine's own code, as the desktop app does (a new identity and a new 8-digit code every
+  time, handed to the test as an instrumentation argument and written to no file or log). The
+  emulator's camera cannot be shown a QR code, so the debug build's `TestSettings.qrTexts`
+  feeds the texts of the codes to the scanner instead of the camera; the camera question with
+  the system's dialog, the slow check of the code, the wrong-code and expired-code refusals, the
+  import and the connection with the imported identity are the real ones. Reading QR codes
+  from a real camera image (and its focus and lighting) is only checked on a phone against the
+  desktop app.
+- **QR scanner:** `android/platform/scanner` reads QR codes with CameraX (the camera picture
+  and its frames) and ZXing core (finding and reading the code), both Apache-2.0 and both
+  without Google Play services, which a phone that installed the APK from outside a store may
+  not have. Their files are pinned by checksum in `android/gradle/verification-metadata.xml`,
+  so a version change needs new checksums there (`./gradlew --write-verification-metadata
+  sha256 …` writes them; keep only the camera and ZXing entries). `QrDecoderTest` reads codes
+  from generated pictures on the computer.
 - **Besides the Android toolchain** the machine needs KVM, `git`, Docker with the compose
   plugin, `sqlite3`, `openssl` and `python3`. No Docker network is created; the server uses Docker's
   built-in bridge.

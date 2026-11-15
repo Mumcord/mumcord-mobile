@@ -52,6 +52,7 @@ const val MORE_DISCONNECT_TEST_TAG = "more-disconnect"
 const val MORE_BLOCKED_TEST_TAG = "more-blocked"
 const val MORE_SENDER_ONLY_TEST_TAG = "more-sender-only"
 const val MORE_SETTINGS_TEST_TAG = "more-settings"
+const val MORE_IDENTITIES_TEST_TAG = "more-identities"
 
 /**
  * The frame of the app while connected: the selected tab's screen, the banners, the whisper
@@ -72,6 +73,7 @@ fun ConnectedShell(
     conversation: ChatUiState?,
     conversationActions: ChatController,
     onNotificationSettings: () -> Unit,
+    onIdentities: () -> Unit,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
 ) {
@@ -126,6 +128,7 @@ fun ConnectedShell(
                         messages,
                         messagesActions,
                         actions::openSettings,
+                        onIdentities,
                         onDisconnect,
                         topInsets,
                     )
@@ -224,6 +227,7 @@ private fun MoreScreen(
     messages: MessagesUiState,
     messagesActions: MessagesController,
     onSettings: () -> Unit,
+    onIdentities: () -> Unit,
     onDisconnect: () -> Unit,
     topInsets: WindowInsets,
 ) {
@@ -258,7 +262,17 @@ private fun MoreScreen(
         Spacer(Modifier.height(MumcordSpace.s4))
         MumcordList {
             MumcordListRow(
+                title = stringResource(R.string.identities_title),
+                icon = MumcordIcons.Key,
+                trailing = {
+                    MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted)
+                },
+                onClick = onIdentities,
+                modifier = Modifier.testTag(MORE_IDENTITIES_TEST_TAG),
+            )
+            MumcordListRow(
                 title = stringResource(R.string.settings_title),
+                divider = true,
                 icon = MumcordIcons.Settings,
                 trailing = {
                     MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted)

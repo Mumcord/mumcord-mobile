@@ -379,4 +379,133 @@
     <string name="blocked_back">Back to More</string>
     <string name="blocked_empty">You have not blocked anybody.</string>
     <string name="blocked_unblock_description">Unblock %1$s</string>
+
+    <!-- Camera permission -->
+    <string name="camera_title">Camera</string>
+    <string name="camera_blocked_text">Allow “Camera” for Mumcord in the system settings.</string>
+    <string name="camera_continue">Continue</string>
+    <string name="camera_not_now">Not now</string>
+    <string name="camera_open_settings">Open settings</string>
+    <string name="camera_allow">Allow the camera</string>
+    <string name="camera_reason_photo">Mumcord needs the camera to take a photo for the chat. Sending a picture from your photo library works without it.</string>
+    <string name="camera_reason_scan">Mumcord needs the camera to read the codes on your desktop. Nothing is recorded or sent anywhere.</string>
+
+    <!-- Identities -->
+    <string name="identities_title">Identities</string>
+    <string name="identities_intro">Your identity is a certificate. Servers recognise you by it.</string>
+    <string name="identities_section_yours">Your identities</string>
+    <string name="identities_section_add">Add an identity</string>
+    <string name="identities_default">%1$s (default)</string>
+    <plurals name="identities_used_on">
+        <item quantity="one">Used on %1$d server</item>
+        <item quantity="other">Used on %1$d servers</item>
+    </plurals>
+    <string name="identities_unused">Not used by any server yet</string>
+    <string name="identities_fingerprint">SHA-1  %1$s …</string>
+    <string name="identities_card_description">%1$s, %2$s. Show details</string>
+    <string name="identities_scan">Scan from desktop app</string>
+    <string name="identities_scan_tag">Easiest</string>
+    <string name="identities_scan_sub">Point the camera at the codes</string>
+    <string name="identities_import">Import a .p12 file</string>
+    <string name="identities_import_sub">Pick a backup from your phone</string>
+    <string name="identities_create">Create a new identity</string>
+    <string name="identities_create_sub">Start fresh on this phone</string>
+    <string name="identities_file_unreadable">Mumcord could not read this file, or it is too large to be an identity.</string>
+    <string name="identity_setup_title">Your identity</string>
+    <string name="identity_setup_text">Your identity is a certificate. Servers recognise you by it. Bring the one you use in the desktop app, or start fresh on this phone.</string>
+
+    <string name="identity_details_name">Name on servers</string>
+    <string name="identity_details_fingerprint">Fingerprint (SHA-1)</string>
+    <string name="identity_details_added">Added</string>
+    <string name="identity_details_default">This is your default identity.</string>
+    <string name="identity_set_default">Set as default</string>
+    <string name="identity_export">Export a backup</string>
+    <string name="identity_delete">Delete</string>
+    <string name="identity_delete_last">Mumcord needs at least one identity, so this one cannot be deleted.</string>
+
+    <string name="identity_create_title">New identity</string>
+    <string name="identity_create_text">Mumcord creates a new certificate on this phone. Servers will see you as a new person.</string>
+    <string name="identity_create_name">Name on servers</string>
+    <string name="identity_create_name_invalid">This name cannot be used. It needs 1 to 64 characters.</string>
+    <string name="identity_create_confirm">Create</string>
+
+    <string name="identity_import_title">Import identity</string>
+    <string name="identity_import_text">Enter the password of the file. Leave it empty if the file has none.</string>
+    <string name="identity_import_password">Password of the file</string>
+    <string name="identity_import_confirm">Import</string>
+    <string name="identity_import_wrong">The password is wrong, or this file does not hold an identity.</string>
+    <string name="identity_import_failed">Mumcord could not import this identity.</string>
+
+    <string name="identity_export_title">Export %1$s</string>
+    <string name="identity_export_text">The backup is a .p12 file protected with a password you choose now. You need that password to import it again.</string>
+    <string name="identity_export_password">Password</string>
+    <string name="identity_export_repeat">Repeat the password</string>
+    <string name="identity_export_mismatch">The passwords are not the same.</string>
+    <string name="identity_export_failed">Mumcord could not create the backup.</string>
+    <string name="identity_export_confirm">Export</string>
+    <string name="identity_export_share">Save or send the backup</string>
+
+    <string name="identity_delete_title">Delete the identity %1$s?</string>
+    <string name="identity_delete_warning">Without a backup you lose the names and permissions registered with this identity on servers. This cannot be undone.</string>
+    <plurals name="identity_delete_servers">
+        <item quantity="one">%1$d server uses this identity. It will use the default identity %2$s afterwards. Its registered name and permissions stay with the old certificate.</item>
+        <item quantity="other">%1$d servers use this identity. They will use the default identity %2$s afterwards. Their registered names and permissions stay with the old certificate.</item>
+    </plurals>
+    <string name="identity_delete_next_default">%1$s becomes your default identity.</string>
+    <string name="identity_delete_backup">Back up first</string>
+    <string name="identity_delete_type">Type the identity label to confirm</string>
+
+    <!-- Scan from desktop app -->
+    <string name="scan_title">Scan from desktop</string>
+    <string name="scan_progress">Code %1$d of %2$d</string>
+    <string name="scan_progress_none">Waiting for the first code</string>
+    <string name="scan_percent">%1$d%%</string>
+    <string name="scan_hint">Keep the phone pointed at the codes on your desktop</string>
+    <string name="scan_hint_where">In the desktop app, open Settings, Identity and choose “Send to your phone”.</string>
+    <string name="scan_all_scanned">All codes scanned</string>
+    <string name="scan_viewfinder">Camera picture for scanning</string>
+    <string name="scan_code_label">Enter the code shown on desktop</string>
+    <plurals name="scan_code_description">
+        <item quantity="one">Code shown on desktop, %1$d digit</item>
+        <item quantity="other">Code shown on desktop, %1$d digits</item>
+    </plurals>
+    <string name="scan_checking">Checking the code…</string>
+    <plurals name="scan_wrong_code">
+        <item quantity="one">Wrong code. %1$d try left.</item>
+        <item quantity="other">Wrong code. %1$d tries left.</item>
+    </plurals>
+    <string name="scan_camera_denied">Mumcord may not use the camera, so it cannot read the codes.</string>
+    <string name="scan_camera_blocked">Mumcord may not use the camera. Allow “Camera” for Mumcord in the system settings.</string>
+    <string name="scan_note_not_a_transfer">This QR code is not from the desktop app’s “Send to your phone”.</string>
+    <string name="scan_note_unreadable">A code was not read correctly. Hold the phone still.</string>
+    <string name="scan_note_newer_version">This transfer needs a newer version of Mumcord on this phone.</string>
+    <string name="scan_note_expired">The codes are older than two minutes. Start “Send to your phone” again on the desktop and scan the new codes.</string>
+    <string name="scan_note_clock_skew">The clocks of your computer and your phone differ too much. Set both to the right time and scan again.</string>
+    <string name="scan_note_rescan">The code was wrong three times. Start “Send to your phone” again on the desktop and scan the new codes.</string>
+    <string name="scan_note_damaged">The codes could not be put together. Start “Send to your phone” again on the desktop and scan the new codes.</string>
+    <string name="scan_note_out_of_memory">This phone does not have enough free memory to check the code. Close other apps and enter the code again.</string>
+    <string name="scan_note_failed">Mumcord could not check this. Try again.</string>
+    <string name="scan_note_no_camera">Mumcord could not start the camera of this phone.</string>
+    <string name="scan_receiving">Receiving:</string>
+    <plurals name="scan_receiving_identities">
+        <item quantity="one">%1$d identity</item>
+        <item quantity="other">%1$d identities</item>
+    </plurals>
+    <plurals name="scan_receiving_servers">
+        <item quantity="one">%1$d server</item>
+        <item quantity="other">%1$d servers</item>
+    </plurals>
+    <string name="scan_receiving_both">%1$s, %2$s</string>
+    <string name="scan_section_identities">Identities</string>
+    <string name="scan_section_servers">Servers</string>
+    <string name="scan_no_passwords">Server passwords are not transferred.</string>
+    <string name="scan_import">Import</string>
+    <string name="scan_importing">Importing…</string>
+    <string name="scan_done_title">Imported</string>
+    <string name="scan_done_nothing">Nothing new: everything is already on this phone.</string>
+    <string name="scan_done_added">Added:</string>
+    <string name="scan_section_skipped">Not imported</string>
+    <string name="scan_skipped_duplicate">Already on this phone</string>
+    <string name="scan_skipped_invalid">Cannot be used</string>
+    <string name="scan_done">Done</string>
 </resources>
