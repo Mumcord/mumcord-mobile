@@ -371,6 +371,119 @@ enum Strings {
         )
     }
 
+    static var cameraTitle: String { text("camera_title") }
+    static var cameraBlockedText: String { text("camera_blocked_text") }
+    static var cameraContinue: String { text("camera_continue") }
+    static var cameraNotNow: String { text("camera_not_now") }
+    static var cameraOpenSettings: String { text("camera_open_settings") }
+    static var cameraAllow: String { text("camera_allow") }
+    static var cameraReasonPhoto: String { text("camera_reason_photo") }
+    static var cameraReasonScan: String { text("camera_reason_scan") }
+    static var identitiesTitle: String { text("identities_title") }
+    static var identitiesIntro: String { text("identities_intro") }
+    static var identitiesSectionYours: String { text("identities_section_yours") }
+    static var identitiesSectionAdd: String { text("identities_section_add") }
+    static func identitiesDefault(_ p1: String) -> String { format("identities_default", p1) }
+    static func identitiesUsedOn(_ p1: Int) -> String {
+        format(p1 == 1 ? "identities_used_on.one" : "identities_used_on.other", p1)
+    }
+    static var identitiesUnused: String { text("identities_unused") }
+    static func identitiesFingerprint(_ p1: String) -> String { format("identities_fingerprint", p1) }
+    static func identitiesCardDescription(_ p1: String, _ p2: String) -> String { format("identities_card_description", p1, p2) }
+    static var identitiesScan: String { text("identities_scan") }
+    static var identitiesScanTag: String { text("identities_scan_tag") }
+    static var identitiesScanSub: String { text("identities_scan_sub") }
+    static var identitiesImport: String { text("identities_import") }
+    static var identitiesImportSub: String { text("identities_import_sub") }
+    static var identitiesCreate: String { text("identities_create") }
+    static var identitiesCreateSub: String { text("identities_create_sub") }
+    static var identitiesFileUnreadable: String { text("identities_file_unreadable") }
+    static var identitySetupTitle: String { text("identity_setup_title") }
+    static var identitySetupText: String { text("identity_setup_text") }
+    static var identityDetailsName: String { text("identity_details_name") }
+    static var identityDetailsFingerprint: String { text("identity_details_fingerprint") }
+    static var identityDetailsAdded: String { text("identity_details_added") }
+    static var identityDetailsDefault: String { text("identity_details_default") }
+    static var identitySetDefault: String { text("identity_set_default") }
+    static var identityExport: String { text("identity_export") }
+    static var identityDelete: String { text("identity_delete") }
+    static var identityDeleteLast: String { text("identity_delete_last") }
+    static var identityCreateTitle: String { text("identity_create_title") }
+    static var identityCreateText: String { text("identity_create_text") }
+    static var identityCreateName: String { text("identity_create_name") }
+    static var identityCreateNameInvalid: String { text("identity_create_name_invalid") }
+    static var identityCreateConfirm: String { text("identity_create_confirm") }
+    static var identityImportTitle: String { text("identity_import_title") }
+    static var identityImportText: String { text("identity_import_text") }
+    static var identityImportPassword: String { text("identity_import_password") }
+    static var identityImportConfirm: String { text("identity_import_confirm") }
+    static var identityImportWrong: String { text("identity_import_wrong") }
+    static var identityImportFailed: String { text("identity_import_failed") }
+    static func identityExportTitle(_ p1: String) -> String { format("identity_export_title", p1) }
+    static var identityExportText: String { text("identity_export_text") }
+    static var identityExportPassword: String { text("identity_export_password") }
+    static var identityExportRepeat: String { text("identity_export_repeat") }
+    static var identityExportMismatch: String { text("identity_export_mismatch") }
+    static var identityExportFailed: String { text("identity_export_failed") }
+    static var identityExportConfirm: String { text("identity_export_confirm") }
+    static var identityExportShare: String { text("identity_export_share") }
+    static func identityDeleteTitle(_ p1: String) -> String { format("identity_delete_title", p1) }
+    static var identityDeleteWarning: String { text("identity_delete_warning") }
+    static func identityDeleteServers(_ p1: Int, _ p2: String) -> String {
+        format(p1 == 1 ? "identity_delete_servers.one" : "identity_delete_servers.other", p1, p2)
+    }
+    static func identityDeleteNextDefault(_ p1: String) -> String { format("identity_delete_next_default", p1) }
+    static var identityDeleteBackup: String { text("identity_delete_backup") }
+    static var identityDeleteType: String { text("identity_delete_type") }
+    static var scanTitle: String { text("scan_title") }
+    static func scanProgress(_ p1: Int, _ p2: Int) -> String { format("scan_progress", p1, p2) }
+    static var scanProgressNone: String { text("scan_progress_none") }
+    static func scanPercent(_ p1: Int) -> String { format("scan_percent", p1) }
+    static var scanHint: String { text("scan_hint") }
+    static var scanHintWhere: String { text("scan_hint_where") }
+    static var scanAllScanned: String { text("scan_all_scanned") }
+    static var scanViewfinder: String { text("scan_viewfinder") }
+    static var scanCodeLabel: String { text("scan_code_label") }
+    static func scanCodeDescription(_ p1: Int) -> String {
+        format(p1 == 1 ? "scan_code_description.one" : "scan_code_description.other", p1)
+    }
+    static var scanChecking: String { text("scan_checking") }
+    static func scanWrongCode(_ p1: Int) -> String {
+        format(p1 == 1 ? "scan_wrong_code.one" : "scan_wrong_code.other", p1)
+    }
+    static var scanCameraDenied: String { text("scan_camera_denied") }
+    static var scanCameraBlocked: String { text("scan_camera_blocked") }
+    static var scanNoteNotATransfer: String { text("scan_note_not_a_transfer") }
+    static var scanNoteUnreadable: String { text("scan_note_unreadable") }
+    static var scanNoteNewerVersion: String { text("scan_note_newer_version") }
+    static var scanNoteExpired: String { text("scan_note_expired") }
+    static var scanNoteClockSkew: String { text("scan_note_clock_skew") }
+    static var scanNoteRescan: String { text("scan_note_rescan") }
+    static var scanNoteDamaged: String { text("scan_note_damaged") }
+    static var scanNoteOutOfMemory: String { text("scan_note_out_of_memory") }
+    static var scanNoteFailed: String { text("scan_note_failed") }
+    static var scanNoteNoCamera: String { text("scan_note_no_camera") }
+    static var scanReceiving: String { text("scan_receiving") }
+    static func scanReceivingIdentities(_ p1: Int) -> String {
+        format(p1 == 1 ? "scan_receiving_identities.one" : "scan_receiving_identities.other", p1)
+    }
+    static func scanReceivingServers(_ p1: Int) -> String {
+        format(p1 == 1 ? "scan_receiving_servers.one" : "scan_receiving_servers.other", p1)
+    }
+    static func scanReceivingBoth(_ p1: String, _ p2: String) -> String { format("scan_receiving_both", p1, p2) }
+    static var scanSectionIdentities: String { text("scan_section_identities") }
+    static var scanSectionServers: String { text("scan_section_servers") }
+    static var scanNoPasswords: String { text("scan_no_passwords") }
+    static var scanImport: String { text("scan_import") }
+    static var scanImporting: String { text("scan_importing") }
+    static var scanDoneTitle: String { text("scan_done_title") }
+    static var scanDoneNothing: String { text("scan_done_nothing") }
+    static var scanDoneAdded: String { text("scan_done_added") }
+    static var scanSectionSkipped: String { text("scan_section_skipped") }
+    static var scanSkippedDuplicate: String { text("scan_skipped_duplicate") }
+    static var scanSkippedInvalid: String { text("scan_skipped_invalid") }
+    static var scanDone: String { text("scan_done") }
+
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }

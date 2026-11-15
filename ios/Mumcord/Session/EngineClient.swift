@@ -57,7 +57,32 @@ protocol EngineClient: AnyObject, Sendable {
     func unblockPerson(id: Int64) async throws
     func mobileSettings() -> MobileSettings
     func setMobileSettings(settings: MobileSettings) async throws
+
+    /// Every identity, the default one first, as they are when asked; later changes arrive as
+    /// events. Certificates and keys never leave the engine.
+    func savedIdentities() -> [Identity]
+    func createIdentity(name: String, label: String?) async throws -> Identity
+    func importIdentity(data: Data, password: String, label: String?) async throws -> Identity
+    func exportIdentity(identityId: Int64, password: String) async throws -> Data
+    func setDefaultIdentity(identityId: Int64) async throws
+    func deleteIdentity(identityId: Int64) async throws
+    /// A new "Send to your phone" scan of the desktop app's QR codes.
+    func startTransfer() throws -> TransferSession
 }
+
+/// The bridge's side of one "Send to your phone" scan (`TransferScan`), as the app uses it, so
+/// tests can follow its rules without the cryptography.
+protocol TransferSession: AnyObject, Sendable {
+    func addPart(text: String) throws -> TransferProgress
+    func progress() -> TransferProgress?
+    func codeDigits() -> UInt8
+    func attemptsLeft() -> UInt8
+    func reset()
+    func open(code: String) async throws -> TransferPreview
+    func importOpened() async throws -> ImportReport
+}
+
+extension TransferScan: TransferSession {}
 
 extension MumcordEngine: EngineClient {
     func savedServers() -> [SavedServer] {
@@ -66,5 +91,13 @@ extension MumcordEngine: EngineClient {
 
     func chatUnreadSnapshot() -> [ChatUnread] {
         snapshot().chatUnread
+    }
+
+    func savedIdentities() -> [Identity] {
+        snapshot().identities
+    }
+
+    func startTransfer() -> TransferSession {
+        newTransfer()
     }
 }

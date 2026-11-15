@@ -8,7 +8,8 @@ import UIKit
 private let maxZoom: CGFloat = 5
 
 /// The sheet over the chat and the full-screen picture, whichever is open, and the system's
-/// photo library and camera when the user adds a picture.
+/// photo library and camera when the user adds a picture. The camera is explained before the
+/// system asks for it, as for the QR scanner; the photo library works without it.
 struct ChatOverlays: View {
     let state: ChatUiState
     let actions: ChatController
@@ -16,6 +17,9 @@ struct ChatOverlays: View {
     @State private var pickingPhoto = false
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var takingPhoto = false
+    /// The camera explanation before "Take photo", while the camera is not allowed.
+    @State private var photoQuestion: CameraPermission?
+    @Environment(\.cameraGateway) private var camera
 
     var body: some View {
         ZStack {
@@ -33,6 +37,18 @@ struct ChatOverlays: View {
             }
             if let viewer = state.viewer {
                 ImageViewer(source: viewer, loader: loader, onClose: actions.closeViewer)
+            }
+            if let photoQuestion {
+                CameraSheet(
+                    reason: Strings.cameraReasonPhoto,
+                    blocked: photoQuestion == .denied,
+                    onContinue: askForCamera,
+                    onOpenSettings: {
+                        self.photoQuestion = nil
+                        if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                    },
+                    onDismiss: { self.photoQuestion = nil }
+                )
             }
         }
         .onChange(of: state.urlToOpen, initial: true) { _, address in
@@ -74,11 +90,26 @@ struct ChatOverlays: View {
 
     private func takePhoto() {
         actions.dismissSheet()
-        if CameraPicker.available {
-            takingPhoto = true
-        } else {
+        if !CameraPicker.available {
             // A device without a camera.
             actions.imageUnreadable()
+            return
+        }
+        let permission = camera.permission()
+        if permission == .granted {
+            takingPhoto = true
+        } else {
+            photoQuestion = permission
+        }
+    }
+
+    /// Lets the system ask; the photo is taken once the camera is allowed.
+    private func askForCamera() {
+        photoQuestion = nil
+        camera.request { granted in
+            if granted {
+                Task { @MainActor in takingPhoto = true }
+            }
         }
     }
 

@@ -10,6 +10,7 @@ struct AppRoot: View {
 
     var body: some View {
         AppContent(uiState: model.uiState, model: model)
+            .environment(\.cameraGateway, model.camera)
             .mumcordTheme(theme)
             .onOpenURL { model.openLink($0.absoluteString) }
             .onChange(of: scenePhase) { _, phase in
@@ -17,6 +18,7 @@ struct AppRoot: View {
                     model.refreshPings()
                     model.recheckMicrophone()
                     model.recheckNotifications()
+                    model.identities.recheckCamera()
                     model.call?.onAppActive()
                 } else {
                     // Hold to talk and hold to whisper work only while the app is on screen
@@ -37,6 +39,7 @@ struct AppRoot: View {
 struct AppContent: View {
     let uiState: AppUiState
     let model: AppModel
+    @State private var pickingIdentityFile = false
 
     var body: some View {
         let prompt = uiState.session.certificatePrompt
@@ -45,7 +48,10 @@ struct AppContent: View {
         let connectedSheet = uiState.connected?.sheet
         let messagesLocal = model.messages.local
         let messagesSheet = messagesLocal.blockSession != nil || messagesLocal.requestSession != nil
+        let identitySheet = uiState.screen == .identities || uiState.screen == .identitySetup ? uiState.identities.sheet : nil
+        let cameraQuestion = uiState.screen == .scan && uiState.identities.scan?.camera == .explain
         let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
+            || identitySheet != nil || cameraQuestion
         ZStack {
             screen
                 // While a sheet is open, the screen behind it is not offered to screen readers.
@@ -58,16 +64,63 @@ struct AppContent: View {
                 )
             } else if let overlay {
                 sheet(for: overlay)
+            } else if let identitySheet {
+                IdentitySheetHost(sheet: identitySheet, actions: model.identities)
+            } else if cameraQuestion {
+                CameraSheet(
+                    reason: Strings.cameraReasonScan,
+                    blocked: false,
+                    onContinue: model.identities.allowCamera,
+                    onOpenSettings: model.openSettings,
+                    onDismiss: model.identities.cameraNotNow
+                )
             } else if let connectedSheet {
                 ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model), model: model)
             } else if uiState.connected != nil {
                 MessagesOverlayHost(model: model)
             }
         }
+        .modifier(IdentityFiles(
+            picking: $pickingIdentityFile,
+            exported: uiState.identities.exported,
+            identities: model.identities
+        ))
     }
 
     @ViewBuilder private var screen: some View {
         switch uiState.screen {
+        case .starting:
+            MumcordScreen { Color.clear }
+        case .identitySetup:
+            IdentitySetupScreen(
+                unreadableFile: uiState.identities.unreadableFile,
+                onScan: model.identities.openScan,
+                onImport: { pickingIdentityFile = true },
+                onCreate: model.identities.openCreate
+            )
+        case .identities:
+            IdentitiesScreen(
+                state: uiState.identities,
+                onBack: model.identities.close,
+                onDetails: model.identities.openDetails,
+                onScan: model.identities.openScan,
+                onImport: { pickingIdentityFile = true },
+                onCreate: model.identities.openCreate
+            )
+        case .scan:
+            if let scan = uiState.identities.scan {
+                ScanScreen(
+                    state: scan,
+                    qrSource: model.qrSource,
+                    onQrText: model.identities.onQrText,
+                    onCameraFailed: model.identities.cameraFailed,
+                    onClose: model.identities.closeScan,
+                    onAllowCamera: model.identities.allowCamera,
+                    onOpenSettings: model.openSettings,
+                    onCode: model.identities.typeCode,
+                    onImport: model.identities.importTransfer
+                )
+            }
         case .talkModeChoice:
             TalkModeChoiceScreen(
                 selected: uiState.talkModeChoice,
@@ -90,7 +143,8 @@ struct AppContent: View {
                 onRemove: model.requestRemove,
                 onRetry: model.retry,
                 onDismissError: model.dismissError,
-                onOpenSettings: model.openSettings
+                onOpenSettings: model.openSettings,
+                onScan: model.identities.openScan
             )
         case .serverForm:
             if let form = uiState.form {

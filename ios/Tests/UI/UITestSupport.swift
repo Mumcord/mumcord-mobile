@@ -53,11 +53,17 @@ extension XCUIApplication {
 
 extension XCTestCase {
     /// Starts the app against the fake engine with canned data (`AppDebugLaunch`).
-    func launchApp(_ options: String, setupDone: Bool = true, theme: String = "dark") -> XCUIApplication {
+    func launchApp(
+        _ options: String,
+        setupDone: Bool = true,
+        theme: String = "dark",
+        identitiesPreset: String? = nil
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         var arguments = ["-mumcordFakeEngine", options]
         if setupDone { arguments += ["-mumcordSetupDone", "YES"] }
         arguments += ["-mumcordTheme", theme]
+        if let identitiesPreset { arguments += ["-mumcordIdentities", identitiesPreset] }
         app.launchArguments = arguments
         app.launch()
         // A cold simulator takes its time; nothing is tapped before the app is on screen.

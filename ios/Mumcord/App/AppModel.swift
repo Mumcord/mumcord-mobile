@@ -35,6 +35,12 @@ final class AppModel {
     @ObservationIgnored let chatStore: ChatStore
     /// The Messages tab: conversations, requests, blocking. Read only by its own views.
     @ObservationIgnored let messages: MessagesController
+    /// The identity screens and "Scan from desktop app".
+    @ObservationIgnored let identities: IdentitiesController
+    /// The camera permission, for the scanner and the chat's "Take photo".
+    @ObservationIgnored let camera: CameraGateway
+    /// Where the scanner gets the texts of QR codes from.
+    @ObservationIgnored let qrSource: QrSource
     /// The private conversation that is open on the Messages tab. It does not keep what was
     /// typed for the next person.
     @ObservationIgnored let conversation: ChatController
@@ -70,7 +76,9 @@ final class AppModel {
         messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(senderOnly: false),
         outputs: OutputAccess? = nil,
         idle: IdleAccess? = nil,
-        mediaPolicy: @escaping MediaPolicy = { true }
+        mediaPolicy: @escaping MediaPolicy = { true },
+        camera: CameraGateway = NoCamera(),
+        qrSource: QrSource = NoQrSource()
     ) {
         self.store = store
         self.setupStore = setupStore
@@ -89,6 +97,9 @@ final class AppModel {
         chat = ChatController(chats: chatStore)
         conversation = ChatController(chats: chatStore, keepDraft: false)
         messages = MessagesController(store: store, chats: chatStore, settings: messageSettings)
+        self.camera = camera
+        self.qrSource = qrSource
+        identities = IdentitiesController(store: store, camera: camera)
         chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
         local = AppUiState(setupDone: setupStore.firstStartDone)
         if let sessionEnded {
@@ -153,6 +164,7 @@ final class AppModel {
             output: outputNotice.state,
             askOutput: outputNotice.asking
         )
+        merged.identities = identitiesUiState(session: session, local: identities.local)
         return merged
     }
 

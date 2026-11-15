@@ -307,6 +307,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `chat-flow` | chat flow, session-ended notice (the lightest group: the place for new tests) |
 | `messages` | messages flow, messages screenshots |
 | `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots |
+| `identities` | identities and "Scan from desktop app" flow, their screenshots |
 
 Before its tests each group starts the app once in the simulator and ends it again (about 20
 seconds), so the first UI test does not pay for the first start of the app in a cold simulator.
@@ -416,3 +417,23 @@ tests go through it; `metered` puts the app on a pretend mobile data network.
 The simulator always has the Mac's network, so only a real iPhone can show: switching between
 Wi-Fi and mobile data during a session, the reconnect into the same channel, the expensive and
 constrained flags of a real path, and the warning notification with its "Stay connected" button.
+
+### Identities and "Scan from desktop app" (iOS)
+
+The identity screens (`ios/Mumcord/Screens/Identities/`) follow the identities the engine reports
+(`IdentitiesChanged`); certificates and keys stay in the engine and the Keychain. An identity file
+comes through the system's file picker, a backup leaves through the share sheet as a `.p12` file
+that exists in the app's temporary folder only while the sheet is open.
+
+The scanner reads QR codes with the system's own reader (`AVCaptureMetadataOutput`,
+`ios/Platform/QrCameraSource.swift`) behind the protocol `QrSource`. The typed code is kept in
+memory only, cleared after each check and never logged; the check itself runs in the bridge, off
+the main thread. The camera is explained before iOS asks for it (`CameraSheet`), for the scanner
+and for the chat's "Take photo"; after a refusal only the system settings help.
+
+The simulator has no camera to show a code to. The debug launch option `qr-parts` makes the
+scanner see the QR codes of a scripted transfer (`FakeDesktopTransfer`) instead, `camera-ask`,
+`camera-refuse` and `camera-blocked` stand for the camera permission, and
+`-mumcordIdentities <preset>` puts the identity screens into the states of the screenshots.
+Only a real iPhone can show the camera picture, reading the desktop's codes from a screen and the
+system's camera question; a transfer made by the desktop app is checked there by hand.

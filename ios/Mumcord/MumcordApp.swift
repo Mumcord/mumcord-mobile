@@ -111,7 +111,9 @@ extension AppModel {
             messageSettings: messageSettings,
             outputs: VoiceOutput(store: store, outputs: outputs),
             idle: idle,
-            mediaPolicy: { loadMedia(network.status, store.state.mobileSettings) }
+            mediaPolicy: { loadMedia(network.status, store.state.mobileSettings) },
+            camera: SystemCameraGateway(),
+            qrSource: CameraQrSource()
         )
         notifier.onOpen { [weak model] key in
             if let chat = chatFromNotificationKey(key) { model?.openChat(chat) }

@@ -182,14 +182,15 @@ final class SessionStore: @unchecked Sendable {
     /// Reads the saved servers once; later changes arrive as events. A failure can be retried.
     func loadServers() async {
         if state.serversLoaded { return }
-        switch await call("load servers", { $0.savedServers() }) {
+        switch await call("load servers", { ($0.savedServers(), $0.savedIdentities()) }) {
         // An event that arrived in between is newer than the snapshot.
-        case .ok(let servers):
+        case .ok(let (servers, identities)):
             update { state in
                 if state.serversLoaded { return state }
                 var next = state
                 next.servers = servers
                 next.serversLoaded = true
+                if next.identities == nil { next.identities = identities }
                 return next
             }
             // The engine exists now; nothing else reports the talk mode it has saved.

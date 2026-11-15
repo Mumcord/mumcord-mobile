@@ -4,10 +4,15 @@ import MumcordBridge
 
 /// The full-screen destinations. Which one shows follows from the state, see `AppUiState.screen`.
 enum AppScreen: Equatable {
+    /// First start, before the identities were read: nothing to show yet.
+    case starting
+    case identitySetup
     case talkModeChoice
     case serverList
     case serverForm
     case channels
+    case identities
+    case scan
 }
 
 /// Where to connect: a saved server, a password for this attempt only, a channel from a link.
@@ -56,9 +61,17 @@ struct AppUiState: Equatable {
     var localNetworkDeniedServerId: Int64?
     /// The connected screens, or nil while no server is shown.
     var connected: ConnectedUiState?
+    /// The identity screens and the scan of a transfer.
+    var identities = IdentitiesUiState()
 
     var screen: AppScreen {
-        if !setupDone { return .talkModeChoice }
+        if identities.scan != nil { return .scan }
+        // First start (FR-5.1): an identity first, then the talk mode.
+        if !setupDone {
+            if !identities.known && !session.phase.isFailed { return .starting }
+            return identities.rows.isEmpty ? .identitySetup : .talkModeChoice
+        }
+        if identities.open { return .identities }
         if connected != nil { return .channels }
         if form != nil { return .serverForm }
         return .serverList
@@ -94,6 +107,13 @@ struct AppUiState: Equatable {
 }
 
 /// A failed connection or command as the server list shows it.
+private extension ConnectionPhase {
+    var isFailed: Bool {
+        if case .failed = self { return true }
+        return false
+    }
+}
+
 struct ConnectFailure: Equatable {
     let error: ConnectionError
     let serverName: String?

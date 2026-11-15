@@ -21,6 +21,7 @@ struct ServerListScreen: View {
     let onRetry: () -> Void
     let onDismissError: () -> Void
     let onOpenSettings: () -> Void
+    var onScan: () -> Void = {}
 
     var body: some View {
         MumcordScreen {
@@ -31,7 +32,7 @@ struct ServerListScreen: View {
             // Nothing to show before the list is read; an empty state would flash by.
             if loaded {
                 if rows.isEmpty {
-                    EmptyState(onAdd: onAdd)
+                    EmptyState(onAdd: onAdd, onScan: onScan)
                 } else {
                     list
                 }
@@ -217,6 +218,7 @@ private struct FailureBanner: View {
 
 private struct EmptyState: View {
     let onAdd: () -> Void
+    let onScan: () -> Void
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
@@ -228,6 +230,9 @@ private struct EmptyState: View {
                 .multilineTextAlignment(.center)
             MumcordButton(text: Strings.serversAdd, icon: MumcordIcons.plus, action: onAdd)
                 .accessibilityIdentifier("server-add")
+            // The server list of the desktop app can come with a transfer (FR-5.66).
+            MumcordButton(text: Strings.identitiesScan, style: .secondary, icon: MumcordIcons.qrCode, action: onScan)
+                .accessibilityIdentifier("server-scan")
         }
         .padding(MumcordSpace.s5)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

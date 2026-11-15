@@ -68,9 +68,10 @@ final class SessionReducerTests: XCTestCase {
         XCTAssertEqual(once.fold(.whisperEnded).whispersEnded, 2)
     }
 
-    func testIdentitiesDoNotChangeTheStateYetAndThePhoneSettingsAreKept() {
+    func testTheIdentitiesAreFollowedAndThePhoneSettingsAreKept() {
         let state = fold(connected)
-        XCTAssertEqual(state.fold(.identitiesChanged(identities: [])), state)
+        XCTAssertNil(state.identities)
+        XCTAssertEqual(state.fold(.identitiesChanged(identities: [])).identities, [])
         let settings = MobileSettings(
             talkModeChosen: true,
             defaultOutput: .speaker,

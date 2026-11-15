@@ -10,6 +10,8 @@ struct SessionState: Equatable {
     /// The server list in its saved order; empty until `serversLoaded`.
     var servers: [SavedServer] = []
     var serversLoaded = false
+    /// Every identity, the default one first; nil until they were read.
+    var identities: [Identity]?
     /// The saved server of the current connection or attempt. It stays set after a failure, so
     /// the error can name the server and "Try again" knows where to connect.
     var activeServerId: Int64?

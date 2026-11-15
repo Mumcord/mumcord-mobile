@@ -84,9 +84,8 @@ extension SessionState {
             next.whispersEnded += 1
         case .mobileSettingsChanged(let settings):
             next.mobileSettings = settings
-        // The identity screens (task 6.5) are the first to follow the identities.
-        case .identitiesChanged:
-            break
+        case .identitiesChanged(let identities):
+            next.identities = identities
         // Profile, activity log, settings and theme screens (task 8.6) follow these themselves.
         case .profileChanged, .activityAdded, .appSettingsChanged, .themesChanged:
             break

@@ -181,6 +181,16 @@ private struct MoreScreen: View {
                     }
                 )
                 .accessibilityIdentifier("more-settings")
+                MumcordListRow(
+                    title: Strings.identitiesTitle,
+                    icon: MumcordIcons.key,
+                    divider: true,
+                    action: model.identities.open,
+                    trailing: {
+                        MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted)
+                    }
+                )
+                .accessibilityIdentifier("more-identities")
             }
             .padding(.bottom, MumcordSpace.s4)
             MoreMessagesSection(model: model)

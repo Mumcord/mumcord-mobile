@@ -4,6 +4,20 @@
 import Foundation
 import MumcordBridge
 
+/// The identity a phone has after its first start; a fingerprint has 40 hex digits.
+let fakeIdentity = Identity(
+    id: 1,
+    label: "Lea",
+    commonName: "Lea",
+    fingerprint: "4fa91c7ed208b36a".padding(toLength: 40, withPad: "5", startingAt: 0),
+    createdMs: 0,
+    isDefault: true,
+    serverIds: []
+)
+
+/// The name inside every identity file of the fake.
+let fakeImportedName = "Imported"
+
 /// One call of `FakeEngine.connectServer`.
 struct ConnectCall: Equatable {
     let serverId: Int64
@@ -77,6 +91,11 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         updateCheck: true
     )
     /// The user's own mute before a deafen, which comes back when the deafen ends.
+    private var _identities: [Identity]
+    private var nextIdentityId: Int64
+    private var _filePassword = ""
+    private var _exportError: BridgeError?
+    private var _transfer: TransferSession?
     private var mutedBeforeDeafen = false
     private var people: [UInt32: Person]
     private var connection = ConnectionState.disconnected(error: nil)
@@ -87,8 +106,11 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         listener: EngineListener,
         server: ServerState,
         prompt: CertificatePrompt? = nil,
-        servers: [SavedServer] = []
+        servers: [SavedServer] = [],
+        identities: [Identity] = [fakeIdentity]
     ) {
+        _identities = identities
+        nextIdentityId = (identities.map(\.id).max() ?? 0) + 1
         self.listener = listener
         self.server = server
         self.prompt = prompt
@@ -763,6 +785,153 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func setBitrateLimitKbps(kbps: UInt32?) {
         locked { _bitrateLimits.append(kbps) }
+    }
+
+    // MARK: Identities
+
+    /// The identities as they are; set before the engine is used, without an event.
+    var identities: [Identity] {
+        get { locked { _identities } }
+        set { locked { _identities = newValue } }
+    }
+
+    /// The password every identity file of the fake has; empty for none.
+    var filePassword: String {
+        get { locked { _filePassword } }
+        set { locked { _filePassword = newValue } }
+    }
+
+    /// When set, exporting fails with it.
+    var exportError: BridgeError? {
+        get { locked { _exportError } }
+        set { locked { _exportError = newValue } }
+    }
+
+    /// The scan the next "Scan from desktop app" gets; without one the engine has no transfer.
+    var transfer: TransferSession? {
+        get { locked { _transfer } }
+        set { locked { _transfer = newValue } }
+    }
+
+    func savedIdentities() -> [Identity] {
+        locked { Self.ordered(_identities) }
+    }
+
+    func createIdentity(name: String, label: String?) async throws -> Identity {
+        let fingerprint = locked { String(format: "%040llx", UInt64(nextIdentityId) &* 0x9E37_79B9) }
+        return try addIdentity(name: name, label: label, fingerprint: fingerprint)
+    }
+
+    /// As the bridge: a wrong password and a file without an identity are the same failure. A
+    /// file this fake exported holds the fingerprint, so importing it again is a duplicate.
+    func importIdentity(data: Data, password: String, label: String?) async throws -> Identity {
+        if password != filePassword { throw BridgeError.InvalidInput(detail: "wrong password or no identity") }
+        let text = String(decoding: data, as: UTF8.self)
+        let fingerprint = text.count == 40 && text.allSatisfy(\.isHexDigit)
+            ? text
+            : String(data.map { String(format: "%02x", $0) }.joined().prefix(40)).padding(toLength: 40, withPad: "0", startingAt: 0)
+        return try addIdentity(name: label ?? fakeImportedName, label: label, fingerprint: fingerprint)
+    }
+
+    func exportIdentity(identityId: Int64, password: String) async throws -> Data {
+        try locked {
+            if let failure = _exportError { throw failure }
+            guard let identity = _identities.first(where: { $0.id == identityId }) else {
+                throw BridgeError.NotFound(detail: "no such identity")
+            }
+            return Data(identity.fingerprint.utf8)
+        }
+    }
+
+    func setDefaultIdentity(identityId: Int64) async throws {
+        let list: [Identity] = locked {
+            _identities = _identities.map { identity in
+                var changed = identity
+                changed.isDefault = identity.id == identityId
+                return changed
+            }
+            return Self.ordered(_identities)
+        }
+        emit(.identitiesChanged(identities: list))
+    }
+
+    /// As the bridge: the oldest remaining identity becomes the default, and servers that named
+    /// the deleted one use the default again.
+    func deleteIdentity(identityId: Int64) async throws {
+        let (list, servers): ([Identity], [SavedServer]?) = try locked {
+            if _identities.count < 2 { throw BridgeError.LastIdentity(detail: "the last identity cannot be deleted") }
+            guard let deleted = _identities.first(where: { $0.id == identityId }) else {
+                throw BridgeError.NotFound(detail: "no such identity")
+            }
+            _identities.removeAll { $0.id == identityId }
+            if deleted.isDefault, let next = _identities.min(by: { ($0.createdMs, $0.id) < ($1.createdMs, $1.id) }) {
+                _identities = _identities.map { identity in
+                    var changed = identity
+                    changed.isDefault = identity.id == next.id
+                    return changed
+                }
+            }
+            var servers: [SavedServer]?
+            if storedServers.contains(where: { $0.identityId == identityId }) {
+                storedServers = storedServers.map { server in
+                    var changed = server
+                    if changed.identityId == identityId { changed.identityId = nil }
+                    return changed
+                }
+                servers = storedServers
+            }
+            return (Self.ordered(_identities), servers)
+        }
+        if let servers { emit(.serversChanged(servers: servers)) }
+        emit(.identitiesChanged(identities: list))
+    }
+
+    func startTransfer() throws -> TransferSession {
+        guard let transfer else { throw BridgeError.Internal(detail: "the fake engine has no transfer") }
+        return transfer
+    }
+
+    /// Adds an identity as the bridge does: the first one becomes the default.
+    @discardableResult
+    func addIdentity(name: String, label: String?, fingerprint: String) throws -> Identity {
+        let (identity, list): (Identity, [Identity]) = try locked {
+            if _identities.contains(where: { $0.fingerprint == fingerprint }) {
+                throw BridgeError.DuplicateIdentity(detail: "the identity is already there")
+            }
+            let identity = Identity(
+                id: nextIdentityId,
+                label: label ?? name,
+                commonName: name,
+                fingerprint: fingerprint,
+                createdMs: nextIdentityId * 1000,
+                isDefault: _identities.isEmpty,
+                serverIds: []
+            )
+            nextIdentityId += 1
+            _identities.append(identity)
+            return (identity, Self.ordered(_identities))
+        }
+        emit(.identitiesChanged(identities: list))
+        return identity
+    }
+
+    /// Adds servers of a transfer to the list, as its import does.
+    func addServers(_ inputs: [ServerInput]) -> [SavedServer] {
+        let (added, all): ([SavedServer], [SavedServer]) = locked {
+            let added = inputs.map { input in
+                let saved = Self.saved(input, id: nextServerId, hadPassword: false)
+                nextServerId += 1
+                return saved
+            }
+            storedServers += added
+            return (added, storedServers)
+        }
+        emit(.serversChanged(servers: all))
+        return added
+    }
+
+    private static func ordered(_ identities: [Identity]) -> [Identity] {
+        identities.filter(\.isDefault) + identities.filter { !$0.isDefault }
     }
 
     private func finishConnecting() {

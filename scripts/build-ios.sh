@@ -55,7 +55,7 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 # (ios/Tests/UI) must be listed in exactly one group, or --check-groups fails. The unit tests are
 # one bundle (MumcordTests) and belong to one group as a whole. Balanced by the measured run
 # times, so the groups finish at about the same time.
-TEST_GROUPS=(app-screens core voice-chat-screens chat-flow messages output-settings)
+TEST_GROUPS=(app-screens core voice-chat-screens chat-flow messages output-settings identities)
 group_tests() {
   case "$1" in
     app-screens)
@@ -72,6 +72,8 @@ group_tests() {
     output-settings)
       printf '%s\n' MumcordUITests/OutputFlowUITests MumcordUITests/PhoneScreenshotUITests \
         MumcordUITests/SettingsFlowUITests ;;
+    identities)
+      printf '%s\n' MumcordUITests/IdentitiesFlowUITests MumcordUITests/IdentitiesScreenshotUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
   esac
 }

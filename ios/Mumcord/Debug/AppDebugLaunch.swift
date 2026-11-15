@@ -39,12 +39,26 @@ import MumcordBridge
 ///         idle-on          "Disconnect when alone for 30 minutes" is switched on
 ///         idle-short       "Disconnect when alone" warns after 3 s and disconnects 3 s later
 ///         metered          the phone is on mobile data (a metered network), not on Wi-Fi
+///         no-identity      the phone has no identity yet, so the first start asks for one
+///         two-identities   besides the default identity "Lea" there is "Work"
+///         file-password    every identity file has the password "secret" (otherwise none)
+///         qr-parts         the scanner sees the QR codes of the desktop's fake transfer
+///                          (`FakeDesktopTransfer`) instead of a camera picture; without it
+///                          the scanner sees nothing
+///         transfer-slow    checking the typed code takes half a minute
+///         transfer-expired the first QR code says the transfer is older than two minutes
+///         transfer-import-fails the import fails once, as with a locked secure storage
+///         camera-ask       the camera has not been asked for; the user allows it
+///         camera-refuse    the camera has not been asked for; the user refuses it
+///         camera-blocked   the camera was refused before; only the system settings help
+///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
 ///
 /// Nothing is stored: the setup flag lives in memory. Release builds do not contain this.
 struct AppDebugLaunch {
     let options: Set<String>
+    let identitiesPreset: String?
     let setupDone: Bool
     let theme: MumcordThemeMode
 
@@ -53,6 +67,7 @@ struct AppDebugLaunch {
         guard let options = defaults.string(forKey: "mumcordFakeEngine") else { return nil }
         return AppDebugLaunch(
             options: Set(options.split(separator: ",").map(String.init)),
+            identitiesPreset: defaults.string(forKey: "mumcordIdentities"),
             setupDone: defaults.bool(forKey: "mumcordSetupDone"),
             theme: defaults.string(forKey: "mumcordTheme").flatMap(MumcordThemeMode.init(rawValue:)) ?? .system
         )
@@ -136,6 +151,25 @@ struct AppDebugLaunch {
                     engine.unread = [ChatMockup.lobby: 2]
                 }
             }
+            if options.contains("no-identity") {
+                engine.identities = []
+            } else if options.contains("two-identities") {
+                engine.identities = [fakeIdentity, workIdentity]
+            }
+            if options.contains("file-password") {
+                engine.filePassword = "secret"
+            }
+            let transfer = FakeDesktopTransfer.scan(for: engine)
+            if options.contains("transfer-slow") {
+                transfer.openDelay = .seconds(30)
+            }
+            if options.contains("transfer-expired") {
+                transfer.failNext = .Expired
+            }
+            if options.contains("transfer-import-fails") {
+                transfer.importFailure = .SecureStorageUnavailable(detail: "locked")
+            }
+            engine.transfer = transfer
             if options.contains("locks") {
                 engine.channelPasswords = [Mockup.music: "secret"]
                 engine.deniedChannels = [Mockup.afk]
@@ -181,6 +215,22 @@ extension AppDebugLaunch {
             available.append(AudioOutput(id: "buds", kind: .bluetooth, name: "Lea's Buds"))
         }
         return FakeOutputDevice(OutputState(available: available, current: available[1]))
+    }
+
+    /// The camera as the options describe it; allowed when they say nothing.
+    var cameraGateway: FakeCameraGateway {
+        if options.contains("camera-blocked") {
+            return FakeCameraGateway(permission: .denied)
+        }
+        if options.contains("camera-ask") || options.contains("camera-refuse") {
+            return FakeCameraGateway(permission: .undetermined, answer: options.contains("camera-ask"))
+        }
+        return FakeCameraGateway()
+    }
+
+    /// The QR texts the scanner sees; the simulator has no camera to show a code to.
+    var qrSource: ScriptedQrSource {
+        ScriptedQrSource(texts: options.contains("qr-parts") ? FakeDesktopTransfer.parts : [])
     }
 
     /// The local network as the options describe it; every server is on the internet when they
@@ -243,8 +293,13 @@ extension AppDebugLaunch {
                 notifier: SystemIdleNotifier(texts: Strings.idleNotificationTexts, log: AppLog.write),
                 times: { idleTimes }
             ),
-            mediaPolicy: { loadMedia(monitor.status, store.state.mobileSettings) }
+            mediaPolicy: { loadMedia(monitor.status, store.state.mobileSettings) },
+            camera: cameraGateway,
+            qrSource: qrSource
         )
+        if let identitiesPreset {
+            IdentitiesPreset.apply(identitiesPreset, to: model.identities)
+        }
         if options.contains("chat") {
             presetChat(model, store)
         }
