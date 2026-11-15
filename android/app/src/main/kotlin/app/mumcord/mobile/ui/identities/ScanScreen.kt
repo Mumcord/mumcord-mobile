@@ -58,11 +58,13 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -372,8 +374,10 @@ private fun CodeEntry(step: ScanStep.Code, onCode: (String) -> Unit) {
             modifier = Modifier.clearAndSetSemantics {},
         )
         BasicTextField(
-            value = step.typed,
-            onValueChange = onCode,
+            // Not the text-only field: it drops a text equal to the last one it reported, which
+            // lost the same code typed again when the refusal came back before the next frame.
+            value = TextFieldValue(step.typed, selection = TextRange(step.typed.length)),
+            onValueChange = { if (it.text != step.typed) onCode(it.text) },
             singleLine = true,
             // The digits are drawn by the boxes; the field itself only takes the typing.
             textStyle = MumcordTheme.typography.body.copy(color = Color.Transparent),

@@ -74,6 +74,7 @@ import app.mumcord.mobile.ui.identities.SCAN_IMPORT_TEST_TAG
 import app.mumcord.mobile.ui.identities.SCAN_NOTE_TEST_TAG
 import app.mumcord.mobile.ui.identities.SCAN_SCREEN_TEST_TAG
 import app.mumcord.mobile.ui.identities.SCAN_SUMMARY_TEST_TAG
+import app.mumcord.mobile.ui.identities.ScanStep
 import app.mumcord.mobile.ui.servers.SERVER_SCAN_TEST_TAG
 import app.mumcord.mobile.ui.setup.SetupStore
 import app.mumcord.mobile.ui.setup.TALK_MODE_CONTINUE_TEST_TAG
@@ -317,6 +318,37 @@ class IdentitiesUiFlowTest {
 
         compose.onNodeWithContentDescription("Close").performClick()
         await { shown(SERVER_SCAN_TEST_TAG) }
+    }
+
+    @Test
+    fun theSameCodeTypedAgainIsCheckedAgainWhenTheAnswerCameBeforeTheNextFrame() {
+        start(servers = false)
+        await { shown(SERVER_SCAN_TEST_TAG) }
+        compose.onNodeWithTag(SERVER_SCAN_TEST_TAG).performClick()
+        await { shown(SCAN_SCREEN_TEST_TAG) }
+        scan(parts)
+        await { shown(SCAN_CODE_TEST_TAG) }
+
+        // No frame between typing and the answer, as on a busy phone: "Checking" is never drawn
+        // and the code field stays on the screen the whole time.
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag(SCAN_CODE_TEST_TAG).performTextInput(wrongCode)
+        awaitScanStep { (it as? ScanStep.Code)?.wrong == true }
+        compose.mainClock.autoAdvance = true
+        await { text("Wrong code. 2 tries left.") }
+
+        compose.onNodeWithTag(SCAN_CODE_TEST_TAG).performTextInput(wrongCode)
+        await { text("Wrong code. 1 try left.") }
+        assertEquals("both codes reached the check", 2, transfer.checkedCodes.get())
+    }
+
+    /** Waits for the scan without drawing a frame, for when the test holds the clock. */
+    private fun awaitScanStep(condition: (ScanStep?) -> Boolean) {
+        val end = System.currentTimeMillis() + TIMEOUT_MILLIS
+        while (!condition(viewModel.identities.local.value.scan?.step)) {
+            check(System.currentTimeMillis() < end) { "the scan did not get there in time" }
+            Thread.sleep(10)
+        }
     }
 
     @Test
