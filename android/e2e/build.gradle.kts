@@ -27,6 +27,7 @@ dependencies {
     compileOnly(project(":platform:audio"))
     // What the user is set to on the server, read from the app under test.
     compileOnly(project(":platform:call"))
+    compileOnly(project(":platform:video"))
     // The channel the user is in and the voice bitrate limit, read from the app under test.
     compileOnly(project(":engine"))
     // The chat test hands the app a picture where the system photo picker would: through the

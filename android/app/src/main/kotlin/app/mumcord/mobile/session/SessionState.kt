@@ -10,6 +10,7 @@ import app.mumcord.mobile.bridge.Identity
 import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SavedServer
+import app.mumcord.mobile.bridge.Stream
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.bridge.Theme
 import app.mumcord.mobile.bridge.ThemeSettings
@@ -59,6 +60,10 @@ data class SessionState(
      * profile is read again each time it grows.
      */
     val ownProfileChanges: Int = 0,
+    /** The screen shares and cameras of the people in the user's channel, as the bridge last sent them. */
+    val streams: List<Stream> = emptyList(),
+    /** The engine waits for the answer to "Allow direct connections?" (a stream needs it). */
+    val directConnectionsQuestion: Boolean = false,
 ) {
     /** True once the server's channels are known and the connection is still alive. */
     val showsServer: Boolean

@@ -7,9 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -19,6 +22,14 @@ import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import app.mumcord.mobile.R
+import app.mumcord.mobile.ui.streams.DirectConnectionsSheet
+import app.mumcord.mobile.ui.streams.MINI_WINDOW_MARGIN
+import app.mumcord.mobile.ui.streams.StreamFullScreen
+import app.mumcord.mobile.ui.streams.StreamMiniWindow
+import app.mumcord.mobile.ui.streams.StreamOrientation
+import app.mumcord.mobile.ui.streams.StreamView
+import app.mumcord.mobile.ui.streams.StreamsController
+import app.mumcord.mobile.ui.streams.StreamsUiState
 import app.mumcord.mobile.design.components.MumcordBanner
 import app.mumcord.mobile.design.components.MumcordBannerTone
 import app.mumcord.mobile.design.components.MumcordScreen
@@ -45,6 +56,9 @@ import app.mumcord.mobile.ui.themes.ThemesScreen
 
 const val DENIED_BANNER_TEST_TAG = "denied-banner"
 
+/** How far the mini window stays above the bottom of the tab's content: clear of the chat's input bar. */
+private val MINI_WINDOW_BOTTOM = 72.dp
+
 /**
  * The frame of the app while connected: the selected tab's screen, the banners, the whisper
  * bar, the voice bar and the bottom tab bar; or the full voice view, which covers all of it.
@@ -69,7 +83,66 @@ fun ConnectedShell(
     onIdentities: () -> Unit,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
+    streams: StreamsUiState = StreamsUiState(),
+    streamActions: StreamsController? = null,
 ) {
+    // The engine waits for this answer before a stream can use a direct connection.
+    if (streamActions != null && streams.directConnectionsQuestion) {
+        Box(Modifier.fillMaxSize()) {
+            ConnectedContent(
+                state, actions, onDisconnect, onMicrophone, chat, chatBadge, chatActions, chatEnvironment, messages,
+                messagesActions, conversation, conversationActions, more, moreActions, onNotificationSettings, onIdentities,
+                topInsets, bottomInsets, streams, streamActions,
+            )
+            DirectConnectionsSheet(streamActions, topInsets, bottomInsets)
+        }
+    } else {
+        ConnectedContent(
+            state, actions, onDisconnect, onMicrophone, chat, chatBadge, chatActions, chatEnvironment, messages,
+            messagesActions, conversation, conversationActions, more, moreActions, onNotificationSettings, onIdentities,
+            topInsets, bottomInsets, streams, streamActions,
+        )
+    }
+}
+
+@Composable
+private fun ConnectedContent(
+    state: ConnectedUiState,
+    actions: ConnectedController,
+    onDisconnect: () -> Unit,
+    onMicrophone: () -> Unit,
+    chat: ChatUiState?,
+    chatBadge: Int,
+    chatActions: ChatController,
+    chatEnvironment: ChatEnvironment,
+    messages: MessagesUiState,
+    messagesActions: MessagesController,
+    conversation: ChatUiState?,
+    conversationActions: ChatController,
+    more: MoreUiState,
+    moreActions: MoreController,
+    onNotificationSettings: () -> Unit,
+    onIdentities: () -> Unit,
+    topInsets: WindowInsets,
+    bottomInsets: WindowInsets,
+    streams: StreamsUiState,
+    streamActions: StreamsController?,
+) {
+    val opened = streams.opened.takeIf { streamActions != null }
+    if (opened != null && streamActions != null && streams.open?.view == StreamView.Full) {
+        StreamOrientation(streams.landscape)
+        StreamFullScreen(
+            stream = opened,
+            landscape = streams.landscape,
+            mute = state.voice?.mute,
+            onToggleMute = actions::toggleMute,
+            onMicrophone = onMicrophone,
+            actions = streamActions,
+            topInsets = topInsets,
+            bottomInsets = bottomInsets,
+        )
+        return
+    }
     // What is open inside the Messages or More tab closes first, then the tab.
     val insideTab = messages.canGoBack && when (state.tab) {
         ConnectedTab.Messages -> !messages.blockedOpen
@@ -95,7 +168,7 @@ fun ConnectedShell(
     MumcordScreen {
         Box(Modifier.weight(1f)) {
             when (state.tab) {
-                ConnectedTab.Channels -> ChannelsScreen(state, actions, topInsets)
+                ConnectedTab.Channels -> ChannelsScreen(state, actions, topInsets, streams, streamActions)
                 // Null for the moment the user's own channel is not known yet.
                 ConnectedTab.Chat -> if (chat != null) {
                     ChatScreen(chat, chatActions, chatEnvironment.loader, chatEnvironment.clock, topInsets)
@@ -145,6 +218,16 @@ fun ConnectedShell(
                     messages.blockedOpen -> BlockedPeopleScreen(messages, messagesActions, topInsets)
                     else -> MoreScreen(more, moreActions, messagesActions::openBlocked, onIdentities, onDisconnect, topInsets)
                 }
+            }
+            if (opened != null && streamActions != null) {
+                StreamMiniWindow(
+                    stream = opened,
+                    actions = streamActions,
+                    // Above the chat's input bar, which stays usable.
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = MINI_WINDOW_MARGIN, bottom = MINI_WINDOW_BOTTOM),
+                )
             }
         }
         ConnectedBanners(state, actions::dismissDenied, onMicrophone)

@@ -45,7 +45,13 @@ import app.mumcord.mobile.update.AppInfo
 import app.mumcord.mobile.update.GitHubReleaseSource
 import app.mumcord.mobile.update.PreferencesUpdateStore
 import app.mumcord.mobile.update.UpdateChecker
+import app.mumcord.mobile.platform.video.EngineVideoFrames
+import app.mumcord.mobile.session.autoplayStreams
+import app.mumcord.mobile.ui.streams.StreamVideo
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import java.io.File
 import kotlinx.coroutines.SupervisorJob
@@ -167,6 +173,23 @@ class MumcordApplication : Application() {
     }
 
     private val networkMonitor: NetworkMonitor by lazy { AndroidNetworkMonitor(this) }
+
+    /** Whether streams start by themselves on the current network ("Start streams automatically", FR-5.41). */
+    val streamsAutoplay: Flow<Boolean> by lazy {
+        combine(networkMonitor.status, sessionRepository.state.map { it.mobileSettings }, ::autoplayStreams)
+    }
+
+    /** The pictures of watched streams: the engine's, through its C functions. */
+    val streamVideo: StreamVideo by lazy {
+        StreamVideo(EngineVideoFrames(handle = { videoHandle }))
+    }
+
+    // Valid for the rest of the process once the engine exists; read on the render threads.
+    private val videoHandle: Long
+        get() = cachedVideoHandle.takeIf { it != 0L } ?: sessionRepository.videoHandle().also { cachedVideoHandle = it }
+
+    @Volatile
+    private var cachedVideoHandle = 0L
 
     /** The bitrate limit on mobile data and getting back in when a network returns. It follows the session by itself too. */
     val networkSession: NetworkSession by lazy {

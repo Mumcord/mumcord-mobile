@@ -183,7 +183,12 @@ was on the screen in its failure message.
   foreign client on the host) must see with the same certificate on two connects; and
   "Scan from desktop app" with a transfer that `e2e/transfer-maker` makes for the run with
   the engine's own code, as the desktop app does (a new identity and a new 8-digit code every
-  time, handed to the test as an instrumentation argument and written to no file or log). The
+  time, handed to the test as an instrumentation argument and written to no file or log); a
+  screen share by `e2e/stream-peer` (the engine on the host, built with libvpx, sharing its
+  moving test pattern with VP9): on the emulator's mobile data the tile waits for a tap and the
+  sharer reports nobody watching before it, then the picture must show the pattern (dark top
+  left, bright bottom right, moving) full screen, in landscape and in the mini window above the
+  chat, and the run prints the time from the tap to the first picture. The
   emulator's camera cannot be shown a QR code, so the debug build's `TestSettings.qrTexts`
   feeds the texts of the codes to the scanner instead of the camera; the camera question with
   the system's dialog, the slow check of the code, the wrong-code and expired-code refusals, the
@@ -214,7 +219,8 @@ was on the screen in its failure message.
   sha256 …` writes them; keep only the camera and ZXing entries). `QrDecoderTest` reads codes
   from generated pictures on the computer.
 - **Besides the Android toolchain** the machine needs KVM, `git`, Docker with the compose
-  plugin, `sqlite3`, `openssl` and `python3`. No Docker network is created; the server uses Docker's
+  plugin, `sqlite3`, `openssl`, `python3` and, for the stream scenario, libvpx with its
+  development files (`libvpx-dev` on Debian and Ubuntu, `libvpx` on Arch). No Docker network is created; the server uses Docker's
   built-in bridge.
 - **Settings:** `E2E_AVD` (emulator device, default `mumcord-test`), `E2E_BOOT_TIMEOUT` and
   `E2E_TEST_TIMEOUT` (seconds, default 300 and 600; the second is per scenario) and

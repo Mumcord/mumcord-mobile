@@ -2693,6 +2693,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mumcord-stream-peer"
+version = "0.1.0"
+dependencies = [
+ "mumcord-engine",
+ "mumcord-store",
+ "tokio",
+]
+
+[[package]]
 name = "mumcord-transfer-maker"
 version = "0.1.0"
 dependencies = [

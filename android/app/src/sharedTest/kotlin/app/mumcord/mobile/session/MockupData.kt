@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.Stream
+import app.mumcord.mobile.bridge.StreamKind
+import app.mumcord.mobile.bridge.StreamWatch
 import app.mumcord.mobile.bridge.ServerState
 
 const val MOCKUP_ROOT = 0u
@@ -49,3 +52,20 @@ fun mockupVoiceServer(): ServerState = mockupServer().let { server ->
         },
     )
 }
+
+/** Mira's screen share as the bridge reports it, with the picture id the bridge gives it. */
+fun mockupStream(
+    watch: StreamWatch = StreamWatch.Idle,
+    viewers: UInt? = 1u,
+    hasSound: Boolean = true,
+    paused: Boolean = false,
+): Stream = Stream(
+    session = MOCKUP_MIRA,
+    kind = StreamKind.SCREEN,
+    videoId = (1uL shl 32) or MOCKUP_MIRA.toULong(),
+    watch = watch,
+    paused = paused,
+    hasSound = hasSound,
+    volume = 136u,
+    viewers = viewers,
+)

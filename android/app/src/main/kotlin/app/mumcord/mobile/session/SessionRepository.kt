@@ -8,6 +8,8 @@ import app.mumcord.mobile.bridge.BanInput
 import app.mumcord.mobile.bridge.BanResult
 import app.mumcord.mobile.bridge.BanTarget
 import app.mumcord.mobile.bridge.BridgeEvent
+import app.mumcord.mobile.bridge.StreamKind
+import app.mumcord.mobile.bridge.VideoSink
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.BridgeSnapshot
 import app.mumcord.mobile.bridge.ChatId
@@ -436,6 +438,8 @@ class SessionRepository(
                     phase = ConnectionPhase.Failed(ConnectionError.ServerUnreachable),
                     certificatePrompt = null,
                     server = null,
+                    streams = emptyList(),
+                    directConnectionsQuestion = false,
                 )
             }
         }
@@ -483,6 +487,34 @@ class SessionRepository(
     suspend fun setPersonLocalMute(session: UInt, muted: Boolean) {
         report(call("set person mute") { it.setPersonLocalMute(session, muted) })
     }
+
+    // ----- streams (FR-5.70 … FR-5.73) -----
+    // How a watch goes shows in the stream's state; a failed command only means the stream or
+    // the connection went away meanwhile, so it is logged and not shown.
+
+    suspend fun watchStream(session: UInt, kind: StreamKind): Outcome<Unit> =
+        call("watch stream") { it.watchStream(session, kind) }
+
+    suspend fun stopWatchingStream(session: UInt, kind: StreamKind): Outcome<Unit> =
+        call("stop watching stream") { it.stopWatchingStream(session, kind) }
+
+    /** How loud a person's screen share sound plays, 0 to 200 percent. */
+    suspend fun setStreamVolume(session: UInt, percent: Int): Outcome<Unit> =
+        call("set stream volume") { it.setStreamVolume(session, percent.coerceIn(0, 200).toUShort()) }
+
+    /** Answers "Allow direct connections?"; the question goes away either way. */
+    suspend fun answerDirectConnections(allow: Boolean): Outcome<Unit> {
+        mutableState.update { it.copy(directConnectionsQuestion = false) }
+        return call("answer direct connections") { it.answerDirectConnections(allow) }
+    }
+
+    /** Where the news of new stream pictures goes, once an engine exists. */
+    fun setVideoSink(sink: VideoSink?) {
+        engine.now { it.setVideoSink(sink) }
+    }
+
+    /** The handle for the engine's picture functions, or 0 while no engine exists. */
+    fun videoHandle(): Long = engine.now { it.videoHandle() }?.toLong() ?: 0L
 
     // ----- moderation (FR-5.90 … FR-5.93) -----
     // The commands return true when the server confirmed the change and false when it did not

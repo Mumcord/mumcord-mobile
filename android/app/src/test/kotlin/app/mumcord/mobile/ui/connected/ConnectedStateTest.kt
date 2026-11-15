@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.ui.connected
 
+import app.mumcord.mobile.bridge.StreamKind
+import app.mumcord.mobile.session.MOCKUP_MIRA
+import app.mumcord.mobile.ui.streams.StreamKey
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ChannelPasswordState
 import app.mumcord.mobile.bridge.ConnectionState
@@ -38,7 +41,19 @@ class ConnectedStateTest {
         when (it) {
             is ChannelListRow.ChannelItem -> "#${it.name}"
             is ChannelListRow.PersonItem -> it.name
+            is ChannelListRow.StreamItem -> "stream of ${it.key.session}"
         }
+    }
+
+    @Test
+    fun aStreamTileSitsRightUnderItsSharerAtItsIndent() {
+        val mira = StreamKey(MOCKUP_MIRA, StreamKind.SCREEN)
+        val rows = channelRows(root, MOCKUP_LOBBY, emptySet(), streams = listOf(mira))
+        val names = rows.names()
+        assertEquals("stream of $MOCKUP_MIRA", names[names.indexOf("Mira") + 1])
+        val person = rows.filterIsInstance<ChannelListRow.PersonItem>().first { it.name == "Mira" }
+        assertEquals(person.depth, rows.filterIsInstance<ChannelListRow.StreamItem>().single().depth)
+        assertEquals("a folded channel hides it", 0, channelRows(root, MOCKUP_LOBBY, setOf(MOCKUP_GAMING), streams = listOf(mira)).count { it is ChannelListRow.StreamItem })
     }
 
     private fun List<ChannelListRow>.channel(id: UInt) =

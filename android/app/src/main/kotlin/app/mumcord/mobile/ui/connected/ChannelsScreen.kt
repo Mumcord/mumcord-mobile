@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.ui.connected
 
+import app.mumcord.mobile.ui.streams.StreamTileLine
+import app.mumcord.mobile.ui.streams.StreamsController
+import app.mumcord.mobile.ui.streams.StreamsUiState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -50,9 +53,18 @@ const val HINT_TEST_TAG = "unsupported-hint"
 /** One step of nesting: the indent of a channel's people and sub-channels (`.channel-body`). */
 private val INDENT = 28.dp
 
-/** The Channels tab: server header, optional search field, the channel tree and the hints. */
+/**
+ * The Channels tab: server header, optional search field, the channel tree with the tiles of
+ * the streams in the user's channel, and the hints.
+ */
 @Composable
-fun ChannelsScreen(state: ConnectedUiState, actions: ConnectedController, topInsets: WindowInsets) {
+fun ChannelsScreen(
+    state: ConnectedUiState,
+    actions: ConnectedController,
+    topInsets: WindowInsets,
+    streams: StreamsUiState = StreamsUiState(),
+    streamActions: StreamsController? = null,
+) {
     Column(Modifier.fillMaxSize()) {
         MumcordAppBar(
             title = state.serverName,
@@ -77,7 +89,7 @@ fun ChannelsScreen(state: ConnectedUiState, actions: ConnectedController, topIns
                 Paragraph(stringResource(R.string.channels_search_empty))
             }
         } else {
-            ChannelList(state.rows, state.hints, actions)
+            ChannelList(state.rows, state.hints, actions, streams, streamActions)
         }
     }
 }
@@ -100,7 +112,13 @@ private fun SearchField(query: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun ChannelList(rows: List<ChannelListRow>, hints: List<UnsupportedHint>, actions: ConnectedController) {
+private fun ChannelList(
+    rows: List<ChannelListRow>,
+    hints: List<UnsupportedHint>,
+    actions: ConnectedController,
+    streams: StreamsUiState,
+    streamActions: StreamsController?,
+) {
     // Rows are immutable values with stable keys: when one person starts or stops talking,
     // only that person's row is drawn again.
     LazyColumn(
@@ -118,6 +136,7 @@ private fun ChannelList(rows: List<ChannelListRow>, hints: List<UnsupportedHint>
                 when (row) {
                     is ChannelListRow.ChannelItem -> "channel-${row.id}"
                     is ChannelListRow.PersonItem -> "person-${row.session}"
+                    is ChannelListRow.StreamItem -> "stream-${row.key.session}-${row.key.kind}"
                 }
             },
             contentType = { it::class },
@@ -126,6 +145,12 @@ private fun ChannelList(rows: List<ChannelListRow>, hints: List<UnsupportedHint>
             when (row) {
                 is ChannelListRow.ChannelItem -> ChannelLine(row, actions, indent)
                 is ChannelListRow.PersonItem -> PersonLine(row, actions::openPerson, indent)
+                is ChannelListRow.StreamItem -> {
+                    val stream = streams.streams[row.key]
+                    if (stream != null && streamActions != null) {
+                        StreamTileLine(stream, streamActions::open, streamActions::tileShown, indent)
+                    }
+                }
             }
         }
         items(items = hints, key = { "hint-${it.id}" }) { hint ->

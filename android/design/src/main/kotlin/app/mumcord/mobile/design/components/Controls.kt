@@ -89,6 +89,7 @@ fun MumcordToggle(
 /**
  * Slider (`.slider`) for a [value] from 0 to 1, such as a volume. [contentDescription] names
  * what it changes. TalkBack and keyboards change it in steps through the accessibility action.
+ * [onMedia] draws it white on dark, for the stream's full screen, which is dark in both themes.
  */
 @Composable
 fun MumcordSlider(
@@ -96,8 +97,13 @@ fun MumcordSlider(
     onValueChange: (Float) -> Unit,
     contentDescription: String,
     modifier: Modifier = Modifier,
+    onMedia: Boolean = false,
 ) {
     val colors = MumcordTheme.colors
+    val fill = if (onMedia) colors.mediaText else colors.accent
+    val track = if (onMedia) colors.stageTrack else colors.bgHover
+    val edge = if (onMedia) Color.Transparent else colors.border
+    val thumbColor = if (onMedia) colors.mediaText else colors.text
     val fraction = value.coerceIn(0f, 1f)
     val onChange by rememberUpdatedState(onValueChange)
     val thumbShadow = ShadowToken(y = 2.dp, blur = 6.dp, spread = 0.dp, color = colors.sliderThumbShadow)
@@ -126,22 +132,22 @@ fun MumcordSlider(
     ) {
         Canvas(Modifier.fillMaxWidth().height(6.dp)) {
             val radius = CornerRadius(size.height / 2)
-            drawRoundRect(colors.bgHover, cornerRadius = radius)
+            drawRoundRect(track, cornerRadius = radius)
             // The filled part ends square under the thumb, like the CSS gradient.
             val track = Path().apply { addRoundRect(RoundRect(0f, 0f, size.width, size.height, radius)) }
             clipPath(track) {
-                drawRect(colors.accent, size = Size(size.width * fraction, size.height))
+                drawRect(fill, size = Size(size.width * fraction, size.height))
             }
             val inset = 0.5.dp.toPx()
             drawRoundRect(
-                color = colors.border,
+                color = edge,
                 topLeft = Offset(inset, inset),
                 size = Size(size.width - 2 * inset, size.height - 2 * inset),
                 cornerRadius = radius,
                 style = Stroke(1.dp.toPx()),
             )
         }
-        Thumb(fraction, colors.text, thumbShadow)
+        Thumb(fraction, thumbColor, thumbShadow)
     }
 }
 

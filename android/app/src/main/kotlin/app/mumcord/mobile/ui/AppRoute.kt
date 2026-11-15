@@ -2,6 +2,8 @@
 
 package app.mumcord.mobile.ui
 
+import app.mumcord.mobile.ui.streams.StreamPictureInPicture
+import app.mumcord.mobile.ui.streams.StreamsUiState
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -91,6 +93,7 @@ fun AppRoute(
     chatImages: ChatImageSystem? = null,
     chatImageLoader: ChatImageLoader = (LocalContext.current.applicationContext as MumcordApplication).chatImageLoader,
     identitySystem: IdentitySystem? = null,
+    pictureInPicture: Boolean = false,
 ) {
     val cameraGateway = (LocalContext.current.applicationContext as MumcordApplication).cameraGateway
     // The camera question of "take a photo" is open, for the chat or for the profile picture;
@@ -126,6 +129,7 @@ fun AppRoute(
     }
     val identities = identitySystem ?: rememberIdentitySystem(viewModel.identities, camera)
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val streams by viewModel.streams.state.collectAsStateWithLifecycle()
     val chat by viewModel.chatState.collectAsStateWithLifecycle()
     val chatBadge by viewModel.chatBadge.collectAsStateWithLifecycle()
     val messages by viewModel.messagesState.collectAsStateWithLifecycle()
@@ -176,6 +180,8 @@ fun AppRoute(
             updateNotice = updateNotice,
             crash = crash,
             avatarImages = avatarImages,
+            streams = streams,
+            pictureInPicture = pictureInPicture,
         )
         photoQuestion?.let { photoFor ->
             CameraSheet(
@@ -220,6 +226,8 @@ fun AppContent(
     avatarImages: ChatImageSystem = ChatImageSystem(pickPhoto = {}, takePhoto = {}),
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
+    streams: StreamsUiState = StreamsUiState(),
+    pictureInPicture: Boolean = false,
 ) {
     val session = uiState.session
     val prompt = session.certificatePrompt
@@ -358,6 +366,12 @@ fun AppContent(
                 AppScreen.Channels -> uiState.connected?.let { connected ->
                     // All follow the same session, so they are there together.
                     if (messages == null || more == null) return@let
+                    // The system's picture-in-picture window shows only the opened stream (FR-5.76).
+                    val pipStream = streams.opened.takeIf { pictureInPicture }
+                    if (pipStream != null) {
+                        StreamPictureInPicture(pipStream)
+                        return@let
+                    }
                     ConnectedShell(
                         state = connected,
                         actions = viewModel.connected,
@@ -381,6 +395,8 @@ fun AppContent(
                         onIdentities = viewModel.identities::open,
                         topInsets = topInsets,
                         bottomInsets = bottomInsets,
+                        streams = streams,
+                        streamActions = viewModel.streams,
                     )
                 }
             }

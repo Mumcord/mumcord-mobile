@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.ui.connected
 
+import app.mumcord.mobile.ui.streams.StreamKey
+import app.mumcord.mobile.ui.streams.key
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.platform.call.OutputState
@@ -41,6 +43,9 @@ sealed interface ChannelListRow {
         val locallyMuted: Boolean,
         val state: PersonFlags,
     ) : ChannelListRow
+
+    /** The tile of a person's screen share or camera, under that person (FR-5.70). */
+    data class StreamItem(val key: StreamKey, override val depth: Int) : ChannelListRow
 }
 
 /** What the state icons of a person show. Being deafened by the server counts as deafened. */
@@ -74,6 +79,7 @@ fun channelRows(
     selfChannelId: UInt?,
     collapsed: Set<UInt>,
     query: String = "",
+    streams: List<StreamKey> = emptyList(),
 ): List<ChannelListRow> {
     root ?: return emptyList()
     val needle = query.trim()
@@ -112,6 +118,8 @@ fun channelRows(
                         state = it.flags(),
                     ),
                 )
+                streams.filter { stream -> stream.session == it.session }
+                    .forEach { stream -> add(ChannelListRow.StreamItem(stream, depth + 1)) }
             }
             node.children.forEach { add(it, level + 1) }
         }
@@ -227,7 +235,13 @@ fun connectedUiState(
     askOutput: Boolean = false,
 ): ConnectedUiState? {
     val server = session.server?.takeIf { session.showsServer } ?: return null
-    val rows = channelRows(server.root, server.selfChannelId, local.collapsed, if (local.searching) local.query else "")
+    val rows = channelRows(
+        server.root,
+        server.selfChannelId,
+        local.collapsed,
+        if (local.searching) local.query else "",
+        streams = session.streams.map { it.key },
+    )
 
     val prompt = session.channelPassword
     val person = local.personSession?.let(server.people::get)

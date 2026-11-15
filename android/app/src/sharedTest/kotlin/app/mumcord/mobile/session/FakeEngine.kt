@@ -57,7 +57,11 @@ import app.mumcord.mobile.bridge.PasswordInput
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
+import app.mumcord.mobile.bridge.Stream
 import app.mumcord.mobile.bridge.StreamKind
+import app.mumcord.mobile.bridge.StreamPath
+import app.mumcord.mobile.bridge.StreamUnreachable
+import app.mumcord.mobile.bridge.StreamWatch
 import app.mumcord.mobile.bridge.VideoSink
 import app.mumcord.mobile.bridge.DefaultOutput
 import app.mumcord.mobile.bridge.Identity
@@ -466,18 +470,78 @@ class FakeEngine(
 
     override fun audioEndpoints(): AudioEndpoints = AudioEndpoints(capture = 0uL, playback = 0uL)
 
-    // Streams phase (task 7.3): the app does not watch streams yet.
-    override suspend fun watchStream(session: UInt, kind: StreamKind) {}
+    // ----- streams -----
+    // The tests set the streams with [showStreams]; a watch goes to Connecting and then to
+    // [watchOutcome], after the direct connection question when [asksDirectConnections].
 
-    override suspend fun stopWatchingStream(session: UInt, kind: StreamKind) {}
+    private val streams = CopyOnWriteArrayList<Stream>()
+    val watchCalls = CopyOnWriteArrayList<Pair<UInt, StreamKind>>()
+    val stopCalls = CopyOnWriteArrayList<Pair<UInt, StreamKind>>()
+    val directAnswers = CopyOnWriteArrayList<Boolean>()
 
-    override suspend fun setStreamVolume(session: UInt, percent: UShort) {}
+    @Volatile
+    var watchOutcome: StreamWatch = StreamWatch.Watching(StreamPath.DIRECT)
 
-    override fun setVideoSink(sink: VideoSink?) {}
+    @Volatile
+    var asksDirectConnections = false
+
+    @Volatile
+    var lastVideoSink: VideoSink? = null
+
+    /** Replaces the streams of the user's channel, as the bridge reports them. */
+    fun showStreams(list: List<Stream>) {
+        streams.clear()
+        streams.addAll(list)
+        emitStreams()
+    }
+
+    fun currentStreams(): List<Stream> = streams.toList()
+
+    private fun emitStreams() = emit(BridgeEvent.StreamsChanged(streams.toList()))
+
+    private fun changeStream(session: UInt, kind: StreamKind, change: (Stream) -> Stream) {
+        val index = streams.indexOfFirst { it.session == session && it.kind == kind }
+        if (index < 0) throw BridgeException.NotFound("no such stream")
+        streams[index] = change(streams[index])
+        emitStreams()
+    }
+
+    override suspend fun watchStream(session: UInt, kind: StreamKind) {
+        watchCalls += session to kind
+        changeStream(session, kind) { it.copy(watch = StreamWatch.Connecting) }
+        if (asksDirectConnections && directAnswers.isEmpty()) {
+            emit(BridgeEvent.DirectConnectionsQuestion)
+            return
+        }
+        changeStream(session, kind) { it.copy(watch = watchOutcome) }
+    }
+
+    override suspend fun stopWatchingStream(session: UInt, kind: StreamKind) {
+        stopCalls += session to kind
+        changeStream(session, kind) { it.copy(watch = StreamWatch.Idle) }
+    }
+
+    override suspend fun setStreamVolume(session: UInt, percent: UShort) {
+        streams.filter { it.session == session }.forEach { stream ->
+            changeStream(session, stream.kind) { it.copy(volume = percent) }
+        }
+    }
+
+    override fun setVideoSink(sink: VideoSink?) {
+        lastVideoSink = sink
+    }
 
     override fun videoHandle(): ULong = 0uL
 
-    override suspend fun answerDirectConnections(allow: Boolean) {}
+    /** The answer also lets the watches that waited for it go on. */
+    override suspend fun answerDirectConnections(allow: Boolean) {
+        directAnswers += allow
+        streams.filter { it.watch == StreamWatch.Connecting }.forEach { stream ->
+            changeStream(stream.session, stream.kind) {
+                it.copy(watch = if (allow) watchOutcome else StreamWatch.Unreachable(StreamUnreachable.DIRECT_CONNECTIONS_DECLINED))
+            }
+        }
+    }
 
     /** Every press (true) and release (false) of the hold-to-talk button, in order. */
     val pushToTalkCalls = CopyOnWriteArrayList<Boolean>()

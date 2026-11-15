@@ -34,6 +34,8 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
             denied = null,
             hints = emptyList(),
             activity = emptyList(),
+            streams = emptyList(),
+            directConnectionsQuestion = false,
         )
         ConnectionState.Connecting -> copy(phase = ConnectionPhase.Connecting)
         ConnectionState.Connected ->
@@ -101,7 +103,6 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.ChatNotification,
     is BridgeEvent.ChatUnreadChanged,
     is BridgeEvent.MessageRequestsChanged -> this
-    // Streams phase (task 7.3): the state does not follow streams yet.
-    is BridgeEvent.StreamsChanged,
-    is BridgeEvent.DirectConnectionsQuestion -> this
+    is BridgeEvent.StreamsChanged -> copy(streams = event.streams)
+    is BridgeEvent.DirectConnectionsQuestion -> copy(directConnectionsQuestion = true)
 }

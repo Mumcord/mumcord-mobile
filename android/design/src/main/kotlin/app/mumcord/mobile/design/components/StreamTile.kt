@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,8 +27,11 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.design.icons.MumcordIcons
@@ -41,22 +46,29 @@ private val OverlayInset = 9.dp
 
 /**
  * Tile of a running stream (`.stream`) in 16:9 with a LIVE badge, a label and the number of
- * viewers. It shows a placeholder that stays dark in both themes, like real video; the video
- * itself is drawn by a later task. The tile is as wide as its container; set a width for the
- * compact form in the channel tree (232 dp in the mockups).
+ * viewers. Under the [picture] it shows a placeholder that stays dark in both themes, like real
+ * video, so the tile looks the same before the first picture arrives. The tile is as wide as its
+ * container; set a width for the compact form in the channel tree (232 dp in the mockups).
  *
+ * @param viewerCount null hides the count (where it is not known).
  * @param contentDescription the whole tile in words for TalkBack, such as
  * "Mira's screen, live, 1 viewer".
+ * @param icon the placeholder's icon: the monitor for a screen share, the camera for a camera.
+ * @param status a short line under the icon, such as "Tap to watch"; null for none.
+ * @param picture the stream's live picture, drawn over the placeholder; null for none.
  */
 @Composable
 fun MumcordStreamTile(
     label: String,
     liveLabel: String,
-    viewerCount: Int,
+    viewerCount: Int?,
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    icon: ImageVector = MumcordIcons.Monitor,
+    status: String? = null,
+    picture: (@Composable () -> Unit)? = null,
 ) {
     val colors = MumcordTheme.colors
     val shape = RoundedCornerShape(MumcordRadius.lg)
@@ -92,26 +104,29 @@ fun MumcordStreamTile(
             .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) { this.contentDescription = contentDescription },
     ) {
-        MumcordIcon(
-            icon = MumcordIcons.Monitor,
-            contentDescription = null,
-            tint = colors.mediaText,
-            size = MumcordSize.iconLg,
-            modifier = Modifier.alpha(0.7f),
-        )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(OverlayInset)
-                .height(22.dp)
-                .background(colors.live, chip)
-                .padding(horizontal = MumcordSpace.s2),
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(MumcordSpace.s1),
+            modifier = Modifier.padding(horizontal = MumcordSpace.s4),
         ) {
-            Box(Modifier.size(6.dp).background(colors.onLive, CircleShape))
-            LineText(liveLabel, MumcordTheme.typography.live, colors.onLive)
+            MumcordIcon(
+                icon = icon,
+                contentDescription = null,
+                tint = colors.mediaText,
+                size = MumcordSize.iconLg,
+                modifier = Modifier.alpha(0.7f),
+            )
+            if (status != null) {
+                BasicText(
+                    text = status,
+                    style = MumcordTheme.typography.captionStrong.copy(color = colors.mediaText, textAlign = TextAlign.Center),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
+        if (picture != null) Box(Modifier.matchParentSize()) { picture() }
+        MumcordLiveBadge(liveLabel, Modifier.align(Alignment.TopStart).padding(OverlayInset))
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
@@ -123,19 +138,38 @@ fun MumcordStreamTile(
         ) {
             LineText(label, MumcordTheme.typography.captionStrong, colors.mediaText)
         }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(OverlayInset)
-                .height(24.dp)
-                .background(colors.mediaScrim, chip)
-                .padding(horizontal = MumcordSpace.s2),
-        ) {
-            MumcordIcon(MumcordIcons.User, contentDescription = null, tint = colors.mediaText, size = MumcordSize.iconSm)
-            LineText(viewerCount.toString(), MumcordTheme.typography.captionStrong, colors.mediaText)
+        if (viewerCount != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(OverlayInset)
+                    .height(24.dp)
+                    .background(colors.mediaScrim, chip)
+                    .padding(horizontal = MumcordSpace.s2),
+            ) {
+                MumcordIcon(MumcordIcons.User, contentDescription = null, tint = colors.mediaText, size = MumcordSize.iconSm)
+                LineText(viewerCount.toString(), MumcordTheme.typography.captionStrong, colors.mediaText)
+            }
         }
+    }
+}
+
+/** The red LIVE badge of streams (`.stream__live`), on the tile, the full screen and the mini window. */
+@Composable
+fun MumcordLiveBadge(liveLabel: String, modifier: Modifier = Modifier) {
+    val colors = MumcordTheme.colors
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .height(22.dp)
+            .background(colors.live, RoundedCornerShape(MumcordRadius.sm))
+            .padding(horizontal = MumcordSpace.s2),
+    ) {
+        Box(Modifier.size(6.dp).background(colors.onLive, CircleShape))
+        LineText(liveLabel, MumcordTheme.typography.live, colors.onLive)
     }
 }
 

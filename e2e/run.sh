@@ -26,7 +26,10 @@
 #      server saw the same certificate on every connect. For the transfer scenario
 #      e2e/transfer-maker makes a transfer with the engine as the desktop app does (a new
 #      identity and a new code in every run); its QR code texts and its code reach the test
-#      as an argument and are written to no file and no log. The public server scenario
+#      as an argument and are written to no file and no log. In the stream scenario
+#      e2e/stream-peer (the engine on this machine, built with libvpx) shares its moving test
+#      pattern; it writes down how many people watch whenever the test asks, which shows that
+#      nothing was fetched before the tap. The public server scenario
 #      serves its own list inside the emulator (android/e2e LocalPublicList) and never
 #      contacts the real list service. In the moderation scenarios the phone connects as the
 #      test server's SuperUser (its password reaches the test as an argument, never a file or
@@ -106,6 +109,8 @@ LOCK_PTT_SECONDS=60
 # "activity" a second person who joins the server, moves and leaves whenever the test asks;
 # "profile" a second person (e2e/profile-watch.py) who has to see the comment and the avatar the
 # phone sets, the avatar without EXIF data;
+# "stream" a second person who shares a screen (e2e/stream-peer) and writes down its viewers
+# whenever the test asks;
 # "moderation" a second person (e2e/moderation-target.py) whom the phone, connected as the test
 # server's SuperUser, moves and kicks, and who has to report both; "ban" the
 # same person, who has to be removed by a short ban, refused while it lasts and let in again
@@ -138,6 +143,7 @@ SCENARIOS=(
   "granted granted pm ${TEST_PACKAGE}.MessagesFlowTest"
   "granted granted identity ${TEST_PACKAGE}.IdentityFlowTest"
   "granted granted transfer ${TEST_PACKAGE}.TransferFlowTest"
+  "granted granted stream ${TEST_PACKAGE}.StreamFlowTest"
   "granted granted activity ${TEST_PACKAGE}.ActivityFlowTest"
   "granted granted profile ${TEST_PACKAGE}.ProfileThemeFlowTest"
   "granted granted moderation ${TEST_PACKAGE}.ModerationFlowTest#moveAndKickReachTheOtherPerson"
@@ -184,6 +190,8 @@ MODERATION_LOG="${OUT_DIR}/moderation-target.log"
 # The SuperUser password of the test server, which scripts/testenv.sh wrote here.
 TESTENV_FILE="${REPO_ROOT}/.engine/testenv/.env"
 TRANSFER_MAKER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/transfer-maker"
+STREAM_PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/stream-peer"
+STREAM_PEER_LOG="${OUT_DIR}/stream-peer.log"
 # The numbers of the private messages the second person of the "pm" scenario is to send, and
 # the steps of the visitor of the "activity" scenario.
 PM_FIFO="${OUT_DIR}/pm-requests"
@@ -294,6 +302,8 @@ start_messenger() {
         printf '%s\n' "${number}" >&9
       elif [[ "${word}" == "visitor" && "${command}" =~ ^(join|move|leave)$ ]]; then
         printf '%s\n' "${command}" >&9
+      elif [[ "${word}" == "stream" && "${command}" == "mark" && "${number}" =~ ^[a-z-]+$ ]]; then
+        printf 'mark %s\n' "${number}" >&9
       fi
     done
   ) &
@@ -339,7 +349,7 @@ check_peers() {
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
   if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" \
     && "${kind}" != "identity" && "${kind}" != "activity" && "${kind}" != "moderation" \
-    && "${kind}" != "ban" && "${kind}" != "profile" ]]; then
+    && "${kind}" != "ban" && "${kind}" != "profile" && "${kind}" != "stream" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -494,6 +504,18 @@ check_peers() {
       done
       printf 'e2e: activity: the visitor joined, moved and left while the phone watched\n'
       ;;
+    stream)
+      # In order: nobody watched before the tap, then the phone did, then it stopped.
+      local after_mark first_frame
+      grep -qx 'MARK before-tap viewers=0' "${STREAM_PEER_LOG}" \
+        || die "the sharer did not report zero viewers before the tap, see e2e/build/stream-peer.log"
+      after_mark="$(sed -n '/^MARK before-tap/,$p' "${STREAM_PEER_LOG}")"
+      grep -q '^VIEWERS 1$' <<<"${after_mark}" || die "the sharer never had the phone as viewer, see e2e/build/stream-peer.log"
+      [[ "$(grep '^VIEWERS' <<<"${after_mark}" | tail -n 1)" == "VIEWERS 0" ]] \
+        || die "the phone still watched after it stopped, see e2e/build/stream-peer.log"
+      first_frame="$(sed -n 's/^stream: first_frame_ms=\([0-9]*\).*/\1/p' "${report}" | tr -d '\r')"
+      printf 'e2e: stream: nothing fetched before the tap; first picture %s ms after the tap\n' "${first_frame:-?}"
+      ;;
   esac
 }
 
@@ -507,7 +529,7 @@ cleanup() {
     # What the other people reported belongs next to the failure, not only into a file.
     local log
     for log in "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}" \
-      "${MODERATION_LOG}" "${PROFILE_WATCH_LOG}"; do
+      "${MODERATION_LOG}" "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}"; do
       [[ -s "${log}" ]] || continue
       printf 'e2e: the end of %s:\n' "${log#"${REPO_ROOT}/"}"
       tail -n 40 "${log}"
@@ -588,7 +610,7 @@ start_emulator() {
 mkdir -p "${OUT_DIR}"
 rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" \
   "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.* "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}" \
-  "${PROFILE_WATCH_LOG}"
+  "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}"
 trap cleanup EXIT
 if [[ -n "${EVIDENCE_DIR}" ]]; then
   mkdir -p "${EVIDENCE_DIR}"
@@ -603,6 +625,13 @@ step "building the app and the tests"
 [[ -x "${PEER_BINARY}" ]] || die "the second person's program was not built at ${PEER_BINARY}"
 [[ -x "${CHAT_PEER_BINARY}" ]] || die "the chat person's program was not built at ${CHAT_PEER_BINARY}"
 [[ -x "${TRANSFER_MAKER_BINARY}" ]] || die "the transfer maker was not built at ${TRANSFER_MAKER_BINARY}"
+# The sharer encodes VP9 on this machine, so it is built on its own with libvpx (a build
+# together with the others would give them its codec and test features too).
+if [[ "${E2E_SCENARIO:-}" == "" || "${TEST_PACKAGE}.StreamFlowTest" == *"${E2E_SCENARIO}"* ]]; then
+  pkg-config --exists vpx 2>/dev/null || die "libvpx is missing for the stream scenario (Debian: libvpx-dev, Arch: libvpx)"
+  (cd "${REPO_ROOT}" && cargo build --locked --quiet --package mumcord-stream-peer --features sharer)
+  [[ -x "${STREAM_PEER_BINARY}" ]] || die "the sharer was not built at ${STREAM_PEER_BINARY}"
+fi
 command -v python3 >/dev/null 2>&1 || die "python3 is required for the raw chat message and the identity watcher"
 
 step "starting the test server on port ${MUMCORD_PORT_BASE}"
@@ -693,6 +722,10 @@ run_scenario() {
     activity)
       start_messenger
       PERSON_INPUT="${PM_FIFO}" start_person "${CHAT_PEER_LOG}" "${CHAT_PEER_BINARY}" --phone "${PHONE_NAME}" --visitor
+      ;;
+    stream)
+      start_messenger
+      PERSON_INPUT="${PM_FIFO}" start_person "${STREAM_PEER_LOG}" "${STREAM_PEER_BINARY}" 127.0.0.1 "${MUMCORD_PORT_BASE}"
       ;;
     moderation | ban)
       local superuser

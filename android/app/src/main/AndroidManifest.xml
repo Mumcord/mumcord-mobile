@@ -26,7 +26,13 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
+            android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustResize">
+            <!-- A watched stream continues in the system's picture-in-picture window (FR-5.76). Size and
+                 orientation changes (rotation, entering and leaving that window) are handled by Compose
+                 without recreating the activity, so the stream's picture does not restart; theme and
+                 language changes still recreate it. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

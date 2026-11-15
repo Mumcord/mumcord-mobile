@@ -78,7 +78,11 @@ import java.time.ZoneId
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import app.mumcord.mobile.ui.streams.StreamVideo
+import app.mumcord.mobile.ui.streams.StreamsController
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -113,6 +117,9 @@ class AppViewModel(
     /** Where the notices are read; the tests read them on their own dispatcher. */
     io: CoroutineDispatcher = Dispatchers.IO,
     crashSource: CrashSource = CrashSource.None,
+    streamsAutoplay: Flow<Boolean> = flowOf(true),
+    /** Where the pictures of watched streams come from. */
+    val streamVideo: StreamVideo = StreamVideo.None,
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -141,6 +148,9 @@ class AppViewModel(
 
     /** The connected screens' own state and actions. */
     val connected = ConnectedController(repository, viewModelScope, outputs)
+
+    /** Watching screen shares and cameras. */
+    val streams = StreamsController(repository, viewModelScope, streamsAutoplay, streamVideo)
 
     /** The identity screens and the scan of a transfer from the desktop app. */
     val identities = IdentitiesController(repository, viewModelScope, camera)
@@ -726,6 +736,8 @@ class AppViewModel(
                     application.updateChecker,
                     NoticesSource.assets(application.assets),
                     crashSource = BridgeCrashSource(application.sessionRepository),
+                    streamsAutoplay = application.streamsAutoplay,
+                    streamVideo = application.streamVideo,
                 ).also {
                     // Start with the first screen and then follow the session by themselves.
                     application.networkSession

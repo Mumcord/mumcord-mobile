@@ -149,6 +149,7 @@ dependencies {
     implementation(project(":platform:notify"))
     implementation(project(":platform:scanner"))
     implementation(project(":platform:securestore"))
+    implementation(project(":platform:video"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
