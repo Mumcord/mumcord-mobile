@@ -7,6 +7,8 @@
 
 plugins {
     alias(libs.plugins.android.test)
+    // The test camera of the camera test draws its preview with Compose.
+    alias(libs.plugins.kotlin.compose)
 }
 
 android {
@@ -28,6 +30,9 @@ dependencies {
     // What the user is set to on the server, read from the app under test.
     compileOnly(project(":platform:call"))
     compileOnly(project(":platform:video"))
+    // The test camera of the camera test hands its pictures to the app's camera input.
+    compileOnly(project(":platform:camera"))
+    compileOnly(libs.compose.foundation)
     // The channel the user is in and the voice bitrate limit, read from the app under test.
     compileOnly(project(":engine"))
     // The chat test hands the app a picture where the system photo picker would: through the

@@ -2,6 +2,8 @@
 
 package app.mumcord.mobile.ui
 
+import app.mumcord.mobile.ui.camerashare.CameraShareUi
+import app.mumcord.mobile.ui.camerashare.CameraSourcePreview
 import app.mumcord.mobile.ui.streams.StreamPictureInPicture
 import app.mumcord.mobile.ui.streams.StreamsUiState
 import androidx.activity.compose.BackHandler
@@ -80,8 +82,8 @@ import app.mumcord.mobile.ui.themes.ThemesSheetHost
 import app.mumcord.mobile.ui.themes.shareThemeText
 import app.mumcord.mobile.update.AvailableUpdate
 
-/** What a photo from the camera is for; the camera question is the same for both. */
-enum class PhotoFor { Chat, Avatar }
+/** What the camera is wanted for: a photo or sharing it; the camera question is the same for all. */
+enum class PhotoFor { Chat, Avatar, CameraShare }
 
 /** Connects the screens to the view model; everything below it only gets values and callbacks. */
 @Composable
@@ -105,7 +107,9 @@ fun AppRoute(
         if (photoFor != null) {
             photoQuestion = null
             cameraGateway.record(answer)
-            if (answer.granted) takePhoto.value(photoFor)
+            if (answer.granted) {
+                if (photoFor == PhotoFor.CameraShare) viewModel.cameraShare?.open() else takePhoto.value(photoFor)
+            }
         } else {
             viewModel.identities.answerCamera(answer)
         }
@@ -125,6 +129,7 @@ fun AppRoute(
         when (photoFor) {
             PhotoFor.Chat -> images.takePhoto()
             PhotoFor.Avatar -> avatarImages.takePhoto()
+            PhotoFor.CameraShare -> Unit
         }
     }
     val identities = identitySystem ?: rememberIdentitySystem(viewModel.identities, camera)
@@ -137,6 +142,15 @@ fun AppRoute(
     val more by viewModel.moreState.collectAsStateWithLifecycle()
     val updateNotice by viewModel.updateNotice.collectAsStateWithLifecycle()
     val crash by viewModel.crashState.collectAsStateWithLifecycle()
+    val cameraShare = viewModel.cameraShare?.let { controller ->
+        val state by controller.state.collectAsStateWithLifecycle()
+        CameraShareUi(
+            state = state,
+            actions = controller,
+            onCameraButton = { if (cameraGateway.granted()) controller.open() else photoQuestion = PhotoFor.CameraShare },
+            preview = { modifier -> CameraSourcePreview(controller.source, modifier) },
+        )
+    }
     val chatEnvironment = ChatEnvironment(chatImageLoader, images, rememberChatClock())
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshPings()
@@ -182,11 +196,16 @@ fun AppRoute(
             avatarImages = avatarImages,
             streams = streams,
             pictureInPicture = pictureInPicture,
+            camera = cameraShare,
         )
         photoQuestion?.let { photoFor ->
             CameraSheet(
                 reason = stringResource(
-                    if (photoFor == PhotoFor.Avatar) R.string.camera_reason_avatar else R.string.camera_reason_photo,
+                    when (photoFor) {
+                        PhotoFor.Chat -> R.string.camera_reason_photo
+                        PhotoFor.Avatar -> R.string.camera_reason_avatar
+                        PhotoFor.CameraShare -> R.string.camera_reason_share
+                    },
                 ),
                 blocked = cameraGateway.promptBlocked,
                 onContinue = camera.ask,
@@ -228,6 +247,7 @@ fun AppContent(
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
     streams: StreamsUiState = StreamsUiState(),
     pictureInPicture: Boolean = false,
+    camera: CameraShareUi? = null,
 ) {
     val session = uiState.session
     val prompt = session.certificatePrompt
@@ -397,6 +417,7 @@ fun AppContent(
                         bottomInsets = bottomInsets,
                         streams = streams,
                         streamActions = viewModel.streams,
+                        camera = camera,
                     )
                 }
             }

@@ -2,6 +2,9 @@
 package app.mumcord.mobile
 
 import app.mumcord.mobile.session.IdleTimes
+import app.mumcord.mobile.platform.camera.CameraFrames
+import app.mumcord.mobile.platform.camera.CameraSource
+import app.mumcord.mobile.platform.camera.CameraTrouble
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -38,4 +41,14 @@ object TestSettings {
      */
     @Volatile
     var banSeconds: UInt? = null
+
+    /**
+     * The emulator's camera shows a scene nobody can check: when set, camera sharing uses this
+     * camera instead (the end-to-end test's moving test pattern). Read whenever the camera opens.
+     */
+    @Volatile
+    var cameraSource: TestCameraSource? = null
 }
+
+/** Makes a camera from where its pictures go and what it calls when it cannot run. */
+typealias TestCameraSource = (frames: CameraFrames, onTrouble: (CameraTrouble) -> Unit) -> CameraSource

@@ -86,6 +86,8 @@ class MainActivity : ComponentActivity() {
     private fun followOpenedStream() {
         addOnPictureInPictureModeChangedListener { change ->
             pictureInPicture = change.isInPictureInPictureMode
+            // The small window counts as leaving the app for the shared camera (FR-5.75).
+            cameraShare.setOnScreen(!change.isInPictureInPictureMode && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
             // Left the window without coming back to the app: the user closed it.
             if (!change.isInPictureInPictureMode && !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
                 viewModel.streams.close()
@@ -133,6 +135,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         viewModel.streams.setOnScreen(true)
+        cameraShare.setOnScreen(!isInPictureInPictureMode)
         // Only on screen may the session's background service be started or changed.
         (application as MumcordApplication).voiceCall.onAppVisible()
     }
@@ -143,7 +146,11 @@ class MainActivity : ComponentActivity() {
         if (isInPictureInPictureMode) viewModel.streams.close()
         // Nothing is decoded that nobody sees (FR-5.43).
         viewModel.streams.setOnScreen(false)
+        // The shared camera pauses while the app is in the background (FR-5.75).
+        cameraShare.setOnScreen(false)
     }
+
+    private val cameraShare get() = (application as MumcordApplication).cameraShare
 
     /** A `mumble://` link from another app. It is only shown; the user decides what happens. */
     private fun openLink(intent: Intent) {

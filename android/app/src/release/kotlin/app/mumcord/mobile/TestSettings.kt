@@ -2,6 +2,9 @@
 package app.mumcord.mobile
 
 import app.mumcord.mobile.session.IdleTimes
+import app.mumcord.mobile.platform.camera.CameraFrames
+import app.mumcord.mobile.platform.camera.CameraSource
+import app.mumcord.mobile.platform.camera.CameraTrouble
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -20,4 +23,10 @@ object TestSettings {
 
     /** A ban always lasts the chosen length. */
     val banSeconds: UInt? = null
+
+    /** The shared camera is always the phone's camera. */
+    val cameraSource: TestCameraSource? = null
 }
+
+/** Makes a camera from where its pictures go and what it calls when it cannot run. */
+typealias TestCameraSource = (frames: CameraFrames, onTrouble: (CameraTrouble) -> Unit) -> CameraSource

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.ui.connected
 
+import app.mumcord.mobile.ui.camerashare.CameraBar
+import app.mumcord.mobile.ui.camerashare.CameraShareSheet
+import app.mumcord.mobile.ui.camerashare.CameraShareUi
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -85,22 +88,26 @@ fun ConnectedShell(
     bottomInsets: WindowInsets,
     streams: StreamsUiState = StreamsUiState(),
     streamActions: StreamsController? = null,
+    camera: CameraShareUi? = null,
 ) {
+    val cameraSheet = camera?.state?.sheet
     // The engine waits for this answer before a stream can use a direct connection.
-    if (streamActions != null && streams.directConnectionsQuestion) {
+    val directQuestion = streamActions != null && streams.directConnectionsQuestion
+    if (cameraSheet != null || directQuestion) {
         Box(Modifier.fillMaxSize()) {
             ConnectedContent(
                 state, actions, onDisconnect, onMicrophone, chat, chatBadge, chatActions, chatEnvironment, messages,
                 messagesActions, conversation, conversationActions, more, moreActions, onNotificationSettings, onIdentities,
-                topInsets, bottomInsets, streams, streamActions,
+                topInsets, bottomInsets, streams, streamActions, camera,
             )
-            DirectConnectionsSheet(streamActions, topInsets, bottomInsets)
+            if (camera != null && cameraSheet != null) CameraShareSheet(cameraSheet, camera, topInsets, bottomInsets)
+            if (streamActions != null && directQuestion) DirectConnectionsSheet(streamActions, topInsets, bottomInsets)
         }
     } else {
         ConnectedContent(
             state, actions, onDisconnect, onMicrophone, chat, chatBadge, chatActions, chatEnvironment, messages,
             messagesActions, conversation, conversationActions, more, moreActions, onNotificationSettings, onIdentities,
-            topInsets, bottomInsets, streams, streamActions,
+            topInsets, bottomInsets, streams, streamActions, camera,
         )
     }
 }
@@ -127,6 +134,7 @@ private fun ConnectedContent(
     bottomInsets: WindowInsets,
     streams: StreamsUiState,
     streamActions: StreamsController?,
+    camera: CameraShareUi?,
 ) {
     val opened = streams.opened.takeIf { streamActions != null }
     if (opened != null && streamActions != null && streams.open?.view == StreamView.Full) {
@@ -162,7 +170,7 @@ private fun ConnectedContent(
     LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { actions.releaseHolds() }
     val voice = state.voice
     if (voice != null && voice.open) {
-        VoiceScreen(voice, state, actions, onDisconnect, onMicrophone, topInsets, bottomInsets)
+        VoiceScreen(voice, state, actions, onDisconnect, onMicrophone, topInsets, bottomInsets, camera)
         return
     }
     MumcordScreen {
@@ -233,6 +241,7 @@ private fun ConnectedContent(
         ConnectedBanners(state, actions::dismissDenied, onMicrophone)
         if (voice != null) {
             voice.whisper?.let { WhisperBar(it, actions::setWhisperHeld, actions::closeWhisper) }
+            camera?.let { CameraBar(it.state, it.actions) }
             VoiceBar(voice, actions, onDisconnect, onMicrophone)
         }
         MumcordTabBar(

@@ -69,5 +69,8 @@
   "settings_language_system": "settings:language.system",
   "stream_title_screen": "screenviewer:title",
   "stream_paused": "screenviewer:pausedShort",
-  "stream_try_again": "screenviewer:retry"
+  "stream_try_again": "screenviewer:retry",
+  "camera_share_cancel": "camera:preview.cancel",
+  "camera_stop": "screenshare:liveBar.stop",
+  "camera_notice_dismiss": "camera:errors.dismissStopped"
 }

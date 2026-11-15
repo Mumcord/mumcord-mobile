@@ -27,9 +27,9 @@ All end-to-end scenarios and instrumented tests run in CI on every push to a pul
 |---|---|
 | End-to-end, some with instrumented tests for a part (AC-5.4's password channel is instrumented only) | 26 |
 | Instrumented or unit tests only | 2 (AC-5.20, AC-5.32) |
-| Automated as far as the emulator allows, the rest manual | 5 (AC-5.8, AC-5.10, AC-5.11, AC-5.12, AC-5.33) |
+| Automated as far as the emulator allows, the rest manual | 6 (AC-5.8, AC-5.10, AC-5.11, AC-5.12, AC-5.24, AC-5.33) |
 | Checked elsewhere (release check V10, desktop CI) | 3 (AC-5.34, AC-5.35, AC-5.36) |
-| Missing: the feature is not built yet | 2 (AC-5.24 camera, AC-5.31 tablet) |
+| Missing: the feature is not built yet | 1 (AC-5.31 tablet) |
 
 ## Criteria
 
@@ -58,7 +58,7 @@ All end-to-end scenarios and instrumented tests run in CI on every push to a pul
 | AC-5.21 | "Send to your phone": scan, code, wrong codes, expiry | End-to-end `TransferFlowTest` (the QR texts come through the debug build's test source instead of the camera); instrumented `IdentitiesUiFlowTest` |
 | AC-5.22 | Screen share tile, full screen, landscape, mini window, chat usable | End-to-end `StreamFlowTest`; instrumented `StreamsUiFlowTest` |
 | AC-5.23 | Mobile data: tap-to-watch loads nothing before the tap; autoplay setting | End-to-end `StreamFlowTest` (tap-to-watch, the sharer counts no viewer before the tap); autoplay: instrumented `StreamsUiFlowTest`, `SettingsUiFlowTest` |
-| AC-5.24 | Camera sharing | Missing: being built (task 7.4); its scenario comes with it |
+| AC-5.24 | Camera sharing after the preview, front and back, "paused" in the background | End-to-end `CameraFlowTest`: a test pattern camera goes through the app's camera input, the engine's encoder and a direct connection to `e2e/stream-peer --viewer`, which sees nothing from the preview, the front and then the back pattern, no picture while the app is in the background and pictures again after it returns; instrumented `CameraShareUiFlowTest` and `CameraXSourceTest` (the real camera is released when the app leaves the screen). Not met: the desktop cannot show "paused" – the engine has no paused signal for cameras, so it shows the last picture. Manual: a real phone against the desktop app |
 | AC-5.25 | Comment and avatar reach the desktop | End-to-end `ProfileThemeFlowTest` (`e2e/profile-watch.py` sees both, the avatar without EXIF data) |
 | AC-5.26 | Desktop theme code, dark and light, System follows the phone | End-to-end `ProfileThemeFlowTest`; instrumented `ProfileThemesUiFlowTest` |
 | AC-5.27 | Admin: move, server mute, kick, ban; no moderation for a normal user | End-to-end `ModerationFlowTest` (move, kick, ban as the test server's SuperUser); server mute and the normal user: instrumented `ModerationUiFlowTest` |

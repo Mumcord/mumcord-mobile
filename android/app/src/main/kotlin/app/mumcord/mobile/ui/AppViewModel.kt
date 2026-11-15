@@ -79,6 +79,8 @@ import java.time.ZoneId
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import app.mumcord.mobile.session.CameraShare
+import app.mumcord.mobile.ui.camerashare.CameraShareController
 import app.mumcord.mobile.ui.streams.StreamVideo
 import app.mumcord.mobile.ui.streams.StreamsController
 import kotlinx.coroutines.Job
@@ -122,6 +124,8 @@ class AppViewModel(
     /** Where the pictures of watched streams come from. */
     val streamVideo: StreamVideo = StreamVideo.None,
     languages: AppLanguages = AppLanguages.PhoneOnly,
+    /** The phone's camera for sharing it; null where it cannot be shared (no camera button). */
+    cameraShare: CameraShare? = null,
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -153,6 +157,9 @@ class AppViewModel(
 
     /** Watching screen shares and cameras. */
     val streams = StreamsController(repository, viewModelScope, streamsAutoplay, streamVideo)
+
+    /** Sharing the own camera (FR-5.74). */
+    val cameraShare: CameraShareController? = cameraShare?.let { CameraShareController(repository, viewModelScope, it) }
 
     /** The identity screens and the scan of a transfer from the desktop app. */
     val identities = IdentitiesController(repository, viewModelScope, camera)
@@ -742,6 +749,7 @@ class AppViewModel(
                     streamsAutoplay = application.streamsAutoplay,
                     streamVideo = application.streamVideo,
                     languages = AppLanguages.of(application),
+                    cameraShare = application.cameraShare,
                 ).also {
                     // Start with the first screen and then follow the session by themselves.
                     application.networkSession

@@ -121,6 +121,8 @@ LOCK_PTT_SECONDS=60
 # "profile" a second person (e2e/profile-watch.py) who has to see the comment and the avatar the
 # phone sets, the avatar without EXIF data;
 # "stream" a second person who shares a screen (e2e/stream-peer) and writes down its viewers
+# whenever the test asks; "camera" a second person (e2e/stream-peer --viewer) who watches the
+# phone's camera, checks its pictures for the phone's test pattern and writes down what it saw
 # whenever the test asks;
 # "moderation" a second person (e2e/moderation-target.py) whom the phone, connected as the test
 # server's SuperUser, moves and kicks, and who has to report both; "ban" the
@@ -158,6 +160,7 @@ SCENARIOS=(
   "granted granted identity ${TEST_PACKAGE}.IdentityFlowTest"
   "granted granted transfer ${TEST_PACKAGE}.TransferFlowTest"
   "granted granted stream ${TEST_PACKAGE}.StreamFlowTest"
+  "granted granted camera ${TEST_PACKAGE}.CameraFlowTest"
   "granted granted activity ${TEST_PACKAGE}.ActivityFlowTest"
   "granted granted profile ${TEST_PACKAGE}.ProfileThemeFlowTest"
   "granted granted moderation ${TEST_PACKAGE}.ModerationFlowTest#moveAndKickReachTheOtherPerson"
@@ -214,6 +217,7 @@ TESTENV_FILE="${REPO_ROOT}/.engine/testenv/.env"
 TRANSFER_MAKER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/transfer-maker"
 STREAM_PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/stream-peer"
 STREAM_PEER_LOG="${OUT_DIR}/stream-peer.log"
+CAMERA_VIEWER_LOG="${OUT_DIR}/camera-viewer.log"
 # The numbers of the private messages the second person of the "pm" scenario is to send, and
 # the steps of the visitor of the "activity" scenario.
 PM_FIFO="${OUT_DIR}/pm-requests"
@@ -408,7 +412,8 @@ check_peers() {
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
   if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" \
     && "${kind}" != "identity" && "${kind}" != "activity" && "${kind}" != "moderation" \
-    && "${kind}" != "ban" && "${kind}" != "profile" && "${kind}" != "stream" && "${kind}" != "certificate" ]]; then
+    && "${kind}" != "ban" && "${kind}" != "profile" && "${kind}" != "stream" && "${kind}" != "certificate" \
+    && "${kind}" != "camera" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -588,6 +593,29 @@ check_peers() {
       first_frame="$(sed -n 's/^stream: first_frame_ms=\([0-9]*\).*/\1/p' "${report}" | tr -d '\r')"
       printf 'e2e: stream: nothing fetched before the tap; first picture %s ms after the tap\n' "${first_frame:-?}"
       ;;
+    camera)
+      # The viewer's notes at the test's marks: "MARK <word> frames=<n> pattern=<p>".
+      local log="${CAMERA_VIEWER_LOG#"${REPO_ROOT}/"}" first
+      frames_at() { sed -n "s/^MARK $1 frames=\([0-9]*\) .*/\1/p" "${CAMERA_VIEWER_LOG}" | tail -n 1; }
+      pattern_at() { sed -n "s/^MARK $1 frames=[0-9]* pattern=\([a-z]*\)$/\1/p" "${CAMERA_VIEWER_LOG}" | tail -n 1; }
+      grep -qx 'MARK preview frames=0 pattern=other' "${CAMERA_VIEWER_LOG}" \
+        || die "the viewer got pictures from the preview, see ${log}"
+      sed -n '/^MARK preview/q;p' "${CAMERA_VIEWER_LOG}" | grep -q '^CAMERA ON' \
+        && die "the camera was on before \"Start sharing\", see ${log}"
+      first="$(sed -n 's/^FIRST_FRAME .* ms_after_on=\([0-9-]*\) ms_after_start=\([0-9-]*\)$/\2 ms after \"Start sharing\", \1 ms after the camera went on/p' "${CAMERA_VIEWER_LOG}" | head -n 1)"
+      [[ -n "${first}" ]] || die "the viewer never decoded a picture of the phone, see ${log}"
+      [[ "$(pattern_at front)" == "front" ]] || die "the viewer did not see the front camera's pattern, see ${log}"
+      [[ "$(pattern_at back)" == "back" ]] || die "the viewer did not see the back camera's pattern, see ${log}"
+      [[ "$(frames_at background-start)" == "$(frames_at background-end)" ]] \
+        || die "pictures kept coming while the app was in the background, see ${log}"
+      (($(frames_at resumed) > $(frames_at background-end))) \
+        || die "no pictures came after the app returned, see ${log}"
+      sed -n '/^MARK resumed/,$p' "${CAMERA_VIEWER_LOG}" | grep -q '^CAMERA OFF' \
+        || die "the viewer did not see the camera turn off, see ${log}"
+      printf 'e2e: camera: nothing sent from the preview; first picture %s; front %s and back %s pictures; paused in the background (%s); %s after return\n' \
+        "${first}" "$(frames_at front)" "$(frames_at back)" "$(frames_at background-end)" "$(frames_at resumed)"
+      grep -h '^camera: ' "${report}" | tr -d '\r' | sed 's/^/e2e: /' || true
+      ;;
   esac
 }
 
@@ -601,7 +629,7 @@ cleanup() {
     # What the other people reported belongs next to the failure, not only into a file.
     local log
     for log in "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}" \
-      "${MODERATION_LOG}" "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}"; do
+      "${MODERATION_LOG}" "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}" "${CAMERA_VIEWER_LOG}"; do
       [[ -s "${log}" ]] || continue
       printf 'e2e: the end of %s:\n' "${log#"${REPO_ROOT}/"}"
       tail -n 40 "${log}"
@@ -679,7 +707,7 @@ start_emulator() {
 mkdir -p "${OUT_DIR}"
 rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" \
   "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.* "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}" \
-  "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}"
+  "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}" "${CAMERA_VIEWER_LOG}"
 trap cleanup EXIT
 if [[ -n "${EVIDENCE_DIR}" ]]; then
   mkdir -p "${EVIDENCE_DIR}"
@@ -696,8 +724,9 @@ step "building the app and the tests"
 [[ -x "${TRANSFER_MAKER_BINARY}" ]] || die "the transfer maker was not built at ${TRANSFER_MAKER_BINARY}"
 # The sharer encodes VP9 on this machine, so it is built on its own with libvpx (a build
 # together with the others would give them its codec and test features too).
-if [[ "${E2E_SCENARIO:-}" == "" || "${TEST_PACKAGE}.StreamFlowTest" == *"${E2E_SCENARIO}"* ]]; then
-  pkg-config --exists vpx 2>/dev/null || die "libvpx is missing for the stream scenario (Debian: libvpx-dev, Arch: libvpx)"
+if [[ "${E2E_SCENARIO:-}" == "" || "${TEST_PACKAGE}.StreamFlowTest" == *"${E2E_SCENARIO}"* \
+  || "${TEST_PACKAGE}.CameraFlowTest" == *"${E2E_SCENARIO}"* ]]; then
+  pkg-config --exists vpx 2>/dev/null || die "libvpx is missing for the stream and camera scenarios (Debian: libvpx-dev, Arch: libvpx)"
   (cd "${REPO_ROOT}" && cargo build --locked --quiet --package mumcord-stream-peer --features sharer)
   [[ -x "${STREAM_PEER_BINARY}" ]] || die "the sharer was not built at ${STREAM_PEER_BINARY}"
 fi
@@ -801,6 +830,10 @@ run_scenario() {
       start_messenger
       PERSON_INPUT="${PM_FIFO}" start_person "${STREAM_PEER_LOG}" "${STREAM_PEER_BINARY}" 127.0.0.1 "${MUMCORD_PORT_BASE}"
       ;;
+    camera)
+      start_messenger
+      PERSON_INPUT="${PM_FIFO}" start_person "${CAMERA_VIEWER_LOG}" "${STREAM_PEER_BINARY}" --viewer 127.0.0.1 "${MUMCORD_PORT_BASE}"
+      ;;
     moderation | ban)
       local superuser
       superuser="$(sed -n 's/^SUPERUSER_PASSWORD=//p' "${TESTENV_FILE}")"
@@ -857,7 +890,8 @@ keep_failed_attempt() {
   local folder="${OUT_DIR}/retried/$1" log
   mkdir -p "${folder}"
   for log in "${OUT_DIR}/instrument-scenario.txt" "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" \
-    "${IDENTITY_WATCH_LOG}" "${MODERATION_LOG}" "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}" "${OUT_DIR}/hung-screen.png" \
+    "${IDENTITY_WATCH_LOG}" "${MODERATION_LOG}" "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}" "${CAMERA_VIEWER_LOG}" \
+    "${OUT_DIR}/hung-screen.png" \
     "${OUT_DIR}/hung-screen.xml"; do
     [[ -s "${log}" ]] && mv "${log}" "${folder}/"
   done

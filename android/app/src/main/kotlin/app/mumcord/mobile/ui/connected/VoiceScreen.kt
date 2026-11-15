@@ -49,6 +49,9 @@ import app.mumcord.mobile.design.components.MumcordScreen
 import app.mumcord.mobile.design.components.MumcordSegmentedPill
 import app.mumcord.mobile.design.components.MumcordTalkButton
 import app.mumcord.mobile.design.components.MumcordVoiceAction
+import app.mumcord.mobile.ui.camerashare.CameraBar
+import app.mumcord.mobile.ui.camerashare.CameraShareUi
+import app.mumcord.mobile.ui.camerashare.cameraButtonLabel
 import app.mumcord.mobile.design.components.MumcordVoiceTile
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.theme.MumcordTheme
@@ -65,6 +68,7 @@ const val VOICE_LEAVE_TEST_TAG = "voice-leave"
 const val VOICE_TALK_MODE_TEST_TAG = "voice-talk-mode"
 const val VOICE_HOLD_TEST_TAG = "voice-hold"
 const val VOICE_LEVEL_TEST_TAG = "voice-level"
+const val VOICE_CAMERA_TEST_TAG = "voice-camera"
 
 /** A swipe down on the top of the voice view of at least this distance closes it. */
 private val CLOSE_SWIPE = 24.dp
@@ -93,6 +97,7 @@ fun VoiceScreen(
     onMicrophone: () -> Unit,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
+    camera: CameraShareUi? = null,
 ) {
     BackHandler(onBack = actions::closeVoice)
     val colors = MumcordTheme.colors
@@ -123,7 +128,8 @@ fun VoiceScreen(
             VoiceTiles(voice.tileRows, Modifier.weight(1f))
             ConnectedBanners(state, actions::dismissDenied, onMicrophone)
             voice.whisper?.let { WhisperBar(it, actions::setWhisperHeld, actions::closeWhisper) }
-            VoiceActions(voice, actions, onLeave, onMicrophone)
+            camera?.let { CameraBar(it.state, it.actions) }
+            VoiceActions(voice, actions, onLeave, onMicrophone, camera)
             MumcordSegmentedPill(
                 options = listOf(
                     stringResource(R.string.talk_mode_voice_activity),
@@ -241,18 +247,22 @@ private fun VoiceTiles(rows: List<List<VoiceTile>>, modifier: Modifier = Modifie
     }
 }
 
-/** Mute, deafen and leave as large round buttons with their names (`.vactions`). */
+/**
+ * Mute, deafen and leave as large round buttons with their names (`.vactions`), and the camera
+ * (no mockup) between deafen and leave where it can be shared.
+ */
 @Composable
 private fun VoiceActions(
     voice: VoiceUiState,
     actions: ConnectedController,
     onLeave: () -> Unit,
     onMicrophone: () -> Unit,
+    camera: CameraShareUi?,
 ) {
     Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
         // Each action is 88 dp wide, which leaves the mockup's 24 dp between the 64 dp buttons
-        // and room for a label of two lines.
-        val slot = Modifier.width(88.dp)
+        // and room for a label of two lines; with the camera four share the row at 80 dp.
+        val slot = Modifier.width(if (camera == null) 88.dp else 80.dp)
         MumcordVoiceAction(
             icon = if (voice.mute == MuteControl.Unmuted) MumcordIcons.Mic else MumcordIcons.MicOff,
             label = stringResource(
@@ -277,6 +287,17 @@ private fun VoiceActions(
             style = if (voice.deafened) MumcordIconButtonStyle.Off else MumcordIconButtonStyle.Tonal,
             modifier = slot.testTag(VOICE_DEAFEN_TEST_TAG),
         )
+        if (camera != null) {
+            val on = camera.state.on
+            MumcordVoiceAction(
+                icon = if (on) MumcordIcons.CameraOff else MumcordIcons.Camera,
+                label = cameraButtonLabel(camera.state),
+                contentDescription = stringResource(if (on) R.string.camera_stop_sharing else R.string.camera_share_title),
+                onClick = if (on) camera.actions::stop else camera.onCameraButton,
+                style = if (on) MumcordIconButtonStyle.On else MumcordIconButtonStyle.Tonal,
+                modifier = slot.testTag(VOICE_CAMERA_TEST_TAG),
+            )
+        }
         MumcordVoiceAction(
             icon = MumcordIcons.PhoneOff,
             label = stringResource(R.string.voice_leave),

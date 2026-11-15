@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# The sharer of the end-to-end stream test: an engine of its own on the host that shares the
-# engine's moving test pattern (VP9), as a desktop app shares a screen. Only e2e/run.sh builds it,
+# The second person of the end-to-end stream and camera tests: an engine of its own on the host
+# that shares the engine's moving test pattern (VP9), as a desktop app shares a screen, or watches
+# the phone's camera and checks its pictures. Only e2e/run.sh builds it,
 # with the `sharer` feature, which needs libvpx on the host; without the feature (a workspace
 # build, CI) it builds without any C library and only says so when started.
 [package]
 name = "mumcord-stream-peer"
-description = "Screen sharer for the end-to-end stream test of the mobile apps"
+description = "Screen sharer and camera viewer for the end-to-end stream tests of the mobile apps"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true

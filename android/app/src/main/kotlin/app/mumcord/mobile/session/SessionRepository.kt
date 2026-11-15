@@ -12,6 +12,8 @@ import app.mumcord.mobile.bridge.StreamKind
 import app.mumcord.mobile.bridge.VideoSink
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.BridgeSnapshot
+import app.mumcord.mobile.bridge.CameraCapture
+import app.mumcord.mobile.bridge.CaptureFailure
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.bridge.EngineListener
@@ -440,6 +442,7 @@ class SessionRepository(
                     server = null,
                     streams = emptyList(),
                     directConnectionsQuestion = false,
+                    ownCamera = CAMERA_OFF,
                 )
             }
         }
@@ -515,6 +518,32 @@ class SessionRepository(
 
     /** The handle for the engine's picture functions, or 0 while no engine exists. */
     fun videoHandle(): Long = engine.now { it.videoHandle() }?.toLong() ?: 0L
+
+    // ----- own camera (FR-5.74, FR-5.75) -----
+    // The state arrives as `ownCamera`; a failed command is logged, and the reason the engine
+    // knows shows in that state.
+
+    /** The app's camera, which the engine starts with the preview and stops when sharing ends. */
+    fun setCameraCapture(capture: CameraCapture?) {
+        engine.now { it.setCameraCapture(capture) }
+    }
+
+    /** The handle for the engine's camera input, or 0 while no engine exists. */
+    fun cameraHandle(): Long = engine.now { it.cameraHandle() }?.toLong() ?: 0L
+
+    /** Opens the preview: the camera starts on the phone, nothing is sent. */
+    suspend fun openCameraPreview(): Outcome<Unit> = call("open camera preview") { it.openCameraPreview() }
+
+    /** "Start sharing": returns once the camera is shared or with the reason it is not. */
+    suspend fun startCameraSharing(): Outcome<Unit> = call("start camera sharing") { it.startCameraSharing() }
+
+    /** Cancel in the preview or Stop while sharing. */
+    suspend fun stopCamera(): Outcome<Unit> = call("stop camera") { it.stopCamera() }
+
+    /** The phone's camera stopped by itself; the engine turns sharing off and names the reason. */
+    fun cameraCaptureFailed(failure: CaptureFailure) {
+        engine.now { it.cameraCaptureFailed(failure) }
+    }
 
     // ----- moderation (FR-5.90 … FR-5.93) -----
     // The commands return true when the server confirmed the change and false when it did not

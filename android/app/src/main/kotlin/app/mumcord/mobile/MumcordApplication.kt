@@ -45,7 +45,10 @@ import app.mumcord.mobile.update.AppInfo
 import app.mumcord.mobile.update.GitHubReleaseSource
 import app.mumcord.mobile.update.PreferencesUpdateStore
 import app.mumcord.mobile.update.UpdateChecker
+import app.mumcord.mobile.platform.camera.CameraXSource
+import app.mumcord.mobile.platform.camera.EngineCameraFrames
 import app.mumcord.mobile.platform.video.EngineVideoFrames
+import app.mumcord.mobile.session.CameraShare
 import app.mumcord.mobile.session.autoplayStreams
 import app.mumcord.mobile.ui.streams.StreamVideo
 import kotlinx.coroutines.CoroutineScope
@@ -190,6 +193,28 @@ class MumcordApplication : Application() {
 
     @Volatile
     private var cachedVideoHandle = 0L
+
+    /** Where the shared camera's pictures go: the engine's C function. */
+    private val cameraFrames by lazy { EngineCameraFrames(handle = { cameraHandle }) }
+
+    // Valid for the rest of the process once the engine exists; read on the camera's thread.
+    private val cameraHandle: Long
+        get() = cachedCameraHandle.takeIf { it != 0L } ?: sessionRepository.cameraHandle().also { cachedCameraHandle = it }
+
+    @Volatile
+    private var cachedCameraHandle = 0L
+
+    /** The phone's camera for sharing it (FR-5.74, FR-5.75). It follows the session by itself too. */
+    val cameraShare: CameraShare by lazy {
+        CameraShare(
+            repository = sessionRepository,
+            newSource = { onTrouble ->
+                TestSettings.cameraSource?.invoke(cameraFrames, onTrouble) ?: CameraXSource(this, cameraFrames, onTrouble)
+            },
+            // CameraX is started and stopped on the main thread.
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+        )
+    }
 
     /** The bitrate limit on mobile data and getting back in when a network returns. It follows the session by itself too. */
     val networkSession: NetworkSession by lazy {

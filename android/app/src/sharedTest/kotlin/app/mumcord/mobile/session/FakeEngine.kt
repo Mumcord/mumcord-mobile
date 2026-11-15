@@ -7,6 +7,11 @@ import app.mumcord.mobile.bridge.AppSettings
 import app.mumcord.mobile.bridge.AudioEndpoints
 import app.mumcord.mobile.bridge.BanInput
 import app.mumcord.mobile.bridge.BanResult
+import app.mumcord.mobile.bridge.CameraCapture
+import app.mumcord.mobile.bridge.CameraProblem
+import app.mumcord.mobile.bridge.CaptureFailure
+import app.mumcord.mobile.bridge.OwnCamera
+import app.mumcord.mobile.bridge.OwnCameraState
 import app.mumcord.mobile.bridge.BanTarget
 import app.mumcord.mobile.bridge.Profile
 import app.mumcord.mobile.bridge.AudioWanted
@@ -532,6 +537,70 @@ class FakeEngine(
     }
 
     override fun videoHandle(): ULong = 0uL
+
+    // ----- own camera -----
+    // Opening starts the app's camera and shows the preview; starting shares it, or fails with
+    // [cameraStartProblem]; stopping stops the app's camera.
+
+    @Volatile
+    var appCamera: CameraCapture? = null
+
+    @Volatile
+    var cameraStartProblem: CameraProblem? = null
+
+    @Volatile
+    var cameraViewers: UInt = 0u
+
+    val captureFailures = CopyOnWriteArrayList<CaptureFailure>()
+
+    /** The own camera's state as last reported. */
+    @Volatile
+    var ownCameraState: OwnCameraState = OwnCameraState.OFF
+        private set
+
+    private fun emitCamera(state: OwnCameraState, problem: CameraProblem? = null) {
+        ownCameraState = state
+        emit(BridgeEvent.OwnCameraChanged(OwnCamera(state, problem, if (state == OwnCameraState.SHARING) cameraViewers else 0u)))
+    }
+
+    override fun setCameraCapture(capture: CameraCapture?) {
+        appCamera = capture
+    }
+
+    override fun cameraHandle(): ULong = 0uL
+
+    override suspend fun openCameraPreview() {
+        val capture = appCamera ?: throw BridgeException.Internal("camera not shared: no-camera")
+        capture.start()
+        emitCamera(OwnCameraState.PREVIEW)
+    }
+
+    override suspend fun startCameraSharing() {
+        emitCamera(OwnCameraState.STARTING)
+        val problem = cameraStartProblem
+        if (problem != null) {
+            emitCamera(OwnCameraState.PREVIEW, problem)
+            throw BridgeException.Internal("camera not shared")
+        }
+        emitCamera(OwnCameraState.SHARING)
+    }
+
+    override suspend fun stopCamera() {
+        appCamera?.stop()
+        emitCamera(OwnCameraState.OFF)
+    }
+
+    override fun cameraCaptureFailed(failure: CaptureFailure) {
+        captureFailures += failure
+        appCamera?.stop()
+        emitCamera(OwnCameraState.OFF, CameraProblem.CAMERA_FAILED)
+    }
+
+    /** The engine reports a new number of people who get the camera. */
+    fun watchCamera(viewers: UInt) {
+        cameraViewers = viewers
+        emitCamera(OwnCameraState.SHARING)
+    }
 
     /** The answer also lets the watches that waited for it go on. */
     override suspend fun answerDirectConnections(allow: Boolean) {

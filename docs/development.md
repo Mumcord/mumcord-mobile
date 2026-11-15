@@ -230,7 +230,16 @@ lists every scenario with its result, duration and attempts, and what the failed
   moving test pattern with VP9): on the emulator's mobile data the tile waits for a tap and the
   sharer reports nobody watching before it, then the picture must show the pattern (dark top
   left, bright bottom right, moving) full screen, in landscape and in the mini window above the
-  chat, and the run prints the time from the tap to the first picture. The
+  chat, and the run prints the time from the tap to the first picture; the phone's own camera,
+  watched by `e2e/stream-peer --viewer` (the engine on the host, decoding it as the desktop app
+  does): the emulator's camera films nothing that can be checked, so the debug build's
+  `TestSettings.cameraSource` puts a test pattern camera (`TestPatternCamera`, dark at the top
+  left for the front camera and at the top right for the back camera) behind the app's real
+  camera input, encoder and direct connection. The viewer must get no picture from the preview,
+  the front pattern after "Start sharing", the back pattern after the switch, no picture while
+  the app is in the background and pictures again after it returns, and the run prints the time
+  from "Start sharing" to the viewer's first picture. That the real camera is released when the
+  app leaves the screen is checked by `CameraXSourceTest` with the emulator's camera. The
   emulator's camera cannot be shown a QR code, so the debug build's `TestSettings.qrTexts`
   feeds the texts of the codes to the scanner instead of the camera; the camera question with
   the system's dialog, the slow check of the code, the wrong-code and expired-code refusals, the
@@ -261,7 +270,7 @@ lists every scenario with its result, duration and attempts, and what the failed
   sha256 …` writes them; keep only the camera and ZXing entries). `QrDecoderTest` reads codes
   from generated pictures on the computer.
 - **Besides the Android toolchain** the machine needs KVM, `git`, Docker with the compose
-  plugin, `sqlite3`, `openssl`, `python3` and, for the stream scenario, libvpx with its
+  plugin, `sqlite3`, `openssl`, `python3` and, for the stream and camera scenarios, libvpx with its
   development files (`libvpx-dev` on Debian and Ubuntu, `libvpx` on Arch). No Docker network is created; the server uses Docker's
   built-in bridge.
 - **Settings:** `E2E_AVD` (emulator device, default `mumcord-test`), `E2E_BOOT_TIMEOUT` and
@@ -281,6 +290,15 @@ lists every scenario with its result, duration and attempts, and what the failed
 
 Streams are decoded with libvpx (VP9; its encoder is for sending the camera) and dav1d (AV1),
 two C libraries that are built into the engine library of every phone target.
+
+The own camera is captured by the app (`android/platform/camera`: CameraX, 640 x 360 frames
+asked for) and handed to the engine frame by frame through the C function of
+`bridge/include/mumcord_camera.h`, which turns the picture upright, cuts out the middle 16:9 and
+scales it to at most 640 x 360 without waiting or allocating; a busy encoder drops the frame.
+The engine encodes it with libvpx in software. That is the spec's "software at a reduced
+resolution": the engine cannot take frames encoded by the phone's hardware (MediaCodec) yet, and
+the mobile cap of 540p30 is meant for such an encoder (`SEND_HEIGHT` in
+`bridge/src/camera_send.rs`).
 `scripts/build-codecs.sh <target>` downloads their pinned releases (versions and checksums at the
 top of the script), cross-builds them as static libraries with the NDK or Xcode and keeps them in
 `.codecs/<target>/` (git-ignored; set `MUMCORD_CODECS_DIR` to keep them elsewhere).

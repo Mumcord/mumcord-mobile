@@ -8,6 +8,8 @@ import app.mumcord.mobile.bridge.AudioWanted
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.Identity
 import app.mumcord.mobile.bridge.MobileSettings
+import app.mumcord.mobile.bridge.OwnCamera
+import app.mumcord.mobile.bridge.OwnCameraState
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.Stream
@@ -64,6 +66,8 @@ data class SessionState(
     val streams: List<Stream> = emptyList(),
     /** The engine waits for the answer to "Allow direct connections?" (a stream needs it). */
     val directConnectionsQuestion: Boolean = false,
+    /** The user's own camera as the engine last reported it (FR-5.74). */
+    val ownCamera: OwnCamera = CAMERA_OFF,
 ) {
     /** True once the server's channels are known and the connection is still alive. */
     val showsServer: Boolean
@@ -154,3 +158,6 @@ const val MAX_HINTS = 3
 
 fun SessionState.withHint(hint: UnsupportedHint): SessionState =
     copy(hints = (hints + hint).takeLast(MAX_HINTS))
+
+/** The own camera while it is off and nothing went wrong. */
+val CAMERA_OFF = OwnCamera(state = OwnCameraState.OFF, problem = null, viewers = 0u)

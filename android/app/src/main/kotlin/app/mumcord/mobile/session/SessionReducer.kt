@@ -36,6 +36,7 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
             activity = emptyList(),
             streams = emptyList(),
             directConnectionsQuestion = false,
+            ownCamera = CAMERA_OFF,
         )
         ConnectionState.Connecting -> copy(phase = ConnectionPhase.Connecting)
         ConnectionState.Connected ->
@@ -105,4 +106,5 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.MessageRequestsChanged -> this
     is BridgeEvent.StreamsChanged -> copy(streams = event.streams)
     is BridgeEvent.DirectConnectionsQuestion -> copy(directConnectionsQuestion = true)
+    is BridgeEvent.OwnCameraChanged -> copy(ownCamera = event.camera)
 }
