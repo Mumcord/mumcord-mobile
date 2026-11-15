@@ -18,7 +18,10 @@ final class SessionStoreTests: XCTestCase {
     private let box = EngineBox()
 
     private var idle: SessionState {
-        SessionState(servers: [saved], serversLoaded: true)
+        // Loading the servers also reads the phone settings of the engine that was created.
+        var state = SessionState(servers: [saved], serversLoaded: true)
+        state.mobileSettings = box.engines.last?.mobileSettings()
+        return state
     }
 
     private func newStore(prompt: CertificatePrompt? = nil, useDefaultPrompt: Bool = true) async -> SessionStore {
