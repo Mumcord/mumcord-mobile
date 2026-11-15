@@ -168,12 +168,13 @@ jobs:
       - name: Free disk space
         run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet
 
+      # libvpx-dev: the sharer of the stream scenario (e2e/stream-peer) encodes VP9 on the runner.
       - name: Install system packages
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev \
-            meson ninja-build nasm
+            meson ninja-build nasm libvpx-dev
 
       - name: Install the Rust toolchain
         run: rustup toolchain install
