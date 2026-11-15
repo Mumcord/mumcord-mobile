@@ -4,6 +4,7 @@
 
 ### Added
 
+- Android: opt-in crash reports as on the desktop – after a crash the server list says so and offers to report it; the report shows exactly what will be sent, takes an optional comment and is sent only with "Send report"; saved reports can be reported or deleted under More → About → Crash reports
 - Android: About Mumcord with the app and engine versions, the third-party licences and a link to the source code, and a daily check for a new version on GitHub that offers the download (can be switched off in Settings)
 - Manual device checklist for every release: what to try on real phones and headsets, with battery and data measurements
 - Android and iOS: the Mumcord app icon (the desktop icon) on the home screen, with a themed icon on Android 13 and later, and the Mumcord glyph in Android notifications

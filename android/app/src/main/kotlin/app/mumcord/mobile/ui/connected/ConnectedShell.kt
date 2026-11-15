@@ -28,6 +28,8 @@ import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.tokens.MumcordSpace
 import app.mumcord.mobile.ui.about.AboutScreen
 import app.mumcord.mobile.ui.about.LicencesScreen
+import app.mumcord.mobile.ui.crash.CrashClock
+import app.mumcord.mobile.ui.crash.CrashReportsScreen
 import app.mumcord.mobile.ui.chat.ChatClock
 import app.mumcord.mobile.ui.chat.ChatController
 import app.mumcord.mobile.ui.chat.ChatImageLoader
@@ -125,7 +127,17 @@ fun ConnectedShell(
                         ThemesScreen(it, moreActions.themes, onBack = moreActions::back, topInsets = topInsets)
                     }
                     morePage == MorePage.About -> more.about?.let {
-                        AboutScreen(it, moreActions::back, moreActions::openLicences, moreActions.about::dismissUpdate, topInsets)
+                        AboutScreen(
+                            it,
+                            moreActions::back,
+                            moreActions::openLicences,
+                            moreActions::openCrashReports,
+                            moreActions.about::dismissUpdate,
+                            topInsets,
+                        )
+                    }
+                    morePage == MorePage.CrashReports -> more.crashReports?.let {
+                        CrashReportsScreen(it, moreActions.crashes, moreActions::back, topInsets, CrashClock(chatEnvironment.clock))
                     }
                     morePage == MorePage.Licences -> more.licences?.let {
                         LicencesScreen(it, moreActions::back, moreActions.about::loadLicences, topInsets)

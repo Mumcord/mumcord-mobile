@@ -14,6 +14,8 @@ import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.ui.connect.CertificateSheet
 import app.mumcord.mobile.ui.connect.LocalNetworkSheet
 import app.mumcord.mobile.ui.connect.SessionEndedSheet
+import app.mumcord.mobile.crash.crashReport
+import app.mumcord.mobile.ui.crash.CrashNotice
 import app.mumcord.mobile.ui.servers.ConnectFailure
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
 import app.mumcord.mobile.ui.servers.PingState
@@ -58,7 +60,12 @@ class ServerScreensScreenshotTest {
     )
 
     @Composable
-    private fun ServerList(rows: List<ServerRow>, failure: ConnectFailure? = null, update: AvailableUpdate? = null) {
+    private fun ServerList(
+        rows: List<ServerRow>,
+        failure: ConnectFailure? = null,
+        update: AvailableUpdate? = null,
+        crash: CrashNotice? = null,
+    ) {
         ServerListScreen(
             rows = rows,
             loaded = true,
@@ -76,6 +83,7 @@ class ServerScreensScreenshotTest {
             onOpenSettings = {},
             onDismissError = {},
             update = update,
+            crashNotice = crash,
             topInsets = top,
             bottomInsets = bottom,
         )
@@ -181,6 +189,15 @@ class ServerScreensScreenshotTest {
     private fun updateNotice(dark: Boolean) = capture("android-update-notice", dark) {
         ServerList(rows(), update = AvailableUpdate(ReleaseVersion(0, 9, 0), hasApk = true))
     }
+
+    // No mockup: the notice after a crash in an earlier run (FR-5.103).
+    private fun crashNotice(dark: Boolean) = capture("android-crash-notice", dark) {
+        ServerList(rows(), crash = CrashNotice.Crashed(crashReport("crash-1777900000.txt", createdMs = 1_777_900_000_000)))
+    }
+
+    @Test fun crashNoticeDark() = crashNotice(dark = true)
+
+    @Test fun crashNoticeLight() = crashNotice(dark = false)
 
     @Test fun updateNoticeDark() = updateNotice(dark = true)
 

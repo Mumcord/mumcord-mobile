@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.R
+import app.mumcord.mobile.bridge.CrashReport
 import app.mumcord.mobile.design.components.MumcordAppBar
 import app.mumcord.mobile.design.components.MumcordBanner
 import app.mumcord.mobile.design.components.MumcordBannerTone
@@ -53,6 +54,8 @@ import app.mumcord.mobile.design.tokens.MumcordSpace
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.ui.about.UpdateNotice
 import app.mumcord.mobile.ui.connect.messageRes
+import app.mumcord.mobile.ui.crash.CrashNotice
+import app.mumcord.mobile.ui.crash.CrashNoticeBanner
 import app.mumcord.mobile.update.AvailableUpdate
 
 const val SERVER_ROW_TEST_TAG = "server-row"
@@ -87,7 +90,8 @@ data class ConnectFailure(
  * The saved servers with people online and latency, and the way to add, edit, remove and
  * connect. While [editing], every row offers Edit and Remove instead of Connect. "Find more"
  * leads to the public server browser. A newer release of the app is offered at the top
- * ([update], FR-5.101; no mockup).
+ * ([update], FR-5.101; no mockup), and so is a crash report after a crash in an earlier run
+ * ([crashNotice], FR-5.103; no mockup).
  */
 @Composable
 fun ServerListScreen(
@@ -108,12 +112,16 @@ fun ServerListScreen(
     onDismissError: () -> Unit,
     update: AvailableUpdate? = null,
     onDismissUpdate: () -> Unit = {},
+    crashNotice: CrashNotice? = null,
+    onReportCrash: (CrashReport) -> Unit = {},
+    onDismissCrash: () -> Unit = {},
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
     MumcordScreen {
         MumcordAppBar(title = stringResource(R.string.servers_title), large = true, windowInsets = topInsets)
         if (failure != null) FailureBanner(failure, onRetry, onOpenSettings, onDismissError)
+        if (crashNotice != null) CrashNoticeBanner(crashNotice, onReportCrash, onDismissCrash)
         if (update != null) UpdateNotice(update, onDismissUpdate)
         when {
             // Nothing to show before the list is read; an empty state would flash by.

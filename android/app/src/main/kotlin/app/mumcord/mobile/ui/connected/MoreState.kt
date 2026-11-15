@@ -12,6 +12,7 @@ import app.mumcord.mobile.ui.about.AboutLocal
 import app.mumcord.mobile.ui.about.AboutUiState
 import app.mumcord.mobile.ui.about.Licences
 import app.mumcord.mobile.ui.about.aboutUiState
+import app.mumcord.mobile.ui.crash.CrashLocal
 import app.mumcord.mobile.ui.profile.OwnProfile
 import app.mumcord.mobile.ui.profile.ProfileEdit
 import app.mumcord.mobile.ui.profile.ProfileEditUiState
@@ -22,7 +23,7 @@ import app.mumcord.mobile.ui.themes.appThemeName
 import app.mumcord.mobile.ui.themes.themesUiState
 
 /** What the More tab shows: its list, or one of the screens it leads to. */
-enum class MorePage { Main, Activity, Settings, EditProfile, Themes, About, Licences }
+enum class MorePage { Main, Activity, Settings, EditProfile, Themes, About, Licences, CrashReports }
 
 /** The choices of the settings that open a sheet. */
 enum class SettingsSheet { TalkMode, DefaultOutput, HistoryAge }
@@ -77,6 +78,8 @@ data class MoreUiState(
     val about: AboutUiState? = null,
     /** Null while the licences screen is closed. */
     val licences: Licences? = null,
+    /** Null while the crash reports are closed. */
+    val crashReports: CrashLocal? = null,
 )
 
 /** What the profile and theme screens add to the More tab; kept apart from [MoreLocal]. */
@@ -86,6 +89,7 @@ data class MoreExtras(
     val themes: ThemesLocal = ThemesLocal(),
     /** Null where no About screen exists (screenshots of other screens). */
     val about: AboutLocal? = null,
+    val crashes: CrashLocal = CrashLocal(),
 )
 
 /** The More tab as a value, or null while no server is shown. */
@@ -131,5 +135,6 @@ fun moreUiState(
         appVersion = extras.about?.info?.appVersion.orEmpty(),
         about = extras.about?.takeIf { local.page == MorePage.About }?.let(::aboutUiState),
         licences = extras.about?.takeIf { local.page == MorePage.Licences }?.licences,
+        crashReports = extras.crashes.takeIf { local.page == MorePage.CrashReports },
     )
 }

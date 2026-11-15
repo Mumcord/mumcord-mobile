@@ -2,6 +2,7 @@
 
 package app.mumcord.mobile.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -12,6 +13,8 @@ import app.mumcord.mobile.MumcordApplication
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.crash.BridgeCrashSource
+import app.mumcord.mobile.crash.CrashSource
 import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.platform.call.SessionEndedNotice
 import app.mumcord.mobile.session.ConnectionError
@@ -48,6 +51,8 @@ import app.mumcord.mobile.ui.connected.MoreUiState
 import app.mumcord.mobile.ui.connected.NotificationAccess
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.ui.connected.moreUiState
+import app.mumcord.mobile.ui.crash.CrashController
+import app.mumcord.mobile.ui.crash.CrashLocal
 import app.mumcord.mobile.ui.identities.IdentitiesController
 import app.mumcord.mobile.ui.identities.IdentitiesLocal
 import app.mumcord.mobile.ui.identities.identitiesUiState
@@ -107,6 +112,7 @@ class AppViewModel(
     notices: NoticesSource = NoticesSource { "" },
     /** Where the notices are read; the tests read them on their own dispatcher. */
     io: CoroutineDispatcher = Dispatchers.IO,
+    crashSource: CrashSource = CrashSource.None,
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -253,6 +259,11 @@ class AppViewModel(
         notifications.granted.value,
     )
 
+    /** Crash reports (FR-5.103): the notice on the server list, the list under About and the upload sheet. */
+    val crashes = CrashController(crashSource, viewModelScope, io, log = { message -> Log.w(LOG_TAG, message) })
+
+    val crashState: StateFlow<CrashLocal> = crashes.local
+
     /** The More tab: the activity log and the settings. */
     val more = MoreController(
         repository,
@@ -260,6 +271,7 @@ class AppViewModel(
         messageSettings,
         viewModelScope,
         AboutController(appInfo, updates, repository, notices, viewModelScope, io = io),
+        crashes,
     )
 
     /** "Version X is available" on the server list (FR-5.101); null when there is nothing to offer. */
@@ -694,6 +706,8 @@ class AppViewModel(
         /** Keeps the state alive across a rotation without restarting the collection. */
         private const val STOP_TIMEOUT_MILLIS = 5_000L
 
+        private const val LOG_TAG = "Mumcord"
+
         val Factory: ViewModelProvider.Factory = viewModelFactory {
             initializer {
                 val application = checkNotNull(this[APPLICATION_KEY]) as MumcordApplication
@@ -711,6 +725,7 @@ class AppViewModel(
                     application.appInfo,
                     application.updateChecker,
                     NoticesSource.assets(application.assets),
+                    crashSource = BridgeCrashSource(application.sessionRepository),
                 ).also {
                     // Start with the first screen and then follow the session by themselves.
                     application.networkSession

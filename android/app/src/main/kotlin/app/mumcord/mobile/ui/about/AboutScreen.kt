@@ -45,6 +45,7 @@ import app.mumcord.mobile.update.AvailableUpdate
 const val ABOUT_SCREEN_TEST_TAG = "about"
 const val ABOUT_LICENCES_TEST_TAG = "about-licences"
 const val ABOUT_SOURCE_TEST_TAG = "about-source"
+const val ABOUT_CRASH_REPORTS_TEST_TAG = "about-crash-reports"
 const val LICENCES_SCREEN_TEST_TAG = "licences"
 const val LICENCES_RETRY_TEST_TAG = "licences-retry"
 const val UPDATE_NOTICE_TEST_TAG = "update-notice"
@@ -53,14 +54,15 @@ const val UPDATE_DISMISS_TEST_TAG = "update-dismiss"
 
 /**
  * About Mumcord (FR-5.100, no mockup): the app and engine versions, the third-party licences,
- * the source code of this version (AGPL-3.0) and what the app contacts besides the servers.
- * A newer release is offered at the top (FR-5.101).
+ * the source code of this version (AGPL-3.0), the saved crash reports (FR-5.103) and what the
+ * app contacts besides the servers. A newer release is offered at the top (FR-5.101).
  */
 @Composable
 fun AboutScreen(
     state: AboutUiState,
     onBack: () -> Unit,
     onLicences: () -> Unit,
+    onCrashReports: () -> Unit,
     onDismissUpdate: () -> Unit,
     topInsets: WindowInsets,
 ) {
@@ -106,6 +108,14 @@ fun AboutScreen(
                     trailing = { Chevron() },
                     onClick = { links.openSafely(state.sourceUrl) },
                     modifier = Modifier.testTag(ABOUT_SOURCE_TEST_TAG),
+                )
+                MumcordListRow(
+                    title = stringResource(R.string.about_crash_reports),
+                    icon = MumcordIcons.Alert,
+                    divider = true,
+                    trailing = { Chevron() },
+                    onClick = onCrashReports,
+                    modifier = Modifier.testTag(ABOUT_CRASH_REPORTS_TEST_TAG),
                 )
             }
             Paragraph(stringResource(R.string.about_licence_text))

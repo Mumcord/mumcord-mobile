@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.SystemClock
 import android.util.Log
+import app.mumcord.mobile.bridge.BridgeException
+import app.mumcord.mobile.bridge.crashInstall
 import app.mumcord.mobile.bridge.engineVersion
 import app.mumcord.mobile.platform.audio.AndroidFeedbackTones
 import app.mumcord.mobile.platform.audio.AndroidVoiceSession
@@ -45,6 +47,7 @@ import app.mumcord.mobile.update.PreferencesUpdateStore
 import app.mumcord.mobile.update.UpdateChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import java.io.File
 import kotlinx.coroutines.SupervisorJob
 
 /**
@@ -52,6 +55,28 @@ import kotlinx.coroutines.SupervisorJob
  * a connection must survive the Activity being recreated (rotation, theme change).
  */
 class MumcordApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        installCrashReports()
+    }
+
+    /**
+     * Crash reports (FR-5.103) start before anything creates the engine, so that a crash while it
+     * starts is caught too. They stay on the phone until the user sends one; without them the app
+     * works on, only crashes are not saved.
+     */
+    private fun installCrashReports() {
+        val version = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+        try {
+            crashInstall(File(filesDir, CRASH_DIR).path, version)
+        } catch (e: BridgeException) {
+            log("crash reports unavailable: ${e.javaClass.simpleName}")
+        } catch (e: LinkageError) {
+            // The native library is missing or does not fit this device; starting the engine says so.
+            log("crash reports unavailable: ${e.javaClass.simpleName}")
+        }
+    }
+
     val sessionRepository: SessionRepository by lazy {
         SessionRepository(
             engineFactory = BridgeEngineFactory(this),
@@ -204,5 +229,8 @@ class MumcordApplication : Application() {
 
     private companion object {
         const val LOG_TAG = "Mumcord"
+
+        /** The folder of the crash reports inside the app's own files. */
+        const val CRASH_DIR = "crash-reports"
     }
 }

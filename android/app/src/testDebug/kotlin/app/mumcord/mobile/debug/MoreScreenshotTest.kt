@@ -50,6 +50,14 @@ import app.mumcord.mobile.ui.profile.OwnProfile
 import app.mumcord.mobile.update.AvailableUpdate
 import app.mumcord.mobile.update.ReleaseVersion
 import java.time.ZoneOffset
+import app.mumcord.mobile.bridge.CrashKind
+import app.mumcord.mobile.crash.crashReport
+import app.mumcord.mobile.ui.crash.CrashClock
+import app.mumcord.mobile.ui.crash.CrashDelete
+import app.mumcord.mobile.ui.crash.CrashList
+import app.mumcord.mobile.ui.crash.CrashLocal
+import app.mumcord.mobile.ui.crash.CrashSheetHost
+import app.mumcord.mobile.ui.crash.CrashUpload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -165,10 +173,11 @@ class MoreScreenshotTest {
         local: MoreLocal,
         session: SessionState = session(),
         about: AboutLocal = AboutLocal(SCREENSHOT_APP_INFO),
+        crashes: CrashLocal = CrashLocal(),
     ) =
         composeRule.captureScreenshot("$name-${if (dark) "dark" else "light"}") {
             val state = checkNotNull(connectedUiState(session, ConnectedLocal(tab = ConnectedTab.More), "Nordlicht"))
-            val moreState = more.state(session, local, output, extras = MoreExtras(profile = profile, about = about))
+            val moreState = more.state(session, local, output, extras = MoreExtras(profile = profile, about = about, crashes = crashes))
             MumcordTheme(darkTheme = dark) {
                 Box(Modifier.fillMaxSize()) {
                     ConnectedShell(
@@ -194,6 +203,7 @@ class MoreScreenshotTest {
                     moreState.settings?.takeIf { it.sheet != null }?.let {
                         SettingsSheetHost(it, more.actions, top, bottom)
                     }
+                    CrashSheetHost(crashes, more.actions.crashes, top, bottom, CrashClock(screenshotChatEnvironment().clock))
                 }
             }
         }
@@ -233,6 +243,52 @@ class MoreScreenshotTest {
         MoreLocal(page = MorePage.Licences),
         about = AboutLocal(SCREENSHOT_APP_INFO, licences = Licences.Loaded(noticeBlocks(SAMPLE_NOTICES))),
     )
+
+    // No mockup: the saved crash reports under About (FR-5.103), one of them already sent.
+    private val crashList = CrashLocal(
+        reports = CrashList.Loaded(
+            listOf(
+                crashReport("crash-1777900000.txt", createdMs = 1_777_900_000_000, cause = "attempt to subtract with overflow"),
+                crashReport(
+                    "crash-1777300000.txt",
+                    createdMs = 1_777_300_000_000,
+                    kind = CrashKind.Signal("SIGSEGV"),
+                    cause = "Mumcord was stopped by SIGSEGV",
+                    version = "0.7.1",
+                    uploaded = true,
+                ),
+            ),
+        ),
+    )
+
+    private fun crashReports(dark: Boolean) =
+        capture("android-crash-reports", dark, MoreLocal(page = MorePage.CrashReports), crashes = crashList)
+
+    // No mockup: the upload sheet with exactly what goes out and the user's comment.
+    private fun crashUpload(dark: Boolean) {
+        val report = (crashList.reports as CrashList.Loaded).reports.first()
+        val comment = "I was listening in Raid when the app closed."
+        val upload = CrashUpload(report, comment = comment, preview = SAMPLE_CRASH_REPORT + "\ncomment:\n$comment\n", previewFor = comment)
+        capture("android-crash-upload", dark, MoreLocal(page = MorePage.CrashReports), crashes = crashList.copy(upload = upload))
+    }
+
+    // No mockup: the question before a report is deleted.
+    private fun crashDelete(dark: Boolean) {
+        val report = (crashList.reports as CrashList.Loaded).reports.first()
+        capture("android-crash-delete", dark, MoreLocal(page = MorePage.CrashReports), crashes = crashList.copy(confirm = CrashDelete.One(report)))
+    }
+
+    @Test fun crashReportsDark() = crashReports(dark = true)
+
+    @Test fun crashReportsLight() = crashReports(dark = false)
+
+    @Test fun crashUploadDark() = crashUpload(dark = true)
+
+    @Test fun crashUploadLight() = crashUpload(dark = false)
+
+    @Test fun crashDeleteDark() = crashDelete(dark = true)
+
+    @Test fun crashDeleteLight() = crashDelete(dark = false)
 
     @Test fun aboutDark() = about(dark = true)
 
@@ -298,4 +354,26 @@ Bricolage Grotesque (font, design/fonts/bricolage-grotesque)
 License: SIL Open Font License, Version 1.1 (OFL-1.1)
 Source: https://github.com/ateliertriay/bricolage
 Copyright 2022 The Bricolage Grotesque Project Authors
+""".trimIndent()
+
+/** A report as the engine writes it on a phone, shortened. */
+private val SAMPLE_CRASH_REPORT = """
+    Mumcord crash report
+    version: 0.8.0
+    time: 1777900000 (2026-05-04 13:06:40 UTC)
+    kind: panic
+    thread: mumcord-engine
+    cause: attempt to subtract with overflow
+
+    running:
+    voice: connected, push-to-talk
+
+    system:
+    os: android 16
+    cpu: aarch64
+    memory: 7.6 GiB
+
+    backtrace:
+       0: mumcord_engine::audio::jitter::JitterBuffer::pop
+       1: mumcord_engine::audio::mixer::Mixer::mix
 """.trimIndent()

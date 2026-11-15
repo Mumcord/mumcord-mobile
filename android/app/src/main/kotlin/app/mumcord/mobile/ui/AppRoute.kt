@@ -52,6 +52,9 @@ import app.mumcord.mobile.ui.connected.NotificationSystem
 import app.mumcord.mobile.ui.connected.SettingsSheetHost
 import app.mumcord.mobile.ui.connected.rememberMicrophoneSystem
 import app.mumcord.mobile.ui.connected.rememberNotificationSystem
+import app.mumcord.mobile.ui.crash.CrashClock
+import app.mumcord.mobile.ui.crash.CrashLocal
+import app.mumcord.mobile.ui.crash.CrashSheetHost
 import app.mumcord.mobile.ui.identities.CameraNotice
 import app.mumcord.mobile.ui.identities.IdentitiesScreen
 import app.mumcord.mobile.ui.identities.IdentitySetupScreen
@@ -129,6 +132,7 @@ fun AppRoute(
     val conversation by viewModel.conversationState.collectAsStateWithLifecycle()
     val more by viewModel.moreState.collectAsStateWithLifecycle()
     val updateNotice by viewModel.updateNotice.collectAsStateWithLifecycle()
+    val crash by viewModel.crashState.collectAsStateWithLifecycle()
     val chatEnvironment = ChatEnvironment(chatImageLoader, images, rememberChatClock())
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshPings()
@@ -170,6 +174,7 @@ fun AppRoute(
             conversation = conversation,
             more = more,
             updateNotice = updateNotice,
+            crash = crash,
             avatarImages = avatarImages,
         )
         photoQuestion?.let { photoFor ->
@@ -211,6 +216,7 @@ fun AppContent(
     conversation: ChatUiState? = null,
     more: MoreUiState? = null,
     updateNotice: AvailableUpdate? = null,
+    crash: CrashLocal = CrashLocal(),
     avatarImages: ChatImageSystem = ChatImageSystem(pickPhoto = {}, takePhoto = {}),
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
@@ -240,7 +246,9 @@ fun AppContent(
     }.takeIf { !covered }
     val chatOverlay = shownChat?.takeIf { it.sheet != null || it.viewer != null || it.urlToOpen != null }
     val chatOverlayActions = if (uiState.connected?.tab == ConnectedTab.Messages) viewModel.conversation else viewModel.chat
-    val sheetOpen = prompt != null || overlay != null || scanExplain || identitySheet != null ||
+    // The crash sheets were opened by the user on the server list or under About.
+    val crashSheet = crash.upload != null || crash.confirm != null
+    val sheetOpen = prompt != null || crashSheet || overlay != null || scanExplain || identitySheet != null ||
         connectedSheet != null || messagesSheet != null || settingsSheet != null ||
         profileSheet != null || themesSheet != null || serverThemeSheet != null ||
         chatOverlay?.sheet != null || chatOverlay?.viewer != null
@@ -313,6 +321,9 @@ fun AppContent(
                         onDismissError = viewModel::dismissError,
                         update = updateNotice,
                         onDismissUpdate = viewModel.more.about::dismissUpdate,
+                        crashNotice = crash.notice,
+                        onReportCrash = viewModel.crashes::openUpload,
+                        onDismissCrash = viewModel.crashes::dismissNotice,
                         topInsets = topInsets,
                         bottomInsets = bottomInsets,
                     )
@@ -382,6 +393,7 @@ fun AppContent(
                 topInsets = topInsets,
                 bottomInsets = bottomInsets,
             )
+            crashSheet -> CrashSheetHost(crash, viewModel.crashes, topInsets, bottomInsets, CrashClock(chatEnvironment.clock))
             scanExplain -> CameraSheet(
                 reason = stringResource(R.string.camera_reason_scan),
                 blocked = false,

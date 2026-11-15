@@ -689,7 +689,8 @@
     <string name="about_source">Source code</string>
     <string name="about_source_sub">The code of this version on GitHub</string>
     <string name="about_licence_text">Mumcord Mobile is free software under the GNU Affero General Public License v3 only (AGPL-3.0-only). It is built on open-source software, including code from the Mumble project.</string>
-    <string name="about_privacy_text">Mumcord does not track you. Besides your servers, it only contacts GitHub once a day to look for a new version (switch it off in Settings) and the public server list when you open it.</string>
+    <string name="about_privacy_text">Mumcord does not track you. Besides your servers, it only contacts GitHub once a day to look for a new version (switch it off in Settings), the public server list when you open it, and the Mumcord crash server when you send a crash report yourself.</string>
+    <string name="about_crash_reports">Crash reports</string>
     <string name="licences_back">Back to About</string>
     <string name="licences_failed">The licences could not be read.</string>
     <string name="licences_retry">Try again</string>
@@ -701,4 +702,48 @@
     <string name="settings_section_updates">Updates</string>
     <string name="settings_update_check">Check for updates</string>
     <string name="settings_update_check_sub">Once a day, asks GitHub for a new version</string>
+    <!-- Crash reports (FR-5.103), worded as on the desktop. -->
+    <string name="crash_notice_title">Mumcord closed unexpectedly.</string>
+    <string name="crash_notice_text">A crash report was saved on this phone. It is only sent if you report the crash. Reporting it helps us fix the problem.</string>
+    <string name="crash_notice_report">Report…</string>
+    <string name="crash_notice_dismiss">Dismiss</string>
+    <string name="crash_notice_sent">Report sent. Thank you!</string>
+    <string name="crash_reports_title">Crash reports</string>
+    <string name="crash_reports_back">Back to About</string>
+    <string name="crash_reports_info">When Mumcord closes unexpectedly it saves a short report: time, version, phone details, what went wrong and the last log lines. Reports stay on this phone and are only sent when you report a crash yourself. Mumcord keeps the last 10.</string>
+    <string name="crash_reports_empty_title">No crash reports</string>
+    <string name="crash_reports_empty_text">Mumcord has not closed unexpectedly.</string>
+    <string name="crash_reports_failed">The crash reports could not be read.</string>
+    <string name="crash_reports_retry">Try again</string>
+    <string name="crash_kind_panic">App error</string>
+    <string name="crash_kind_native">Native crash</string>
+    <string name="crash_kind_unexpected">Closed unexpectedly</string>
+    <string name="crash_uploaded">Uploaded</string>
+    <!-- %1$s is the kind of crash, %2$s the app version, e.g. "App error · v0.8.0". -->
+    <string name="crash_row_details">%1$s · v%2$s</string>
+    <string name="crash_report">Report crash…</string>
+    <string name="crash_delete">Delete</string>
+    <string name="crash_delete_all">Delete all</string>
+    <string name="crash_status_sent">Report sent. Thank you!</string>
+    <string name="crash_status_deleted">Report deleted.</string>
+    <string name="crash_status_deleted_all">All crash reports deleted.</string>
+    <string name="crash_status_failed">That did not work. Try again.</string>
+    <string name="crash_delete_title">Delete crash report?</string>
+    <!-- %1$s is the date and time of the report. -->
+    <string name="crash_delete_text">The report from %1$s will be removed from this phone.</string>
+    <string name="crash_delete_all_title">Delete all crash reports?</string>
+    <plurals name="crash_delete_all_text">
+        <item quantity="one">%1$d report will be removed from this phone.</item>
+        <item quantity="other">%1$d reports will be removed from this phone.</item>
+    </plurals>
+    <string name="crash_upload_title">Send crash report?</string>
+    <string name="crash_upload_what">What will be sent</string>
+    <string name="crash_upload_comment">What were you doing? (optional)</string>
+    <string name="crash_upload_comment_placeholder">For example: I was listening in a channel when the app closed.</string>
+    <string name="crash_upload_where">Sent to the Mumcord team at crash.mumcord.app over an encrypted connection. Kept for 90 days.</string>
+    <string name="crash_upload_shared">Shared: the Mumcord version, what went wrong, which features were in use, the last log lines and your phone\'s system details (such as the Android version, processor and memory). None of this names you, but together these details can identify this phone.</string>
+    <string name="crash_upload_send">Send report</string>
+    <string name="crash_upload_sending">Sending…</string>
+    <string name="crash_upload_failed">The report could not be sent. Check your connection and try again; it stays on this phone.</string>
+    <string name="crash_upload_unreadable">This report could not be read.</string>
 </resources>
