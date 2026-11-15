@@ -1,0 +1,209 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import SwiftUI
+
+/// The frame of the app while connected: the selected tab's screen, the banners, the whisper
+/// bar, the voice bar and the bottom tab bar, or the full voice view over all of it. `chat` is
+/// the Chat tab, which reads its own state, as the Messages tab does through `model`.
+struct ConnectedShell<Chat: View>: View {
+    let state: ConnectedUiState
+    let actions: ConnectedActions
+    let onDisconnect: () -> Void
+    /// Unread messages of the current channel's chat, shown on the Chat tab.
+    let chatBadge: Int
+    /// For the Messages tab and the messages part of More, which read their own state.
+    let model: AppModel
+    @ViewBuilder let chat: () -> Chat
+
+    var body: some View {
+        if let voice = state.voice, voice.open {
+            VoiceScreen(voice: voice, state: state, actions: actions, onLeave: onDisconnect)
+        } else {
+            tabs
+        }
+    }
+
+    private var tabs: some View {
+        // This frame ends where the keyboard begins, which the chat needs to know: the screen
+        // inside it reaches under the keyboard.
+        GeometryReader { area in
+            screen.environment(\.keyboardTop, area.frame(in: .global).maxY)
+        }
+    }
+
+    private var screen: some View {
+        MumcordScreen {
+            tabScreen
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            ConnectedBanners(state: state, actions: actions)
+            if let voice = state.voice {
+                if let whisper = voice.whisper {
+                    WhisperBar(whisper: whisper, onHeldChange: actions.setWhisperHeld, onClose: actions.closeWhisper)
+                }
+                VoiceBar(voice: voice, actions: actions, onLeave: onDisconnect)
+            }
+            MumcordTabBar(
+                tabs: [
+                    MumcordTab(icon: MumcordIcons.list, label: Strings.tabChannels),
+                    MumcordTab(
+                        icon: MumcordIcons.hash,
+                        label: Strings.tabChat,
+                        badge: chatBadge > 0 ? String(chatBadge) : nil,
+                        accessibilityLabel: chatBadge > 0 ? Strings.chatTabUnread(chatBadge) : nil
+                    ),
+                    MessagesTabItem.make(model.messagesBadge),
+                    MumcordTab(icon: MumcordIcons.more, label: Strings.tabMore),
+                ],
+                selectedIndex: state.tab.rawValue,
+                onSelect: { index in
+                    if let tab = ConnectedTab(rawValue: index) {
+                        actions.selectTab(tab)
+                    }
+                }
+            )
+        }
+        // The tab bar stays at the bottom while the search field has the keyboard open.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    @ViewBuilder private var tabScreen: some View {
+        switch state.tab {
+        case .channels:
+            ChannelsScreen(state: state, actions: actions)
+        case .chat:
+            chat()
+        case .messages:
+            MessagesTab(model: model)
+        case .more:
+            if let settings = state.settings {
+                SettingsScreen(settings: settings, onChange: model.changeSettings, onBack: model.closeSettingsScreen)
+            } else {
+                MoreBlockedHost(model: model) {
+                    MoreScreen(serverName: state.serverName, model: model, onDisconnect: onDisconnect)
+                }
+            }
+        }
+    }
+}
+
+private struct KeyboardTopKey: EnvironmentKey {
+    static let defaultValue = CGFloat.infinity
+}
+
+extension EnvironmentValues {
+    /// Where the keyboard begins on the screen, or the bottom of the area for content without
+    /// one. Set by the connected screens, whose bars stay under the keyboard.
+    var keyboardTop: CGFloat {
+        get { self[KeyboardTopKey.self] }
+        set { self[KeyboardTopKey.self] = newValue }
+    }
+}
+
+/// A lost connection, the microphone that may not be used and the latest refusal by the server,
+/// visible on every tab and in the full voice view.
+struct ConnectedBanners: View {
+    let state: ConnectedUiState
+    let actions: ConnectedActions
+    var horizontalMargin: CGFloat = MumcordSpace.s4
+
+    var body: some View {
+        let reconnecting = state.reconnecting
+        let denied = state.denied
+        if reconnecting != nil || denied != nil || state.microphone != .none {
+            VStack(spacing: MumcordSpace.s2) {
+                if let reconnecting {
+                    MumcordBanner(
+                        text: Strings.channelsReconnecting(reconnecting.attempt, reconnecting.maxAttempts),
+                        icon: MumcordIcons.alert,
+                        tone: .warning,
+                        horizontalMargin: horizontalMargin
+                    )
+                }
+                if state.microphone != .none {
+                    MicrophoneBanner(
+                        blocked: state.microphone == .blocked,
+                        horizontalMargin: horizontalMargin,
+                        action: actions.requestMicrophone
+                    )
+                }
+                if let denied {
+                    Button(action: actions.dismissDenied) {
+                        MumcordBanner(
+                            // The server's own words are shown as plain characters.
+                            text: denied.detail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                ? Strings.deniedText
+                                : denied.detail,
+                            title: denied.channelName.map(Strings.deniedTitleChannel) ?? Strings.deniedTitle,
+                            icon: MumcordIcons.alert,
+                            tone: .danger,
+                            horizontalMargin: horizontalMargin
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(Strings.deniedDismiss)
+                    .accessibilityIdentifier("denied-banner")
+                }
+            }
+            .padding(.bottom, MumcordSpace.s2)
+        }
+    }
+}
+
+/// The Messages tab's entry in the tab bar, with the number of unread private messages.
+private enum MessagesTabItem {
+    static func make(_ badge: Int) -> MumcordTab {
+        MumcordTab(
+            icon: MumcordIcons.messages,
+            label: Strings.tabMessages,
+            badge: badge > 0 ? String(badge) : nil,
+            accessibilityLabel: badge > 0 ? Strings.messagesTabUnread(badge) : nil
+        )
+    }
+}
+
+private struct MoreScreen: View {
+    let serverName: String
+    let model: AppModel
+    let onDisconnect: () -> Void
+    @Environment(\.mumcordTheme) private var theme
+
+    var body: some View {
+        VStack(spacing: 0) {
+            MumcordAppBar(title: Strings.tabMore, large: true)
+            MumcordList {
+                MumcordListRow(
+                    title: Strings.settingsTitle,
+                    icon: MumcordIcons.settings,
+                    action: model.openSettingsScreen,
+                    trailing: {
+                        MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted)
+                    }
+                )
+                .accessibilityIdentifier("more-settings")
+                MumcordListRow(
+                    title: Strings.identitiesTitle,
+                    icon: MumcordIcons.key,
+                    divider: true,
+                    action: model.identities.open,
+                    trailing: {
+                        MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted)
+                    }
+                )
+                .accessibilityIdentifier("more-identities")
+            }
+            .padding(.bottom, MumcordSpace.s4)
+            MoreMessagesSection(model: model)
+            MumcordList {
+                MumcordListRow(
+                    title: Strings.moreDisconnect(serverName),
+                    icon: MumcordIcons.phoneOff,
+                    danger: true,
+                    action: onDisconnect
+                )
+                .accessibilityIdentifier("more-disconnect")
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}

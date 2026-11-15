@@ -1,0 +1,369 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Android release (RELEASING.md). A pushed tag vX.Y.Z builds the release APK, signs it with the
+# release key of the GitHub environment `android-release`, and creates a draft GitHub release with
+# the APK, SHA256SUMS, the SBOM and the third-party notices. Nothing is public until the draft is
+# published by hand.
+#
+# Pull requests that change the release pipeline, and a manual start, run the same build as a
+# test: signed with a throwaway key made inside the job, kept only as workflow artifacts. That
+# path never uses the environment or any secret.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "scripts/release-notes.sh"
+      - "scripts/release-version.sh"
+      - "scripts/sign-apk.sh"
+      - "scripts/check-release-apk.sh"
+      - "scripts/generate-sbom.sh"
+      - "scripts/sbom-merge.py"
+      - "scripts/generate-notices.sh"
+      - "scripts/notices.py"
+      - "scripts/license-tools.env"
+      - "about.toml"
+      - "android/app/build.gradle.kts"
+      - "android/app/proguard-rules.pro"
+      - "android/gradle/libs.versions.toml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.sha || github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build the release APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      version: ${{ steps.version.outputs.name }}
+      code: ${{ steps.version.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # A tag decides the version (scripts/release-version.sh); a test build gets a version
+      # below every release.
+      - name: Version
+        id: version
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            scripts/release-version.sh "${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            scripts/release-version.sh --dry-run "${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+
+      # The specification wants a release to contain a released engine. Until Mumcord 0.9.0 is
+      # out the pin is a commit, which the release notes then name.
+      - name: Check the engine pin
+        if: github.ref_type == 'tag'
+        run: |
+          if ! grep -q '^tag *= *"' engine.lock.toml; then
+            rev="$(sed -n 's/^rev *= *"\(.*\)"/\1/p' engine.lock.toml)"
+            echo "::warning title=Engine is not a release::engine.lock.toml pins the Mumcord commit ${rev}, not a release tag; the release notes name the commit."
+          fi
+
+      # The same system packages, toolchain and caches as the build job of ci-android.yml.
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev \
+            meson ninja-build nasm
+
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
+
+      - name: Restore the Android toolchain
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Android/Sdk
+            ~/.local/share/mumcord
+            ~/.cargo/bin/cargo-ndk
+          key: android-toolchain-${{ hashFiles('scripts/setup-android.sh') }}
+
+      - name: Install the Android toolchain
+        run: |
+          scripts/setup-android.sh --no-emulator
+          scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
+          # The runner image points this at its own SDK; Gradle refuses two different locations.
+          echo "ANDROID_SDK_ROOT=${HOME}/Android/Sdk" >> "$GITHUB_ENV"
+
+      - name: Name the video codec build
+        id: codecs
+        run: echo "id=$(scripts/build-codecs.sh --id aarch64-linux-android)" >> "$GITHUB_OUTPUT"
+
+      # Only restored: ci-android.yml saves it. Built here when the cache is cold.
+      - name: Restore the video codecs
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .codecs
+          key: codecs-android-${{ steps.codecs.outputs.id }}
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: android
+          save-if: false
+
+      - name: Restore Gradle
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-build-${{ hashFiles('android/gradle/**', 'android/**/*.gradle.kts', 'android/gradle.properties') }}
+          restore-keys: gradle-build-
+
+      - name: Cache the licence and SBOM tools
+        id: license-tools
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/bin/cargo-about
+            ~/.cargo/bin/cargo-cyclonedx
+          key: license-tools-${{ hashFiles('scripts/license-tools.env', 'rust-toolchain.toml') }}
+
+      - name: Install the licence and SBOM tools
+        if: steps.license-tools.outputs.cache-hit != 'true'
+        run: |
+          source scripts/license-tools.env
+          cargo install cargo-about --version "${CARGO_ABOUT_VERSION}" --locked --features cli
+          cargo install cargo-cyclonedx --version "${CARGO_CYCLONEDX_VERSION}" --locked
+
+      # The notices go into the APK (About -> Third-party licences), so they are generated first:
+      # from the SBOM of the Android libraries and the Rust crates of the engine library.
+      - name: SBOM of the Android libraries
+        working-directory: android
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          ./gradlew --console=plain :app:cyclonedxDirectBom \
+            "-Pmumcord.versionName=${VERSION_NAME}" "-Pmumcord.versionCode=${VERSION_CODE}"
+
+      - name: Third-party notices
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          mkdir -p dist
+          scripts/generate-notices.sh "${VERSION_NAME}" android/app/build/reports/cyclonedx-direct/bom.json \
+            dist/THIRD_PARTY_NOTICES.txt
+
+      # lintVitalRelease runs with assembleRelease. The APK stays unsigned here: the key only
+      # exists in the signing job.
+      - name: Build the release APK
+        working-directory: android
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          ./gradlew --console=plain assembleRelease \
+            "-Pmumcord.versionName=${VERSION_NAME}" "-Pmumcord.versionCode=${VERSION_CODE}" \
+            "-Pmumcord.noticesFile=${GITHUB_WORKSPACE}/dist/THIRD_PARTY_NOTICES.txt"
+
+      - name: Check that the APK is the product
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          scripts/check-release-apk.sh android/app/build/outputs/apk/release/app-release-unsigned.apk \
+            "${VERSION_NAME}" "${VERSION_CODE}" android/app/build/outputs/mapping/release/mapping.txt \
+            dist/THIRD_PARTY_NOTICES.txt
+
+      - name: SBOM and release notes
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          base="mumcord-mobile-${VERSION_NAME}"
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk "dist/${base}-arm64-unsigned.apk"
+          android_sbom=android/app/build/reports/cyclonedx-direct/bom.json
+          scripts/generate-sbom.sh "${VERSION_NAME}" "${android_sbom}" "dist/${base}-android.cdx.json"
+          scripts/release-notes.sh "${VERSION_NAME}" "${base}-arm64.apk" "${base}-android.cdx.json" \
+            > dist/release-notes.md
+          ls -l dist
+
+      - name: Upload the unsigned release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-unsigned
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+      # What turns a crash report of this APK back into readable names: the engine libraries
+      # before the Android build stripped their symbols, and R8's map of the renamed Kotlin code.
+      - name: Upload the symbols of the release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-symbols
+          path: |
+            android/engine/src/main/jniLibs/arm64-v8a/
+            android/app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: error
+          retention-days: 90
+
+  # Test runs only. Proves signing, verification and checksums without any secret.
+  sign-dry-run:
+    name: Sign with a throwaway key (test run)
+    if: github.ref_type != 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Restore the Android toolchain
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Android/Sdk
+            ~/.local/share/mumcord
+            ~/.cargo/bin/cargo-ndk
+          key: android-toolchain-${{ hashFiles('scripts/setup-android.sh') }}
+
+      - name: Install the Android toolchain
+        run: |
+          scripts/setup-android.sh --no-emulator
+          scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: android-unsigned
+          path: dist
+
+      - name: Sign with a throwaway key
+        env:
+          VERSION_NAME: ${{ needs.build.outputs.version }}
+        run: |
+          password="$(openssl rand -hex 24)"
+          echo "::add-mask::${password}"
+          export SIGNING_KEYSTORE="${RUNNER_TEMP}/dry-run.p12" SIGNING_KEY_ALIAS=dry-run
+          export SIGNING_KEYSTORE_PASSWORD="${password}" SIGNING_KEY_PASSWORD="${password}"
+          "${JAVA_HOME}/bin/keytool" -genkeypair -keystore "${SIGNING_KEYSTORE}" -storetype PKCS12 \
+            -storepass:env SIGNING_KEYSTORE_PASSWORD -alias dry-run -keyalg RSA -keysize 4096 \
+            -validity 2 -dname "CN=Mumcord Mobile test run, O=not for release"
+          base="mumcord-mobile-${VERSION_NAME}"
+          scripts/sign-apk.sh "dist/${base}-arm64-unsigned.apk" "dist/${base}-arm64.apk"
+          rm -f "dist/${base}-arm64-unsigned.apk" "${SIGNING_KEYSTORE}"
+          (cd dist && sha256sum -- *.apk *.cdx.json THIRD_PARTY_NOTICES.txt > SHA256SUMS && sha256sum --check SHA256SUMS)
+          ls -l dist
+
+      - name: Upload the test release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-dry-run
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  # Tag runs only. The release key exists only in the environment android-release, which the
+  # product manager restricts to v* tags (RELEASING.md).
+  sign:
+    name: Sign with the release key
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: android-release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Restore the Android toolchain
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Android/Sdk
+            ~/.local/share/mumcord
+            ~/.cargo/bin/cargo-ndk
+          key: android-toolchain-${{ hashFiles('scripts/setup-android.sh') }}
+
+      - name: Install the Android toolchain
+        run: |
+          scripts/setup-android.sh --no-emulator
+          scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: android-unsigned
+          path: dist
+
+      - name: Sign with the release key
+        env:
+          VERSION_NAME: ${{ needs.build.outputs.version }}
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 SIGNING_KEYSTORE_PASSWORD SIGNING_KEY_ALIAS SIGNING_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::a signing secret is missing in the environment android-release (see RELEASING.md)"
+              exit 1
+            fi
+          done
+          export SIGNING_KEYSTORE="${RUNNER_TEMP}/release.p12"
+          trap 'rm -f "${SIGNING_KEYSTORE}"' EXIT
+          printf '%s' "${KEYSTORE_BASE64}" | base64 --decode > "${SIGNING_KEYSTORE}"
+          base="mumcord-mobile-${VERSION_NAME}"
+          scripts/sign-apk.sh "dist/${base}-arm64-unsigned.apk" "dist/${base}-arm64.apk"
+          rm -f "dist/${base}-arm64-unsigned.apk"
+          (cd dist && sha256sum -- *.apk *.cdx.json THIRD_PARTY_NOTICES.txt > SHA256SUMS && sha256sum --check SHA256SUMS)
+          ls -l dist
+
+      - name: Upload the signed release
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-release
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Create the draft release
+    if: github.ref_type == 'tag'
+    needs: [build, sign]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: android-release
+          path: dist
+
+      # Run again for the same tag (for example after a failed upload), it replaces the files of
+      # the draft. A published release is never changed.
+      - name: Create or update the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION_NAME: ${{ needs.build.outputs.version }}
+        run: |
+          cd dist
+          files=(*.apk SHA256SUMS *.cdx.json THIRD_PARTY_NOTICES.txt)
+          if draft="$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [[ "${draft}" != "true" ]]; then
+              echo "::error::the release ${GITHUB_REF_NAME} is already published; it is not changed"
+              exit 1
+            fi
+            gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
+            gh release edit "${GITHUB_REF_NAME}" --notes-file release-notes.md
+          else
+            gh release create "${GITHUB_REF_NAME}" "${files[@]}" --draft --verify-tag \
+              --title "Mumcord Mobile ${VERSION_NAME}" --notes-file release-notes.md
+          fi

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Written by scripts/translations.py from Mumcord b258e927e1af (ui/src/locales/el) and i18n/mobile/el.json. Do not edit by hand. -->
+<resources>
+    <string name="call_channel_name">Voice session</string>
+    <string name="call_channel_description">Shown while you are connected to a server, with Mute, Deafen and Leave.</string>
+    <string name="call_status_connected">Voice connected</string>
+    <string name="call_status_muted">Σε σίγαση</string>
+    <string name="call_status_deafened">Σε κώφωση</string>
+    <string name="call_action_mute">Σίγαση μικροφώνου</string>
+    <string name="call_action_unmute">Unmute</string>
+    <string name="call_action_deafen">Κώφωση</string>
+    <string name="call_action_undeafen">Undeafen</string>
+</resources>

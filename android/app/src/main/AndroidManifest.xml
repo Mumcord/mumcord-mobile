@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Talking to Mumble servers is the app's purpose. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+        Since Android 17 a server on the local network (home or office, private addresses) can
+        only be reached with this permission. The app asks for it, with an explanation, when the
+        user connects to such a server.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK" />
+
+    <!-- The secure storage is left out of every backup and transfer; see the two rule files. -->
+    <application
+        android:name=".MumcordApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:localeConfig="@xml/locales_config"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        tools:targetApi="33">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
+            android:supportsPictureInPicture="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- A watched stream continues in the system's picture-in-picture window (FR-5.76). Size and
+                 orientation changes (rotation, entering and leaving that window) are handled by Compose
+                 without recreating the activity, so the stream's picture does not restart; theme and
+                 language changes still recreate it. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- mumble:// links from other apps. The app shows the target and asks before connecting. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mumble" />
+            </intent-filter>
+        </activity>
+        <!--
+            Hands the system camera app the file for a photo the user takes for the chat. Not
+            exported: other apps only reach a file through the one-time grant of that request.
+            The app has the CAMERA permission for scanning QR codes, so Android demands it for
+            the camera app's capture request too: the chat asks for it before taking a photo.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+
+</manifest>

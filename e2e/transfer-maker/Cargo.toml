@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+
+[package]
+name = "mumcord-transfer-maker"
+description = "Makes the QR code texts of a transfer for the end-to-end tests of the mobile apps"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "transfer-maker"
+path = "src/main.rs"
+
+[dependencies]
+mumcord-store.workspace = true

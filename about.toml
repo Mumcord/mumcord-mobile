@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# cargo-about configuration: the Rust part of the third-party notices of each release
+# (scripts/generate-notices.sh). AGPL-3.0-only is Mumcord itself (the engine and the bridge);
+# every other entry is a permissive or weak-copyleft licence compatible with it. Add a licence
+# only after checking that compatibility. Same list as the Mumcord repository's about.toml.
+accepted = [
+    "AGPL-3.0-only",
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "MPL-2.0",
+    "CC0-1.0",
+    "BSL-1.0",
+    "OpenSSL",
+    "0BSD",
+    "Unlicense",
+    "CDLA-Permissive-2.0",
+]
+# Only what the release APK contains: the bridge built for phones.
+targets = ["aarch64-linux-android"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+workarounds = ["ring"]

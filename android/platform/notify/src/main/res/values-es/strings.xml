@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Written by scripts/translations.py from Mumcord b258e927e1af (ui/src/locales/es) and i18n/mobile/es.json. Do not edit by hand. -->
+<resources>
+    <string name="message_channel_name">Mensajes</string>
+    <string name="message_channel_description">Private messages and mentions while you are connected</string>
+    <string name="message_new">New message</string>
+    <string name="message_you">Tú</string>
+    <string name="idle_channel_name">Session notices</string>
+    <string name="idle_channel_description">The warning before Mumcord disconnects because you are alone in a channel</string>
+    <string name="idle_warning_title">Disconnecting in 1 minute</string>
+    <string name="idle_warning_text">You are alone in your channel.</string>
+    <string name="idle_stay_connected">Stay connected</string>
+    <string name="idle_disconnected_title">Desconectado</string>
+    <string name="idle_disconnected_text">You were alone in a channel for 30 minutes.</string>
+</resources>

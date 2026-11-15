@@ -1,0 +1,28 @@
+# Rust workspace of the mobile apps.
+[workspace]
+resolver = "3"
+# e2e/voice-peer is the second person of the end-to-end voice test; only e2e/run.sh builds it.
+members = ["bridge", "e2e/chat-peer", "e2e/stream-peer", "e2e/transfer-maker", "e2e/voice-peer"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.99"
+license = "AGPL-3.0-only"
+repository = "https://github.com/Mumcord/mumcord-mobile"
+
+[workspace.dependencies]
+# The pinned Mumcord engine. `rev` must be the reference in `engine.lock.toml`; the bridge's
+# build script fails when the two differ. Desktop-only parts stay off (`default-features = false`).
+mumcord-engine = { git = "https://github.com/Mumcord/mumcord", rev = "b258e927e1af54bfd122dfa1976cd90f4f74af74", default-features = false }
+mumcord-camera = { git = "https://github.com/Mumcord/mumcord", rev = "b258e927e1af54bfd122dfa1976cd90f4f74af74" }
+mumcord-audio = { git = "https://github.com/Mumcord/mumcord", rev = "b258e927e1af54bfd122dfa1976cd90f4f74af74" }
+mumcord-store = { git = "https://github.com/Mumcord/mumcord", rev = "b258e927e1af54bfd122dfa1976cd90f4f74af74" }
+
+# The phone libraries: optimising the whole program at once (link-time optimisation in one unit)
+# makes the engine library about 4 MB smaller. The speed level stays at the default (3): the voice
+# processing runs in Rust, and optimising for size instead ("s", another 2.5 MB less) could slow
+# it down. The Android build strips the symbols when it packages the library; the release
+# workflow keeps the unstripped library as an artifact for reading crash reports.
+[profile.release]
+lto = "fat"
+codegen-units = 1

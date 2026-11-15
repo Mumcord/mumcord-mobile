@@ -1,0 +1,494 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Foundation
+
+/// Typed access to the texts in `Localizable.strings`. The keys equal the string names of the
+/// Android app, so both apps are translated from the same list.
+///
+/// Plural forms are picked here between `.one` and `.other`, which is enough for English; the
+/// language task replaces this with the plural rules of each language.
+enum Strings {
+    static var appName: String { text("app_name") }
+    static var actionCancel: String { text("action_cancel") }
+    static var actionBack: String { text("action_back") }
+    static var actionClose: String { text("action_close") }
+    static var talkModeTitle: String { text("talk_mode_title") }
+    static var talkModeSubtitle: String { text("talk_mode_subtitle") }
+    static var talkModeVoiceActivity: String { text("talk_mode_voice_activity") }
+    static var talkModeVoiceActivityText: String { text("talk_mode_voice_activity_text") }
+    static var talkModePerkNoiseSuppression: String { text("talk_mode_perk_noise_suppression") }
+    static var talkModePerkHandsFree: String { text("talk_mode_perk_hands_free") }
+    static var talkModePushToTalk: String { text("talk_mode_push_to_talk") }
+    static var talkModePushToTalkText: String { text("talk_mode_push_to_talk_text") }
+    static var talkModePerkHold: String { text("talk_mode_perk_hold") }
+    static var talkModeContinue: String { text("talk_mode_continue") }
+    static var talkModeChangeLater: String { text("talk_mode_change_later") }
+    static var serversTitle: String { text("servers_title") }
+    static var serversFavourites: String { text("servers_favourites") }
+    static var serversEdit: String { text("servers_edit") }
+    static var serversDone: String { text("servers_done") }
+    static var serversConnect: String { text("servers_connect") }
+    static func serversConnectDescription(_ p1: String) -> String { format("servers_connect_description", p1) }
+    static func serversCancelDescription(_ p1: String) -> String { format("servers_cancel_description", p1) }
+    static func serversEditDescription(_ p1: String) -> String { format("servers_edit_description", p1) }
+    static func serversRemoveDescription(_ p1: String) -> String { format("servers_remove_description", p1) }
+    static var serversConnecting: String { text("servers_connecting") }
+    static func serversOnline(_ p1: Int, _ p2: Int) -> String {
+        format(p1 == 1 ? "servers_online.one" : "servers_online.other", p1, p2)
+    }
+    static var serversOffline: String { text("servers_offline") }
+    static var serversAdd: String { text("servers_add") }
+    static var serversEmptyTitle: String { text("servers_empty_title") }
+    static var serversEmptyText: String { text("servers_empty_text") }
+    static var formAddTitle: String { text("form_add_title") }
+    static var formEditTitle: String { text("form_edit_title") }
+    static var formAddressLabel: String { text("form_address_label") }
+    static var formAddressPlaceholder: String { text("form_address_placeholder") }
+    static var formAddressMissing: String { text("form_address_missing") }
+    static var formPortLabel: String { text("form_port_label") }
+    static var formPortInvalid: String { text("form_port_invalid") }
+    static var formNameLabel: String { text("form_name_label") }
+    static var formNameHint: String { text("form_name_hint") }
+    static var formUsernameLabel: String { text("form_username_label") }
+    static var formUsernameHint: String { text("form_username_hint") }
+    static var formUsernameMissing: String { text("form_username_missing") }
+    static var formPasswordLabel: String { text("form_password_label") }
+    static var formPasswordHint: String { text("form_password_hint") }
+    static var formPasswordSaved: String { text("form_password_saved") }
+    static var formPasswordWillBeRemoved: String { text("form_password_will_be_removed") }
+    static var formPasswordRemove: String { text("form_password_remove") }
+    static var formPasswordKeep: String { text("form_password_keep") }
+    static var formSave: String { text("form_save") }
+    static var formSaveFailed: String { text("form_save_failed") }
+    static var passwordTitle: String { text("password_title") }
+    static func passwordText(_ p1: String) -> String { format("password_text", p1) }
+    static var passwordLabel: String { text("password_label") }
+    static var switchTitle: String { text("switch_title") }
+    static func switchText(_ p1: String, _ p2: String) -> String { format("switch_text", p1, p2) }
+    static var switchConfirm: String { text("switch_confirm") }
+    static var removeTitle: String { text("remove_title") }
+    static func removeText(_ p1: String) -> String { format("remove_text", p1) }
+    static var removeConfirm: String { text("remove_confirm") }
+    static var linkTitle: String { text("link_title") }
+    static var linkText: String { text("link_text") }
+    static var linkServer: String { text("link_server") }
+    static var linkChannel: String { text("link_channel") }
+    static var linkUsername: String { text("link_username") }
+    static var linkWillAdd: String { text("link_will_add") }
+    static var linkInvalidTitle: String { text("link_invalid_title") }
+    static var linkInvalidText: String { text("link_invalid_text") }
+    static var errorTitle: String { text("error_title") }
+    static func errorTitleServer(_ p1: String) -> String { format("error_title_server", p1) }
+    static var errorRetry: String { text("error_retry") }
+    static var errorDismiss: String { text("error_dismiss") }
+    static var errorEnterPassword: String { text("error_enter_password") }
+    static var errorNotConnected: String { text("error_not_connected") }
+    static var errorServerUnreachable: String { text("error_server_unreachable") }
+    static var errorWrongPassword: String { text("error_wrong_password") }
+    static var errorNameInUse: String { text("error_name_in_use") }
+    static var errorCertificateRejected: String { text("error_certificate_rejected") }
+    static var errorCertificateChanged: String { text("error_certificate_changed") }
+    static var errorServerTooOld: String { text("error_server_too_old") }
+    static var errorBanned: String { text("error_banned") }
+    static var errorNotFound: String { text("error_not_found") }
+    static var errorPermissionDenied: String { text("error_permission_denied") }
+    static var errorInvalidInput: String { text("error_invalid_input") }
+    static var errorSecureStorageUnavailable: String { text("error_secure_storage_unavailable") }
+    static var errorIo: String { text("error_io") }
+    static var errorDuplicateIdentity: String { text("error_duplicate_identity") }
+    static var errorLastIdentity: String { text("error_last_identity") }
+    static var errorNoIdentity: String { text("error_no_identity") }
+    static var errorInternal: String { text("error_internal") }
+    static var certificateUnknownTitle: String { text("certificate_unknown_title") }
+    static var certificateUnknownMessage: String { text("certificate_unknown_message") }
+    static var certificateFingerprintLabel: String { text("certificate_fingerprint_label") }
+    static var certificateUnknownTrust: String { text("certificate_unknown_trust") }
+    static var certificateReject: String { text("certificate_reject") }
+    static var certificateChangedTitle: String { text("certificate_changed_title") }
+    static var certificateChangedMessage: String { text("certificate_changed_message") }
+    static var certificateChangedPreviousLabel: String { text("certificate_changed_previous_label") }
+    static var certificateChangedNewLabel: String { text("certificate_changed_new_label") }
+    static var certificateChangedTrust: String { text("certificate_changed_trust") }
+    static func channelsReconnecting(_ p1: Int, _ p2: Int) -> String { format("channels_reconnecting", p1, p2) }
+    static var channelsSelfMarker: String { text("channels_self_marker") }
+    static var channelsHere: String { text("channels_here") }
+    static var channelsSearch: String { text("channels_search") }
+    static var channelsSearchClose: String { text("channels_search_close") }
+    static var channelsSearchEmpty: String { text("channels_search_empty") }
+    static func channelsChannelDescription(_ p1: String, _ p2: String) -> String { format("channels_channel_description", p1, p2) }
+    static var channelsChannelHereSuffix: String { text("channels_channel_here_suffix") }
+    static var channelsChannelLockedSuffix: String { text("channels_channel_locked_suffix") }
+    static var channelsLocked: String { text("channels_locked") }
+    static func channelsCollapse(_ p1: String) -> String { format("channels_collapse", p1) }
+    static func channelsExpand(_ p1: String) -> String { format("channels_expand", p1) }
+    static var channelsMenu: String { text("channels_menu") }
+    static func channelsOnline(_ p1: Int) -> String {
+        format(p1 == 1 ? "channels_online.one" : "channels_online.other", p1)
+    }
+    static var personTalking: String { text("person_talking") }
+    static var personMuted: String { text("person_muted") }
+    static var personDeafened: String { text("person_deafened") }
+    static var personServerMuted: String { text("person_server_muted") }
+    static var personStreaming: String { text("person_streaming") }
+    static var personCamera: String { text("person_camera") }
+    static var personVolume: String { text("person_volume") }
+    static func personVolumeValue(_ p1: Int) -> String { format("person_volume_value", p1) }
+    static var personMute: String { text("person_mute") }
+    static var channelPasswordTitle: String { text("channel_password_title") }
+    static func channelPasswordText(_ p1: String) -> String { format("channel_password_text", p1) }
+    static var channelPasswordWrong: String { text("channel_password_wrong") }
+    static var channelJoin: String { text("channel_join") }
+    static var channelCollapse: String { text("channel_collapse") }
+    static var channelExpand: String { text("channel_expand") }
+    static var deniedTitle: String { text("denied_title") }
+    static func deniedTitleChannel(_ p1: String) -> String { format("denied_title_channel", p1) }
+    static var deniedText: String { text("denied_text") }
+    static var deniedDismiss: String { text("denied_dismiss") }
+    static func hintFileTransfer(_ p1: String) -> String { format("hint_file_transfer", p1) }
+    static func hintWatchTogether(_ p1: String) -> String { format("hint_watch_together", p1) }
+    static func hintPluginContent(_ p1: String) -> String { format("hint_plugin_content", p1) }
+    static var tabChannels: String { text("tab_channels") }
+    static var tabChat: String { text("tab_chat") }
+    static var tabMessages: String { text("tab_messages") }
+    static var tabMore: String { text("tab_more") }
+    static func moreDisconnect(_ p1: String) -> String { format("more_disconnect", p1) }
+    static func channelsPeopleCount(_ p1: Int) -> String {
+        format(p1 == 1 ? "channels_people_count.one" : "channels_people_count.other", p1)
+    }
+
+    static var localNetworkTitle: String { text("local_network_title") }
+    static func localNetworkText(_ p1: String) -> String { format("local_network_text", p1) }
+    static var localNetworkContinue: String { text("local_network_continue") }
+    static var localNetworkNotNow: String { text("local_network_not_now") }
+    static var localNetworkDenied: String { text("local_network_denied") }
+    static var localNetworkSuspected: String { text("local_network_suspected") }
+    static var localNetworkOpenSettings: String { text("local_network_open_settings") }
+    static var microphoneTitle: String { text("microphone_title") }
+    static var microphoneText: String { text("microphone_text") }
+    static var microphoneContinue: String { text("microphone_continue") }
+    static var microphoneNotNow: String { text("microphone_not_now") }
+    static var microphoneDeniedTitle: String { text("microphone_denied_title") }
+    static var microphoneDeniedAsk: String { text("microphone_denied_ask") }
+    static var microphoneDeniedSettings: String { text("microphone_denied_settings") }
+    static var microphoneAllow: String { text("microphone_allow") }
+    static var microphoneOpenSettings: String { text("microphone_open_settings") }
+    static func voiceStatusConnected(_ p1: String) -> String { format("voice_status_connected", p1) }
+    static func voiceStatusReconnecting(_ p1: String) -> String { format("voice_status_reconnecting", p1) }
+    static var voiceOpen: String { text("voice_open") }
+    static var voiceCollapse: String { text("voice_collapse") }
+    static var voiceView: String { text("voice_view") }
+    static var voiceTalking: String { text("voice_talking") }
+    static var voiceNotTalking: String { text("voice_not_talking") }
+    static var voiceMute: String { text("voice_mute") }
+    static var voiceUnmute: String { text("voice_unmute") }
+    static var voiceMuteMicrophone: String { text("voice_mute_microphone") }
+    static var voiceUnmuteMicrophone: String { text("voice_unmute_microphone") }
+    static var voiceMutedByServer: String { text("voice_muted_by_server") }
+    static var voiceNoMicrophone: String { text("voice_no_microphone") }
+    static var voiceNoMicrophoneAction: String { text("voice_no_microphone_action") }
+    static var voiceDeafen: String { text("voice_deafen") }
+    static var voiceUndeafen: String { text("voice_undeafen") }
+    static var voiceLeave: String { text("voice_leave") }
+    static var voiceLeaveServer: String { text("voice_leave_server") }
+    static var voiceTalkMode: String { text("voice_talk_mode") }
+    static var voiceHoldToTalk: String { text("voice_hold_to_talk") }
+    static func voicePersonYou(_ p1: String) -> String { format("voice_person_you", p1) }
+    static var voiceLevel: String { text("voice_level") }
+    static var voiceLevelHint: String { text("voice_level_hint") }
+    static func personWhisper(_ p1: String) -> String { format("person_whisper", p1) }
+    static var channelShout: String { text("channel_shout") }
+    static func whisperToPerson(_ p1: String) -> String { format("whisper_to_person", p1) }
+    static func whisperToChannel(_ p1: String) -> String { format("whisper_to_channel", p1) }
+    static var whisperActive: String { text("whisper_active") }
+    static var whisperInactive: String { text("whisper_inactive") }
+    static var whisperClose: String { text("whisper_close") }
+
+    static func chatTitle(_ p1: String) -> String { format("chat_title", p1) }
+    static func chatSubtitle(_ p1: Int, _ p2: String) -> String {
+        format(p1 == 1 ? "chat_subtitle.one" : "chat_subtitle.other", p1, p2)
+    }
+    static func chatPlaceholder(_ p1: String) -> String { format("chat_placeholder", p1) }
+    static var chatAddImage: String { text("chat_add_image") }
+    static var chatAddGif: String { text("chat_add_gif") }
+    static var chatSend: String { text("chat_send") }
+    static var chatEmpty: String { text("chat_empty") }
+    static var chatLoading: String { text("chat_loading") }
+    static var chatLoadFailed: String { text("chat_load_failed") }
+    static var chatRetry: String { text("chat_retry") }
+    static var chatLoadingOlder: String { text("chat_loading_older") }
+    static var chatHistoryStart: String { text("chat_history_start") }
+    static var chatDayToday: String { text("chat_day_today") }
+    static var chatDayYesterday: String { text("chat_day_yesterday") }
+    static func chatNewMessages(_ p1: Int) -> String {
+        format(p1 == 1 ? "chat_new_messages.one" : "chat_new_messages.other", p1)
+    }
+    static func chatTabUnread(_ p1: Int) -> String {
+        format(p1 == 1 ? "chat_tab_unread.one" : "chat_tab_unread.other", p1)
+    }
+    static func chatAnnounce(_ p1: String, _ p2: String) -> String { format("chat_announce", p1, p2) }
+    static var chatMentionsYou: String { text("chat_mentions_you") }
+    static var chatReplyAction: String { text("chat_reply_action") }
+    static func chatReplyingTo(_ p1: String) -> String { format("chat_replying_to", p1) }
+    static var chatReplyCancel: String { text("chat_reply_cancel") }
+    static func chatMentionItem(_ p1: String) -> String { format("chat_mention_item", p1) }
+    static var chatImageWord: String { text("chat_image_word") }
+    static var chatGifWord: String { text("chat_gif_word") }
+    static var chatImageOpenAction: String { text("chat_image_open_action") }
+    static var chatGifAddAction: String { text("chat_gif_add_action") }
+    static var chatTruncated: String { text("chat_truncated") }
+    static var chatSending: String { text("chat_sending") }
+    static var chatNotSent: String { text("chat_not_sent") }
+    static var chatRefused: String { text("chat_refused") }
+    static var chatImageRefused: String { text("chat_image_refused") }
+    static var chatDiscard: String { text("chat_discard") }
+    static func chatCharactersLeft(_ p1: Int) -> String {
+        format(p1 == 1 ? "chat_characters_left.one" : "chat_characters_left.other", p1)
+    }
+    static func chatCharactersOver(_ p1: Int) -> String {
+        format(p1 == 1 ? "chat_characters_over.one" : "chat_characters_over.other", p1)
+    }
+    static var chatImageUnreadable: String { text("chat_image_unreadable") }
+    static var chatNoticeDismiss: String { text("chat_notice_dismiss") }
+    static var gifTitle: String { text("gif_title") }
+    static var gifHint: String { text("gif_hint") }
+    static func gifItem(_ p1: Int) -> String { format("gif_item", p1) }
+    static var gifRemove: String { text("gif_remove") }
+    static var gifSaved: String { text("gif_saved") }
+    static var gifNotSaved: String { text("gif_not_saved") }
+    static var imageSourceTitle: String { text("image_source_title") }
+    static var imageSourceLibrary: String { text("image_source_library") }
+    static var imageSourceCamera: String { text("image_source_camera") }
+    static var linkWarningTitle: String { text("link_warning_title") }
+    static var linkWarningText: String { text("link_warning_text") }
+    static var linkWarningOpen: String { text("link_warning_open") }
+    static var viewerTitle: String { text("viewer_title") }
+    static var viewerClose: String { text("viewer_close") }
+    static var sessionEndedTitle: String { text("session_ended_title") }
+    static func sessionEndedText(_ p1: String) -> String { format("session_ended_text", p1) }
+    static var sessionEndedReconnect: String { text("session_ended_reconnect") }
+    static var sessionEndedClose: String { text("session_ended_close") }
+
+    static var messagesEmpty: String { text("messages_empty") }
+    static var messagesSearch: String { text("messages_search") }
+    static var messagesSearchClose: String { text("messages_search_close") }
+    static var messagesSearchEmpty: String { text("messages_search_empty") }
+    static var messagesSection: String { text("messages_section") }
+    static var messagesNew: String { text("messages_new") }
+    static func messagesRequests(_ p1: Int) -> String { format("messages_requests", p1) }
+    static var messagesRequestsSub: String { text("messages_requests_sub") }
+    static var messagesUnknownPerson: String { text("messages_unknown_person") }
+    static var messagesPreviewPicture: String { text("messages_preview_picture") }
+    static var messagesOnline: String { text("messages_online") }
+    static func messagesRowUnread(_ p1: Int) -> String {
+        format(p1 == 1 ? "messages_row_unread.one" : "messages_row_unread.other", p1)
+    }
+    static func messagesTabUnread(_ p1: Int) -> String {
+        format(p1 == 1 ? "messages_tab_unread.one" : "messages_tab_unread.other", p1)
+    }
+    static var messagesNotificationsOffTitle: String { text("messages_notifications_off_title") }
+    static var messagesNotificationsOffText: String { text("messages_notifications_off_text") }
+    static var messagesNotificationsOffAction: String { text("messages_notifications_off_action") }
+    static var conversationBack: String { text("conversation_back") }
+    static func conversationOnline(_ p1: String) -> String { format("conversation_online", p1) }
+    static func conversationOffline(_ p1: String) -> String { format("conversation_offline", p1) }
+    static var requestsTitle: String { text("requests_title") }
+    static var requestsBack: String { text("requests_back") }
+    static var requestsHint: String { text("requests_hint") }
+    static var requestsChatRequest: String { text("requests_chat_request") }
+    static var requestsChatRequestEmpty: String { text("requests_chat_request_empty") }
+    static func requestsMoreMessages(_ p1: Int) -> String {
+        format(p1 == 1 ? "requests_more_messages.one" : "requests_more_messages.other", p1)
+    }
+    static var requestsAccept: String { text("requests_accept") }
+    static var requestsDecline: String { text("requests_decline") }
+    static func requestsAcceptDescription(_ p1: String) -> String { format("requests_accept_description", p1) }
+    static func requestsDeclineDescription(_ p1: String) -> String { format("requests_decline_description", p1) }
+    static var pickerTitle: String { text("picker_title") }
+    static var pickerSearch: String { text("picker_search") }
+    static var pickerEmpty: String { text("picker_empty") }
+    static var pickerNoMatch: String { text("picker_no_match") }
+    static var personMessage: String { text("person_message") }
+    static var personChatRequest: String { text("person_chat_request") }
+    static var personChatRequestPending: String { text("person_chat_request_pending") }
+    static var personBlock: String { text("person_block") }
+    static var personUnblock: String { text("person_unblock") }
+    static func chatRequestTitle(_ p1: String) -> String { format("chat_request_title", p1) }
+    static func chatRequestText(_ p1: String) -> String { format("chat_request_text", p1) }
+    static var chatRequestNote: String { text("chat_request_note") }
+    static func chatRequestCounter(_ p1: Int, _ p2: Int) -> String { format("chat_request_counter", p1, p2) }
+    static var chatRequestSend: String { text("chat_request_send") }
+    static func chatRequestRefused(_ p1: String) -> String { format("chat_request_refused", p1) }
+    static var chatRequestFailed: String { text("chat_request_failed") }
+    static func blockTitle(_ p1: String) -> String { format("block_title", p1) }
+    static func blockPrivate(_ p1: String) -> String { format("block_private", p1) }
+    static func blockChannel(_ p1: String) -> String { format("block_channel", p1) }
+    static func blockVoice(_ p1: String) -> String { format("block_voice", p1) }
+    static var blockSilent: String { text("block_silent") }
+    static var blockFailed: String { text("block_failed") }
+    static var moreSectionMessages: String { text("more_section_messages") }
+    static var moreBlocked: String { text("more_blocked") }
+    static var moreSenderOnly: String { text("more_sender_only") }
+    static var moreSenderOnlySub: String { text("more_sender_only_sub") }
+    static var blockedTitle: String { text("blocked_title") }
+    static var blockedBack: String { text("blocked_back") }
+    static var blockedEmpty: String { text("blocked_empty") }
+    static func blockedUnblockDescription(_ p1: String) -> String { format("blocked_unblock_description", p1) }
+    static var notificationsTitle: String { text("notifications_title") }
+    static var notificationsText: String { text("notifications_text") }
+    static var notificationsContinue: String { text("notifications_continue") }
+    static var notificationsNotNow: String { text("notifications_not_now") }
+    static var messageNew: String { text("message_new") }
+    static func outputChip(_ p1: String) -> String { format("output_chip", p1) }
+    static var outputTitle: String { text("output_title") }
+    static var outputSpeaker: String { text("output_speaker") }
+    static var outputEarpiece: String { text("output_earpiece") }
+    static var outputWired: String { text("output_wired") }
+    static var outputBluetooth: String { text("output_bluetooth") }
+    static var outputNotConnected: String { text("output_not_connected") }
+    static var outputNote: String { text("output_note") }
+    static var outputQuestionTitle: String { text("output_question_title") }
+    static var outputQuestionText: String { text("output_question_text") }
+    static var outputQuestionSpeaker: String { text("output_question_speaker") }
+    static var outputQuestionEarpiece: String { text("output_question_earpiece") }
+    static var sessionEndedAloneTitle: String { text("session_ended_alone_title") }
+    static func sessionEndedAloneText(_ p1: String) -> String { format("session_ended_alone_text", p1) }
+    static var settingsTitle: String { text("settings_title") }
+    static var settingsBack: String { text("settings_back") }
+    static var settingsSectionMobileData: String { text("settings_section_mobile_data") }
+    static var settingsAutoplayStreams: String { text("settings_autoplay_streams") }
+    static var settingsLoadMedia: String { text("settings_load_media") }
+    static var settingsReducedVoice: String { text("settings_reduced_voice") }
+    static var settingsSectionBattery: String { text("settings_section_battery") }
+    static var settingsIdleDisconnect: String { text("settings_idle_disconnect") }
+    static var settingsIdleDisconnectSub: String { text("settings_idle_disconnect_sub") }
+    static var idleNotificationTexts: IdleNotificationTexts {
+        IdleNotificationTexts(
+            warningTitle: text("idle_warning_title"),
+            warningText: text("idle_warning_text"),
+            stayConnected: text("idle_stay_connected"),
+            disconnectedTitle: text("idle_disconnected_title"),
+            disconnectedText: text("idle_disconnected_text")
+        )
+    }
+
+    static var cameraTitle: String { text("camera_title") }
+    static var cameraBlockedText: String { text("camera_blocked_text") }
+    static var cameraContinue: String { text("camera_continue") }
+    static var cameraNotNow: String { text("camera_not_now") }
+    static var cameraOpenSettings: String { text("camera_open_settings") }
+    static var cameraAllow: String { text("camera_allow") }
+    static var cameraReasonPhoto: String { text("camera_reason_photo") }
+    static var cameraReasonScan: String { text("camera_reason_scan") }
+    static var identitiesTitle: String { text("identities_title") }
+    static var identitiesIntro: String { text("identities_intro") }
+    static var identitiesSectionYours: String { text("identities_section_yours") }
+    static var identitiesSectionAdd: String { text("identities_section_add") }
+    static func identitiesDefault(_ p1: String) -> String { format("identities_default", p1) }
+    static func identitiesUsedOn(_ p1: Int) -> String {
+        format(p1 == 1 ? "identities_used_on.one" : "identities_used_on.other", p1)
+    }
+    static var identitiesUnused: String { text("identities_unused") }
+    static func identitiesFingerprint(_ p1: String) -> String { format("identities_fingerprint", p1) }
+    static func identitiesCardDescription(_ p1: String, _ p2: String) -> String { format("identities_card_description", p1, p2) }
+    static var identitiesScan: String { text("identities_scan") }
+    static var identitiesScanTag: String { text("identities_scan_tag") }
+    static var identitiesScanSub: String { text("identities_scan_sub") }
+    static var identitiesImport: String { text("identities_import") }
+    static var identitiesImportSub: String { text("identities_import_sub") }
+    static var identitiesCreate: String { text("identities_create") }
+    static var identitiesCreateSub: String { text("identities_create_sub") }
+    static var identitiesFileUnreadable: String { text("identities_file_unreadable") }
+    static var identitySetupTitle: String { text("identity_setup_title") }
+    static var identitySetupText: String { text("identity_setup_text") }
+    static var identityDetailsName: String { text("identity_details_name") }
+    static var identityDetailsFingerprint: String { text("identity_details_fingerprint") }
+    static var identityDetailsAdded: String { text("identity_details_added") }
+    static var identityDetailsDefault: String { text("identity_details_default") }
+    static var identitySetDefault: String { text("identity_set_default") }
+    static var identityExport: String { text("identity_export") }
+    static var identityDelete: String { text("identity_delete") }
+    static var identityDeleteLast: String { text("identity_delete_last") }
+    static var identityCreateTitle: String { text("identity_create_title") }
+    static var identityCreateText: String { text("identity_create_text") }
+    static var identityCreateName: String { text("identity_create_name") }
+    static var identityCreateNameInvalid: String { text("identity_create_name_invalid") }
+    static var identityCreateConfirm: String { text("identity_create_confirm") }
+    static var identityImportTitle: String { text("identity_import_title") }
+    static var identityImportText: String { text("identity_import_text") }
+    static var identityImportPassword: String { text("identity_import_password") }
+    static var identityImportConfirm: String { text("identity_import_confirm") }
+    static var identityImportWrong: String { text("identity_import_wrong") }
+    static var identityImportFailed: String { text("identity_import_failed") }
+    static func identityExportTitle(_ p1: String) -> String { format("identity_export_title", p1) }
+    static var identityExportText: String { text("identity_export_text") }
+    static var identityExportPassword: String { text("identity_export_password") }
+    static var identityExportRepeat: String { text("identity_export_repeat") }
+    static var identityExportMismatch: String { text("identity_export_mismatch") }
+    static var identityExportFailed: String { text("identity_export_failed") }
+    static var identityExportConfirm: String { text("identity_export_confirm") }
+    static var identityExportShare: String { text("identity_export_share") }
+    static func identityDeleteTitle(_ p1: String) -> String { format("identity_delete_title", p1) }
+    static var identityDeleteWarning: String { text("identity_delete_warning") }
+    static func identityDeleteServers(_ p1: Int, _ p2: String) -> String {
+        format(p1 == 1 ? "identity_delete_servers.one" : "identity_delete_servers.other", p1, p2)
+    }
+    static func identityDeleteNextDefault(_ p1: String) -> String { format("identity_delete_next_default", p1) }
+    static var identityDeleteBackup: String { text("identity_delete_backup") }
+    static var identityDeleteType: String { text("identity_delete_type") }
+    static var scanTitle: String { text("scan_title") }
+    static func scanProgress(_ p1: Int, _ p2: Int) -> String { format("scan_progress", p1, p2) }
+    static var scanProgressNone: String { text("scan_progress_none") }
+    static func scanPercent(_ p1: Int) -> String { format("scan_percent", p1) }
+    static var scanHint: String { text("scan_hint") }
+    static var scanHintWhere: String { text("scan_hint_where") }
+    static var scanAllScanned: String { text("scan_all_scanned") }
+    static var scanViewfinder: String { text("scan_viewfinder") }
+    static var scanCodeLabel: String { text("scan_code_label") }
+    static func scanCodeDescription(_ p1: Int) -> String {
+        format(p1 == 1 ? "scan_code_description.one" : "scan_code_description.other", p1)
+    }
+    static var scanChecking: String { text("scan_checking") }
+    static func scanWrongCode(_ p1: Int) -> String {
+        format(p1 == 1 ? "scan_wrong_code.one" : "scan_wrong_code.other", p1)
+    }
+    static var scanCameraDenied: String { text("scan_camera_denied") }
+    static var scanCameraBlocked: String { text("scan_camera_blocked") }
+    static var scanNoteNotATransfer: String { text("scan_note_not_a_transfer") }
+    static var scanNoteUnreadable: String { text("scan_note_unreadable") }
+    static var scanNoteNewerVersion: String { text("scan_note_newer_version") }
+    static var scanNoteExpired: String { text("scan_note_expired") }
+    static var scanNoteClockSkew: String { text("scan_note_clock_skew") }
+    static var scanNoteRescan: String { text("scan_note_rescan") }
+    static var scanNoteDamaged: String { text("scan_note_damaged") }
+    static var scanNoteOutOfMemory: String { text("scan_note_out_of_memory") }
+    static var scanNoteFailed: String { text("scan_note_failed") }
+    static var scanNoteNoCamera: String { text("scan_note_no_camera") }
+    static var scanReceiving: String { text("scan_receiving") }
+    static func scanReceivingIdentities(_ p1: Int) -> String {
+        format(p1 == 1 ? "scan_receiving_identities.one" : "scan_receiving_identities.other", p1)
+    }
+    static func scanReceivingServers(_ p1: Int) -> String {
+        format(p1 == 1 ? "scan_receiving_servers.one" : "scan_receiving_servers.other", p1)
+    }
+    static func scanReceivingBoth(_ p1: String, _ p2: String) -> String { format("scan_receiving_both", p1, p2) }
+    static var scanSectionIdentities: String { text("scan_section_identities") }
+    static var scanSectionServers: String { text("scan_section_servers") }
+    static var scanNoPasswords: String { text("scan_no_passwords") }
+    static var scanImport: String { text("scan_import") }
+    static var scanImporting: String { text("scan_importing") }
+    static var scanDoneTitle: String { text("scan_done_title") }
+    static var scanDoneNothing: String { text("scan_done_nothing") }
+    static var scanDoneAdded: String { text("scan_done_added") }
+    static var scanSectionSkipped: String { text("scan_section_skipped") }
+    static var scanSkippedDuplicate: String { text("scan_skipped_duplicate") }
+    static var scanSkippedInvalid: String { text("scan_skipped_invalid") }
+    static var scanDone: String { text("scan_done") }
+
+    private static func text(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
+
+    private static func format(_ key: String, _ arguments: CVarArg...) -> String {
+        String(format: text(key), locale: Locale.current, arguments: arguments)
+    }
+}
