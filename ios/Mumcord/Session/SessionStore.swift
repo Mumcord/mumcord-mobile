@@ -402,7 +402,10 @@ final class SessionStore: @unchecked Sendable {
     func reconnectNow() async {
         let task: Task<Void, Never>? = lock.withLock {
             guard resumeTask == nil, case .reconnecting = current.phase else { return nil }
-            let task = Task { [weak self] in await self?.resume() }
+            let task = Task { [weak self] in
+                guard let self else { return }
+                await self.resume()
+            }
             resumeTask = task
             return task
         }
