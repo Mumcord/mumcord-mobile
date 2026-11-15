@@ -43,12 +43,14 @@ jobs:
 
       # The binding generator builds the engine for the runner itself too: cmake builds Opus
       # from source, the audio device layer links ALSA and PipeWire (bindings generated with
-      # libclang), the secret storage links D-Bus.
+      # libclang), the secret storage links D-Bus. meson, ninja and nasm build the video codecs
+      # (scripts/build-codecs.sh) when their cache is cold.
       - name: Install system packages
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev
+            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev \
+            meson ninja-build nasm
 
       # Version, components and targets come from rust-toolchain.toml.
       - name: Install the Rust toolchain
@@ -71,6 +73,18 @@ jobs:
           scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
           # The runner image points this at its own SDK; Gradle refuses two different locations.
           echo "ANDROID_SDK_ROOT=${HOME}/Android/Sdk" >> "$GITHUB_ENV"
+
+      # The video codecs of both ABIs, built once per codec version, build script and NDK; the
+      # Gradle build calls scripts/build-codecs.sh, which keeps a current build as it is.
+      - name: Name the video codec build
+        id: codecs
+        run: echo "id=$(scripts/build-codecs.sh --id aarch64-linux-android)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the video codecs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .codecs
+          key: codecs-android-${{ steps.codecs.outputs.id }}
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
@@ -146,7 +160,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev
+            cmake pkg-config libasound2-dev libpipewire-0.3-dev libdbus-1-dev libclang-dev \
+            meson ninja-build nasm
 
       - name: Install the Rust toolchain
         run: rustup toolchain install
@@ -168,6 +183,17 @@ jobs:
           scripts/setup-android.sh --env | sed -e 's/^export //' -e 's/"//g' >> "$GITHUB_ENV"
           # The runner image points this at its own SDK; Gradle refuses two different locations.
           echo "ANDROID_SDK_ROOT=${HOME}/Android/Sdk" >> "$GITHUB_ENV"
+
+      # Only restored: the build job saves it. Built here when the cache is still cold.
+      - name: Name the video codec build
+        id: codecs
+        run: echo "id=$(scripts/build-codecs.sh --id aarch64-linux-android)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore the video codecs
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .codecs
+          key: codecs-android-${{ steps.codecs.outputs.id }}
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:

@@ -16,6 +16,7 @@ on:
       - "engine.lock.toml"
       - "rust-toolchain.toml"
       - "scripts/build-ios.sh"
+      - "scripts/build-codecs.sh"
       - ".github/workflows/ci-ios.yml"
   push:
     branches: [main]
@@ -67,7 +68,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install build tools
-        run: brew install xcodegen cmake
+        run: brew install xcodegen cmake meson ninja
         env:
           HOMEBREW_NO_AUTO_UPDATE: "1"
           HOMEBREW_NO_INSTALL_CLEANUP: "1"
@@ -77,6 +78,18 @@ jobs:
         run: rustup toolchain install
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+
+      # The video codecs of device and simulator, built once per codec version, build script and
+      # Xcode; scripts/build-ios.sh calls scripts/build-codecs.sh, which keeps a current build.
+      - name: Name the video codec build
+        id: codecs
+        run: echo "id=$(scripts/build-codecs.sh --id aarch64-apple-ios)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the video codecs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .codecs
+          key: codecs-ios-${{ steps.codecs.outputs.id }}
 
       - name: Build the app and its tests
         run: scripts/build-ios.sh --build-for-testing 2>&1 | tee "$RUNNER_TEMP/build-ios.log"
