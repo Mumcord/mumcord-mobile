@@ -11,6 +11,7 @@ import app.mumcord.mobile.bridge.ContentBlock
 import app.mumcord.mobile.bridge.Conversation
 import app.mumcord.mobile.bridge.MessageContent
 import app.mumcord.mobile.bridge.MessageRequest
+import app.mumcord.mobile.bridge.PublicServer
 import app.mumcord.mobile.bridge.ReplyQuote
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SavedServer
@@ -93,6 +94,9 @@ fun savedServer(
     hasPassword = hasPassword,
     identityId = null,
 )
+
+fun publicServer(name: String, host: String, country: String = "Germany", code: String = "DE", port: UShort = 64738u) =
+    PublicServer(name = name, host = host, port = port, country = country, countryCode = code)
 
 fun span(text: String) = Span(
     text = text,

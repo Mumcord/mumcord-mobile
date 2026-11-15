@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.mumcord.mobile.MumcordApplication
 import app.mumcord.mobile.R
@@ -51,6 +52,7 @@ import app.mumcord.mobile.ui.link.InvalidLinkSheet
 import app.mumcord.mobile.ui.link.LinkConfirmSheet
 import app.mumcord.mobile.ui.messages.MessagesSheetHost
 import app.mumcord.mobile.ui.messages.MessagesUiState
+import app.mumcord.mobile.ui.servers.PublicServersScreen
 import app.mumcord.mobile.ui.servers.RemoveServerSheet
 import app.mumcord.mobile.ui.servers.ServerFormScreen
 import app.mumcord.mobile.ui.servers.ServerListScreen
@@ -252,6 +254,7 @@ fun AppContent(
                         onCancelConnect = viewModel::disconnect,
                         onAdd = viewModel::openAddServer,
                         onScan = viewModel.identities::openScan,
+                        onBrowsePublic = viewModel::openPublicServers,
                         onToggleEditing = viewModel::toggleEditing,
                         onEdit = viewModel::openEditServer,
                         onRemove = viewModel::requestRemove,
@@ -269,6 +272,21 @@ fun AppContent(
                         onChange = viewModel::changeForm,
                         onSave = viewModel::saveForm,
                         onBack = viewModel::closeForm,
+                        topInsets = topInsets,
+                        bottomInsets = bottomInsets,
+                    )
+                }
+                AppScreen.PublicServers -> {
+                    BackHandler(onBack = viewModel::closePublicServers)
+                    // No pings while the app is not on screen (FR-5.43).
+                    LifecycleStartEffect(viewModel) {
+                        viewModel.publicServers.resumePings()
+                        onStopOrDispose { viewModel.publicServers.pausePings() }
+                    }
+                    val publicServers by viewModel.publicServersState.collectAsStateWithLifecycle()
+                    PublicServersScreen(
+                        state = publicServers,
+                        actions = viewModel.publicServerActions,
                         topInsets = topInsets,
                         bottomInsets = bottomInsets,
                     )

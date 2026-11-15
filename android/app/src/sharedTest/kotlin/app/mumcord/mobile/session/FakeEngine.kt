@@ -51,6 +51,7 @@ import app.mumcord.mobile.bridge.PublicServerQuery
 import app.mumcord.mobile.bridge.TransferScan
 import app.mumcord.mobile.bridge.ServerState
 import app.mumcord.mobile.bridge.TalkMode
+import kotlinx.coroutines.CompletableDeferred
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -733,8 +734,31 @@ class FakeEngine(
     /** The public server list as the directory would give it. */
     val publicServers = CopyOnWriteArrayList<PublicServer>()
 
+    /** How often the list was downloaded: on the first call and on every refresh. */
+    @Volatile var publicDownloads = 0
+        private set
+
+    /** When set, downloading the list fails with it; the list downloaded before stays, as in the bridge. */
+    @Volatile var publicListFailure: BridgeException? = null
+
+    /** When set, a download waits for it. */
+    @Volatile var publicListGate: CompletableDeferred<Unit>? = null
+
+    /** The list as last downloaded; null before the first download. */
+    @Volatile private var downloaded: List<PublicServer>? = null
+
+    /** What listed servers answer, by "host:port"; the others give no answer. */
+    val publicPings = ConcurrentHashMap<String, ServerPing>()
+    val publicPingRequests = CopyOnWriteArrayList<String>()
+
     override suspend fun publicServers(query: PublicServerQuery): PublicServerPage {
-        val matching = publicServers.filter {
+        val list = downloaded.takeIf { !query.refresh } ?: run {
+            publicDownloads++
+            publicListGate?.await()
+            publicListFailure?.let { throw it }
+            publicServers.toList().also { downloaded = it }
+        }
+        val matching = list.filter {
             it.name.contains(query.search, ignoreCase = true) &&
                 (query.countryCode == null || it.countryCode == query.countryCode)
         }
@@ -744,8 +768,10 @@ class FakeEngine(
         )
     }
 
-    /** No public server answers a ping in the fake. */
-    override suspend fun pingPublicServer(host: String, port: UShort): ServerPing? = null
+    override suspend fun pingPublicServer(host: String, port: UShort): ServerPing? {
+        publicPingRequests += "$host:$port"
+        return publicPings["$host:$port"]
+    }
 
     private fun appendOwn(chat: ChatId, content: MessageContent): ChatMessage {
         val message = chatMessage(

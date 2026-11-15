@@ -49,6 +49,10 @@ import app.mumcord.mobile.ui.messages.MessagesController
 import app.mumcord.mobile.ui.messages.MessagesUiState
 import app.mumcord.mobile.ui.messages.messagesUiState
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
+import app.mumcord.mobile.ui.servers.PublicServersActions
+import app.mumcord.mobile.ui.servers.PublicServersController
+import app.mumcord.mobile.ui.servers.PublicServersUiState
+import app.mumcord.mobile.ui.servers.publicServersUiState
 import app.mumcord.mobile.ui.servers.ServerFormState
 import app.mumcord.mobile.ui.servers.toPingState
 import app.mumcord.mobile.ui.setup.PreferencesSetupStore
@@ -113,6 +117,33 @@ class AppViewModel(
 
     /** The identity screens and the scan of a transfer from the desktop app. */
     val identities = IdentitiesController(repository, viewModelScope, camera)
+
+    /** The public server browser (FR-5.9). */
+    val publicServers = PublicServersController(repository, viewModelScope)
+
+    /** Its own flow: pings arriving for the browser do not rebuild the other screens. */
+    val publicServersState: StateFlow<PublicServersUiState> =
+        combine(publicServers.local, repository.state.map { it.servers }.distinctUntilChanged(), ::publicServersUiState)
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                publicServersUiState(publicServers.local.value, repository.state.value.servers),
+            )
+
+    val publicServerActions = object : PublicServersActions {
+        override fun back() = closePublicServers()
+        override fun refresh() = publicServers.refresh()
+        override fun search(text: String) = publicServers.search(text)
+        override fun selectCountry(code: String?) = publicServers.selectCountry(code)
+        override fun showing(keys: List<String>) = publicServers.showing(keys)
+        override fun add(key: String) = publicServers.add(key)
+
+        // The normal flow takes over on the server list, where its questions and errors are.
+        override fun connect(serverId: Long) {
+            closePublicServers()
+            this@AppViewModel.connect(serverId)
+        }
+    }
 
     /** What the phone says about the session, beside the session itself. */
     private data class Phone(
@@ -311,6 +342,17 @@ class AppViewModel(
         local.update { it.copy(form = it.form?.let(change)) }
 
     fun closeForm() = local.update { it.copy(form = null) }
+
+    /** Opening the browser is what loads the public list: nothing is requested before (FR-5.9). */
+    fun openPublicServers() {
+        local.update { it.copy(browsingPublic = true, editing = false) }
+        publicServers.open()
+    }
+
+    fun closePublicServers() {
+        publicServers.close()
+        local.update { it.copy(browsingPublic = false) }
+    }
 
     fun saveForm() {
         val form = local.value.form ?: return

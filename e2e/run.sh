@@ -26,7 +26,9 @@
 #      server saw the same certificate on every connect. For the transfer scenario
 #      e2e/transfer-maker makes a transfer with the engine as the desktop app does (a new
 #      identity and a new code in every run); its QR code texts and its code reach the test
-#      as an argument and are written to no file and no log.
+#      as an argument and are written to no file and no log. The public server scenario
+#      serves its own list inside the emulator (android/e2e LocalPublicList) and never
+#      contacts the real list service.
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
@@ -99,6 +101,7 @@ LOCK_PTT_SECONDS=60
 # and the test gets a transfer made for this run (the camera permission is asked for in it).
 SCENARIOS=(
   "granted granted alone ${TEST_PACKAGE}.ConnectFlowTest"
+  "granted granted alone ${TEST_PACKAGE}.PublicServersFlowTest"
   "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
   "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#refusingItIsNamedInTheErrorWhichLeadsToTheSystemSettingsAndBackToAConnection"
   "granted ask alone ${TEST_PACKAGE}.MicrophoneFlowTest#itIsExplainedWhenTalkingBecomesPossibleThenTheSystemAsksAndAllowingItLeavesNoNotice"

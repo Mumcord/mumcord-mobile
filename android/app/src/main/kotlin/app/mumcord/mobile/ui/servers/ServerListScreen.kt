@@ -39,6 +39,7 @@ import app.mumcord.mobile.design.components.MumcordButton
 import app.mumcord.mobile.design.components.MumcordButtonStyle
 import app.mumcord.mobile.design.components.MumcordDot
 import app.mumcord.mobile.design.components.MumcordFab
+import app.mumcord.mobile.design.components.MumcordIcon
 import app.mumcord.mobile.design.components.MumcordIconButton
 import app.mumcord.mobile.design.components.MumcordList
 import app.mumcord.mobile.design.components.MumcordListRow
@@ -59,6 +60,7 @@ const val CONNECT_ERROR_TEST_TAG = "connect-error"
 const val LOCAL_NETWORK_SETTINGS_TEST_TAG = "local-network-settings"
 const val CONNECT_RETRY_TEST_TAG = "connect-retry"
 const val SERVER_SCAN_TEST_TAG = "server-scan"
+const val SERVER_BROWSE_PUBLIC_TEST_TAG = "server-browse-public"
 
 /** What the local network permission has to do with a failed connection. */
 enum class LocalNetworkHint {
@@ -81,7 +83,8 @@ data class ConnectFailure(
 
 /**
  * The saved servers with people online and latency, and the way to add, edit, remove and
- * connect. While [editing], every row offers Edit and Remove instead of Connect.
+ * connect. While [editing], every row offers Edit and Remove instead of Connect. "Find more"
+ * leads to the public server browser.
  */
 @Composable
 fun ServerListScreen(
@@ -93,6 +96,7 @@ fun ServerListScreen(
     onCancelConnect: () -> Unit,
     onAdd: () -> Unit,
     onScan: () -> Unit,
+    onBrowsePublic: () -> Unit,
     onToggleEditing: () -> Unit,
     onEdit: (Long) -> Unit,
     onRemove: (Long) -> Unit,
@@ -108,7 +112,7 @@ fun ServerListScreen(
         when {
             // Nothing to show before the list is read; an empty state would flash by.
             !loaded -> Unit
-            rows.isEmpty() -> EmptyState(onAdd, onScan, Modifier.weight(1f).windowInsetsPadding(bottomInsets))
+            rows.isEmpty() -> EmptyState(onAdd, onScan, onBrowsePublic, Modifier.weight(1f).windowInsetsPadding(bottomInsets))
             else -> Box(Modifier.weight(1f).windowInsetsPadding(bottomInsets)) {
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                     MumcordSectionHeader(
@@ -120,6 +124,18 @@ fun ServerListScreen(
                         rows.forEachIndexed { index, row ->
                             ServerListRow(row, index > 0, editing, onConnect, onCancelConnect, onEdit, onRemove)
                         }
+                    }
+                    MumcordSectionHeader(title = stringResource(R.string.servers_find_more))
+                    MumcordList {
+                        MumcordListRow(
+                            title = stringResource(R.string.servers_browse_public),
+                            icon = MumcordIcons.Globe,
+                            trailing = {
+                                MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted, size = 18.dp)
+                            },
+                            onClick = onBrowsePublic,
+                            modifier = Modifier.testTag(SERVER_BROWSE_PUBLIC_TEST_TAG),
+                        )
                     }
                     // Room to scroll the last row out from under the add button.
                     Spacer(Modifier.height(FAB_CLEARANCE))
@@ -290,7 +306,7 @@ private fun FailureBanner(
 }
 
 @Composable
-private fun EmptyState(onAdd: () -> Unit, onScan: () -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyState(onAdd: () -> Unit, onScan: () -> Unit, onBrowsePublic: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(MumcordSpace.s4, Alignment.CenterVertically),
@@ -321,6 +337,13 @@ private fun EmptyState(onAdd: () -> Unit, onScan: () -> Unit, modifier: Modifier
             style = MumcordButtonStyle.Secondary,
             icon = MumcordIcons.QrCode,
             modifier = Modifier.testTag(SERVER_SCAN_TEST_TAG),
+        )
+        MumcordButton(
+            text = stringResource(R.string.servers_browse_public),
+            onClick = onBrowsePublic,
+            style = MumcordButtonStyle.Secondary,
+            icon = MumcordIcons.Globe,
+            modifier = Modifier.testTag(SERVER_BROWSE_PUBLIC_TEST_TAG),
         )
     }
 }

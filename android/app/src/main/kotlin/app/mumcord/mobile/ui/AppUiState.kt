@@ -25,6 +25,7 @@ enum class AppScreen {
     TalkModeChoice,
     ServerList,
     ServerForm,
+    PublicServers,
     Channels,
     Identities,
     Scan,
@@ -74,6 +75,8 @@ data class AppUiState(
     val editing: Boolean = false,
     /** The open add or edit form, or null. */
     val form: ServerFormState? = null,
+    /** The public server browser is open (FR-5.9). */
+    val browsingPublic: Boolean = false,
     val overlay: Overlay? = null,
     /** The server whose address is being looked at before its connection starts. */
     val checkingServerId: Long? = null,
@@ -98,6 +101,7 @@ data class AppUiState(
             identities.open -> AppScreen.Identities
             connected != null -> AppScreen.Channels
             form != null -> AppScreen.ServerForm
+            browsingPublic -> AppScreen.PublicServers
             else -> AppScreen.ServerList
         }
 

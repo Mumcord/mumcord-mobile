@@ -11,6 +11,8 @@ import app.mumcord.mobile.bridge.EngineListener
 import app.mumcord.mobile.bridge.Identity
 import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.MumbleLink
+import app.mumcord.mobile.bridge.PublicServer
+import app.mumcord.mobile.bridge.PublicServerQuery
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
@@ -165,6 +167,39 @@ class SessionRepository(
     /** People online and latency of a saved server, or null when it does not answer. */
     suspend fun pingServer(serverId: Long, refresh: Boolean): ServerPing? =
         when (val ping = call("ping server") { it.pingServer(serverId, refresh) }) {
+            is Outcome.Ok -> ping.value
+            is Outcome.Failed -> null
+        }
+
+    // ----- public servers -----
+
+    /**
+     * The whole public server list, read page by page. The engine downloads it on the first
+     * call and when [refresh] is set, otherwise it answers from the last download; a failed
+     * download leaves that one in place.
+     */
+    suspend fun publicServers(refresh: Boolean): Outcome<List<PublicServer>> =
+        call("public servers") { engine ->
+            val servers = mutableListOf<PublicServer>()
+            do {
+                val page = engine.publicServers(
+                    PublicServerQuery(
+                        search = "",
+                        countryCode = null,
+                        offset = servers.size.toUInt(),
+                        limit = PUBLIC_PAGE,
+                        // Only the first page may download; the others read that download.
+                        refresh = refresh && servers.isEmpty(),
+                    ),
+                )
+                servers += page.servers
+            } while (page.servers.isNotEmpty() && servers.size.toUInt() < page.total)
+            servers
+        }
+
+    /** People online, user limit and latency of a listed server, or null when it does not answer. */
+    suspend fun pingPublicServer(host: String, port: UShort): ServerPing? =
+        when (val ping = call("ping public server") { it.pingPublicServer(host, port) }) {
             is Outcome.Ok -> ping.value
             is Outcome.Failed -> null
         }
@@ -522,5 +557,8 @@ class SessionRepository(
 
         /** How long the engine may take to end a connection it is told to end. */
         const val STOP_TIMEOUT_MILLIS = 5_000L
+
+        /** The most servers the bridge returns in one page. */
+        const val PUBLIC_PAGE = 100u
     }
 }

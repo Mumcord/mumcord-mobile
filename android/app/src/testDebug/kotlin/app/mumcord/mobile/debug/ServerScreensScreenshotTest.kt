@@ -70,6 +70,7 @@ class ServerScreensScreenshotTest {
             onCancelConnect = {},
             onAdd = {},
             onScan = {},
+            onBrowsePublic = {},
             onToggleEditing = {},
             onEdit = {},
             onRemove = {},

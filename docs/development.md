@@ -165,6 +165,16 @@ was on the screen in its failure message.
   import and the connection with the imported identity are the real ones. Reading QR codes
   from a real camera image (and its focus and lighting) is only checked on a phone against the
   desktop app.
+- **Public servers:** the browser is never tested against the real list service or a public
+  server. `LocalPublicList` (android/e2e) serves a list of its own inside the emulator on
+  127.0.0.1 and points the engine at it with `MUMCORD_PUBLIC_SERVERS_URL`, set by the test
+  before the app creates the engine (only test code sets it; the app has no way to change the
+  list's address). With that variable the engine contacts nothing but the loopback address, so
+  the list's entry for the local test server is `127.0.0.1` too, and a relay in the test passes
+  its ping (UDP) and its connection (TCP) on to the test server on the host and to nothing
+  else; the other entries are closed loopback ports that do not answer. The test stops serving
+  the list to check that a failed refresh keeps the list loaded before. The real list and the
+  pings of real servers are not part of any test.
 - **QR scanner:** `android/platform/scanner` reads QR codes with CameraX (the camera picture
   and its frames) and ZXing core (finding and reading the code), both Apache-2.0 and both
   without Google Play services, which a phone that installed the APK from outside a store may
