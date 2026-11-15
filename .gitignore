@@ -5,6 +5,9 @@
 # Engine checkout used by CI and scripts (see engine.lock.toml)
 /.engine/
 
+# Video codec libraries built by scripts/build-codecs.sh
+/.codecs/
+
 # Gradle / Android Studio
 .gradle/
 build/
