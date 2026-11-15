@@ -317,11 +317,20 @@ private struct CodeBoxes: View {
     @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
 
     var body: some View {
+        let half = digits / 2
+        // Two groups (4 + 4) with a wider gap between them; every box has the same width.
+        HStack(spacing: MumcordSpace.s4) {
+            boxes(0..<half)
+            boxes(half..<digits)
+        }
+    }
+
+    private func boxes(_ range: Range<Int>) -> some View {
         let colors = theme.colors
         let shape = RoundedRectangle(cornerRadius: MumcordRadius.lg)
         let characters = Array(typed)
-        HStack(spacing: 6) {
-            ForEach(0..<digits, id: \.self) { index in
+        return HStack(spacing: 6) {
+            ForEach(range, id: \.self) { index in
                 let current = active && index == characters.count
                 Text(verbatim: index < characters.count ? String(characters[index]) : "")
                     .font(.system(size: TextToken.bodyStrong.size * scale, weight: .semibold, design: .monospaced))
@@ -329,10 +338,9 @@ private struct CodeBoxes: View {
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .background(colors.bgElevated, in: shape)
                     .overlay { shape.strokeBorder(current ? colors.focus : colors.border, lineWidth: current ? 2 : 1) }
-                    // A wider gap between the two groups (4 + 4).
-                    .padding(.leading, index == digits / 2 ? MumcordSpace.s4 - 6 : 0)
             }
         }
+        .frame(maxWidth: .infinity)
     }
 }
 
