@@ -10,6 +10,9 @@ Before every APK or TestFlight release, run the [manual device checklist](device
 - Linux on x86_64 with KVM available (`/dev/kvm` readable and writable for your user). The
   emulator is unusably slow without it.
 - `rustup` and `cargo`, plus `curl`, `unzip`, `tar` and `sha256sum`.
+- `meson`, `ninja`, `nasm`, `make` and `perl` for the video codecs (see
+  [Video codecs](#video-codecs)), e.g. `sudo apt install meson ninja-build nasm` or
+  `sudo pacman -S meson ninja nasm`.
 - About 12 GB of free disk space and a download of roughly 4 GB.
 
 ## One-time setup
@@ -200,6 +203,22 @@ was on the screen in its failure message.
   sets 300 ms, because a stall of the emulator or of the second person at the end of the
   stretch adds to it there; a button that does not stop the voice is heard for seconds longer.
 
+## Video codecs
+
+Streams are decoded with libvpx (VP9; its encoder is for sending the camera) and dav1d (AV1),
+two C libraries that are built into the engine library of every phone target.
+`scripts/build-codecs.sh <target>` downloads their pinned releases (versions and checksums at the
+top of the script), cross-builds them as static libraries with the NDK or Xcode and keeps them in
+`.codecs/<target>/` (git-ignored; set `MUMCORD_CODECS_DIR` to keep them elsewhere).
+`scripts/build-android.sh` and `scripts/build-ios.sh` call it for each target they build, so the
+first build takes a minute or two longer and later builds reuse the result. A new version of the
+script, a new NDK or a new Xcode builds them again. `CODECS_JOBS` limits the parallel compile
+jobs.
+
+Builds for this machine (the binding generator, `cargo test`, the end-to-end helpers) leave the
+codecs out: the bridge switches the engine's `vp9` and `av1-decode` features on for Android and iOS
+only.
+
 ## Continuous integration
 
 `.github/workflows/ci-android.yml` runs on pull requests and on `main` whenever the Android
@@ -216,7 +235,8 @@ the versions listed above:
   contents of `e2e/build/`, the device log of the instrumented tests among them, and the test
   reports are attached to the run as `emulator-test-logs`, also when it fails.
 
-The Rust build, the Gradle downloads and the toolchain are cached between runs. The emulator
+The Rust build, the Gradle downloads, the toolchain and the video codecs are cached between
+runs. The emulator
 and its image are not (they are several GB) and are downloaded on every run.
 
 ## Updating a version
@@ -239,7 +259,7 @@ The iOS app can only be built on a Mac. You need:
 - Xcode 26 or newer with an iOS simulator runtime (the script uses the simulator "iPhone 17").
 - `rustup`; the Rust version and the iOS targets come from `rust-toolchain.toml`
   (`rustup toolchain install` in the repository folder).
-- XcodeGen and cmake: `brew install xcodegen cmake`.
+- XcodeGen, cmake, meson and ninja: `brew install xcodegen cmake meson ninja`.
 
 ```sh
 # Bridge for device and simulator, Swift bindings, MumcordBridge.xcframework, Mumcord.xcodeproj
