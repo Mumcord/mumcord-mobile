@@ -28,11 +28,18 @@ struct VoiceScreen: View {
         MumcordScreen {
             VStack(alignment: .leading, spacing: MumcordSpace.s3) {
                 CollapseHandle(onClose: actions.closeVoice)
-                VStack(alignment: .leading, spacing: 0) {
-                    // The mockup's title is one step larger than the app bar title.
-                    LineText(voice.channelName, style: TextToken.title.with(size: 24), color: colors.text)
-                        .accessibilityAddTraits(.isHeader)
-                    LineText(voice.statusLine, style: .small, color: colors.textMuted)
+                HStack(alignment: .top, spacing: MumcordSpace.s3) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // The mockup's title is one step larger than the app bar title.
+                        LineText(voice.channelName, style: TextToken.title.with(size: 24), color: colors.text)
+                            .accessibilityAddTraits(.isHeader)
+                        LineText(voice.statusLine, style: .small, color: colors.textMuted)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if let output = voice.output {
+                        OutputChip(current: output, action: actions.openOutput)
+                            .layoutPriority(1)
+                    }
                 }
                 VoiceTiles(rows: voice.tileRows)
                 ConnectedBanners(state: state, actions: actions, horizontalMargin: 0)

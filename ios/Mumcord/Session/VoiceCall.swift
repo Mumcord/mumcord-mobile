@@ -20,6 +20,8 @@ final class VoiceCall {
     ///   - callSystem: the phone's call service, or nil when sessions are not shown to the
     ///     phone as calls (`CallSystems.make`).
     ///   - prepareAudio: sets the audio session up for voice without starting it.
+    ///   - tones: the sounds that answer a headset's button.
+    ///   - currentOutput: where the voice plays right now, for `endRequestMeans`.
     ///   - log: receives short technical messages without personal data.
     init(
         store: SessionStore,
@@ -27,12 +29,14 @@ final class VoiceCall {
         callSystem: CallSystem?,
         prepareAudio: @escaping () -> Void,
         markers: SessionMarkerStore,
+        tones: FeedbackTones? = nil,
+        currentOutput: @escaping () -> AudioOutput? = { nil },
         log: @escaping @Sendable (String) -> Void
     ) {
         self.markers = markers
         // Read before the first state of this run can overwrite what the last run left behind.
         sessionEnded = markers.takeNotice()
-        let control = SessionVoiceControl(store: store)
+        let control = SessionVoiceControl(store: store, tones: tones)
         let interruptions = Interruptions(current: { control.current() }) { effect in
             switch effect {
             case .setVoice(let voice): await control.set(voice)
@@ -43,8 +47,10 @@ final class VoiceCall {
         session = CallSession(
             system: callSystem,
             prepareAudio: prepareAudio,
-            onMuted: control.setMuted,
+            onMuted: control.systemMuted,
             onLeave: control.leave,
+            onHeadsetButton: control.headsetButton,
+            endRequest: { endRequestMeans(current: currentOutput()) },
             onInterruption: interruptions.send,
             onActivation: audio.setActivation,
             log: log

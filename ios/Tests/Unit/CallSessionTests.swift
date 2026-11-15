@@ -70,6 +70,9 @@ final class CallSessionTests: XCTestCase {
     private var prepared = 0
     private var muted: [Bool] = []
     private var leaves = 0
+    private var headsetPresses = 0
+    /// What the system's wish to end the call means in the test.
+    private var endRequest = EndRequest.leave
     private var interruptions: [InterruptionEvent] = []
     private var activations: [AudioActivation] = []
     private var timers: [(seconds: TimeInterval, work: () -> Void)] = []
@@ -83,6 +86,8 @@ final class CallSessionTests: XCTestCase {
             prepareAudio: { [unowned self] in self.prepared += 1 },
             onMuted: { [unowned self] in self.muted.append($0) },
             onLeave: { [unowned self] in self.leaves += 1 },
+            onHeadsetButton: { [unowned self] in self.headsetPresses += 1 },
+            endRequest: { [unowned self] in self.endRequest },
             onInterruption: { [unowned self] in self.interruptions.append($0) },
             onActivation: { [unowned self] in self.activations.append($0) },
             after: { [unowned self] seconds, work in self.timers.append((seconds, work)) },
@@ -154,6 +159,24 @@ final class CallSessionTests: XCTestCase {
         // The session ends as asked; its call is gone already.
         session.follow(nil)
         XCTAssertFalse(system.requests.contains(.end))
+    }
+
+    func testAnEndRequestThatMeansTheHeadsetsButtonKeepsTheSessionAndShowsItAsACallAgain() {
+        let session = makeRunning()
+        endRequest = .toggleMute
+        let first = system.call
+        system.delegate?.callEndedBySystem(first)
+        XCTAssertEqual(headsetPresses, 1)
+        XCTAssertEqual(leaves, 0)
+
+        // The system's call is over; the session gets a new one and waits for its audio.
+        XCTAssertEqual(system.calls.count, 2)
+        XCTAssertNotEqual(system.call, first)
+        XCTAssertEqual(system.requests.last, .start("Nordlicht · Lobby"))
+        XCTAssertEqual(Array(activations.suffix(2)), [.own, .callWaiting])
+
+        session.follow(nil)
+        XCTAssertEqual(system.requests.last, .end)
     }
 
     func testTheEndOfAnotherCallIsNotTheSessionsEnd() {

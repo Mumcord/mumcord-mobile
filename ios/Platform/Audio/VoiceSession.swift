@@ -37,22 +37,31 @@ protocol VoiceSession: AnyObject {
 }
 
 /// Puts the phone into its voice-chat audio mode, which selects the system's voice processing
-/// (echo cancellation, the call volume) for the audio unit.
-final class SystemVoiceSession: VoiceSession {
+/// (echo cancellation, the call volume) for the audio unit, and says where the voice plays
+/// (`OutputDevice`). The only place that touches the phone's audio session.
+final class SystemVoiceSession: VoiceSession, OutputDevice {
     /// The engine's rate, so the system does not have to convert where the device allows it.
     private static let sampleRate = 48_000.0
     /// 10 ms: short enough for a conversation, long enough to be cheap.
     private static let bufferDuration = 0.01
 
     private let log: (String) -> Void
+    private let hasEarpiece: Bool
     private var observers: [NSObjectProtocol] = []
+    private let lock = NSLock()
+    /// True between `begin` and `end`: only then the phone knows where the voice plays.
+    private var running = false
+    private var outputsChanged: (@Sendable () -> Void)?
     var onEvent: ((VoiceSessionEvent) -> Void)?
     var systemActivates = false
     /// Receives every signal of the system, on a thread of the system. Interruptions are only
     /// reported here: whether they stop the audio is decided by the interruption rules.
     var onSignal: ((AudioSessionSignal) -> Void)?
 
-    init(log: @escaping (String) -> Void) {
+    /// - Parameter hasEarpiece: the device has an earpiece to hold to the ear, as a phone has
+    ///   and a tablet has not; the audio session does not say.
+    init(hasEarpiece: Bool, log: @escaping (String) -> Void) {
+        self.hasEarpiece = hasEarpiece
         self.log = log
         let center = NotificationCenter.default
         let session = AVAudioSession.sharedInstance()
@@ -75,6 +84,7 @@ final class SystemVoiceSession: VoiceSession {
             forName: AVAudioSession.routeChangeNotification, object: session, queue: nil
         ) { [weak self] _ in
             self?.onSignal?(.routeChanged)
+            self?.onOutputsChanged?()
         })
         observers.append(center.addObserver(
             forName: AVAudioSession.mediaServicesWereResetNotification, object: session, queue: nil
@@ -96,7 +106,7 @@ final class SystemVoiceSession: VoiceSession {
         do {
             // No options: the voice-chat mode already allows Bluetooth hands-free headsets, and
             // the output stays where the system puts a call (the earpiece, or a connected
-            // headset). Choosing the speaker is the audio output task.
+            // headset). Another output is chosen with `select`.
             try session.setCategory(.playAndRecord, mode: .voiceChat, options: [])
             // Wishes only: the device decides, and the audio unit converts what differs.
             try? session.setPreferredSampleRate(Self.sampleRate)
@@ -111,22 +121,89 @@ final class SystemVoiceSession: VoiceSession {
     func begin() -> Bool {
         guard prepare() else { return false }
         // The session of a call is started by the system, never by the app.
-        if systemActivates { return true }
-        do {
-            try AVAudioSession.sharedInstance().setActive(true)
-            return true
-        } catch {
-            log("starting the voice session failed (\((error as NSError).code))")
-            return false
+        if !systemActivates {
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                log("starting the voice session failed (\((error as NSError).code))")
+                return false
+            }
         }
+        setRunning(true)
+        return true
     }
 
     func end() {
+        setRunning(false)
         if systemActivates { return }
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
             log("ending the voice session failed (\((error as NSError).code))")
         }
+    }
+}
+
+// MARK: Outputs
+
+extension SystemVoiceSession {
+    var onOutputsChanged: (@Sendable () -> Void)? {
+        get { lock.withLock { outputsChanged } }
+        set { lock.withLock { outputsChanged = newValue } }
+    }
+
+    private func setRunning(_ next: Bool) {
+        lock.withLock { running = next }
+        onOutputsChanged?()
+    }
+
+    func outputs() -> OutputState? {
+        guard lock.withLock({ running }) else { return nil }
+        let session = AVAudioSession.sharedInstance()
+        return outputState(
+            inputs: (session.availableInputs ?? []).map(Self.port),
+            route: session.currentRoute.outputs.map(Self.port),
+            hasEarpiece: hasEarpiece
+        )
+    }
+
+    /// Moves the voice. The loudspeaker is an override of the route; every other output goes
+    /// with its microphone, so the microphone is chosen and the phone moves the sound along.
+    func select(_ id: String) {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            if id == OutputId.speaker {
+                try session.overrideOutputAudioPort(.speaker)
+                return
+            }
+            try session.overrideOutputAudioPort(.none)
+            let inputs = session.availableInputs ?? []
+            switch id {
+            case OutputId.earpiece:
+                try session.setPreferredInput(inputs.first { $0.portType == .builtInMic })
+            // Headphones without a microphone play as soon as nothing overrides them.
+            case OutputId.headphones:
+                try session.setPreferredInput(nil)
+            default:
+                guard let input = inputs.first(where: { $0.uid == id }) else { return }
+                try session.setPreferredInput(input)
+            }
+        } catch {
+            log("choosing the audio output failed (\((error as NSError).code))")
+        }
+    }
+
+    private static func port(_ port: AVAudioSessionPortDescription) -> AudioPort {
+        let kind: AudioPort.Kind
+        switch port.portType {
+        case .builtInMic: kind = .builtInMicrophone
+        case .builtInReceiver: kind = .builtInReceiver
+        case .builtInSpeaker: kind = .builtInSpeaker
+        case .headsetMic, .usbAudio: kind = .wiredHeadset
+        case .headphones: kind = .headphones
+        case .bluetoothHFP, .bluetoothA2DP, .bluetoothLE: kind = .bluetooth
+        default: kind = .other
+        }
+        return AudioPort(uid: port.uid, kind: kind, name: port.portName)
     }
 }

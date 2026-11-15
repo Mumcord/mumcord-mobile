@@ -177,6 +177,8 @@ struct ConnectedLocal: Equatable {
     var whisperTarget: WhisperTarget?
     /// The hold-to-whisper button is down.
     var whisperHeld = false
+    /// The choice of the audio output is open.
+    var outputOpen = false
 }
 
 /// The sheet over the connected screens. At most one at a time.
@@ -186,6 +188,10 @@ enum ConnectedSheet: Equatable {
     case microphone
     /// What notifications are for, before the system asks for them.
     case notifications
+    /// "Loudspeaker or earpiece?", asked with the first connection without a headset.
+    case outputQuestion
+    /// The choice of the audio output, opened from the voice view.
+    case audioOutput(rows: [OutputRow])
     case person(PersonSheetState)
     /// `expanded` as in `ChannelItem`; `canJoin` is false for the own channel.
     case channelMenu(id: UInt32, name: String, expanded: Bool?, canJoin: Bool)
@@ -230,7 +236,9 @@ func connectedUiState(
     local: ConnectedLocal,
     serverName: String,
     microphone: MicrophoneNotice = .none,
-    explainNotifications: Bool = false
+    explainNotifications: Bool = false,
+    output: OutputState = OutputState(),
+    askOutput: Bool = false
 ) -> ConnectedUiState? {
     guard session.showsServer, let server = session.server else { return nil }
     let rows = channelRows(
@@ -254,6 +262,11 @@ func connectedUiState(
     } else if explainNotifications {
         // Asked once the first session runs, after the microphone.
         sheet = .notifications
+    } else if askOutput {
+        // Asked once the voice plays somewhere, after the two permissions.
+        sheet = .outputQuestion
+    } else if local.outputOpen, let outputUi = outputUiState(output) {
+        sheet = .audioOutput(rows: outputUi.rows)
     } else if let person = local.personSession.flatMap({ server.people[$0] }) {
         sheet = .person(PersonSheetState(
             session: person.session,
@@ -297,7 +310,8 @@ func connectedUiState(
             server: server,
             local: local,
             serverName: serverName,
-            microphone: microphone
+            microphone: microphone,
+            output: output.current
         ),
         sheet: sheet
     )

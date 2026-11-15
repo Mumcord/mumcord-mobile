@@ -152,7 +152,8 @@ final class PhoneFakes {
     func makeModel(
         store: SessionStore,
         setupStore: SetupStore,
-        sessionEnded: SessionEndedNotice? = nil
+        sessionEnded: SessionEndedNotice? = nil,
+        outputs: OutputAccess? = nil
     ) -> AppModel {
         AppModel(
             store: store,
@@ -167,7 +168,8 @@ final class PhoneFakes {
             ),
             localNetwork: localNetwork,
             openSettings: { [weak self] in self?.settingsOpened += 1 },
-            sessionEnded: sessionEnded
+            sessionEnded: sessionEnded,
+            outputs: outputs
         )
     }
 }

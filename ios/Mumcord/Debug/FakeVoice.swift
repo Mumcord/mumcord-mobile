@@ -51,6 +51,55 @@ final class FakeMicrophoneGateway: MicrophoneGateway, @unchecked Sendable {
     }
 }
 
+/// Stands in for the phone's audio outputs: it plays where it was last told to. `stopped`
+/// is the phone while the session's audio does not run and it knows no outputs.
+final class FakeOutputDevice: OutputDevice, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _state: OutputState
+    private var _stopped = false
+    private var _selections: [String] = []
+    private var _onOutputsChanged: (@Sendable () -> Void)?
+
+    init(_ state: OutputState) {
+        _state = state
+    }
+
+    var onOutputsChanged: (@Sendable () -> Void)? {
+        get { lock.withLock { _onOutputsChanged } }
+        set { lock.withLock { _onOutputsChanged = newValue } }
+    }
+
+    /// Every output the voice was moved to, in order.
+    var selections: [String] { lock.withLock { _selections } }
+
+    func outputs() -> OutputState? {
+        lock.withLock { _stopped ? nil : _state }
+    }
+
+    func select(_ id: String) {
+        lock.withLock {
+            _selections.append(id)
+            if let output = _state.available.first(where: { $0.id == id }) { _state.current = output }
+        }
+        onOutputsChanged?()
+    }
+
+    /// Changes the outputs behind the app's back, as plugging in a headset does.
+    func set(_ state: OutputState) {
+        lock.withLock { _state = state }
+        onOutputsChanged?()
+    }
+
+    /// Stops or restarts the session's audio; a restart plays where the phone chooses.
+    func setStopped(_ stopped: Bool, restartsOn current: AudioOutput? = nil) {
+        lock.withLock {
+            _stopped = stopped
+            if let current { _state.current = current }
+        }
+        onOutputsChanged?()
+    }
+}
+
 /// An audio unit that only notes what it was asked to do.
 final class FakeStreamBackend: StreamBackend, @unchecked Sendable {
     private let lock = NSLock()

@@ -49,6 +49,8 @@ struct VoiceUiState: Equatable {
     /// The people of the user's channel in rows, see `voiceTileRows`.
     let tileRows: [[VoiceTile]]
     let whisper: WhisperBarState?
+    /// Where the voice plays, for the chip; nil while the phone has not said.
+    let output: AudioOutput?
 }
 
 /// How many people stand next to each other in the full voice view.
@@ -98,7 +100,8 @@ func voiceUiState(
     server: ServerModel,
     local: ConnectedLocal,
     serverName: String,
-    microphone: MicrophoneNotice
+    microphone: MicrophoneNotice,
+    output: AudioOutput? = nil
 ) -> VoiceUiState? {
     guard let person = server.people[server.selfSession] else { return nil }
     var whisper: WhisperBarState?
@@ -118,6 +121,7 @@ func voiceUiState(
         talkHeld: local.talkHeld,
         open: local.voiceOpen,
         tileRows: voiceTileRows(people: server.people.values, channelId: person.channelId),
-        whisper: whisper
+        whisper: whisper,
+        output: output
     )
 }

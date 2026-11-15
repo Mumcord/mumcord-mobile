@@ -32,6 +32,9 @@ import MumcordBridge
 ///         chat-viewer      the Chat tab shows the picture of Ben's message large
 ///         chat-gifs        the Chat tab shows the GIF favourites
 ///         session-ended    the last run was closed in the middle of a session with Nordlicht
+///         outputs          the phone has a loudspeaker and an earpiece and plays on the earpiece
+///         output-bluetooth the Bluetooth headset "Lea's Buds" is connected as well
+///         output-ask       no default output is saved, so the first connection asks
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
 ///
@@ -97,6 +100,9 @@ struct AppDebugLaunch {
             if options.contains("ptt") {
                 engine.savedTalkMode = .pushToTalk
             }
+            if options.contains("output-ask") {
+                engine.storedMobileSettings.defaultOutput = .ask
+            }
             if options.contains("level") {
                 engine.levelOnConnect = 60
             }
@@ -151,6 +157,18 @@ extension AppDebugLaunch {
         return FakeNotificationGateway(granted: true, asked: true)
     }
 
+    /// The phone's audio outputs as the options describe them.
+    var outputDevice: FakeOutputDevice {
+        var available = [
+            AudioOutput(id: OutputId.speaker, kind: .speaker, name: ""),
+            AudioOutput(id: OutputId.earpiece, kind: .earpiece, name: ""),
+        ]
+        if options.contains("output-bluetooth") {
+            available.append(AudioOutput(id: "buds", kind: .bluetooth, name: "Lea's Buds"))
+        }
+        return FakeOutputDevice(OutputState(available: available, current: available[1]))
+    }
+
     /// The local network as the options describe it; every server is on the internet when they
     /// say nothing.
     var localNetworkGateway: FakeLocalNetworkGateway {
@@ -186,7 +204,10 @@ extension AppDebugLaunch {
             sessionEnded: options.contains("session-ended")
                 ? SessionEndedNotice(serverId: Mockup.servers[0].id, serverName: Mockup.servers[0].name)
                 : nil,
-            notifications: NotificationPrompt(gateway: notificationGateway)
+            notifications: NotificationPrompt(gateway: notificationGateway),
+            outputs: options.contains("outputs")
+                ? VoiceOutput(store: store, outputs: SessionOutputs(device: outputDevice))
+                : nil
         )
         if options.contains("chat") {
             presetChat(model, store)

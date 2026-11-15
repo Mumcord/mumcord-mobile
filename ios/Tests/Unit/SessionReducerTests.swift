@@ -68,7 +68,7 @@ final class SessionReducerTests: XCTestCase {
         XCTAssertEqual(once.fold(.whisperEnded).whispersEnded, 2)
     }
 
-    func testIdentitiesAndPhoneSettingsDoNotChangeTheStateYet() {
+    func testIdentitiesDoNotChangeTheStateYetAndThePhoneSettingsAreKept() {
         let state = fold(connected)
         XCTAssertEqual(state.fold(.identitiesChanged(identities: [])), state)
         let settings = MobileSettings(
@@ -81,7 +81,7 @@ final class SessionReducerTests: XCTestCase {
             notifySenderOnly: true,
             updateCheck: true
         )
-        XCTAssertEqual(state.fold(.mobileSettingsChanged(settings: settings)), state)
+        XCTAssertEqual(state.fold(.mobileSettingsChanged(settings: settings)).mobileSettings, settings)
     }
 
     func testANewSessionIsIdleAndShowsNoServer() {

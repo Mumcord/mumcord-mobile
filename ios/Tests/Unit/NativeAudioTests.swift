@@ -49,7 +49,7 @@ final class NativeAudioTests: XCTestCase {
 
     private func cycle(capture: Bool) {
         let backend = NativeAudio()
-        let session = SystemVoiceSession(log: { print("NATIVE-AUDIO session: \($0)") })
+        let session = SystemVoiceSession(hasEarpiece: true, log: { print("NATIVE-AUDIO session: \($0)") })
         let request = StreamRequest(playbackHandle: 0, captureHandle: 0, playback: true, capture: capture)
         for round in 1...5 {
             let began = session.begin()

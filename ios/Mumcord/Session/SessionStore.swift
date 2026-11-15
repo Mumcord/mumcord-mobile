@@ -158,6 +158,15 @@ final class SessionStore: @unchecked Sendable {
                     return next
                 }
             }
+            // An event that arrived in between is newer than what is read here.
+            if case .ok(let settings) = await call("mobile settings", { $0.mobileSettings() }) {
+                update { state in
+                    if state.mobileSettings != nil { return state }
+                    var next = state
+                    next.mobileSettings = settings
+                    return next
+                }
+            }
         case .failed(let error):
             update { state in
                 var next = state
@@ -404,7 +413,17 @@ final class SessionStore: @unchecked Sendable {
         }
         change(&settings)
         let changed = settings
-        return await call("set mobile settings") { try await $0.setMobileSettings(settings: changed) }
+        let saved: Outcome<Void> = await call("set mobile settings") {
+            try await $0.setMobileSettings(settings: changed)
+        }
+        if case .ok = saved {
+            update { state in
+                var next = state
+                next.mobileSettings = changed
+                return next
+            }
+        }
+        return saved
     }
 
     /// Runs a command on the engine, creating it on first use. `name` is what the log calls it.

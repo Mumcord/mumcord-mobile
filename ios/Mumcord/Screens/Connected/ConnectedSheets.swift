@@ -17,6 +17,10 @@ struct ConnectedSheetHost: View {
             MicrophoneSheet(onContinue: actions.requestMicrophone, onDismiss: actions.microphoneNotNow)
         case .notifications:
             NotificationSheet(onContinue: actions.askNotifications, onDismiss: actions.notificationsNotNow)
+        case .outputQuestion:
+            OutputQuestionSheet(onAnswer: actions.answerOutputQuestion, onDismiss: actions.dismissOutputQuestion)
+        case .audioOutput(let rows):
+            AudioOutputSheet(rows: rows, onSelect: actions.selectOutput, onDismiss: actions.dismissSheet)
         case .person(let person):
             PersonSheet(person: person, actions: actions, model: model)
         case .channelMenu(let id, let name, let expanded, let canJoin):

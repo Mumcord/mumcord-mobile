@@ -22,7 +22,29 @@ extension AppModel {
     func closeVoice() {
         releaseTalk()
         connectedLocal.voiceOpen = false
+        connectedLocal.outputOpen = false
         syncChat()
+    }
+
+    /// Opens the choice of the audio output.
+    func openOutput() {
+        connectedLocal.outputOpen = true
+    }
+
+    /// Moves the voice to this output at once and closes the choice.
+    func selectOutput(_ id: String) {
+        outputs.select(id)
+        connectedLocal.outputOpen = false
+    }
+
+    /// The answer to "Loudspeaker or earpiece?".
+    func answerOutputQuestion(_ choice: DefaultOutput) {
+        outputs.answer(choice)
+    }
+
+    /// Puts the question away unanswered.
+    func dismissOutputQuestion() {
+        outputs.dismissQuestion()
     }
 
     /// Mutes or unmutes the user. Unmuting also ends a deafen (the engine does that).

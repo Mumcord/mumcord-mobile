@@ -247,6 +247,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `voice-chat-screens` | voice screenshots, chat screenshots |
 | `chat-flow` | chat flow, session-ended notice (the lightest group: the place for new tests) |
 | `messages` | messages flow, messages screenshots |
+| `output-settings` | audio output flow, audio output screenshots |
 
 Before its tests each group starts the app once in the simulator and ends it again (about 20
 seconds), so the first UI test does not pay for the first start of the app in a cold simulator.
@@ -289,6 +290,35 @@ would end every session started in a simulator.
 
 Only a real iPhone can show: the call screen and the lock screen, a real phone call holding the
 session, car systems, the recent calls list, and how long iOS keeps the app alive.
+
+### Audio output and the headset button (iOS)
+
+The outputs of a session come from the audio session, which only `SystemVoiceSession`
+(`ios/Platform/Audio/VoiceSession.swift`) touches. iOS lists microphones, never outputs, so the
+list is built from them (`outputState` in `ios/Platform/Call/AudioOutput.swift`): the
+loudspeaker always, the earpiece on an iPhone (an iPad has none, so it never asks "Loudspeaker
+or earpiece?"), every Bluetooth hands-free device, and a wired headset. The loudspeaker is
+chosen with an override of the route, every other output by choosing its microphone. iOS forgets
+the choice whenever the session's audio stops, so `SessionOutputs` makes it again when the audio
+is back. The rules (a headset is used at once, the question, the saved default) are the ones of
+Android, in `ios/Mumcord/Session/VoiceOutput.swift`.
+
+While the session is a call, iOS keeps a headset's buttons for itself and only tells the app
+"mute" or "end the call", never where the request came from. A mute request (the stem of
+AirPods, a car's mute key, the mute button of the call screen) toggles the microphone with a
+short sound. An end request always leaves the session, because the red End button of the lock
+screen and the Dynamic Island arrives as the same request and must do what it says; that is the
+one difference to Android, and it is the single function `endRequestMeans`. The sounds are
+played by players of their own (`ios/Platform/Audio/FeedbackTone.swift`), outside the audio
+unit.
+
+The simulator has no call, no earpiece, no headset and no route to change, so the tests run
+against a faked phone: the debug launch options `outputs`, `output-bluetooth` and `output-ask`
+(`ios/Mumcord/Debug/AppDebugLaunch.swift`). Only a real iPhone can show: that the output really
+moves while iOS owns the call's audio, what headphones without a microphone and a second
+Bluetooth device look like, which request each headset's button sends (the button of wired
+EarPods is expected to end the call and so to leave the session), and that the sounds are heard
+on the headset.
 
 **For the store release (Epic 6).**
 

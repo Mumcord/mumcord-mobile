@@ -40,6 +40,8 @@ final class AppModel {
     @ObservationIgnored let conversation: ChatController
     /// The question about notifications and whether the phone shows them.
     @ObservationIgnored let notifications: NotificationAccess
+    /// Where the voice plays and the first-connect question about it.
+    @ObservationIgnored let outputs: OutputAccess
     /// The last connect, so "Try again" and the password retry keep a link's channel.
     @ObservationIgnored private var lastTarget: ConnectTarget?
 
@@ -49,6 +51,7 @@ final class AppModel {
     var connectedLocal = ConnectedLocal()
     private var microphoneNotice = MicrophoneNotice.none
     private var notificationState: NotificationState
+    private var outputNotice: OutputNotice
 
     init(
         store: SessionStore,
@@ -59,7 +62,8 @@ final class AppModel {
         call: VoiceCall? = nil,
         sessionEnded: SessionEndedNotice? = nil,
         notifications: NotificationAccess = NoNotificationQuestion(),
-        messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(senderOnly: false)
+        messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(senderOnly: false),
+        outputs: OutputAccess? = nil
     ) {
         self.store = store
         self.setupStore = setupStore
@@ -69,6 +73,9 @@ final class AppModel {
         self.call = call
         self.notifications = notifications
         notificationState = notifications.state
+        let outputs = outputs ?? NoOutputs()
+        self.outputs = outputs
+        outputNotice = outputs.notice
         let chatStore = ChatStore(session: store)
         self.chatStore = chatStore
         chat = ChatController(chats: chatStore)
@@ -100,6 +107,13 @@ final class AppModel {
                 self.notificationState = state
             }
         }
+        let outputNotices = outputs.notices()
+        Task { [weak self] in
+            for await notice in outputNotices {
+                guard let self else { return }
+                self.outputNotice = notice
+            }
+        }
         messages.showMessagesTab = { [weak self] in self?.showTab(.messages) }
         messages.dismissConnectedSheet = { [weak self] in self?.dismissSheet() }
         let levels = store.inputLevels()
@@ -119,7 +133,9 @@ final class AppModel {
             local: connectedLocal,
             serverName: merged.activeServerName ?? "",
             microphone: microphoneNotice,
-            explainNotifications: notificationState.explain
+            explainNotifications: notificationState.explain,
+            output: outputNotice.state,
+            askOutput: outputNotice.asking
         )
         return merged
     }

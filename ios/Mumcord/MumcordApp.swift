@@ -56,7 +56,12 @@ extension AppModel {
     /// The app on the real engine. Created once per process: the engine must exist only once.
     static let live: AppModel = {
         let store = SessionStore(engineFactory: BridgeEngineFactory.make, log: AppLog.write)
-        let voiceSession = SystemVoiceSession(log: AppLog.write)
+        let voiceSession = SystemVoiceSession(
+            // A phone has an earpiece, a tablet has not.
+            hasEarpiece: UIDevice.current.userInterfaceIdiom == .phone,
+            log: AppLog.write
+        )
+        let outputs = SessionOutputs(device: voiceSession)
         let audio = VoiceAudio(
             store: store,
             gateway: SystemMicrophoneGateway(),
@@ -71,6 +76,8 @@ extension AppModel {
             callSystem: CallSystems.make(log: AppLog.write),
             prepareAudio: { voiceSession.prepare() },
             markers: SessionMarkerStore(),
+            tones: SystemFeedbackTones(log: AppLog.write),
+            currentOutput: { outputs.state.current },
             log: AppLog.write
         )
         voiceSession.onSignal = { [weak call] in call?.onAudioSignal($0) }
@@ -89,7 +96,8 @@ extension AppModel {
             call: call,
             sessionEnded: call.takeSessionEndedNotice(),
             notifications: NotificationPrompt(gateway: notificationGateway),
-            messageSettings: messageSettings
+            messageSettings: messageSettings,
+            outputs: VoiceOutput(store: store, outputs: outputs)
         )
         // Created at the start of the app: a tap on a notification that started the app is
         // delivered right after launch.

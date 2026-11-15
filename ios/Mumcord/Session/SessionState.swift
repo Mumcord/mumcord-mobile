@@ -24,6 +24,8 @@ struct SessionState: Equatable {
     var hints: [UnsupportedHint] = []
     /// The saved talk mode; voice activity until the engine has been asked.
     var talkMode = TalkMode.voiceActivity
+    /// The phone settings as the engine keeps them; nil until they have been read.
+    var mobileSettings: MobileSettings?
     /// Which of the phone's speaker and microphone the engine needs right now.
     var audio = AudioWanted(capture: false, playback: false)
 

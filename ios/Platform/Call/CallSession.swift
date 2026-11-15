@@ -20,9 +20,10 @@ protocol CallSystem: AnyObject {
 
 /// What the phone's call service tells about the session's call.
 protocol CallSystemDelegate: AnyObject {
-    /// The user ended the call outside the app: the system's call screen, a car's hang-up button.
+    /// The user ended the call outside the app: the system's call screen, a car's hang-up
+    /// button, the button of a wired headset.
     func callEndedBySystem(_ call: UUID)
-    /// The mute button of the system's call screen.
+    /// The mute button of the system's call screen, or a headset's or a car's mute button.
     func callMutedBySystem(_ call: UUID, muted: Bool)
     /// The system put the call on hold, or took it off hold.
     func callHeldBySystem(_ call: UUID, held: Bool)
@@ -58,6 +59,8 @@ final class CallSession: CallSystemDelegate {
     private let prepareAudio: () -> Void
     private let onMuted: (Bool) -> Void
     private let onLeave: () -> Void
+    private let onHeadsetButton: () -> Void
+    private let endRequest: () -> EndRequest
     private let onInterruption: (InterruptionEvent) -> Void
     private let onActivation: (AudioActivation) -> Void
     private let after: (TimeInterval, @escaping () -> Void) -> Void
@@ -74,6 +77,8 @@ final class CallSession: CallSystemDelegate {
     ///   - prepareAudio: sets the audio session up for voice without starting it.
     ///   - onMuted: the system's mute button asks to mute or unmute.
     ///   - onLeave: the call was ended outside the app; leaves the server.
+    ///   - onHeadsetButton: a headset's button was pressed once; toggles the microphone.
+    ///   - endRequest: what the system's wish to end the call means now, see `endRequestMeans`.
     ///   - onInterruption: receives what the system does to the call; see `Interruptions`.
     ///   - onActivation: says who starts the audio, see `AudioActivation`.
     ///   - after: runs work on the main thread after some seconds.
@@ -82,6 +87,8 @@ final class CallSession: CallSystemDelegate {
         prepareAudio: @escaping () -> Void,
         onMuted: @escaping (Bool) -> Void,
         onLeave: @escaping () -> Void,
+        onHeadsetButton: @escaping () -> Void = {},
+        endRequest: @escaping () -> EndRequest = { endRequestMeans(current: nil) },
         onInterruption: @escaping (InterruptionEvent) -> Void,
         onActivation: @escaping (AudioActivation) -> Void,
         after: @escaping (TimeInterval, @escaping () -> Void) -> Void = { seconds, work in
@@ -93,6 +100,8 @@ final class CallSession: CallSystemDelegate {
         self.prepareAudio = prepareAudio
         self.onMuted = onMuted
         self.onLeave = onLeave
+        self.onHeadsetButton = onHeadsetButton
+        self.endRequest = endRequest
         self.onInterruption = onInterruption
         self.onActivation = onActivation
         self.after = after
@@ -169,9 +178,16 @@ final class CallSession: CallSystemDelegate {
         guard call?.id == id else { return }
         call = nil
         held = false
-        // Until the server has been left the session's audio is the app's own again.
+        // The system's call is over either way; the session's audio is the app's own again.
         onActivation(.own)
-        onLeave()
+        switch endRequest() {
+        case .leave:
+            onLeave()
+        case .toggleMute:
+            onHeadsetButton()
+            // The session goes on and is shown to the phone as a call again.
+            if let shown { begin(shown) }
+        }
     }
 
     func callMutedBySystem(_ id: UUID, muted: Bool) {

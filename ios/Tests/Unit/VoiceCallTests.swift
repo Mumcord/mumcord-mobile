@@ -6,6 +6,18 @@ import XCTest
 
 @testable import Mumcord
 
+/// Notes the sounds it was asked to play.
+final class RecordingTones: FeedbackTones, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _played: [FeedbackTone] = []
+
+    var played: [FeedbackTone] { lock.withLock { _played } }
+
+    func play(_ tone: FeedbackTone) {
+        lock.withLock { _played.append(tone) }
+    }
+}
+
 /// The voice session and the phone, against the fake engine and a faked call service: the
 /// call, its buttons, a phone call during the session, and the note about a cut-off session.
 @MainActor
@@ -15,6 +27,7 @@ final class VoiceCallTests: XCTestCase {
     private let fakes = PhoneFakes()
     private let suite = "VoiceCallTests-\(UUID().uuidString)"
     private var kept: [VoiceCall] = []
+    private let tones = RecordingTones()
 
     private var engine: FakeEngine { box.engine }
 
@@ -54,6 +67,7 @@ final class VoiceCallTests: XCTestCase {
             callSystem: callSystem ? system : nil,
             prepareAudio: {},
             markers: markers,
+            tones: tones,
             log: { _ in }
         )
         kept.append(call)
@@ -121,6 +135,22 @@ final class VoiceCallTests: XCTestCase {
         // Muting in the app is told to the system.
         await store.setSelfMute(true)
         await assertEventually { self.system.requests.last == .setMuted(true) }
+    }
+
+    func testAHeadsetsMuteIsAnsweredWithASoundAndMutingOnScreenIsNot() async {
+        let store = await makeConnected()
+        system.delegate?.callMutedBySystem(system.call, muted: true)
+        await assertEventually { self.own(store)?.muted == true }
+        await assertEventually { self.system.requests.last == .setMuted(true) }
+        system.delegate?.callMutedBySystem(system.call, muted: false)
+        await assertEventually { self.own(store)?.muted == false }
+        XCTAssertEqual(tones.played, [.muted, .unmuted])
+
+        // The system reports back what the app told it; that is no press of a button.
+        await store.setSelfMute(true)
+        await assertEventually { self.system.requests.last == .setMuted(true) }
+        system.delegate?.callMutedBySystem(system.call, muted: true)
+        XCTAssertEqual(tones.played, [.muted, .unmuted])
     }
 
     func testInPushToTalkModeTheSystemsMuteButtonNeverOpensTheMicrophone() async {

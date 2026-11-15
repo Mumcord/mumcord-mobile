@@ -27,6 +27,10 @@ struct ConnectedActions {
     let openWhisper: (WhisperTarget) -> Void
     let setWhisperHeld: (Bool) -> Void
     let closeWhisper: () -> Void
+    let openOutput: () -> Void
+    let selectOutput: (String) -> Void
+    let answerOutputQuestion: (DefaultOutput) -> Void
+    let dismissOutputQuestion: () -> Void
     /// Lets the system ask for the microphone, or opens the system settings once it no longer asks.
     let requestMicrophone: () -> Void
     let microphoneNotNow: () -> Void
@@ -63,6 +67,10 @@ extension ConnectedActions {
             openWhisper: model.openWhisper,
             setWhisperHeld: model.setWhisperHeld,
             closeWhisper: model.closeWhisper,
+            openOutput: model.openOutput,
+            selectOutput: model.selectOutput,
+            answerOutputQuestion: model.answerOutputQuestion,
+            dismissOutputQuestion: model.dismissOutputQuestion,
             requestMicrophone: model.requestMicrophone,
             microphoneNotNow: model.microphoneNotNow,
             askNotifications: model.askNotifications,

@@ -85,6 +85,7 @@ extension AppModel {
             connectedLocal.personSession = nil
             connectedLocal.volumeDraft = nil
             connectedLocal.menuChannelId = nil
+            connectedLocal.outputOpen = false
         }
     }
 

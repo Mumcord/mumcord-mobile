@@ -322,3 +322,15 @@
 "notifications_continue" = "Continue";
 "notifications_not_now" = "Not now";
 "message_new" = "New message";
+"output_chip" = "Audio output: %1$@";
+"output_title" = "Audio output";
+"output_speaker" = "Speaker";
+"output_earpiece" = "Earpiece";
+"output_wired" = "Wired headset";
+"output_bluetooth" = "Bluetooth";
+"output_not_connected" = "Not connected";
+"output_note" = "A connected headset is used automatically";
+"output_question_title" = "Loudspeaker or earpiece?";
+"output_question_text" = "Where do you want to hear the others when no headset is connected? You can switch at any time in the voice view.";
+"output_question_speaker" = "Loudspeaker";
+"output_question_earpiece" = "Earpiece";

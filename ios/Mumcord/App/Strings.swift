@@ -338,6 +338,18 @@ enum Strings {
     static var notificationsContinue: String { text("notifications_continue") }
     static var notificationsNotNow: String { text("notifications_not_now") }
     static var messageNew: String { text("message_new") }
+    static func outputChip(_ p1: String) -> String { format("output_chip", p1) }
+    static var outputTitle: String { text("output_title") }
+    static var outputSpeaker: String { text("output_speaker") }
+    static var outputEarpiece: String { text("output_earpiece") }
+    static var outputWired: String { text("output_wired") }
+    static var outputBluetooth: String { text("output_bluetooth") }
+    static var outputNotConnected: String { text("output_not_connected") }
+    static var outputNote: String { text("output_note") }
+    static var outputQuestionTitle: String { text("output_question_title") }
+    static var outputQuestionText: String { text("output_question_text") }
+    static var outputQuestionSpeaker: String { text("output_question_speaker") }
+    static var outputQuestionEarpiece: String { text("output_question_earpiece") }
 
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
