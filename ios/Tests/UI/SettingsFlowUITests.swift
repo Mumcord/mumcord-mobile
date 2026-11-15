@@ -31,7 +31,8 @@ final class SettingsFlowUITests: XCTestCase {
         let app = connect("voice-server")
         tapWhenReady(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "More")).firstMatch)
         tapWhenReady(app.element("more-settings"))
-        expectAppears(app.element(containing: "Mobile data"))
+        // Section headers are shown in capitals, and the label is what is shown.
+        expectAppears(app.element(containing: "MOBILE DATA"))
         let media = toggle(app, "settings-load-media")
         let idle = toggle(app, "settings-idle-disconnect")
         expectAppears(media)
