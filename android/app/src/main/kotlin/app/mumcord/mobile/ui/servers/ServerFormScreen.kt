@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -20,31 +22,47 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.R
+import app.mumcord.mobile.bridge.Theme
 import app.mumcord.mobile.design.components.MumcordAppBar
 import app.mumcord.mobile.design.components.MumcordBanner
 import app.mumcord.mobile.design.components.MumcordBannerTone
 import app.mumcord.mobile.design.components.MumcordButton
 import app.mumcord.mobile.design.components.MumcordButtonStyle
+import app.mumcord.mobile.design.components.MumcordIcon
+import app.mumcord.mobile.design.components.MumcordList
+import app.mumcord.mobile.design.components.MumcordListRow
+import app.mumcord.mobile.design.components.MumcordListRowValue
 import app.mumcord.mobile.design.components.MumcordScreen
 import app.mumcord.mobile.design.components.MumcordTextField
 import app.mumcord.mobile.design.icons.MumcordIcons
+import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.design.tokens.MumcordSpace
+import app.mumcord.mobile.ui.common.SheetOverlay
 import app.mumcord.mobile.ui.connect.messageRes
 
 const val FORM_SAVE_TEST_TAG = "server-form-save"
 
-/** Adds a server to the list or changes one: address, port, name, user name, server password. */
+/**
+ * Adds a server to the list or changes one: address, port, name, user name, server password,
+ * and for a saved server the theme it is shown in (no mockup; as in the desktop's edit-server
+ * dialog, Spec 02 FR-2.17).
+ */
 @Composable
 fun ServerFormScreen(
     form: ServerFormState,
     onChange: ((ServerFormState) -> ServerFormState) -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
+    themes: List<Theme> = emptyList(),
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
@@ -120,6 +138,9 @@ fun ServerFormScreen(
                     modifier = Modifier.align(Alignment.Start),
                 )
             }
+            if (form.isEdit && themes.isNotEmpty()) {
+                ServerThemeRow(form, themes, onOpen = { onChange { it.copy(themeSheet = true) } })
+            }
             if (form.saveError != null) {
                 MumcordBanner(
                     title = stringResource(R.string.form_save_failed),
@@ -135,6 +156,75 @@ fun ServerFormScreen(
                 enabled = !form.saving,
                 modifier = Modifier.fillMaxWidth().testTag(FORM_SAVE_TEST_TAG),
             )
+        }
+    }
+}
+
+@Composable
+private fun ServerThemeRow(form: ServerFormState, themes: List<Theme>, onOpen: () -> Unit) {
+    val name = form.themeId?.let { id -> themes.firstOrNull { it.id == id }?.name }
+        ?: stringResource(R.string.server_theme_use_app)
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        MumcordList(horizontalMargin = 0.dp) {
+            MumcordListRow(
+                title = stringResource(R.string.server_theme),
+                icon = MumcordIcons.Moon,
+                trailing = {
+                    MumcordListRowValue(name)
+                    MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted)
+                },
+                onClick = onOpen,
+                modifier = Modifier.testTag(FORM_THEME_TEST_TAG),
+            )
+        }
+        BasicText(
+            text = stringResource(R.string.server_theme_hint),
+            style = MumcordTheme.typography.small.copy(color = MumcordTheme.colors.textMuted),
+        )
+    }
+}
+
+const val FORM_THEME_TEST_TAG = "server-form-theme"
+const val SERVER_THEME_OPTION_TEST_TAG_PREFIX = "server-theme-option-"
+
+/** The test tag of a choice in the server theme sheet; "app" for "Use app theme". */
+fun serverThemeOptionTestTag(themeId: String?): String = SERVER_THEME_OPTION_TEST_TAG_PREFIX + (themeId ?: "app")
+
+/** The theme a server is shown in: "Use app theme" or one of all themes. Taken over on Save. */
+@Composable
+fun ServerThemeSheet(
+    form: ServerFormState,
+    themes: List<Theme>,
+    onChange: ((ServerFormState) -> ServerFormState) -> Unit,
+    topInsets: WindowInsets,
+    bottomInsets: WindowInsets,
+) {
+    val close = { onChange { it.copy(themeSheet = false) } }
+    val title = stringResource(R.string.server_theme_title, form.name.ifBlank { form.address })
+    SheetOverlay(title, close, topInsets, bottomInsets) {
+        MumcordList(horizontalMargin = MumcordSpace.s1, modifier = Modifier.selectableGroup()) {
+            val options = listOf<Pair<String?, String>>(null to stringResource(R.string.server_theme_use_app)) +
+                themes.map { it.id to it.name }
+            options.forEachIndexed { index, (themeId, name) ->
+                val selected = form.themeId == themeId
+                MumcordListRow(
+                    title = name,
+                    divider = index > 0,
+                    selected = selected,
+                    trailing = if (selected) {
+                        { MumcordIcon(MumcordIcons.Check, contentDescription = null, tint = MumcordTheme.colors.accentText) }
+                    } else {
+                        null
+                    },
+                    onClick = { onChange { it.copy(themeId = themeId, themeSheet = false) } },
+                    modifier = Modifier
+                        .semantics {
+                            this.selected = selected
+                            role = Role.RadioButton
+                        }
+                        .testTag(serverThemeOptionTestTag(themeId)),
+                )
+            }
         }
     }
 }

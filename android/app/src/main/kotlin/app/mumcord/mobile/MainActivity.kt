@@ -3,15 +3,22 @@
 package app.mumcord.mobile
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.session.chatFromNotificationKey
 import app.mumcord.mobile.ui.AppRoute
 import app.mumcord.mobile.ui.AppViewModel
+import app.mumcord.mobile.ui.themes.AppThemeHost
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AppViewModel by viewModels { AppViewModel.Factory }
@@ -22,9 +29,28 @@ class MainActivity : ComponentActivity() {
         // Not again after a rotation: the link that started the app was handled the first time.
         if (savedInstanceState == null) openLink(intent)
         setContent {
-            MumcordTheme {
+            val theme by viewModel.appTheme.collectAsStateWithLifecycle()
+            AppThemeHost(theme) {
+                SystemBarsFollowTheme()
                 AppRoute(viewModel)
             }
+        }
+    }
+
+    /**
+     * The status and navigation bar icons follow the app's colours, not the phone's dark mode:
+     * the user may show the app light on a dark phone and the other way round.
+     */
+    @Composable
+    private fun SystemBarsFollowTheme() {
+        val dark = MumcordTheme.isDark
+        LaunchedEffect(dark) {
+            val style = if (dark) {
+                SystemBarStyle.dark(Color.TRANSPARENT)
+            } else {
+                SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+            }
+            enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
         }
     }
 

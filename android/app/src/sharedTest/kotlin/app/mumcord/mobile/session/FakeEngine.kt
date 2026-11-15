@@ -937,7 +937,13 @@ class FakeEngine(
         emit(BridgeEvent.ProfileChanged(server.selfSession))
     }
 
+    /** The bytes the app last set as the avatar; null after removing it. */
+    @Volatile
+    var ownAvatar: ByteArray? = null
+
     override suspend fun setOwnAvatar(image: ByteArray?) {
+        ownAvatar = image
+        profile = profile.copy(avatar = image?.let { ImageData(it, "image/png", 1u, 1u, animated = false) })
         emit(BridgeEvent.ProfileChanged(server.selfSession))
     }
 

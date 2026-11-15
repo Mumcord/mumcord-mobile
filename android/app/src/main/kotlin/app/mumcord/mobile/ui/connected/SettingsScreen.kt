@@ -59,7 +59,8 @@ fun settingsOptionTestTag(index: Int): String = SETTINGS_OPTION_TEST_TAG_PREFIX 
  * The settings (mockup `16-settings`, FR-5.100). Every switch is saved at once; the rows with a
  * value open a sheet with the choices. Left out until their features exist: echo cancellation
  * (the phone's own voice processing does it, there is nothing to switch), link previews (the
- * chat shows none yet), appearance and language (task 8.3), about and updates (task 10.2). The
+ * chat shows none yet), the language (task 8.3, after the translations), about and updates (task
+ * 10.2). Dark, light or system is chosen on the themes screen (mockup `19-themes`). The
  * level meter, the "Chat" section and the note under "Notifications" have no mockup.
  */
 @Composable

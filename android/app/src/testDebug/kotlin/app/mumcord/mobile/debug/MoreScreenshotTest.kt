@@ -13,6 +13,8 @@ import app.mumcord.mobile.bridge.AppSettings
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.bridge.ThemeMode
+import app.mumcord.mobile.bridge.ThemeSettings
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.platform.call.AudioOutput
 import app.mumcord.mobile.platform.call.OutputKind
@@ -20,6 +22,7 @@ import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.session.FAKE_MOBILE_SETTINGS
 import app.mumcord.mobile.session.MOCKUP_ANNA
 import app.mumcord.mobile.session.MOCKUP_BEN
+import app.mumcord.mobile.session.MOCKUP_BUILT_IN_THEMES
 import app.mumcord.mobile.session.MOCKUP_GAMING
 import app.mumcord.mobile.session.MOCKUP_JONAS
 import app.mumcord.mobile.session.MOCKUP_LOBBY
@@ -34,11 +37,13 @@ import app.mumcord.mobile.ui.connected.ConnectedController
 import app.mumcord.mobile.ui.connected.ConnectedLocal
 import app.mumcord.mobile.ui.connected.ConnectedShell
 import app.mumcord.mobile.ui.connected.ConnectedTab
+import app.mumcord.mobile.ui.connected.MoreExtras
 import app.mumcord.mobile.ui.connected.MoreLocal
 import app.mumcord.mobile.ui.connected.MorePage
 import app.mumcord.mobile.ui.connected.SettingsSheet
 import app.mumcord.mobile.ui.connected.SettingsSheetHost
 import app.mumcord.mobile.ui.connected.connectedUiState
+import app.mumcord.mobile.ui.profile.OwnProfile
 import java.time.ZoneOffset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -134,9 +139,17 @@ class MoreScreenshotTest {
                 BridgeEvent.ServerSynced(mockupVoiceServer()),
                 BridgeEvent.MobileSettingsChanged(FAKE_MOBILE_SETTINGS.copy(talkModeChosen = true)),
                 BridgeEvent.AppSettingsChanged(appSettings),
+                BridgeEvent.ThemesChanged(
+                    ThemeSettings(ThemeMode.SYSTEM, MOCKUP_BUILT_IN_THEMES[0].id, emptyList(), emptyMap()),
+                ),
             ) + activity
-            ).fold(SessionState(talkMode = TalkMode.VOICE_ACTIVITY)) { state, event -> state.fold(event) }
+            ).fold(SessionState(talkMode = TalkMode.VOICE_ACTIVITY, builtInThemes = MOCKUP_BUILT_IN_THEMES)) { state, event ->
+            state.fold(event)
+        }
     }
+
+    // The user's own profile as the mockup shows it.
+    private val profile = OwnProfile(name = "Lea", comment = "Playing late, always up for a chat", avatar = null)
 
     @After
     fun tearDown() = scope.cancel()
@@ -144,7 +157,7 @@ class MoreScreenshotTest {
     private fun capture(name: String, dark: Boolean, local: MoreLocal, session: SessionState = session()) =
         composeRule.captureScreenshot("$name-${if (dark) "dark" else "light"}") {
             val state = checkNotNull(connectedUiState(session, ConnectedLocal(tab = ConnectedTab.More), "Nordlicht"))
-            val moreState = more.state(session, local, output)
+            val moreState = more.state(session, local, output, extras = MoreExtras(profile = profile))
             MumcordTheme(darkTheme = dark) {
                 Box(Modifier.fillMaxSize()) {
                     ConnectedShell(

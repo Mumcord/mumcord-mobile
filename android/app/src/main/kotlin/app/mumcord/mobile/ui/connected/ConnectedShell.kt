@@ -36,6 +36,8 @@ import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.chat.ChatImageSystem
 import app.mumcord.mobile.ui.chat.ChatScreen
 import app.mumcord.mobile.ui.chat.ChatUiState
+import app.mumcord.mobile.ui.profile.EditProfileScreen
+import app.mumcord.mobile.ui.themes.ThemesScreen
 
 const val DENIED_BANNER_TEST_TAG = "denied-banner"
 
@@ -112,6 +114,13 @@ fun ConnectedShell(
                     // Null for the moment the voice settings are being read.
                     morePage == MorePage.Settings -> more.settings?.let {
                         SettingsScreen(it, moreActions, actions.inputLevel, topInsets)
+                    }
+                    // Null for the moment the profile or the themes are being read.
+                    morePage == MorePage.EditProfile -> more.profileEdit?.let {
+                        EditProfileScreen(it, moreActions.profile, topInsets)
+                    }
+                    morePage == MorePage.Themes -> more.themes?.let {
+                        ThemesScreen(it, moreActions.themes, onBack = moreActions::back, topInsets = topInsets)
                     }
                     messages.blockedOpen -> BlockedPeopleScreen(messages, messagesActions, topInsets)
                     else -> MoreScreen(more, moreActions, messagesActions::openBlocked, onIdentities, onDisconnect, topInsets)

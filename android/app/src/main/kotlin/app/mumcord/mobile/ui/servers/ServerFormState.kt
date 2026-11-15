@@ -23,6 +23,12 @@ data class ServerFormState(
     val removeSavedPassword: Boolean = false,
     /** Kept as it is: choosing the identity arrives with the identity screens. */
     val identityId: Long? = null,
+    /** The theme picked for this server (Spec 02 FR-2.17); null shows it in the app theme. */
+    val themeId: String? = null,
+    /** The theme the server had when the form was opened; a different [themeId] is saved. */
+    val savedThemeId: String? = null,
+    /** The choice of the server's theme is open. */
+    val themeSheet: Boolean = false,
     /** Errors are shown once the user has tried to save. */
     val showErrors: Boolean = false,
     val saving: Boolean = false,
@@ -40,6 +46,9 @@ data class ServerFormState(
 
     val usernameMissing: Boolean
         get() = username.isBlank()
+
+    val themeChanged: Boolean
+        get() = themeId != savedThemeId
 
     val isValid: Boolean
         get() = !addressMissing && !usernameMissing && portNumber != null
@@ -63,7 +72,9 @@ data class ServerFormState(
     }
 
     companion object {
-        fun edit(server: SavedServer) = ServerFormState(
+        fun edit(server: SavedServer, themeId: String? = null) = ServerFormState(
+            themeId = themeId,
+            savedThemeId = themeId,
             serverId = server.id,
             name = server.name,
             address = server.address,

@@ -104,6 +104,8 @@ LOCK_PTT_SECONDS=60
 # person who has to see the same certificate each time the phone connects; "transfer" nobody,
 # and the test gets a transfer made for this run (the camera permission is asked for in it);
 # "activity" a second person who joins the server, moves and leaves whenever the test asks;
+# "profile" a second person (e2e/profile-watch.py) who has to see the comment and the avatar the
+# phone sets, the avatar without EXIF data;
 # "moderation" a second person (e2e/moderation-target.py) whom the phone, connected as the test
 # server's SuperUser, moves and kicks, and who has to report both; "ban" the
 # same person, who has to be removed by a short ban, refused while it lasts and let in again
@@ -137,6 +139,7 @@ SCENARIOS=(
   "granted granted identity ${TEST_PACKAGE}.IdentityFlowTest"
   "granted granted transfer ${TEST_PACKAGE}.TransferFlowTest"
   "granted granted activity ${TEST_PACKAGE}.ActivityFlowTest"
+  "granted granted profile ${TEST_PACKAGE}.ProfileThemeFlowTest"
   "granted granted moderation ${TEST_PACKAGE}.ModerationFlowTest#moveAndKickReachTheOtherPerson"
   "granted granted ban ${TEST_PACKAGE}.ModerationFlowTest#aShortBanRemovesThePersonUntilItEnds"
 )
@@ -176,6 +179,7 @@ CHAT_PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/chat-peer"
 CHAT_PEER_LOG="${OUT_DIR}/chat-peer.log"
 RAW_CHAT_LOG="${OUT_DIR}/raw-chat.log"
 IDENTITY_WATCH_LOG="${OUT_DIR}/identity-watch.log"
+PROFILE_WATCH_LOG="${OUT_DIR}/profile-watch.log"
 MODERATION_LOG="${OUT_DIR}/moderation-target.log"
 # The SuperUser password of the test server, which scripts/testenv.sh wrote here.
 TESTENV_FILE="${REPO_ROOT}/.engine/testenv/.env"
@@ -185,6 +189,8 @@ TRANSFER_MAKER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/transfer-m
 PM_FIFO="${OUT_DIR}/pm-requests"
 # The user name the app connects with in the tests (AppDriver.USER_NAME).
 PHONE_NAME="e2e-phone"
+# The comment the profile scenario sets on the phone (ProfileThemeFlowTest.COMMENT).
+PROFILE_COMMENT="Hello from the phone"
 
 step() {
   printf '\ne2e: %s\n' "$*"
@@ -333,7 +339,7 @@ check_peers() {
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
   if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" \
     && "${kind}" != "identity" && "${kind}" != "activity" && "${kind}" != "moderation" \
-    && "${kind}" != "ban" ]]; then
+    && "${kind}" != "ban" && "${kind}" != "profile" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -425,6 +431,15 @@ check_peers() {
         || die "the server did not see the same certificate on the second connect, see e2e/build/identity-watch.log"
       printf 'e2e: identity: the server saw the same certificate on both connects\n'
       ;;
+    profile)
+      grep -q "^COMMENT .*${PROFILE_COMMENT}" "${PROFILE_WATCH_LOG}" \
+        || die "the second person did not see the phone's comment, see e2e/build/profile-watch.log"
+      grep -qE '^AVATAR (png|jpeg) no-exif$' "${PROFILE_WATCH_LOG}" \
+        || die "the second person did not get the phone's avatar as a picture without EXIF data, see e2e/build/profile-watch.log"
+      ! grep -q '^AVATAR .* exif$' "${PROFILE_WATCH_LOG}" \
+        || die "the phone's avatar reached the second person with EXIF data, see e2e/build/profile-watch.log"
+      printf 'e2e: profile: the second person saw the comment and the avatar (no EXIF data)\n'
+      ;;
     chat)
       grep -q '^SENT' "${CHAT_PEER_LOG}" || die "the second person did not get its messages out, see e2e/build/chat-peer.log"
       grep -q '^RAW SENT' "${RAW_CHAT_LOG}" || die "the raw markup was not sent, see e2e/build/raw-chat.log"
@@ -492,7 +507,7 @@ cleanup() {
     # What the other people reported belongs next to the failure, not only into a file.
     local log
     for log in "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}" \
-      "${MODERATION_LOG}"; do
+      "${MODERATION_LOG}" "${PROFILE_WATCH_LOG}"; do
       [[ -s "${log}" ]] || continue
       printf 'e2e: the end of %s:\n' "${log#"${REPO_ROOT}/"}"
       tail -n 40 "${log}"
@@ -572,7 +587,8 @@ start_emulator() {
 
 mkdir -p "${OUT_DIR}"
 rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" \
-  "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.* "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}"
+  "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.* "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}" \
+  "${PROFILE_WATCH_LOG}"
 trap cleanup EXIT
 if [[ -n "${EVIDENCE_DIR}" ]]; then
   mkdir -p "${EVIDENCE_DIR}"
@@ -643,6 +659,9 @@ run_scenario() {
     alone | notify | chat-restart | gap | idle) ;;
     identity)
       start_person "${IDENTITY_WATCH_LOG}" python3 "${REPO_ROOT}/e2e/identity-watch.py" "${PHONE_NAME}"
+      ;;
+    profile)
+      start_person "${PROFILE_WATCH_LOG}" python3 "${REPO_ROOT}/e2e/profile-watch.py" "${PHONE_NAME}"
       ;;
     transfer)
       # Base64 keeps the QR code texts whole on their way through the device's shell. The

@@ -8,10 +8,14 @@ import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
+import app.mumcord.mobile.ui.profile.ProfileController
+import app.mumcord.mobile.ui.themes.ThemesController
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -30,13 +34,32 @@ class MoreController(
     private val mutableLocal = MutableStateFlow(MoreLocal())
     val local: StateFlow<MoreLocal> = mutableLocal.asStateFlow()
 
+    /** The user's own profile and its editor (FR-5.80). */
+    val profile = ProfileController(repository, scope, onClosed = ::back)
+
+    /** The themes screen (FR-5.81). */
+    val themes = ThemesController(repository, scope)
+
+    /** The profile and themes state the More tab shows besides [local]. */
+    val extras: Flow<MoreExtras> = combine(profile.own, profile.edit, themes.local, ::MoreExtras)
+
     init {
         scope.launch {
             repository.state.map { it.showsServer }.distinctUntilChanged().collect { shown ->
-                if (!shown) mutableLocal.value = MoreLocal()
+                if (!shown) {
+                    mutableLocal.value = MoreLocal()
+                    themes.reset()
+                }
             }
         }
     }
+
+    fun openProfile() {
+        profile.open()
+        mutableLocal.update { it.copy(page = MorePage.EditProfile) }
+    }
+
+    fun openThemes() = mutableLocal.update { it.copy(page = MorePage.Themes) }
 
     fun openActivity() = mutableLocal.update { it.copy(page = MorePage.Activity, seenActivityId = newestActivity()) }
 
@@ -53,9 +76,16 @@ class MoreController(
     }
 
     /** Back to the list of the More tab; what was in the log until now counts as seen. */
-    fun back() = mutableLocal.update {
-        val seen = if (it.page == MorePage.Activity) newestActivity() else it.seenActivityId
-        it.copy(page = MorePage.Main, seenActivityId = seen, sheet = null)
+    fun back() {
+        when (mutableLocal.value.page) {
+            MorePage.Themes -> themes.reset()
+            MorePage.EditProfile -> profile.discard()
+            else -> Unit
+        }
+        mutableLocal.update {
+            val seen = if (it.page == MorePage.Activity) newestActivity() else it.seenActivityId
+            it.copy(page = MorePage.Main, seenActivityId = seen, sheet = null)
+        }
     }
 
     fun openSheet(sheet: SettingsSheet) = mutableLocal.update { it.copy(sheet = sheet) }

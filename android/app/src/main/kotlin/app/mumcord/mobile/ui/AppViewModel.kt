@@ -21,6 +21,8 @@ import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.session.setServerTheme
+import app.mumcord.mobile.session.themeTokens
 import app.mumcord.mobile.ui.chat.ChatController
 import app.mumcord.mobile.ui.chat.ChatUiState
 import app.mumcord.mobile.ui.chat.chatTabBadge
@@ -60,6 +62,9 @@ import app.mumcord.mobile.ui.servers.ServerFormState
 import app.mumcord.mobile.ui.servers.toPingState
 import app.mumcord.mobile.ui.setup.PreferencesSetupStore
 import app.mumcord.mobile.ui.setup.SetupStore
+import app.mumcord.mobile.ui.themes.AppTheme
+import app.mumcord.mobile.ui.themes.shownThemeId
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -69,6 +74,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -242,12 +248,12 @@ class AppViewModel(
     val moreState: StateFlow<MoreUiState?> =
         combine(
             repository.state,
-            more.local,
+            combine(more.local, more.extras, ::Pair),
             outputs.state,
             messageSettings.senderOnly,
             uiState.map { it.activeServerName.orEmpty() }.distinctUntilChanged(),
-        ) { session, moreLocal, output, senderOnly, serverName ->
-            moreUiState(session, moreLocal, serverName, output, senderOnly)
+        ) { session, (moreLocal, extras), output, senderOnly, serverName ->
+            moreUiState(session, moreLocal, serverName, output, senderOnly, extras)
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -259,6 +265,27 @@ class AppViewModel(
                 messageSettings.senderOnly.value,
             ),
         )
+
+    /**
+     * The colours of the shown theme in both versions (FR-5.81): the shown server's own theme
+     * while connected to one that has it, otherwise the app theme. Null until the themes were
+     * read; the app then draws in its own Mumcord colours.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val appTheme: StateFlow<AppTheme?> =
+        repository.state
+            // Any change of the themes reads the colours again: a theme of the same id may have
+            // been replaced. That is rare and cheap.
+            .map { state -> state.themes?.let { it to state.activeServerId?.takeIf { state.showsServer } } }
+            .distinctUntilChanged()
+            .mapLatest { shown ->
+                val (settings, shownServer) = shown ?: return@mapLatest null
+                when (val tokens = repository.themeTokens(shownThemeId(settings, shownServer))) {
+                    is Outcome.Ok -> AppTheme(settings.mode, tokens.value.first, tokens.value.second)
+                    is Outcome.Failed -> null
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** The open private conversation: the same chat screen as the Chat tab, for one person. */
     val conversation = ChatController(
@@ -363,7 +390,8 @@ class AppViewModel(
 
     fun openEditServer(serverId: Long) {
         val server = server(serverId) ?: return
-        local.update { it.copy(form = ServerFormState.edit(server)) }
+        val themeId = repository.state.value.themes?.serverThemes?.get(serverId)
+        local.update { it.copy(form = ServerFormState.edit(server, themeId)) }
     }
 
     fun changeForm(change: (ServerFormState) -> ServerFormState) =
@@ -397,9 +425,15 @@ class AppViewModel(
             } else {
                 repository.updateServer(form.serverId, input)
             }
-            when (saved) {
+            // The server's theme is its own setting, saved once the server itself is.
+            val themed = if (saved is Outcome.Ok && form.serverId != null && form.themeChanged) {
+                repository.setServerTheme(form.serverId, form.themeId)
+            } else {
+                saved
+            }
+            when (themed) {
                 is Outcome.Ok -> closeForm()
-                is Outcome.Failed -> changeForm { it.copy(saving = false, saveError = saved.error) }
+                is Outcome.Failed -> changeForm { it.copy(saving = false, saveError = themed.error) }
             }
         }
     }

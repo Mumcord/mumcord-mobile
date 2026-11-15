@@ -9,6 +9,7 @@ import app.mumcord.mobile.bridge.BanResult
 import app.mumcord.mobile.bridge.BanTarget
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BridgeException
+import app.mumcord.mobile.bridge.BridgeSnapshot
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.bridge.EngineListener
@@ -21,6 +22,8 @@ import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.bridge.Theme
+import app.mumcord.mobile.bridge.ThemeSettings
 import app.mumcord.mobile.bridge.TransferScan
 import app.mumcord.mobile.bridge.VoiceSettings
 import app.mumcord.mobile.bridge.WhisperTarget
@@ -148,14 +151,17 @@ class SessionRepository(
     /** Reads the saved servers once; later changes arrive as events. A failure can be retried. */
     suspend fun loadServers() {
         if (mutableState.value.serversLoaded) return
-        when (val loaded = call("load servers") { Triple(it.snapshot(), it.talkMode(), it.appSettings()) }) {
+        val loaded = call("load servers") { Loaded(it.snapshot(), it.talkMode(), it.appSettings(), it.themeSettings(), it.builtInThemes()) }
+        when (loaded) {
             // An event that arrived in between is newer than the snapshot.
             is Outcome.Ok -> mutableState.update {
-                val (snapshot, talkMode, appSettings) = loaded.value
+                val (snapshot, talkMode, appSettings, themes, builtInThemes) = loaded.value
                 val known = it.copy(
                     talkMode = talkMode,
                     mobileSettings = it.mobileSettings ?: snapshot.mobileSettings,
                     appSettings = it.appSettings ?: appSettings,
+                    themes = it.themes ?: themes,
+                    builtInThemes = builtInThemes,
                 )
                 val identified = known.copy(identities = it.identities ?: snapshot.identities)
                 if (it.serversLoaded) identified else identified.copy(servers = snapshot.servers, serversLoaded = true)
@@ -163,6 +169,14 @@ class SessionRepository(
             is Outcome.Failed -> mutableState.update { it.copy(phase = ConnectionPhase.Failed(loaded.error)) }
         }
     }
+
+    private data class Loaded(
+        val snapshot: BridgeSnapshot,
+        val talkMode: TalkMode,
+        val appSettings: AppSettings,
+        val themes: ThemeSettings,
+        val builtInThemes: List<Theme>,
+    )
 
     suspend fun addServer(input: ServerInput): Outcome<SavedServer> =
         call("add server") { it.addServer(input) }

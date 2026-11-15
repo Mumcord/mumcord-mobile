@@ -2,6 +2,7 @@
 
 package app.mumcord.mobile.debug
 
+import app.mumcord.mobile.ui.connected.MoreExtras
 import app.mumcord.mobile.ui.messages.messagesUiState
 import app.mumcord.mobile.ui.messages.MessagesUiState
 import app.mumcord.mobile.ui.messages.MessagesLocal
@@ -138,5 +139,6 @@ class ScreenshotMore(repository: SessionRepository, connected: ConnectedControll
         local: MoreLocal = MoreLocal(),
         output: OutputState = OutputState(),
         senderOnly: Boolean = false,
-    ): MoreUiState = checkNotNull(moreUiState(session, local, "Nordlicht", output, senderOnly))
+        extras: MoreExtras = MoreExtras(),
+    ): MoreUiState = checkNotNull(moreUiState(session, local, "Nordlicht", output, senderOnly, extras))
 }

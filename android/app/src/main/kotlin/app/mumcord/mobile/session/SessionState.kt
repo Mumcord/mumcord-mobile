@@ -11,6 +11,8 @@ import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.Person
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.bridge.Theme
+import app.mumcord.mobile.bridge.ThemeSettings
 
 /** Everything the screens need to know about the one connection, as an immutable value. */
 data class SessionState(
@@ -48,6 +50,15 @@ data class SessionState(
     val activity: List<ActivityEntry> = emptyList(),
     /** Things the app cannot show, newest last; see [withHint]. */
     val hints: List<UnsupportedHint> = emptyList(),
+    /** The appearance mode and the themes; null until they have been read. */
+    val themes: ThemeSettings? = null,
+    /** The themes that come with the app, Mumcord first; read with [themes]. */
+    val builtInThemes: List<Theme> = emptyList(),
+    /**
+     * How often the user's own comment or avatar may have changed on the shown server; the
+     * profile is read again each time it grows.
+     */
+    val ownProfileChanges: Int = 0,
 ) {
     /** True once the server's channels are known and the connection is still alive. */
     val showsServer: Boolean

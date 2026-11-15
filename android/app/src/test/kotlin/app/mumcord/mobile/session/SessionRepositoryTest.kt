@@ -11,6 +11,8 @@ import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.bridge.ServerState
+import app.mumcord.mobile.bridge.ThemeMode
+import app.mumcord.mobile.bridge.ThemeSettings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -40,6 +42,8 @@ class SessionRepositoryTest {
         identities = listOf(FAKE_IDENTITY),
         mobileSettings = FAKE_MOBILE_SETTINGS,
         appSettings = FAKE_APP_SETTINGS,
+        themes = ThemeSettings(ThemeMode.SYSTEM, FAKE_THEME.id, emptyList(), emptyMap()),
+        builtInThemes = listOf(FAKE_THEME),
     )
 
     private suspend fun TestScope.repository(prompt: CertificatePrompt? = this@SessionRepositoryTest.prompt) =

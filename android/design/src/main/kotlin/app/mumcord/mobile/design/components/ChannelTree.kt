@@ -2,6 +2,7 @@
 
 package app.mumcord.mobile.design.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,8 +27,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.selected
@@ -192,12 +195,14 @@ enum class MumcordAvatarSize(internal val diameter: Dp, internal val fontSize: I
     Sheet(56.dp, 24),
     Tile(72.dp, 28),
     ExtraLarge(88.dp, 32),
+    Profile(96.dp, 40),
 }
 
 /**
  * Round avatar with initials (`.avatar`). [colorSlot] picks one of the eight avatar colours;
  * [talking] adds the green ring and glow. The ring is drawn outside the avatar and does not
- * change its size.
+ * change its size. A person's own picture ([image]) is shown instead of the initials, cut to
+ * the circle.
  */
 @Composable
 fun MumcordAvatar(
@@ -206,6 +211,7 @@ fun MumcordAvatar(
     modifier: Modifier = Modifier,
     size: MumcordAvatarSize = MumcordAvatarSize.Medium,
     talking: Boolean = false,
+    image: ImageBitmap? = null,
 ) {
     val colors = MumcordTheme.colors
     val gap = colors.bgSidebar
@@ -230,11 +236,20 @@ fun MumcordAvatar(
             .background(colors.avatar(colorSlot), CircleShape)
             .clearAndSetSemantics {},
     ) {
-        LineText(
-            text = initials,
-            style = MumcordTheme.typography.smallStrong.copy(fontSize = size.fontSize.sp),
-            color = colors.avatarText,
-        )
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize().clip(CircleShape),
+            )
+        } else {
+            LineText(
+                text = initials,
+                style = MumcordTheme.typography.smallStrong.copy(fontSize = size.fontSize.sp),
+                color = colors.avatarText,
+            )
+        }
     }
 }
 

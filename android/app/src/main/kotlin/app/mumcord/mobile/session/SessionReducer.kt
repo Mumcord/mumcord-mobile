@@ -92,9 +92,9 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.MobileSettingsChanged -> copy(mobileSettings = event.settings)
     is BridgeEvent.AppSettingsChanged -> copy(appSettings = event.settings)
     is BridgeEvent.ActivityAdded -> copy(activity = (listOf(event.entry) + activity).take(MAX_ACTIVITY))
-    // The profile and theme screens (task 8.3) follow these themselves.
-    is BridgeEvent.ProfileChanged,
-    is BridgeEvent.ThemesChanged -> this
+    is BridgeEvent.ProfileChanged ->
+        if (event.session == server?.selfSession) copy(ownProfileChanges = ownProfileChanges + 1) else this
+    is BridgeEvent.ThemesChanged -> copy(themes = event.settings)
     // Chat phase (tasks 5.2/5.3): the state does not follow chat yet.
     is BridgeEvent.BlockedPeopleChanged,
     is BridgeEvent.ChatMessageReceived,

@@ -162,7 +162,11 @@ was on the screen in its failure message.
   conversation, no notification for the open conversation, "Show sender only", none with
   "Private messages" switched off, nothing after disconnecting); the activity log, for which
   `e2e/chat-peer --visitor` joins the server, moves to "Raid" and leaves whenever the test asks
-  for it; the identity created at the first start, which `e2e/identity-watch.py` (a
+  for it; the profile and the themes, for which `e2e/profile-watch.py` (a foreign client on the
+  host) must see the comment and the avatar the phone sets, the avatar without the photo's EXIF
+  data, and a theme code made by the desktop app must draw the app in the desktop's colours in
+  dark, in light and with "System" following the phone (`cmd uimode night`); the identity
+  created at the first start, which `e2e/identity-watch.py` (a
   foreign client on the host) must see with the same certificate on two connects; and
   "Scan from desktop app" with a transfer that `e2e/transfer-maker` makes for the run with
   the engine's own code, as the desktop app does (a new identity and a new 8-digit code every

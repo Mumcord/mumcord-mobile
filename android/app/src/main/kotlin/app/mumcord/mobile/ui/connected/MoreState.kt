@@ -8,9 +8,17 @@ import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.platform.call.OutputKind
 import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.ui.profile.OwnProfile
+import app.mumcord.mobile.ui.profile.ProfileEdit
+import app.mumcord.mobile.ui.profile.ProfileEditUiState
+import app.mumcord.mobile.ui.profile.profileEditUiState
+import app.mumcord.mobile.ui.themes.ThemesLocal
+import app.mumcord.mobile.ui.themes.ThemesUiState
+import app.mumcord.mobile.ui.themes.appThemeName
+import app.mumcord.mobile.ui.themes.themesUiState
 
 /** What the More tab shows: its list, or one of the screens it leads to. */
-enum class MorePage { Main, Activity, Settings }
+enum class MorePage { Main, Activity, Settings, EditProfile, Themes }
 
 /** The choices of the settings that open a sheet. */
 enum class SettingsSheet { TalkMode, DefaultOutput, HistoryAge }
@@ -51,6 +59,21 @@ data class MoreUiState(
     val filter: ActivityFilter,
     /** Null while the settings are closed or not read yet. */
     val settings: SettingsUiState?,
+    /** The user's own profile for the header; null until it was read. */
+    val profile: OwnProfile? = null,
+    /** Null while the editor is closed. */
+    val profileEdit: ProfileEditUiState? = null,
+    /** The name of the app theme for the Themes row; null until the themes were read. */
+    val themeName: String? = null,
+    /** Null while the themes screen is closed or the themes have not been read. */
+    val themes: ThemesUiState? = null,
+)
+
+/** What the profile and theme screens add to the More tab; kept apart from [MoreLocal]. */
+data class MoreExtras(
+    val profile: OwnProfile? = null,
+    val profileEdit: ProfileEdit? = null,
+    val themes: ThemesLocal = ThemesLocal(),
 )
 
 /** The More tab as a value, or null while no server is shown. */
@@ -60,6 +83,7 @@ fun moreUiState(
     serverName: String,
     output: OutputState,
     senderOnly: Boolean,
+    extras: MoreExtras = MoreExtras(),
 ): MoreUiState? {
     if (!session.showsServer) return null
     val mobile = session.mobileSettings
@@ -84,5 +108,13 @@ fun moreUiState(
         activity = session.activity,
         filter = local.filter,
         settings = settings,
+        profile = extras.profile,
+        profileEdit = if (local.page == MorePage.EditProfile) {
+            extras.profile?.let { own -> extras.profileEdit?.let { profileEditUiState(own, it) } }
+        } else {
+            null
+        },
+        themeName = appThemeName(session),
+        themes = if (local.page == MorePage.Themes) themesUiState(session, extras.themes, serverName) else null,
     )
 }

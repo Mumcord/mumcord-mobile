@@ -54,10 +54,17 @@ fun mumcordColors(darkTheme: Boolean): MumcordColors = if (darkTheme) DarkColors
  * The Mumcord theme. It follows the system's dark or light setting unless [darkTheme] is given.
  * Material components used inside (dialogs, text fields of screens that are not rebuilt yet)
  * get a colour scheme and type scale made from the same tokens.
+ *
+ * [colors] are the colours of the theme the user picked; without them the app's own Mumcord
+ * colours are used, which are also the built-in "Mumcord" theme. [darkTheme] then says whether
+ * those colours are dark, which picks the opacities, shadows and the system bars.
  */
 @Composable
-fun MumcordTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    val colors = mumcordColors(darkTheme)
+fun MumcordTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    colors: MumcordColors = mumcordColors(darkTheme),
+    content: @Composable () -> Unit,
+) {
     CompositionLocalProvider(
         LocalColors provides colors,
         LocalOpacities provides if (darkTheme) DarkOpacities else LightOpacities,

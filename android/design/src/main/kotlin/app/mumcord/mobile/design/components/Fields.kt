@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
@@ -29,6 +31,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
@@ -46,7 +49,8 @@ import app.mumcord.mobile.design.tokens.MumcordSpace
  * Single-line text field of a form (`.label` over `.field`): the [label] above, the field with
  * a focus ring while it is being edited, and below it the [error] in the danger colour or else
  * the [hint]. TalkBack reads the label and the error with the field. [password] hides the
- * typed characters.
+ * typed characters. [minLines] above 1 makes it a text area that grows with its text;
+ * [readOnly] shows a value that cannot be changed here, dimmed, with [trailingIcon] saying why.
  */
 @Composable
 fun MumcordTextField(
@@ -60,8 +64,12 @@ fun MumcordTextField(
     password: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
+    minLines: Int = 1,
+    readOnly: Boolean = false,
+    trailingIcon: ImageVector? = null,
 ) {
     val colors = MumcordTheme.colors
+    val multiLine = minLines > 1
     val shape = RoundedCornerShape(MumcordRadius.lg)
     var focused by remember { mutableStateOf(false) }
     val borderColor = when {
@@ -95,7 +103,9 @@ fun MumcordTextField(
             onValueChange = onValueChange,
             textStyle = MumcordTheme.typography.body.copy(color = colors.text),
             cursorBrush = SolidColor(colors.accent),
-            singleLine = true,
+            singleLine = !multiLine,
+            minLines = minLines,
+            readOnly = readOnly,
             visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
@@ -107,17 +117,23 @@ fun MumcordTextField(
                     if (error != null) error(error)
                 },
             decorationBox = { field ->
-                Box(
-                    contentAlignment = Alignment.CenterStart,
+                Row(
+                    verticalAlignment = if (multiLine) Alignment.Top else Alignment.CenterVertically,
                     modifier = Modifier
                         .then(ring)
                         .defaultMinSize(minHeight = MumcordSize.touchVisual)
+                        .alpha(if (readOnly) READ_ONLY_ALPHA else 1f)
                         .background(colors.bgElevated, shape)
                         .border(1.dp, borderColor, shape)
-                        .padding(horizontal = MumcordSpace.s4),
+                        .padding(horizontal = MumcordSpace.s4, vertical = if (multiLine) MumcordSpace.s3 else 0.dp),
                 ) {
-                    if (value.isEmpty()) LineText(placeholder, MumcordTheme.typography.body, colors.textMuted)
-                    field()
+                    Box(contentAlignment = if (multiLine) Alignment.TopStart else Alignment.CenterStart, modifier = Modifier.weight(1f)) {
+                        if (value.isEmpty()) LineText(placeholder, MumcordTheme.typography.body, colors.textMuted)
+                        field()
+                    }
+                    if (trailingIcon != null) {
+                        MumcordIcon(trailingIcon, contentDescription = null, tint = colors.textSecondary, size = MumcordSize.iconSm)
+                    }
                 }
             },
         )
@@ -132,6 +148,9 @@ fun MumcordTextField(
         }
     }
 }
+
+// The dimmed look of `.field` in the edit profile mockup for the name that cannot be changed.
+private const val READ_ONLY_ALPHA = 0.75f
 
 @Preview(name = "Text field dark")
 @Composable
