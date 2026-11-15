@@ -174,10 +174,11 @@ class MoreScreenshotTest {
         session: SessionState = session(),
         about: AboutLocal = AboutLocal(SCREENSHOT_APP_INFO),
         crashes: CrashLocal = CrashLocal(),
+        languageChoice: Boolean = false,
     ) =
         composeRule.captureScreenshot("$name-${if (dark) "dark" else "light"}") {
             val state = checkNotNull(connectedUiState(session, ConnectedLocal(tab = ConnectedTab.More), "Nordlicht"))
-            val moreState = more.state(session, local, output, extras = MoreExtras(profile = profile, about = about, crashes = crashes))
+            val moreState = more.state(session, local, output, extras = MoreExtras(profile = profile, about = about, crashes = crashes), languageChoice = languageChoice)
             MumcordTheme(darkTheme = dark) {
                 Box(Modifier.fillMaxSize()) {
                     ConnectedShell(
@@ -224,6 +225,35 @@ class MoreScreenshotTest {
     private fun settings(dark: Boolean) = capture("android-settings", dark, settings)
 
     private fun settingsFull(dark: Boolean) = capture("android-settings-full", dark, settings)
+
+    // The language row and its choices exist from Android 13 on.
+    private fun languageRow(dark: Boolean) = capture("android-settings-language", dark, settings, languageChoice = true)
+
+    private fun languageSheet(dark: Boolean) =
+        capture("android-settings-language-sheet", dark, settings.copy(sheet = SettingsSheet.Language), languageChoice = true)
+
+    // The longest of the shipped languages on the whole settings screen (FR-5.82).
+    private fun settingsGerman(dark: Boolean) = capture("android-lang-de-settings", dark, settings, languageChoice = true)
+
+    @Config(qualifiers = "w390dp-h1500dp-xhdpi")
+    @Test
+    fun languageRowDark() = languageRow(dark = true)
+
+    @Config(qualifiers = "w390dp-h1500dp-xhdpi")
+    @Test
+    fun languageRowLight() = languageRow(dark = false)
+
+    @Test fun languageSheetDark() = languageSheet(dark = true)
+
+    @Test fun languageSheetLight() = languageSheet(dark = false)
+
+    @Config(qualifiers = "de-w390dp-h1500dp-xhdpi")
+    @Test
+    fun settingsGermanDark() = settingsGerman(dark = true)
+
+    @Config(qualifiers = "de-w390dp-h1500dp-xhdpi")
+    @Test
+    fun settingsGermanLight() = settingsGerman(dark = false)
 
     private fun historySheet(dark: Boolean) =
         capture("android-settings-history-sheet", dark, settings.copy(sheet = SettingsSheet.HistoryAge))

@@ -95,7 +95,16 @@ when iOS was paused):
   while connected to that server.
 - `SessionReducer.swift` ignores `ProfileChanged` and `ThemesChanged` today.
 
-The language override of task 8.3 waits for the translations task 8.1 on both platforms.
+Translations (task 8.1) and the language override of task 8.3 are done on Android only. For iOS:
+
+- Extend `scripts/translations.py` to write `<language>.lproj/Localizable.strings` from the same
+  sources (keys equal the Android names; `%1$s` becomes `%1$@`, `%1$d` stays) and a
+  `Localizable.stringsdict` for the plurals.
+- The Swift code picks `.one` and `.other` keys by the English rule today; it must use the
+  `.stringsdict` plurals instead, or Polish, Czech, Irish and the other languages with more
+  plural forms show wrong texts.
+- The language override: iOS offers the per-app language in the system settings; the app
+  follows it and saves it as the shared `language` setting.
 
 ### 7.5 Streams and camera (FR-5.70 … FR-5.76)
 

@@ -26,7 +26,7 @@ import app.mumcord.mobile.ui.themes.themesUiState
 enum class MorePage { Main, Activity, Settings, EditProfile, Themes, About, Licences, CrashReports }
 
 /** The choices of the settings that open a sheet. */
-enum class SettingsSheet { TalkMode, DefaultOutput, HistoryAge }
+enum class SettingsSheet { TalkMode, DefaultOutput, HistoryAge, Language }
 
 /** The days after which chat history is deleted, as the desktop app offers them; null keeps it. */
 val HISTORY_AGE_DAYS: List<UInt?> = listOf(null, 7u, 30u, 90u, 365u)
@@ -52,6 +52,8 @@ data class SettingsUiState(
     val hasEarpiece: Boolean,
     val senderOnly: Boolean,
     val sheet: SettingsSheet?,
+    /** Whether the language row is shown; on Android 12 the app follows the phone's language. */
+    val languageChoice: Boolean = false,
 )
 
 data class MoreUiState(
@@ -100,6 +102,7 @@ fun moreUiState(
     output: OutputState,
     senderOnly: Boolean,
     extras: MoreExtras = MoreExtras(),
+    languageChoice: Boolean = false,
 ): MoreUiState? {
     if (!session.showsServer) return null
     val mobile = session.mobileSettings
@@ -113,6 +116,7 @@ fun moreUiState(
             hasEarpiece = output.available.any { it.kind == OutputKind.Earpiece },
             senderOnly = senderOnly,
             sheet = local.sheet,
+            languageChoice = languageChoice,
         )
     } else {
         null

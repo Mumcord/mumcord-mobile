@@ -5,6 +5,7 @@ import app.mumcord.mobile.bridge.AppSettings
 import app.mumcord.mobile.bridge.DefaultOutput
 import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.session.AppLanguages
 import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
@@ -20,7 +21,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -37,7 +40,11 @@ class MoreController(
     val about: AboutController,
     /** The saved crash reports under About (FR-5.103); the app shares them with the server list's notice. */
     val crashes: CrashController = CrashController(CrashSource.None, scope),
+    private val languages: AppLanguages = AppLanguages.PhoneOnly,
 ) {
+    /** Whether the settings offer a language; on Android 12 the app follows the phone's. */
+    val languageChoice: Boolean = languages.available
+
     private val mutableLocal = MutableStateFlow(MoreLocal())
     val local: StateFlow<MoreLocal> = mutableLocal.asStateFlow()
 
@@ -150,6 +157,28 @@ class MoreController(
     fun selectHistoryAge(days: UInt?) {
         closeSheet()
         changeApp { it.copy(historyMaxAgeDays = days) }
+    }
+
+    /** Shows the app in [language], null following the phone, and saves it as the shared setting. */
+    fun selectLanguage(language: String?) {
+        closeSheet()
+        // The system recreates the screens in the new language while the setting is saved.
+        languages.set(language)
+        changeApp { it.copy(language = language) }
+    }
+
+    /**
+     * The phone's settings can change the app's language too (Android 13 and later), so the
+     * shared setting follows the phone's per-app language. Called whenever the screens are
+     * created, which a language change does.
+     */
+    fun syncLanguage() {
+        if (!languages.available) return
+        scope.launch {
+            val saved = repository.state.mapNotNull { it.appSettings }.first().language
+            val system = languages.current()
+            if (saved != system) report(repository.updateAppSettings { it.copy(language = system) })
+        }
     }
 
     private fun newestActivity(): ULong? = repository.state.value.activity.firstOrNull()?.id

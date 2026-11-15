@@ -17,6 +17,7 @@ import app.mumcord.mobile.crash.BridgeCrashSource
 import app.mumcord.mobile.crash.CrashSource
 import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.platform.call.SessionEndedNotice
+import app.mumcord.mobile.session.AppLanguages
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.IdleAccess
@@ -120,6 +121,7 @@ class AppViewModel(
     streamsAutoplay: Flow<Boolean> = flowOf(true),
     /** Where the pictures of watched streams come from. */
     val streamVideo: StreamVideo = StreamVideo.None,
+    languages: AppLanguages = AppLanguages.PhoneOnly,
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -282,6 +284,7 @@ class AppViewModel(
         viewModelScope,
         AboutController(appInfo, updates, repository, notices, viewModelScope, io = io),
         crashes,
+        languages,
     )
 
     /** "Version X is available" on the server list (FR-5.101); null when there is nothing to offer. */
@@ -299,7 +302,7 @@ class AppViewModel(
             messageSettings.senderOnly,
             uiState.map { it.activeServerName.orEmpty() }.distinctUntilChanged(),
         ) { session, (moreLocal, extras), output, senderOnly, serverName ->
-            moreUiState(session, moreLocal, serverName, output, senderOnly, extras)
+            moreUiState(session, moreLocal, serverName, output, senderOnly, extras, more.languageChoice)
         }.stateIn(
             viewModelScope,
             SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
@@ -738,6 +741,7 @@ class AppViewModel(
                     crashSource = BridgeCrashSource(application.sessionRepository),
                     streamsAutoplay = application.streamsAutoplay,
                     streamVideo = application.streamVideo,
+                    languages = AppLanguages.of(application),
                 ).also {
                     // Start with the first screen and then follow the session by themselves.
                     application.networkSession

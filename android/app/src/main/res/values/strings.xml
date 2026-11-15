@@ -488,6 +488,10 @@
         <item quantity="other">%1$d days</item>
     </plurals>
     <string name="settings_history_note">Older messages are deleted from this phone automatically. The server is not affected.</string>
+    <!-- Language (FR-5.82), worded as in the desktop app. The languages show under their own names. -->
+    <string name="settings_section_language">Language</string>
+    <string name="settings_language">Display language</string>
+    <string name="settings_language_system">Follow system</string>
     <string name="settings_section_mobile_data">Mobile data</string>
     <string name="settings_autoplay_streams">Start streams automatically</string>
     <string name="settings_load_media">Load images and GIFs</string>

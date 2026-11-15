@@ -11,6 +11,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -34,6 +35,8 @@ import app.mumcord.mobile.design.components.MumcordToggle
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.design.tokens.MumcordSpace
+import app.mumcord.mobile.session.languageEndonym
+import app.mumcord.mobile.session.languagesByEndonym
 import app.mumcord.mobile.ui.common.SheetOverlay
 import kotlinx.coroutines.flow.StateFlow
 
@@ -51,6 +54,7 @@ const val SETTINGS_NOTIFY_MENTIONS_TEST_TAG = "settings-notify-mentions"
 const val SETTINGS_SENDER_ONLY_TEST_TAG = "settings-sender-only"
 const val SETTINGS_HISTORY_TEST_TAG = "settings-history"
 const val SETTINGS_UPDATE_CHECK_TEST_TAG = "settings-update-check"
+const val SETTINGS_LANGUAGE_TEST_TAG = "settings-language"
 const val SETTINGS_OPTION_TEST_TAG_PREFIX = "settings-option-"
 
 /** The test tag of a choice in a settings sheet, by its position. */
@@ -60,9 +64,10 @@ fun settingsOptionTestTag(index: Int): String = SETTINGS_OPTION_TEST_TAG_PREFIX 
  * The settings (mockup `16-settings`, FR-5.100). Every switch is saved at once; the rows with a
  * value open a sheet with the choices. Left out until their features exist: echo cancellation
  * (the phone's own voice processing does it, there is nothing to switch), link previews (the
- * chat shows none yet), the language (task 8.3, after the translations). About is in the More tab as in its mockup.
- * Dark, light or system is chosen on the themes screen (mockup `19-themes`). The level meter,
- * the "Chat" and "Updates" sections and the note under "Notifications" have no mockup.
+ * chat shows none yet). About is in the More tab as in its mockup. Dark, light or system is
+ * chosen on the themes screen (mockup `19-themes`). The level meter, the "Chat", "Language" and
+ * "Updates" sections and the note under "Notifications" have no mockup; the language is worded
+ * as in the desktop app and only offered from Android 13, which has a language per app.
  */
 @Composable
 fun SettingsScreen(
@@ -102,6 +107,18 @@ fun SettingsScreen(
                     onClick = { actions.openSheet(SettingsSheet.HistoryAge) },
                     testTag = SETTINGS_HISTORY_TEST_TAG,
                 )
+            }
+            if (state.languageChoice) {
+                MumcordSectionHeader(stringResource(R.string.settings_section_language))
+                MumcordList {
+                    ValueRow(
+                        title = stringResource(R.string.settings_language),
+                        value = languageText(state.app.language),
+                        icon = MumcordIcons.Globe,
+                        onClick = { actions.openSheet(SettingsSheet.Language) },
+                        testTag = SETTINGS_LANGUAGE_TEST_TAG,
+                    )
+                }
             }
             // FR-5.101: the Android update check, on by default.
             MumcordSectionHeader(stringResource(R.string.settings_section_updates))
@@ -327,6 +344,17 @@ fun SettingsSheetHost(
             topInsets = topInsets,
             bottomInsets = bottomInsets,
         )
+        SettingsSheet.Language -> {
+            val languages = remember { listOf(null) + languagesByEndonym() }
+            ChoiceSheet(
+                title = stringResource(R.string.settings_language),
+                options = languages.map { Choice(languageText(it), MumcordIcons.Globe, it == state.app.language) },
+                onSelect = { actions.selectLanguage(languages[it]) },
+                onDismiss = actions::closeSheet,
+                topInsets = topInsets,
+                bottomInsets = bottomInsets,
+            )
+        }
         null -> Unit
     }
 }
@@ -387,5 +415,10 @@ private fun outputIcon(output: DefaultOutput): ImageVector = when (output) {
 private fun historyAgeText(days: UInt?): String =
     days?.let { pluralStringResource(R.plurals.settings_history_days, it.toInt(), it.toInt()) }
         ?: stringResource(R.string.settings_history_never)
+
+/** A language under its own name, so that everybody finds theirs; null follows the phone. */
+@Composable
+private fun languageText(language: String?): String =
+    language?.let(::languageEndonym) ?: stringResource(R.string.settings_language_system)
 
 private val LEVEL_METER_WIDTH = 120.dp

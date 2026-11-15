@@ -6,6 +6,7 @@ import app.mumcord.mobile.bridge.ActivityKind
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.DefaultOutput
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.session.AppLanguages
 import app.mumcord.mobile.session.FAKE_MOBILE_SETTINGS
 import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
 import app.mumcord.mobile.session.FakeEngine
@@ -60,7 +61,7 @@ class SettingsUiTest {
     fun tearDown() = Dispatchers.resetMain()
 
     /** Connected to Nordlicht, alone in the Lobby; "disconnect when alone" waits 20 s and warns for 10 s. */
-    private suspend fun TestScope.connected(): AppViewModel {
+    private suspend fun TestScope.connected(languages: AppLanguages = AppLanguages.PhoneOnly): AppViewModel {
         val server = mockupVoiceServer().let { all ->
             all.copy(people = all.people.map { if (it.isSelf) it else it.copy(channelId = MOCKUP_GAMING) })
         }
@@ -81,6 +82,7 @@ class SettingsUiTest {
             FakeMicrophoneAccess(),
             messageSettings = messageSettings,
             idle = idle,
+            languages = languages,
         )
         backgroundScope.launch { viewModel.uiState.collect() }
         backgroundScope.launch { viewModel.moreState.collect() }
@@ -265,5 +267,58 @@ class SettingsUiTest {
 
         assertNull(viewModel.uiState.value.overlay)
         assertFalse(notifier.disconnected)
+    }
+
+    /** The phone's per-app language of Android 13 and later. */
+    private class FakeAppLanguages(var system: String? = null) : AppLanguages {
+        override val available = true
+
+        override fun current(): String? = system
+
+        override fun set(language: String?) {
+            system = language
+        }
+    }
+
+    @Test
+    fun aChosenLanguageSwitchesTheAppAndIsSavedAsTheSharedSetting() = runTest(dispatcher) {
+        val languages = FakeAppLanguages()
+        val viewModel = connected(languages)
+        viewModel.more.openSettings()
+        runCurrent()
+        assertTrue(viewModel.settings!!.languageChoice)
+
+        viewModel.more.openSheet(SettingsSheet.Language)
+        viewModel.more.selectLanguage("de")
+        runCurrent()
+        assertEquals("de", languages.system)
+        assertEquals("de", engine.appSettings.language)
+        assertEquals("de", viewModel.settings!!.app.language)
+        assertNull(viewModel.settings!!.sheet)
+
+        viewModel.more.selectLanguage(null)
+        runCurrent()
+        assertNull(languages.system)
+        assertNull(engine.appSettings.language)
+    }
+
+    @Test
+    fun aLanguageChosenInThePhonesSettingsBecomesTheSharedSetting() = runTest(dispatcher) {
+        val languages = FakeAppLanguages(system = "fr")
+        val viewModel = connected(languages)
+
+        viewModel.more.syncLanguage()
+        runCurrent()
+        assertEquals("fr", engine.appSettings.language)
+    }
+
+    @Test
+    fun withoutALanguagePerAppTheRowIsHiddenAndTheAppFollowsThePhone() = runTest(dispatcher) {
+        val viewModel = connected()
+        viewModel.more.openSettings()
+        viewModel.more.syncLanguage()
+        runCurrent()
+        assertFalse(viewModel.settings!!.languageChoice)
+        assertNull(engine.appSettings.language)
     }
 }

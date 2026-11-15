@@ -197,6 +197,25 @@ class StreamsScreenshotTest {
         tab = ConnectedTab.Chat,
     )
 
+    // The longest of the shipped languages on the full-screen stream (FR-5.82).
+    @Config(qualifiers = "de-$PHONE_QUALIFIERS")
+    @Test
+    fun fullScreenGermanDark() = capture(
+        "android-lang-de-streams-full-screen",
+        true,
+        mockupStream(watch = StreamWatch.Watching(StreamPath.RELAY), viewers = 3u),
+        StreamsLocal(open = OpenStream(key, StreamView.Full)),
+    )
+
+    @Config(qualifiers = "de-$PHONE_QUALIFIERS")
+    @Test
+    fun fullScreenGermanLight() = capture(
+        "android-lang-de-streams-full-screen",
+        false,
+        mockupStream(watch = StreamWatch.Watching(StreamPath.RELAY), viewers = 3u),
+        StreamsLocal(open = OpenStream(key, StreamView.Full)),
+    )
+
     // No mockup exists for the states below; they are built from the design system.
 
     @Test

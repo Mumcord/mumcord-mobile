@@ -48,6 +48,8 @@ class MainActivity : ComponentActivity() {
         // Not again after a rotation: the link that started the app was handled the first time.
         if (savedInstanceState == null) openLink(intent)
         followOpenedStream()
+        // Also after a language change, which recreates the screens.
+        viewModel.more.syncLanguage()
         setContent {
             val theme by viewModel.appTheme.collectAsStateWithLifecycle()
             AppThemeHost(theme) {

@@ -8,7 +8,8 @@
 # pinned in engine.lock.toml and checked out into the git-ignored .engine/.
 #
 # Usage: scripts/testenv.sh <fetch|up|down>
-#   fetch   check out testenv/ of the pinned Mumcord commit into .engine/
+#   fetch   check out testenv/ and the desktop translations (ui/src/locales/, read by
+#           scripts/translations.py) of the pinned Mumcord commit into .engine/
 #   up      fetch, then start the server and wait until it accepts connections
 #   down    stop the server and delete its data, so the next start is a fresh server
 #
@@ -25,7 +26,7 @@ export MUMCORD_PROJECT="${MUMCORD_PROJECT:-mumcord-mobile-e2e}"
 # Seconds to wait for the started server to accept connections.
 READY_TIMEOUT=60
 # Folders of the Mumcord repository that are checked out; the whole tree is some 300 MB.
-ENGINE_PATHS=(testenv)
+ENGINE_PATHS=(testenv ui/src/locales)
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENGINE_DIR="${REPO_ROOT}/.engine"
@@ -62,7 +63,7 @@ fetch() {
   fi
 
   local stamp="${ENGINE_DIR}/.fetched-ref"
-  if [[ -f "${stamp}" && "$(cat "${stamp}")" == "${repository} ${ref}" && -d "${TESTENV_DIR}" ]]; then
+  if [[ -f "${stamp}" && "$(cat "${stamp}")" == "${repository} ${ref} ${ENGINE_PATHS[*]}" && -d "${TESTENV_DIR}" ]]; then
     return
   fi
 
@@ -75,8 +76,16 @@ fetch() {
   "${git[@]}" config core.sparseCheckoutCone true
   mkdir -p "${ENGINE_DIR}/.git/info"
   printf '/*\n!/*/\n' >"${ENGINE_DIR}/.git/info/sparse-checkout"
-  local path
+  local path prefix part parents
   for path in "${ENGINE_PATHS[@]}"; do
+    # Cone mode: each parent of a nested folder is listed, without its other subfolders.
+    parents=()
+    [[ "${path}" != */* ]] || IFS=/ read -ra parents <<<"${path%/*}"
+    prefix=""
+    for part in "${parents[@]}"; do
+      prefix+="/${part}"
+      printf '%s/\n!%s/*/\n' "${prefix}" "${prefix}" >>"${ENGINE_DIR}/.git/info/sparse-checkout"
+    done
     printf '/%s/\n' "${path}" >>"${ENGINE_DIR}/.git/info/sparse-checkout"
   done
   if ! "${git[@]}" fetch --quiet --depth 1 --filter=blob:none "${repository}" "${ref}"; then
@@ -87,7 +96,7 @@ to a commit that exists on the engine branch, or to a release tag."
   fi
   "${git[@]}" checkout --quiet --force --detach FETCH_HEAD
   [[ -x "${TESTENV_DIR}/up.sh" ]] || die "${ref} of ${repository} has no testenv/up.sh"
-  printf '%s %s\n' "${repository}" "${ref}" >"${stamp}"
+  printf '%s %s %s\n' "${repository}" "${ref}" "${ENGINE_PATHS[*]}" >"${stamp}"
   printf 'testenv: checked out %s into .engine/\n' "${ref}"
 }
 

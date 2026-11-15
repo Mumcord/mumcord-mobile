@@ -151,5 +151,6 @@ class ScreenshotMore(repository: SessionRepository, connected: ConnectedControll
         output: OutputState = OutputState(),
         senderOnly: Boolean = false,
         extras: MoreExtras = MoreExtras(),
-    ): MoreUiState = checkNotNull(moreUiState(session, local, "Nordlicht", output, senderOnly, extras))
+        languageChoice: Boolean = false,
+    ): MoreUiState = checkNotNull(moreUiState(session, local, "Nordlicht", output, senderOnly, extras, languageChoice))
 }

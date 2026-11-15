@@ -139,6 +139,17 @@ class ConnectedScreenshotTest {
     private fun notificationsExplain(dark: Boolean) =
         capture("android-notify-explain", dark, ConnectedLocal(), explainNotifications = true)
 
+    // The longest of the shipped languages on the channel list (FR-5.82).
+    private fun channelsGerman(dark: Boolean) = capture("android-lang-de-channels", dark, ConnectedLocal())
+
+    @Config(qualifiers = "de-$PHONE_QUALIFIERS")
+    @Test
+    fun channelsGermanDark() = channelsGerman(dark = true)
+
+    @Config(qualifiers = "de-$PHONE_QUALIFIERS")
+    @Test
+    fun channelsGermanLight() = channelsGerman(dark = false)
+
     @Test fun notificationsExplainDark() = notificationsExplain(dark = true)
 
     @Test fun notificationsExplainLight() = notificationsExplain(dark = false)

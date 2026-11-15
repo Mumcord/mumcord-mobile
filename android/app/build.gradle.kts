@@ -137,6 +137,9 @@ android {
         disable += "ChromeOsAbiSupport"
         // Lint rules shipped inside a library that this lint version cannot load; not our code.
         disable += "ObsoleteLintCustomCheck"
+        // The translations are written from the desktop's translation files by
+        // scripts/translations.py, and untranslated texts are English on purpose.
+        disable += "Typos"
     }
 }
 

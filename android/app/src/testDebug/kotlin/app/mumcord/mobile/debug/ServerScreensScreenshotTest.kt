@@ -129,6 +129,17 @@ class ServerScreensScreenshotTest {
         }
     }
 
+    // The longest of the shipped languages on the first screen (FR-5.82).
+    private fun serverListGerman(dark: Boolean) = capture("android-lang-de-server-list", dark) { ServerList(rows()) }
+
+    @Config(qualifiers = "de-$PHONE_QUALIFIERS")
+    @Test
+    fun serverListGermanDark() = serverListGerman(dark = true)
+
+    @Config(qualifiers = "de-$PHONE_QUALIFIERS")
+    @Test
+    fun serverListGermanLight() = serverListGerman(dark = false)
+
     @Test fun idleDisconnectedDark() = idleDisconnected(dark = true)
 
     @Test fun idleDisconnectedLight() = idleDisconnected(dark = false)
