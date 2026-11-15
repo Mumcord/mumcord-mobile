@@ -86,6 +86,7 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
     private let action: (() -> Void)?
     private let leading: Leading
     private let trailing: Trailing
+    private var wraps = false
     @Environment(\.mumcordTheme) private var theme
 
     init(
@@ -137,9 +138,16 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
                     .frame(width: 24)
             }
             VStack(alignment: .leading, spacing: 0) {
-                LineText(title, style: .bodyStrong, color: danger ? colors.danger : colors.text)
-                if let subtitle {
-                    LineText(subtitle, style: .small, color: colors.textMuted)
+                if wraps {
+                    ParagraphText(title, style: .bodyStrong, color: danger ? colors.danger : colors.text)
+                    if let subtitle {
+                        ParagraphText(subtitle, style: .small, color: colors.textMuted)
+                    }
+                } else {
+                    LineText(title, style: .bodyStrong, color: danger ? colors.danger : colors.text)
+                    if let subtitle {
+                        LineText(subtitle, style: .small, color: colors.textMuted)
+                    }
                 }
                 if let status {
                     HStack(spacing: 6) { status }
@@ -217,6 +225,16 @@ extension MumcordListRow where Trailing == EmptyView {
             leading: leading,
             trailing: { EmptyView() }
         )
+    }
+}
+
+extension MumcordListRow {
+    /// Lets the title and subtitle run over several lines instead of ending with "…", for rows
+    /// whose words must be read in full, also with a large font (a setting).
+    func wrapping() -> Self {
+        var row = self
+        row.wraps = true
+        return row
     }
 }
 

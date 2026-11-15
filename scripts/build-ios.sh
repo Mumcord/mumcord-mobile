@@ -69,7 +69,8 @@ group_tests() {
     messages)
       printf '%s\n' MumcordUITests/MessagesFlowUITests MumcordUITests/MessagesScreenshotUITests ;;
     output-settings)
-      printf '%s\n' MumcordUITests/OutputFlowUITests MumcordUITests/PhoneScreenshotUITests ;;
+      printf '%s\n' MumcordUITests/OutputFlowUITests MumcordUITests/PhoneScreenshotUITests \
+        MumcordUITests/SettingsFlowUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
   esac
 }

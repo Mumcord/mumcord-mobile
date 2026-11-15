@@ -247,7 +247,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `voice-chat-screens` | voice screenshots, chat screenshots |
 | `chat-flow` | chat flow, session-ended notice (the lightest group: the place for new tests) |
 | `messages` | messages flow, messages screenshots |
-| `output-settings` | audio output flow, audio output screenshots |
+| `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots |
 
 Before its tests each group starts the app once in the simulator and ends it again (about 20
 seconds), so the first UI test does not pay for the first start of the app in a cold simulator.
@@ -329,3 +329,31 @@ on the headset.
 - Apple does not accept CallKit being active in mainland China. Nothing switches it off by
   region yet: `CallSystems.make` has to return nil there, which gives the behaviour described
   above. Apple names no official way to detect the region.
+
+### Network changes, mobile data and "disconnect when alone" (iOS)
+
+The network comes from `NWPathMonitor` (`ios/Platform/Network/NetworkMonitor.swift`). A path
+that iOS calls expensive (mobile data, a personal hotspot) or constrained (Low Data Mode) counts
+as metered; the switches of Settings → "Mobile data" apply there (`ios/Mumcord/Session/MobileData.swift`):
+images and GIFs are loaded as "Load images and GIFs" says, and "Reduced voice quality" limits the
+voice to 24 kbit/s. The engine forgets that limit when it starts, so `NetworkSession` sets it
+again with every connection and every change of the network or the switch.
+
+The engine reconnects by itself after a network change. From its third attempt on it waits up
+to half a minute between tries, so when a working network appears then, the app ends the
+connection and starts it again itself (`SessionStore.reconnectNow`): into the same channel, with
+the same mute and deafen, and with the password typed for this connection, which is kept in
+memory only and forgotten when the connection ends. The bridge has no command for this yet.
+
+"Disconnect when alone for 30 minutes" (`ios/Mumcord/Session/IdleDisconnect.swift`) waits in the
+app's own process on the continuous clock, which goes on while the phone sleeps; a session only
+exists while the call keeps the app running. The warning is a local notification with the action
+"Stay connected", which works without opening the app; its answer comes to the app's one
+notification delegate (`SystemMessageNotifier.onResponse`). Without the permission for
+notifications the app still disconnects and says so when it is opened. The debug launch options
+`alone`, `idle-on` and `idle-short` (3 seconds instead of 30 minutes and 1 minute) let the UI
+tests go through it; `metered` puts the app on a pretend mobile data network.
+
+The simulator always has the Mac's network, so only a real iPhone can show: switching between
+Wi-Fi and mobile data during a session, the reconnect into the same channel, the expensive and
+constrained flags of a real path, and the warning notification with its "Stay connected" button.

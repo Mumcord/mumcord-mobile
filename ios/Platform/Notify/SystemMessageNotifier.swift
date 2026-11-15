@@ -16,6 +16,8 @@ final class SystemMessageNotifier: NSObject, MessageNotifier, UNUserNotification
     private let log: @Sendable (String) -> Void
     private let lock = NSLock()
     private var open: (@MainActor @Sendable (String) -> Void)?
+    /// What the actions of the app's other notifications do, by their category.
+    private var responses: [String: @MainActor @Sendable (String) -> Void] = [:]
 
     /// - Parameters:
     ///   - newMessage: what stands in place of a message whose text may not be shown.
@@ -36,6 +38,12 @@ final class SystemMessageNotifier: NSObject, MessageNotifier, UNUserNotification
     /// What a tap on the notification of the conversation with that key does.
     func onOpen(_ open: @escaping @MainActor @Sendable (String) -> Void) {
         lock.withLock { self.open = open }
+    }
+
+    /// What a tap on a notification of this category does; it receives the action's identifier.
+    /// The app has one notification delegate, so the other notifications are answered here too.
+    func onResponse(category: String, _ handle: @escaping @MainActor @Sendable (String) -> Void) {
+        lock.withLock { responses[category] = handle }
     }
 
     func show(_ notice: MessageNotice) {
@@ -63,9 +71,19 @@ final class SystemMessageNotifier: NSObject, MessageNotifier, UNUserNotification
         center.removePendingNotificationRequests(withIdentifiers: [key])
     }
 
+    /// Only the message notifications: the others (a notice that the app disconnected) stay.
     func cancelAll() {
-        center.removeAllDeliveredNotifications()
-        center.removeAllPendingNotificationRequests()
+        center.getDeliveredNotifications { [center] delivered in
+            let keys = delivered.map(\.request).filter(Self.isMessage).map(\.identifier)
+            center.removeDeliveredNotifications(withIdentifiers: keys)
+        }
+        center.getPendingNotificationRequests { [center] pending in
+            center.removePendingNotificationRequests(withIdentifiers: pending.filter(Self.isMessage).map(\.identifier))
+        }
+    }
+
+    private static func isMessage(_ request: UNNotificationRequest) -> Bool {
+        request.content.userInfo[chatKeyField] != nil
     }
 
     // The engine leaves out the chat that is on screen, so what arrives here is about a chat
@@ -83,7 +101,16 @@ final class SystemMessageNotifier: NSObject, MessageNotifier, UNUserNotification
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let key = response.notification.request.content.userInfo[chatKeyField] as? String
+        let content = response.notification.request.content
+        if let handle = lock.withLock({ responses[content.categoryIdentifier] }) {
+            let action = response.actionIdentifier
+            Task { @MainActor in
+                handle(action)
+                completionHandler()
+            }
+            return
+        }
+        let key = content.userInfo[chatKeyField] as? String
         let open = lock.withLock { self.open }
         if let key, let open, response.actionIdentifier == UNNotificationDefaultActionIdentifier {
             Task { @MainActor in open(key) }

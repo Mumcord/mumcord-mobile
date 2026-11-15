@@ -87,6 +87,21 @@ struct ServerModel: Equatable {
     /// The channel the user is in, or nil while the server has not said.
     var selfChannelId: UInt32? { people[selfSession]?.channelId }
 
+    /// The names from below the root channel down to the user's own channel, as a connection
+    /// takes them to enter that channel; empty in the root channel or while it is unknown.
+    func selfChannelPath() -> [String] {
+        var path: [String] = []
+        var channel = selfChannelId.flatMap { channels[$0] }
+        // The number of channels bounds the walk should the server ever send a loop.
+        for _ in 0..<channels.count {
+            guard let current = channel else { break }
+            guard let parent = current.parentId else { return path }
+            path.insert(current.name, at: 0)
+            channel = channels[parent]
+        }
+        return path
+    }
+
     func with(channels: [UInt32: Channel]) -> ServerModel {
         ServerModel(selfSession: selfSession, channels: channels, people: people)
     }

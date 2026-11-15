@@ -27,6 +27,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _serverInputs: [ServerInput] = []
     private var _pingRequests: [Int64] = []
     private var _disconnects = 0
+    private var _bitrateLimits: [UInt32?] = []
     private var _joinCalls: [(channelId: UInt32, password: String?)] = []
     private var _volumeCalls: [(session: UInt32, percent: Int)] = []
     private var _pings: [Int64: ServerPing] = [:]
@@ -107,6 +108,8 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     var serverInputs: [ServerInput] { locked { _serverInputs } }
     var pingRequests: [Int64] { locked { _pingRequests } }
     var disconnects: Int { locked { _disconnects } }
+    /// Every bitrate limit the app set, in order.
+    var bitrateLimits: [UInt32?] { locked { _bitrateLimits } }
     var joinCalls: [(channelId: UInt32, password: String?)] { locked { _joinCalls } }
     var volumeCalls: [(session: UInt32, percent: Int)] { locked { _volumeCalls } }
     var currentTalkMode: TalkMode { locked { _talkMode } }
@@ -756,6 +759,10 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func setMobileSettings(settings: MobileSettings) async throws {
         locked { _mobileSettings = settings }
+    }
+
+    func setBitrateLimitKbps(kbps: UInt32?) {
+        locked { _bitrateLimits.append(kbps) }
     }
 
     private func finishConnecting() {

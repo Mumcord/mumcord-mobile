@@ -25,6 +25,8 @@ protocol EngineClient: AnyObject, Sendable {
     func setPushToTalkPressed(pressed: Bool)
     func setSelfMute(muted: Bool) async throws
     func setSelfDeaf(deafened: Bool) async throws
+    /// Limits the voice bitrate in kbit/s, nil for no limit; forgotten when the engine starts.
+    func setBitrateLimitKbps(kbps: UInt32?)
     func startWhisper(target: WhisperTarget) async throws
     func stopWhisper()
 

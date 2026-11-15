@@ -42,6 +42,11 @@ final class AppModel {
     @ObservationIgnored let notifications: NotificationAccess
     /// Where the voice plays and the first-connect question about it.
     @ObservationIgnored let outputs: OutputAccess
+    /// "Disconnect when alone": the notice after the app disconnected by itself.
+    @ObservationIgnored let idle: IdleAccess?
+    /// The last change of the phone settings; the next one waits for it, so that two switches
+    /// flipped quickly do not save over each other.
+    @ObservationIgnored var settingsSave: Task<Void, Never>?
     /// The last connect, so "Try again" and the password retry keep a link's channel.
     @ObservationIgnored private var lastTarget: ConnectTarget?
 
@@ -63,7 +68,9 @@ final class AppModel {
         sessionEnded: SessionEndedNotice? = nil,
         notifications: NotificationAccess = NoNotificationQuestion(),
         messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(senderOnly: false),
-        outputs: OutputAccess? = nil
+        outputs: OutputAccess? = nil,
+        idle: IdleAccess? = nil,
+        mediaPolicy: @escaping MediaPolicy = { true }
     ) {
         self.store = store
         self.setupStore = setupStore
@@ -75,8 +82,9 @@ final class AppModel {
         notificationState = notifications.state
         let outputs = outputs ?? NoOutputs()
         self.outputs = outputs
+        self.idle = idle
         outputNotice = outputs.notice
-        let chatStore = ChatStore(session: store)
+        let chatStore = ChatStore(session: store, mediaPolicy: mediaPolicy)
         self.chatStore = chatStore
         chat = ChatController(chats: chatStore)
         conversation = ChatController(chats: chatStore, keepDraft: false)
@@ -112,6 +120,14 @@ final class AppModel {
             for await notice in outputNotices {
                 guard let self else { return }
                 self.outputNotice = notice
+            }
+        }
+        if let idleNotices = idle?.notices() {
+            Task { [weak self] in
+                for await notice in idleNotices {
+                    guard let self else { return }
+                    self.showIdleNotice(notice)
+                }
             }
         }
         messages.showMessagesTab = { [weak self] in self?.showTab(.messages) }
@@ -395,7 +411,17 @@ final class AppModel {
     }
 
     func dismissOverlay() {
+        if case .sessionEnded(_, _, true) = local.overlay { idle?.dismiss() }
         local.overlay = nil
+    }
+
+    /// The app disconnected because the user was alone for too long: says so and offers to
+    /// reconnect, unless something else is on screen.
+    private func showIdleNotice(_ notice: IdleNotice?) {
+        guard let notice else { return }
+        if local.overlay == nil {
+            local.overlay = .sessionEnded(serverId: notice.serverId, serverName: notice.serverName, alone: true)
+        }
     }
 
     // MARK: Connecting
@@ -463,7 +489,7 @@ final class AppModel {
 
     /// Connects again to the server of the session that was cut off.
     func reconnectAfterSessionEnded() {
-        guard case .sessionEnded(let serverId, _) = local.overlay else { return }
+        guard case .sessionEnded(let serverId, _, _) = local.overlay else { return }
         dismissOverlay()
         connect(serverId)
     }

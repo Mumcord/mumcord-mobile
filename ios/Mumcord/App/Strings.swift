@@ -350,6 +350,26 @@ enum Strings {
     static var outputQuestionText: String { text("output_question_text") }
     static var outputQuestionSpeaker: String { text("output_question_speaker") }
     static var outputQuestionEarpiece: String { text("output_question_earpiece") }
+    static var sessionEndedAloneTitle: String { text("session_ended_alone_title") }
+    static func sessionEndedAloneText(_ p1: String) -> String { format("session_ended_alone_text", p1) }
+    static var settingsTitle: String { text("settings_title") }
+    static var settingsBack: String { text("settings_back") }
+    static var settingsSectionMobileData: String { text("settings_section_mobile_data") }
+    static var settingsAutoplayStreams: String { text("settings_autoplay_streams") }
+    static var settingsLoadMedia: String { text("settings_load_media") }
+    static var settingsReducedVoice: String { text("settings_reduced_voice") }
+    static var settingsSectionBattery: String { text("settings_section_battery") }
+    static var settingsIdleDisconnect: String { text("settings_idle_disconnect") }
+    static var settingsIdleDisconnectSub: String { text("settings_idle_disconnect_sub") }
+    static var idleNotificationTexts: IdleNotificationTexts {
+        IdleNotificationTexts(
+            warningTitle: text("idle_warning_title"),
+            warningText: text("idle_warning_text"),
+            stayConnected: text("idle_stay_connected"),
+            disconnectedTitle: text("idle_disconnected_title"),
+            disconnectedText: text("idle_disconnected_text")
+        )
+    }
 
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")

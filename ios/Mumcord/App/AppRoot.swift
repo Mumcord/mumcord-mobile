@@ -155,9 +155,10 @@ struct AppContent: View {
             )
         case .invalidLink:
             InvalidLinkSheet(onDismiss: model.dismissOverlay)
-        case .sessionEnded(_, let serverName):
+        case .sessionEnded(_, let serverName, let alone):
             SessionEndedSheet(
                 serverName: serverName,
+                alone: alone,
                 onReconnect: model.reconnectAfterSessionEnded,
                 onDismiss: model.dismissOverlay
             )

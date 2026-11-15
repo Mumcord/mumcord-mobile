@@ -29,7 +29,9 @@ enum Overlay: Equatable {
     case link(LinkConfirmState)
     case invalidLink
     /// The last run was closed in the middle of a session with this server (FR-5.37).
-    case sessionEnded(serverId: Int64, serverName: String)
+    /// `alone`: the app disconnected because the user was alone in a channel for too long
+    /// (FR-5.42), not because the system closed it.
+    case sessionEnded(serverId: Int64, serverName: String, alone: Bool = false)
 }
 
 struct AppUiState: Equatable {

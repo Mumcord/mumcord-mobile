@@ -35,6 +35,10 @@ import MumcordBridge
 ///         outputs          the phone has a loudspeaker and an earpiece and plays on the earpiece
 ///         output-bluetooth the Bluetooth headset "Lea's Buds" is connected as well
 ///         output-ask       no default output is saved, so the first connection asks
+///         alone            the user is alone in the Lobby; the others are in Gaming
+///         idle-on          "Disconnect when alone for 30 minutes" is switched on
+///         idle-short       "Disconnect when alone" warns after 3 s and disconnects 3 s later
+///         metered          the phone is on mobile data (a metered network), not on Wi-Fi
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
 ///
@@ -74,6 +78,13 @@ struct AppDebugLaunch {
                     return changed
                 }
             }
+            if options.contains("alone") {
+                server.people = server.people.map { person in
+                    var changed = person
+                    if !person.isSelf { changed.channelId = Mockup.gaming }
+                    return changed
+                }
+            }
             if options.contains("self-muted") {
                 server.people = server.people.map { person in
                     var changed = person
@@ -102,6 +113,9 @@ struct AppDebugLaunch {
             }
             if options.contains("output-ask") {
                 engine.storedMobileSettings.defaultOutput = .ask
+            }
+            if options.contains("idle-on") {
+                engine.storedMobileSettings.idleDisconnect = true
             }
             if options.contains("level") {
                 engine.levelOnConnect = 60
@@ -185,9 +199,25 @@ extension AppDebugLaunch {
 
     /// The app against the fake engine. Its audio never touches the phone's speaker or
     /// microphone, and nothing asks the system for a permission.
+    /// The network the app is told about.
+    var network: NetworkStatus {
+        options.contains("metered") ? fakeMobileData : fakeWifi
+    }
+
+    /// "Disconnect when alone" with the product's times, or shortened for a test (AC-5.30).
+    var idleTimes: IdleTimes {
+        options.contains("idle-short") ? IdleTimes(alone: .seconds(3), warning: .seconds(3)) : IdleTimes()
+    }
+
+    /// Lives as long as the process, as in the app on the real engine.
+    @MainActor private static var networkSession: NetworkSession?
+
     @MainActor
     func makeModel() -> AppModel {
         let store = SessionStore(engineFactory: engineFactory, log: AppLog.write)
+        let monitor = FakeNetworkMonitor(network)
+        Self.networkSession = NetworkSession(store: store, monitor: monitor)
+        let idleTimes = idleTimes
         let model = AppModel(
             store: store,
             setupStore: InMemorySetupStore(firstStartDone: setupDone),
@@ -207,7 +237,13 @@ extension AppDebugLaunch {
             notifications: NotificationPrompt(gateway: notificationGateway),
             outputs: options.contains("outputs")
                 ? VoiceOutput(store: store, outputs: SessionOutputs(device: outputDevice))
-                : nil
+                : nil,
+            idle: IdleDisconnect(
+                store: store,
+                notifier: SystemIdleNotifier(texts: Strings.idleNotificationTexts, log: AppLog.write),
+                times: { idleTimes }
+            ),
+            mediaPolicy: { loadMedia(monitor.status, store.state.mobileSettings) }
         )
         if options.contains("chat") {
             presetChat(model, store)

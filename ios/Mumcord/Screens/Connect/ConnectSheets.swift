@@ -46,16 +46,18 @@ struct PasswordSheet: View {
     }
 }
 
-/// Shown at the start after the app was closed in the middle of a voice session (FR-5.37).
-/// Reconnecting is offered, never done by itself.
+/// Shown at the start after the app was closed in the middle of a voice session (FR-5.37), and
+/// after the app disconnected because the user was `alone` in a channel for 30 minutes
+/// (FR-5.42). Reconnecting is offered, never done by itself.
 struct SessionEndedSheet: View {
     let serverName: String
+    var alone = false
     let onReconnect: () -> Void
     let onDismiss: () -> Void
 
     var body: some View {
-        SheetOverlay(title: Strings.sessionEndedTitle, onDismiss: onDismiss) {
-            Paragraph(Strings.sessionEndedText(serverName))
+        SheetOverlay(title: alone ? Strings.sessionEndedAloneTitle : Strings.sessionEndedTitle, onDismiss: onDismiss) {
+            Paragraph(alone ? Strings.sessionEndedAloneText(serverName) : Strings.sessionEndedText(serverName))
             MumcordButton(text: Strings.sessionEndedReconnect, fullWidth: true, action: onReconnect)
                 .accessibilityIdentifier("session-ended-reconnect")
             MumcordButton(text: Strings.sessionEndedClose, style: .secondary, fullWidth: true, action: onDismiss)

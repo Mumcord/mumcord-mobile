@@ -28,6 +28,30 @@ final class SessionStore: @unchecked Sendable {
     private let engine: EngineHolder
     private let log: @Sendable (String) -> Void
     private let linkParser: @Sendable (String) throws -> MumbleLink
+
+    // ----- getting back in by the app itself, see `reconnectNow` -----
+
+    /// The password typed for the running connection only (not the saved one). Kept in memory
+    /// so that `reconnectNow` can use it again; forgotten when the connection ends, never
+    /// stored and never logged.
+    private var sessionPassword: String?
+    /// True while the state hides that the connection is ended and started again.
+    private var resuming = false
+    private var resumeTask: Task<Void, Never>?
+    /// What the engine last said about the connection, also what `resuming` hides.
+    private var raw = RawConnection()
+    private var rawObservers: [UUID: AsyncStream<RawConnection>.Continuation] = [:]
+
+    private struct RawConnection {
+        var connection: ConnectionState?
+        /// How often a server's channels arrived; grows with every connection that got in.
+        var synced = 0
+    }
+
+    /// How long ending the connection and getting in again may take together.
+    private static let resumeTimeout: TimeInterval = 30
+    /// How long the engine may take to end a connection it is told to end.
+    private static let stopTimeout: TimeInterval = 5
     /// Chat messages, unread counts, notifications, message requests and blocked people as the
     /// engine reports them, for `ChatStore`, its one reader. They never pass through the state, so chat traffic does not redraw the channels.
     let chatEvents: AsyncStream<BridgeEvent>
@@ -61,7 +85,7 @@ final class SessionStore: @unchecked Sendable {
                      .blockedPeopleChanged:
                     chatQueue.yield(event)
                 default:
-                    self?.update { $0.fold(event) }
+                    self?.receive(event)
                 }
             }
         }
@@ -100,6 +124,7 @@ final class SessionStore: @unchecked Sendable {
         lock.lock()
         observers[id] = nil
         levelObservers[id] = nil
+        rawObservers[id] = nil
         lock.unlock()
     }
 
@@ -126,13 +151,30 @@ final class SessionStore: @unchecked Sendable {
     private func update(_ change: (SessionState) -> SessionState) {
         lock.lock()
         defer { lock.unlock() }
-        let next = change(current)
+        setLocked(change(current))
+    }
+
+    /// Call with the lock held.
+    private func setLocked(_ next: SessionState) {
         guard next != current else { return }
         current = next
         // Sent while the lock is held, so observers see the states in order; it never waits.
         for observer in observers.values {
             observer.yield(next)
         }
+    }
+
+    /// Folds an engine event; while the app gets back in by itself (`reconnectNow`) the end and
+    /// the start of the connection are hidden. The password of the connection is forgotten
+    /// once it is over.
+    private func receive(_ event: BridgeEvent) {
+        lock.lock()
+        defer { lock.unlock() }
+        if case .connectionChanged(let state) = event { raw.connection = state }
+        if case .serverSynced = event { raw.synced += 1 }
+        for observer in rawObservers.values { observer.yield(raw) }
+        setLocked(resuming ? current.foldResuming(event) : current.fold(event))
+        if !resuming && !current.isBusy { sessionPassword = nil }
     }
 
     // MARK: Commands
@@ -287,6 +329,7 @@ final class SessionStore: @unchecked Sendable {
     func connectServer(_ serverId: Int64, password: String?, channelPath: [String]) async {
         // Shown at once: creating the engine on first use takes a moment.
         update { state in
+            sessionPassword = password
             var next = state
             next.phase = .connecting
             next.certificatePrompt = nil
@@ -328,6 +371,14 @@ final class SessionStore: @unchecked Sendable {
     }
 
     func disconnect() async {
+        lock.withLock {
+            sessionPassword = nil
+            guard resuming else { return }
+            // Leaving wins over getting back in; what the state hid is shown now.
+            resumeTask?.cancel()
+            resuming = false
+            setLocked(current.fold(.connectionChanged(state: .disconnected(error: nil))))
+        }
         let result = await call("disconnect") { try await $0.disconnect() }
         if case .failed(let error) = result {
             update { state in
@@ -338,6 +389,136 @@ final class SessionStore: @unchecked Sendable {
                 return next
             }
         }
+    }
+
+    /// Gets back into the server at once, for the moment a network is there again while the
+    /// engine still waits before its next attempt (FR-5.40). The engine has no command for
+    /// that, so the connection is ended and started again: into the channel the user was in,
+    /// with the mute and deafen they had, and with the password of this connection. Meanwhile
+    /// the state stays "Reconnecting". A running whisper ends.
+    ///
+    /// Does nothing unless the engine is reconnecting, and never runs twice at a time. When it
+    /// does not get in, the connection ends as lost, like the engine's own last attempt.
+    func reconnectNow() async {
+        let task: Task<Void, Never>? = lock.withLock {
+            guard resumeTask == nil, case .reconnecting = current.phase else { return nil }
+            let task = Task { [weak self] in await self?.resume() }
+            resumeTask = task
+            return task
+        }
+        await task?.value
+    }
+
+    private func resume() async {
+        defer {
+            lock.withLock {
+                resuming = false
+                resumeTask = nil
+            }
+        }
+        let before = state
+        guard let serverId = before.activeServerId else { return }
+        let channelPath = before.server?.selfChannelPath() ?? []
+        let voice = selfVoice(before)
+        let (syncedBefore, password): (Int, String?) = lock.withLock {
+            resuming = true
+            return (raw.synced, sessionPassword)
+        }
+        let back = await withTimeout(Self.resumeTimeout) { [self] in
+            guard case .ok = await call("disconnect", { try await $0.disconnect() }) else { return false }
+            await firstRaw { $0.connection.isDisconnected }
+            // Forgotten, so that the end waited for below is the new connection's.
+            lock.withLock { raw.connection = nil }
+            let connect = await call("reconnect") {
+                try await $0.connectServer(serverId: serverId, password: password, channelPath: channelPath)
+            }
+            guard case .ok = connect else { return false }
+            let end = await firstRaw { $0.connection.isDisconnected || $0.connection.isConnected }
+            guard end.connection.isConnected else { return false }
+            await firstRaw { $0.synced > syncedBefore }
+            return true
+        }
+        // The user left meanwhile; `disconnect` has shown that already.
+        if Task.isCancelled { return }
+        if back {
+            lock.withLock { resuming = false }
+            if let voice { await restore(voice) }
+        } else {
+            await lost()
+        }
+    }
+
+    /// The connection could not be got back: it ends as lost, like the engine's own last
+    /// attempt. The engine is told to stop while the state still hides its orderly end, which
+    /// would otherwise look as if the user had left.
+    private func lost() async {
+        if !lock.withLock({ raw.connection.isDisconnected }) {
+            _ = await call("disconnect") { try await $0.disconnect() }
+            _ = await withTimeout(Self.stopTimeout) { [self] in
+                await firstRaw { $0.connection.isDisconnected }
+                return true
+            }
+        }
+        lock.withLock {
+            sessionPassword = nil
+            // A failure the engine reported itself is already shown with its own reason.
+            if case .failed = current.phase { return }
+            var next = current
+            next.phase = .failed(.serverUnreachable)
+            next.certificatePrompt = nil
+            next.server = nil
+            setLocked(next)
+        }
+    }
+
+    /// Puts back the mute and deafen the user had, where the new connection starts otherwise.
+    private func restore(_ voice: SelfVoice) async {
+        guard let now = selfVoice(state), now != voice else { return }
+        if voice.deafened {
+            await setSelfDeaf(true)
+        } else {
+            if now.deafened { await setSelfDeaf(false) }
+            await setSelfMute(voice.muted)
+        }
+    }
+
+    /// Waits for the first raw connection that fulfils the condition, or for the cancellation
+    /// of the waiting task.
+    @discardableResult
+    private func firstRaw(_ condition: @escaping (RawConnection) -> Bool) async -> RawConnection {
+        let id = UUID()
+        let stream = AsyncStream<RawConnection> { continuation in
+            lock.withLock {
+                rawObservers[id] = continuation
+                continuation.yield(raw)
+            }
+            continuation.onTermination = { [weak self] _ in self?.removeObserver(id) }
+        }
+        for await value in stream where condition(value) {
+            return value
+        }
+        return lock.withLock { raw }
+    }
+
+    /// Runs `work`, or gives up with false after `seconds`.
+    private func withTimeout(_ seconds: TimeInterval, _ work: @escaping @Sendable () async -> Bool) async -> Bool {
+        await withTaskGroup(of: Bool?.self) { group in
+            group.addTask { await work() }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first ?? false
+        }
+    }
+
+    /// Limits the voice bitrate in kbit/s, or lifts the limit with nil. The engine does not
+    /// keep it across a restart, so it is set again whenever it could have been lost. Never
+    /// waits; without an engine there is nothing to limit yet.
+    func setBitrateLimit(_ kbps: UInt32?) {
+        engineNow()?.setBitrateLimitKbps(kbps: kbps)
     }
 
     /// Asks to enter a channel; a refusal arrives as a password question or a denial.
@@ -493,5 +674,17 @@ private final class QueueingListener: EngineListener, @unchecked Sendable {
 
     func onEvent(event: BridgeEvent) {
         queue.yield(event)
+    }
+}
+
+private extension Optional where Wrapped == ConnectionState {
+    var isDisconnected: Bool {
+        if case .disconnected = self { return true }
+        return false
+    }
+
+    var isConnected: Bool {
+        if case .connected = self { return true }
+        return false
     }
 }

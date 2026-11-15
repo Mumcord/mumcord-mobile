@@ -83,6 +83,18 @@ extension AppModel {
         voiceSession.onSignal = { [weak call] in call?.onAudioSignal($0) }
         let notificationGateway = SystemNotificationGateway()
         let messageSettings = EngineMessageNotificationSettings(store: store)
+        // Created at the start of the app: a tap on a notification that started the app is
+        // delivered right after launch.
+        let notifier = SystemMessageNotifier(newMessage: Strings.messageNew, log: AppLog.write)
+        let network = SystemNetworkMonitor()
+        networkSession = NetworkSession(store: store, monitor: network)
+        let idle = IdleDisconnect(
+            store: store,
+            notifier: SystemIdleNotifier(texts: Strings.idleNotificationTexts, log: AppLog.write)
+        )
+        notifier.onResponse(category: SystemIdleNotifier.warningCategory) { action in
+            if action == SystemIdleNotifier.stayAction { idle.stayConnected() }
+        }
         let model = AppModel(
             store: store,
             setupStore: UserDefaultsSetupStore(),
@@ -97,11 +109,10 @@ extension AppModel {
             sessionEnded: call.takeSessionEndedNotice(),
             notifications: NotificationPrompt(gateway: notificationGateway),
             messageSettings: messageSettings,
-            outputs: VoiceOutput(store: store, outputs: outputs)
+            outputs: VoiceOutput(store: store, outputs: outputs),
+            idle: idle,
+            mediaPolicy: { loadMedia(network.status, store.state.mobileSettings) }
         )
-        // Created at the start of the app: a tap on a notification that started the app is
-        // delivered right after launch.
-        let notifier = SystemMessageNotifier(newMessage: Strings.messageNew, log: AppLog.write)
         notifier.onOpen { [weak model] key in
             if let chat = chatFromNotificationKey(key) { model?.openChat(chat) }
         }
@@ -117,6 +128,9 @@ extension AppModel {
 
     /// Lives as long as the process: it turns the engine's message events into notifications.
     @MainActor private static var messageNotifications: MessageNotificationCenter?
+
+    /// Lives as long as the process: it follows the phone's network for the session.
+    @MainActor private static var networkSession: NetworkSession?
 }
 
 /// The app's technical log. Messages never contain names, addresses or other personal data.

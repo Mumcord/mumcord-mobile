@@ -96,3 +96,18 @@ extension SessionState {
         return next
     }
 }
+
+extension SessionState {
+    /// Folds an event while the app itself gets back into the server (`SessionStore.reconnectNow`):
+    /// the engine's connection is ended and started again, which must look like the reconnect it
+    /// is. So the orderly end and the new attempt leave the state as it is ("Reconnecting", with
+    /// the last known channels); a failure and everything else are folded as always.
+    func foldResuming(_ event: BridgeEvent) -> SessionState {
+        guard case .connectionChanged(let connection) = event else { return fold(event) }
+        switch connection {
+        case .connecting: return self
+        case .disconnected(let error) where error == nil: return self
+        default: return fold(event)
+        }
+    }
+}

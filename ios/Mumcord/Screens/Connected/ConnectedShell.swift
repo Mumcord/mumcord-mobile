@@ -75,8 +75,12 @@ struct ConnectedShell<Chat: View>: View {
         case .messages:
             MessagesTab(model: model)
         case .more:
-            MoreBlockedHost(model: model) {
-                MoreScreen(serverName: state.serverName, model: model, onDisconnect: onDisconnect)
+            if let settings = state.settings {
+                SettingsScreen(settings: settings, onChange: model.changeSettings, onBack: model.closeSettingsScreen)
+            } else {
+                MoreBlockedHost(model: model) {
+                    MoreScreen(serverName: state.serverName, model: model, onDisconnect: onDisconnect)
+                }
             }
         }
     }
@@ -162,10 +166,23 @@ private struct MoreScreen: View {
     let serverName: String
     let model: AppModel
     let onDisconnect: () -> Void
+    @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
         VStack(spacing: 0) {
             MumcordAppBar(title: Strings.tabMore, large: true)
+            MumcordList {
+                MumcordListRow(
+                    title: Strings.settingsTitle,
+                    icon: MumcordIcons.settings,
+                    action: model.openSettingsScreen,
+                    trailing: {
+                        MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted)
+                    }
+                )
+                .accessibilityIdentifier("more-settings")
+            }
+            .padding(.bottom, MumcordSpace.s4)
             MoreMessagesSection(model: model)
             MumcordList {
                 MumcordListRow(
