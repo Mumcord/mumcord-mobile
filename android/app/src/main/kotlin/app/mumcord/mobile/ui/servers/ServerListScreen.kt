@@ -51,7 +51,9 @@ import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.design.tokens.MumcordSpace
 import app.mumcord.mobile.session.ConnectionError
+import app.mumcord.mobile.ui.about.UpdateNotice
 import app.mumcord.mobile.ui.connect.messageRes
+import app.mumcord.mobile.update.AvailableUpdate
 
 const val SERVER_ROW_TEST_TAG = "server-row"
 const val SERVER_CONNECT_TEST_TAG = "server-connect"
@@ -84,7 +86,8 @@ data class ConnectFailure(
 /**
  * The saved servers with people online and latency, and the way to add, edit, remove and
  * connect. While [editing], every row offers Edit and Remove instead of Connect. "Find more"
- * leads to the public server browser.
+ * leads to the public server browser. A newer release of the app is offered at the top
+ * ([update], FR-5.101; no mockup).
  */
 @Composable
 fun ServerListScreen(
@@ -103,12 +106,15 @@ fun ServerListScreen(
     onRetry: () -> Unit,
     onOpenSettings: () -> Unit,
     onDismissError: () -> Unit,
+    update: AvailableUpdate? = null,
+    onDismissUpdate: () -> Unit = {},
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
     MumcordScreen {
         MumcordAppBar(title = stringResource(R.string.servers_title), large = true, windowInsets = topInsets)
         if (failure != null) FailureBanner(failure, onRetry, onOpenSettings, onDismissError)
+        if (update != null) UpdateNotice(update, onDismissUpdate)
         when {
             // Nothing to show before the list is read; an empty state would flash by.
             !loaded -> Unit

@@ -8,6 +8,7 @@ import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
+import app.mumcord.mobile.ui.about.AboutController
 import app.mumcord.mobile.ui.profile.ProfileController
 import app.mumcord.mobile.ui.themes.ThemesController
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +31,8 @@ class MoreController(
     private val connected: ConnectedController,
     private val messageSettings: MessageNotificationSettings,
     private val scope: CoroutineScope,
+    /** About Mumcord, its licences and the update notice (FR-5.100, FR-5.101). */
+    val about: AboutController,
 ) {
     private val mutableLocal = MutableStateFlow(MoreLocal())
     val local: StateFlow<MoreLocal> = mutableLocal.asStateFlow()
@@ -41,7 +44,7 @@ class MoreController(
     val themes = ThemesController(repository, scope)
 
     /** The profile and themes state the More tab shows besides [local]. */
-    val extras: Flow<MoreExtras> = combine(profile.own, profile.edit, themes.local, ::MoreExtras)
+    val extras: Flow<MoreExtras> = combine(profile.own, profile.edit, themes.local, about.local, ::MoreExtras)
 
     init {
         scope.launch {
@@ -63,6 +66,13 @@ class MoreController(
 
     fun openActivity() = mutableLocal.update { it.copy(page = MorePage.Activity, seenActivityId = newestActivity()) }
 
+    fun openAbout() = mutableLocal.update { it.copy(page = MorePage.About) }
+
+    fun openLicences() {
+        about.loadLicences()
+        mutableLocal.update { it.copy(page = MorePage.Licences) }
+    }
+
     fun selectFilter(filter: ActivityFilter) = mutableLocal.update { it.copy(filter = filter) }
 
     /** Opens the settings and reads the voice settings, which have no event of their own. */
@@ -75,8 +85,12 @@ class MoreController(
         }
     }
 
-    /** Back to the list of the More tab; what was in the log until now counts as seen. */
+    /**
+     * Back to the list of the More tab, or from the licences to About; what was in the log until
+     * now counts as seen.
+     */
     fun back() {
+        if (mutableLocal.value.page == MorePage.Licences) return mutableLocal.update { it.copy(page = MorePage.About) }
         when (mutableLocal.value.page) {
             MorePage.Themes -> themes.reset()
             MorePage.EditProfile -> profile.discard()

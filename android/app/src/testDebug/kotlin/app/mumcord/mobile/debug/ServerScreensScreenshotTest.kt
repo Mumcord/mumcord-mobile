@@ -12,8 +12,8 @@ import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.session.CertificatePromptState
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.ui.connect.CertificateSheet
-import app.mumcord.mobile.ui.connect.SessionEndedSheet
 import app.mumcord.mobile.ui.connect.LocalNetworkSheet
+import app.mumcord.mobile.ui.connect.SessionEndedSheet
 import app.mumcord.mobile.ui.servers.ConnectFailure
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
 import app.mumcord.mobile.ui.servers.PingState
@@ -23,6 +23,8 @@ import app.mumcord.mobile.ui.servers.ServerListScreen
 import app.mumcord.mobile.ui.servers.ServerRow
 import app.mumcord.mobile.ui.servers.initials
 import app.mumcord.mobile.ui.setup.TalkModeChoiceScreen
+import app.mumcord.mobile.update.AvailableUpdate
+import app.mumcord.mobile.update.ReleaseVersion
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -56,7 +58,7 @@ class ServerScreensScreenshotTest {
     )
 
     @Composable
-    private fun ServerList(rows: List<ServerRow>, failure: ConnectFailure? = null) {
+    private fun ServerList(rows: List<ServerRow>, failure: ConnectFailure? = null, update: AvailableUpdate? = null) {
         ServerListScreen(
             rows = rows,
             loaded = true,
@@ -73,6 +75,7 @@ class ServerScreensScreenshotTest {
             onRetry = {},
             onOpenSettings = {},
             onDismissError = {},
+            update = update,
             topInsets = top,
             bottomInsets = bottom,
         )
@@ -173,6 +176,15 @@ class ServerScreensScreenshotTest {
     private fun localNetworkDenied(dark: Boolean) = capture("android-localnet-denied", dark) {
         ServerList(rows(), ConnectFailure(ConnectionError.ServerUnreachable, "Nordlicht", LocalNetworkHint.Denied))
     }
+
+    // "Version X is available" (FR-5.101, no mockup).
+    private fun updateNotice(dark: Boolean) = capture("android-update-notice", dark) {
+        ServerList(rows(), update = AvailableUpdate(ReleaseVersion(0, 9, 0), hasApk = true))
+    }
+
+    @Test fun updateNoticeDark() = updateNotice(dark = true)
+
+    @Test fun updateNoticeLight() = updateNotice(dark = false)
 
     @Test fun serverListDark() = serverList(dark = true)
 

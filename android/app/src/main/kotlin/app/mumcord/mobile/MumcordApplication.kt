@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.os.SystemClock
 import android.util.Log
+import app.mumcord.mobile.bridge.engineVersion
 import app.mumcord.mobile.platform.audio.AndroidFeedbackTones
 import app.mumcord.mobile.platform.audio.AndroidVoiceSession
 import app.mumcord.mobile.platform.audio.AudioController
@@ -30,14 +31,18 @@ import app.mumcord.mobile.session.VoiceAudio
 import app.mumcord.mobile.session.VoiceCall
 import app.mumcord.mobile.session.VoiceOutput
 import app.mumcord.mobile.session.loadMedia
-import app.mumcord.mobile.ui.chat.BridgeImageLoader
-import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.camera.AndroidCameraGateway
 import app.mumcord.mobile.ui.camera.CameraGateway
+import app.mumcord.mobile.ui.chat.BridgeImageLoader
+import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.connect.AndroidLocalNetworkGateway
 import app.mumcord.mobile.ui.connect.LocalNetworkGateway
 import app.mumcord.mobile.ui.connected.AndroidMicrophoneGateway
 import app.mumcord.mobile.ui.connected.AndroidNotificationGateway
+import app.mumcord.mobile.update.AppInfo
+import app.mumcord.mobile.update.GitHubReleaseSource
+import app.mumcord.mobile.update.PreferencesUpdateStore
+import app.mumcord.mobile.update.UpdateChecker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -60,6 +65,20 @@ class MumcordApplication : Application() {
 
     val chatImageLoader: ChatImageLoader by lazy {
         BridgeImageLoader(sessionRepository.chat, log = { message -> Log.w(LOG_TAG, message) })
+    }
+
+    /** The versions the About screen names (FR-5.100); the engine's is read from the bridge library. */
+    val appInfo: AppInfo by lazy {
+        AppInfo(
+            appVersion = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty(),
+            engineVersion = engineVersion(),
+            debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0,
+        )
+    }
+
+    /** The daily Android update check (FR-5.101); debug and test builds never ask. */
+    val updateChecker: UpdateChecker by lazy {
+        UpdateChecker(appInfo, GitHubReleaseSource(), PreferencesUpdateStore(this), log = log)
     }
 
     val localNetworkGateway: LocalNetworkGateway by lazy { AndroidLocalNetworkGateway(this) }

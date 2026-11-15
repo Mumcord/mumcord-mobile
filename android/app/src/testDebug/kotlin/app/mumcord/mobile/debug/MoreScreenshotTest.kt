@@ -32,6 +32,9 @@ import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.session.SessionState
 import app.mumcord.mobile.session.fold
 import app.mumcord.mobile.session.mockupVoiceServer
+import app.mumcord.mobile.ui.about.AboutLocal
+import app.mumcord.mobile.ui.about.Licences
+import app.mumcord.mobile.ui.about.noticeBlocks
 import app.mumcord.mobile.ui.connected.ActivityFilter
 import app.mumcord.mobile.ui.connected.ConnectedController
 import app.mumcord.mobile.ui.connected.ConnectedLocal
@@ -44,6 +47,8 @@ import app.mumcord.mobile.ui.connected.SettingsSheet
 import app.mumcord.mobile.ui.connected.SettingsSheetHost
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.ui.profile.OwnProfile
+import app.mumcord.mobile.update.AvailableUpdate
+import app.mumcord.mobile.update.ReleaseVersion
 import java.time.ZoneOffset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -154,10 +159,16 @@ class MoreScreenshotTest {
     @After
     fun tearDown() = scope.cancel()
 
-    private fun capture(name: String, dark: Boolean, local: MoreLocal, session: SessionState = session()) =
+    private fun capture(
+        name: String,
+        dark: Boolean,
+        local: MoreLocal,
+        session: SessionState = session(),
+        about: AboutLocal = AboutLocal(SCREENSHOT_APP_INFO),
+    ) =
         composeRule.captureScreenshot("$name-${if (dark) "dark" else "light"}") {
             val state = checkNotNull(connectedUiState(session, ConnectedLocal(tab = ConnectedTab.More), "Nordlicht"))
-            val moreState = more.state(session, local, output, extras = MoreExtras(profile = profile))
+            val moreState = more.state(session, local, output, extras = MoreExtras(profile = profile, about = about))
             MumcordTheme(darkTheme = dark) {
                 Box(Modifier.fillMaxSize()) {
                     ConnectedShell(
@@ -207,6 +218,30 @@ class MoreScreenshotTest {
     private fun historySheet(dark: Boolean) =
         capture("android-settings-history-sheet", dark, settings.copy(sheet = SettingsSheet.HistoryAge))
 
+    // A newer release is offered at the top (FR-5.101).
+    private fun about(dark: Boolean) = capture(
+        "android-about",
+        dark,
+        MoreLocal(page = MorePage.About),
+        about = AboutLocal(SCREENSHOT_APP_INFO, update = AvailableUpdate(ReleaseVersion(0, 9, 0), hasApk = true)),
+    )
+
+    // The start of the notices as the release build bundles them.
+    private fun licences(dark: Boolean) = capture(
+        "android-licences",
+        dark,
+        MoreLocal(page = MorePage.Licences),
+        about = AboutLocal(SCREENSHOT_APP_INFO, licences = Licences.Loaded(noticeBlocks(SAMPLE_NOTICES))),
+    )
+
+    @Test fun aboutDark() = about(dark = true)
+
+    @Test fun aboutLight() = about(dark = false)
+
+    @Test fun licencesDark() = licences(dark = true)
+
+    @Test fun licencesLight() = licences(dark = false)
+
     @Test fun moreDark() = more(dark = true)
 
     @Test fun moreLight() = more(dark = false)
@@ -240,3 +275,27 @@ class MoreScreenshotTest {
 
     @Test fun historySheetLight() = historySheet(dark = false)
 }
+
+private val SAMPLE_NOTICES = """
+Mumcord Mobile 0.8.0 for Android - Third-party notices
+================================================================================
+
+Mumcord Mobile itself, the Mumcord engine and the bridge are licensed under the
+GNU AGPL v3 only (see LICENSE). The app includes the third-party material below.
+
+--------------------------------------------------------------------------------
+Instrument Sans (font, design/fonts/instrument-sans)
+--------------------------------------------------------------------------------
+
+License: SIL Open Font License, Version 1.1 (OFL-1.1)
+Source: https://github.com/Instrument/instrument-sans
+Copyright 2022 The Instrument Sans Project Authors
+
+--------------------------------------------------------------------------------
+Bricolage Grotesque (font, design/fonts/bricolage-grotesque)
+--------------------------------------------------------------------------------
+
+License: SIL Open Font License, Version 1.1 (OFL-1.1)
+Source: https://github.com/ateliertriay/bricolage
+Copyright 2022 The Bricolage Grotesque Project Authors
+""".trimIndent()

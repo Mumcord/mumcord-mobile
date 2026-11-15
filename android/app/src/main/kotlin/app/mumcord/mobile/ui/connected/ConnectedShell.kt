@@ -19,10 +19,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import app.mumcord.mobile.R
-import app.mumcord.mobile.ui.messages.MessagesUiState
-import app.mumcord.mobile.ui.messages.MessagesScreen
-import app.mumcord.mobile.ui.messages.MessagesController
-import app.mumcord.mobile.ui.messages.BlockedPeopleScreen
 import app.mumcord.mobile.design.components.MumcordBanner
 import app.mumcord.mobile.design.components.MumcordBannerTone
 import app.mumcord.mobile.design.components.MumcordScreen
@@ -30,12 +26,18 @@ import app.mumcord.mobile.design.components.MumcordTab
 import app.mumcord.mobile.design.components.MumcordTabBar
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.tokens.MumcordSpace
+import app.mumcord.mobile.ui.about.AboutScreen
+import app.mumcord.mobile.ui.about.LicencesScreen
 import app.mumcord.mobile.ui.chat.ChatClock
 import app.mumcord.mobile.ui.chat.ChatController
 import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.chat.ChatImageSystem
 import app.mumcord.mobile.ui.chat.ChatScreen
 import app.mumcord.mobile.ui.chat.ChatUiState
+import app.mumcord.mobile.ui.messages.BlockedPeopleScreen
+import app.mumcord.mobile.ui.messages.MessagesController
+import app.mumcord.mobile.ui.messages.MessagesScreen
+import app.mumcord.mobile.ui.messages.MessagesUiState
 import app.mumcord.mobile.ui.profile.EditProfileScreen
 import app.mumcord.mobile.ui.themes.ThemesScreen
 
@@ -121,6 +123,12 @@ fun ConnectedShell(
                     }
                     morePage == MorePage.Themes -> more.themes?.let {
                         ThemesScreen(it, moreActions.themes, onBack = moreActions::back, topInsets = topInsets)
+                    }
+                    morePage == MorePage.About -> more.about?.let {
+                        AboutScreen(it, moreActions::back, moreActions::openLicences, moreActions.about::dismissUpdate, topInsets)
+                    }
+                    morePage == MorePage.Licences -> more.licences?.let {
+                        LicencesScreen(it, moreActions::back, moreActions.about::loadLicences, topInsets)
                     }
                     messages.blockedOpen -> BlockedPeopleScreen(messages, messagesActions, topInsets)
                     else -> MoreScreen(more, moreActions, messagesActions::openBlocked, onIdentities, onDisconnect, topInsets)

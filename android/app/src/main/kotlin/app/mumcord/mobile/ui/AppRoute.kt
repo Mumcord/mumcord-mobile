@@ -28,13 +28,6 @@ import app.mumcord.mobile.design.components.MumcordScreen
 import app.mumcord.mobile.ui.camera.CameraSheet
 import app.mumcord.mobile.ui.camera.record
 import app.mumcord.mobile.ui.camera.rememberCameraSystem
-import app.mumcord.mobile.ui.identities.CameraNotice
-import app.mumcord.mobile.ui.identities.IdentitiesScreen
-import app.mumcord.mobile.ui.identities.IdentitySetupScreen
-import app.mumcord.mobile.ui.identities.IdentitySheetHost
-import app.mumcord.mobile.ui.identities.IdentitySystem
-import app.mumcord.mobile.ui.identities.ScanScreen
-import app.mumcord.mobile.ui.identities.rememberIdentitySystem
 import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.chat.ChatImageSystem
 import app.mumcord.mobile.ui.chat.ChatOverlays
@@ -48,6 +41,24 @@ import app.mumcord.mobile.ui.connect.LocalNetworkSystem
 import app.mumcord.mobile.ui.connect.PasswordSheet
 import app.mumcord.mobile.ui.connect.SessionEndedSheet
 import app.mumcord.mobile.ui.connect.rememberLocalNetworkSystem
+import app.mumcord.mobile.ui.connected.ChatEnvironment
+import app.mumcord.mobile.ui.connected.ConnectedSheetHost
+import app.mumcord.mobile.ui.connected.ConnectedShell
+import app.mumcord.mobile.ui.connected.ConnectedTab
+import app.mumcord.mobile.ui.connected.MicrophoneNotice
+import app.mumcord.mobile.ui.connected.MicrophoneSystem
+import app.mumcord.mobile.ui.connected.MoreUiState
+import app.mumcord.mobile.ui.connected.NotificationSystem
+import app.mumcord.mobile.ui.connected.SettingsSheetHost
+import app.mumcord.mobile.ui.connected.rememberMicrophoneSystem
+import app.mumcord.mobile.ui.connected.rememberNotificationSystem
+import app.mumcord.mobile.ui.identities.CameraNotice
+import app.mumcord.mobile.ui.identities.IdentitiesScreen
+import app.mumcord.mobile.ui.identities.IdentitySetupScreen
+import app.mumcord.mobile.ui.identities.IdentitySheetHost
+import app.mumcord.mobile.ui.identities.IdentitySystem
+import app.mumcord.mobile.ui.identities.ScanScreen
+import app.mumcord.mobile.ui.identities.rememberIdentitySystem
 import app.mumcord.mobile.ui.link.InvalidLinkSheet
 import app.mumcord.mobile.ui.link.LinkConfirmSheet
 import app.mumcord.mobile.ui.messages.MessagesSheetHost
@@ -60,19 +71,9 @@ import app.mumcord.mobile.ui.servers.ServerFormScreen
 import app.mumcord.mobile.ui.servers.ServerListScreen
 import app.mumcord.mobile.ui.servers.ServerThemeSheet
 import app.mumcord.mobile.ui.setup.TalkModeChoiceScreen
-import app.mumcord.mobile.ui.connected.ChatEnvironment
-import app.mumcord.mobile.ui.connected.ConnectedSheetHost
-import app.mumcord.mobile.ui.connected.ConnectedTab
-import app.mumcord.mobile.ui.connected.ConnectedShell
-import app.mumcord.mobile.ui.connected.MoreUiState
-import app.mumcord.mobile.ui.connected.SettingsSheetHost
-import app.mumcord.mobile.ui.connected.MicrophoneNotice
-import app.mumcord.mobile.ui.connected.MicrophoneSystem
-import app.mumcord.mobile.ui.connected.NotificationSystem
-import app.mumcord.mobile.ui.connected.rememberNotificationSystem
-import app.mumcord.mobile.ui.connected.rememberMicrophoneSystem
 import app.mumcord.mobile.ui.themes.ThemesSheetHost
 import app.mumcord.mobile.ui.themes.shareThemeText
+import app.mumcord.mobile.update.AvailableUpdate
 
 /** What a photo from the camera is for; the camera question is the same for both. */
 enum class PhotoFor { Chat, Avatar }
@@ -127,11 +128,13 @@ fun AppRoute(
     val messages by viewModel.messagesState.collectAsStateWithLifecycle()
     val conversation by viewModel.conversationState.collectAsStateWithLifecycle()
     val more by viewModel.moreState.collectAsStateWithLifecycle()
+    val updateNotice by viewModel.updateNotice.collectAsStateWithLifecycle()
     val chatEnvironment = ChatEnvironment(chatImageLoader, images, rememberChatClock())
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshPings()
         viewModel.recheckMicrophone()
         viewModel.identities.recheckCamera()
+        viewModel.checkForUpdate()
         onPauseOrDispose { }
     }
     // A finished backup goes to the share sheet once.
@@ -166,6 +169,7 @@ fun AppRoute(
             messages = messages,
             conversation = conversation,
             more = more,
+            updateNotice = updateNotice,
             avatarImages = avatarImages,
         )
         photoQuestion?.let { photoFor ->
@@ -206,6 +210,7 @@ fun AppContent(
     messages: MessagesUiState? = null,
     conversation: ChatUiState? = null,
     more: MoreUiState? = null,
+    updateNotice: AvailableUpdate? = null,
     avatarImages: ChatImageSystem = ChatImageSystem(pickPhoto = {}, takePhoto = {}),
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
@@ -306,6 +311,8 @@ fun AppContent(
                         onRetry = viewModel::retry,
                         onOpenSettings = localNetwork.openSettings,
                         onDismissError = viewModel::dismissError,
+                        update = updateNotice,
+                        onDismissUpdate = viewModel.more.about::dismissUpdate,
                         topInsets = topInsets,
                         bottomInsets = bottomInsets,
                     )

@@ -679,4 +679,26 @@
     <string name="server_theme_title">Theme for %1$s</string>
     <string name="server_theme_use_app">Use app theme</string>
     <string name="server_theme_hint">Shown while this server is shown.</string>
+    <!-- About Mumcord (FR-5.100), its licences and the update check (FR-5.101). -->
+    <string name="more_about">About Mumcord</string>
+    <string name="about_title">About Mumcord</string>
+    <string name="about_back">Back to More</string>
+    <string name="about_version">Version</string>
+    <string name="about_engine">Engine</string>
+    <string name="about_licences">Third-party licences</string>
+    <string name="about_source">Source code</string>
+    <string name="about_source_sub">The code of this version on GitHub</string>
+    <string name="about_licence_text">Mumcord Mobile is free software under the GNU Affero General Public License v3 only (AGPL-3.0-only). It is built on open-source software, including code from the Mumble project.</string>
+    <string name="about_privacy_text">Mumcord does not track you. Besides your servers, it only contacts GitHub once a day to look for a new version (switch it off in Settings) and the public server list when you open it.</string>
+    <string name="licences_back">Back to About</string>
+    <string name="licences_failed">The licences could not be read.</string>
+    <string name="licences_retry">Try again</string>
+    <!-- %1$s is a version number such as 0.3.0. -->
+    <string name="update_available">Version %1$s is available.</string>
+    <string name="update_available_text">The download opens in your browser. Installing it keeps your servers and settings.</string>
+    <string name="update_download">Download</string>
+    <string name="update_not_now">Not now</string>
+    <string name="settings_section_updates">Updates</string>
+    <string name="settings_update_check">Check for updates</string>
+    <string name="settings_update_check_sub">Once a day, asks GitHub for a new version</string>
 </resources>

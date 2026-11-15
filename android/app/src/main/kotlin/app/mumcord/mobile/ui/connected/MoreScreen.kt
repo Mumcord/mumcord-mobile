@@ -52,12 +52,13 @@ const val MORE_SETTINGS_TEST_TAG = "more-settings"
 const val MORE_IDENTITIES_TEST_TAG = "more-identities"
 const val MORE_THEMES_TEST_TAG = "more-themes"
 const val MORE_EDIT_PROFILE_TEST_TAG = "more-edit-profile"
+const val MORE_ABOUT_TEST_TAG = "more-about"
 
 /**
  * The More tab (mockup `15-more`): the user's own profile with "Edit profile", the activity log,
  * the identities, the themes, the blocked people (not in the mockup; it has no other place),
- * the settings, and leaving the server. Left out until their features exist: "About Mumcord"
- * (task 10.2) and "Server information".
+ * the settings, "About Mumcord" with the app version, and leaving the server. Left out until
+ * its feature exists: "Server information".
  */
 @Composable
 fun MoreScreen(
@@ -126,6 +127,19 @@ fun MoreScreen(
                     trailing = { Chevron() },
                     onClick = actions::openSettings,
                     modifier = Modifier.testTag(MORE_SETTINGS_TEST_TAG),
+                )
+            }
+            Spacer(Modifier.height(MumcordSpace.s3))
+            MumcordList {
+                MumcordListRow(
+                    title = stringResource(R.string.more_about),
+                    icon = MumcordIcons.Star,
+                    trailing = {
+                        MumcordListRowValue(state.appVersion)
+                        Chevron()
+                    },
+                    onClick = actions::openAbout,
+                    modifier = Modifier.testTag(MORE_ABOUT_TEST_TAG),
                 )
             }
             Spacer(Modifier.height(MumcordSpace.s3))

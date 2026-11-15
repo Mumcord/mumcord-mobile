@@ -50,6 +50,7 @@ const val SETTINGS_NOTIFY_PRIVATE_TEST_TAG = "settings-notify-private"
 const val SETTINGS_NOTIFY_MENTIONS_TEST_TAG = "settings-notify-mentions"
 const val SETTINGS_SENDER_ONLY_TEST_TAG = "settings-sender-only"
 const val SETTINGS_HISTORY_TEST_TAG = "settings-history"
+const val SETTINGS_UPDATE_CHECK_TEST_TAG = "settings-update-check"
 const val SETTINGS_OPTION_TEST_TAG_PREFIX = "settings-option-"
 
 /** The test tag of a choice in a settings sheet, by its position. */
@@ -59,9 +60,9 @@ fun settingsOptionTestTag(index: Int): String = SETTINGS_OPTION_TEST_TAG_PREFIX 
  * The settings (mockup `16-settings`, FR-5.100). Every switch is saved at once; the rows with a
  * value open a sheet with the choices. Left out until their features exist: echo cancellation
  * (the phone's own voice processing does it, there is nothing to switch), link previews (the
- * chat shows none yet), the language (task 8.3, after the translations), about and updates (task
- * 10.2). Dark, light or system is chosen on the themes screen (mockup `19-themes`). The
- * level meter, the "Chat" section and the note under "Notifications" have no mockup.
+ * chat shows none yet), the language (task 8.3, after the translations). About is in the More tab as in its mockup.
+ * Dark, light or system is chosen on the themes screen (mockup `19-themes`). The level meter,
+ * the "Chat" and "Updates" sections and the note under "Notifications" have no mockup.
  */
 @Composable
 fun SettingsScreen(
@@ -100,6 +101,18 @@ fun SettingsScreen(
                     icon = MumcordIcons.Trash,
                     onClick = { actions.openSheet(SettingsSheet.HistoryAge) },
                     testTag = SETTINGS_HISTORY_TEST_TAG,
+                )
+            }
+            // FR-5.101: the Android update check, on by default.
+            MumcordSectionHeader(stringResource(R.string.settings_section_updates))
+            MumcordList {
+                SwitchRow(
+                    title = stringResource(R.string.settings_update_check),
+                    subtitle = stringResource(R.string.settings_update_check_sub),
+                    icon = MumcordIcons.Globe,
+                    checked = state.mobile.updateCheck,
+                    onCheckedChange = { on -> actions.changeMobile { it.copy(updateCheck = on) } },
+                    testTag = SETTINGS_UPDATE_CHECK_TEST_TAG,
                 )
             }
         }

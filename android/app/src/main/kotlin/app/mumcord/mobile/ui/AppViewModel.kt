@@ -11,18 +11,23 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import app.mumcord.mobile.MumcordApplication
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.bridge.SavedServer
-import app.mumcord.mobile.platform.call.SessionEndedNotice
 import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.platform.call.OutputState
+import app.mumcord.mobile.platform.call.SessionEndedNotice
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.session.ConnectionPhase
 import app.mumcord.mobile.session.IdleAccess
 import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
 import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.Outcome
+import app.mumcord.mobile.session.OutputAccess
 import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.session.SessionState
 import app.mumcord.mobile.session.setServerTheme
 import app.mumcord.mobile.session.themeTokens
+import app.mumcord.mobile.ui.about.AboutController
+import app.mumcord.mobile.ui.about.NoticesSource
+import app.mumcord.mobile.ui.camera.CameraGateway
 import app.mumcord.mobile.ui.chat.ChatController
 import app.mumcord.mobile.ui.chat.ChatUiState
 import app.mumcord.mobile.ui.chat.chatTabBadge
@@ -40,12 +45,9 @@ import app.mumcord.mobile.ui.connected.MicrophoneAnswer
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.MoreController
 import app.mumcord.mobile.ui.connected.MoreUiState
-import app.mumcord.mobile.ui.connected.moreUiState
 import app.mumcord.mobile.ui.connected.NotificationAccess
 import app.mumcord.mobile.ui.connected.connectedUiState
-import app.mumcord.mobile.platform.call.OutputState
-import app.mumcord.mobile.session.OutputAccess
-import app.mumcord.mobile.ui.camera.CameraGateway
+import app.mumcord.mobile.ui.connected.moreUiState
 import app.mumcord.mobile.ui.identities.IdentitiesController
 import app.mumcord.mobile.ui.identities.IdentitiesLocal
 import app.mumcord.mobile.ui.identities.identitiesUiState
@@ -57,13 +59,19 @@ import app.mumcord.mobile.ui.servers.LocalNetworkHint
 import app.mumcord.mobile.ui.servers.PublicServersActions
 import app.mumcord.mobile.ui.servers.PublicServersController
 import app.mumcord.mobile.ui.servers.PublicServersUiState
-import app.mumcord.mobile.ui.servers.publicServersUiState
 import app.mumcord.mobile.ui.servers.ServerFormState
+import app.mumcord.mobile.ui.servers.publicServersUiState
 import app.mumcord.mobile.ui.servers.toPingState
 import app.mumcord.mobile.ui.setup.PreferencesSetupStore
 import app.mumcord.mobile.ui.setup.SetupStore
 import app.mumcord.mobile.ui.themes.AppTheme
 import app.mumcord.mobile.ui.themes.shownThemeId
+import app.mumcord.mobile.update.AppInfo
+import app.mumcord.mobile.update.AvailableUpdate
+import app.mumcord.mobile.update.UpdateChecker
+import java.time.ZoneId
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,7 +86,6 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.ZoneId
 
 /**
  * The state of the app. Its own part is everything before the connected screens: first-start setup, the server list,
@@ -95,6 +102,11 @@ class AppViewModel(
     private val outputs: OutputAccess = OutputAccess.None,
     private val idle: IdleAccess = IdleAccess.Never,
     camera: CameraGateway = CameraGateway.Never,
+    appInfo: AppInfo = AppInfo(appVersion = "0.1.0", engineVersion = "", debuggable = true),
+    updates: UpdateChecker? = null,
+    notices: NoticesSource = NoticesSource { "" },
+    /** Where the notices are read; the tests read them on their own dispatcher. */
+    io: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
     private val local = MutableStateFlow(
         AppUiState(
@@ -242,7 +254,19 @@ class AppViewModel(
     )
 
     /** The More tab: the activity log and the settings. */
-    val more = MoreController(repository, connected, messageSettings, viewModelScope)
+    val more = MoreController(
+        repository,
+        connected,
+        messageSettings,
+        viewModelScope,
+        AboutController(appInfo, updates, repository, notices, viewModelScope, io = io),
+    )
+
+    /** "Version X is available" on the server list (FR-5.101); null when there is nothing to offer. */
+    val updateNotice: StateFlow<AvailableUpdate?> = more.about.update
+
+    /** The app came to the front: the update check runs when one is due. */
+    fun checkForUpdate() = more.about.checkIfDue()
 
     /** Its own flow: a new activity entry does not rebuild the other tabs. */
     val moreState: StateFlow<MoreUiState?> =
@@ -684,6 +708,9 @@ class AppViewModel(
                     application.voiceOutput,
                     application.idleDisconnect,
                     application.cameraGateway,
+                    application.appInfo,
+                    application.updateChecker,
+                    NoticesSource.assets(application.assets),
                 ).also {
                     // Start with the first screen and then follow the session by themselves.
                     application.networkSession

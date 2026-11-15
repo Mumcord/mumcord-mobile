@@ -8,6 +8,10 @@ import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.platform.call.OutputKind
 import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.ui.about.AboutLocal
+import app.mumcord.mobile.ui.about.AboutUiState
+import app.mumcord.mobile.ui.about.Licences
+import app.mumcord.mobile.ui.about.aboutUiState
 import app.mumcord.mobile.ui.profile.OwnProfile
 import app.mumcord.mobile.ui.profile.ProfileEdit
 import app.mumcord.mobile.ui.profile.ProfileEditUiState
@@ -18,7 +22,7 @@ import app.mumcord.mobile.ui.themes.appThemeName
 import app.mumcord.mobile.ui.themes.themesUiState
 
 /** What the More tab shows: its list, or one of the screens it leads to. */
-enum class MorePage { Main, Activity, Settings, EditProfile, Themes }
+enum class MorePage { Main, Activity, Settings, EditProfile, Themes, About, Licences }
 
 /** The choices of the settings that open a sheet. */
 enum class SettingsSheet { TalkMode, DefaultOutput, HistoryAge }
@@ -67,6 +71,12 @@ data class MoreUiState(
     val themeName: String? = null,
     /** Null while the themes screen is closed or the themes have not been read. */
     val themes: ThemesUiState? = null,
+    /** The version on the "About Mumcord" row. */
+    val appVersion: String = "",
+    /** Null while the About screen is closed. */
+    val about: AboutUiState? = null,
+    /** Null while the licences screen is closed. */
+    val licences: Licences? = null,
 )
 
 /** What the profile and theme screens add to the More tab; kept apart from [MoreLocal]. */
@@ -74,6 +84,8 @@ data class MoreExtras(
     val profile: OwnProfile? = null,
     val profileEdit: ProfileEdit? = null,
     val themes: ThemesLocal = ThemesLocal(),
+    /** Null where no About screen exists (screenshots of other screens). */
+    val about: AboutLocal? = null,
 )
 
 /** The More tab as a value, or null while no server is shown. */
@@ -116,5 +128,8 @@ fun moreUiState(
         },
         themeName = appThemeName(session),
         themes = if (local.page == MorePage.Themes) themesUiState(session, extras.themes, serverName) else null,
+        appVersion = extras.about?.info?.appVersion.orEmpty(),
+        about = extras.about?.takeIf { local.page == MorePage.About }?.let(::aboutUiState),
+        licences = extras.about?.takeIf { local.page == MorePage.Licences }?.licences,
     )
 }

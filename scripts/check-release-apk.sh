@@ -3,7 +3,7 @@
 #
 # Checks that a release APK is the product and nothing else:
 #
-#   scripts/check-release-apk.sh <apk> <versionName> <versionCode> <mapping.txt>
+#   scripts/check-release-apk.sh <apk> <versionName> <versionCode> <mapping.txt> [<notices>]
 #
 # <mapping.txt> is R8's map of the release build (android/app/build/outputs/mapping/release/):
 # R8 renames classes and moves code into other classes, so only the map tells what code the APK
@@ -16,6 +16,10 @@
 #   file that has a release counterpart under src/release (TestSettings) must be the release
 #   one, which has no setters: only the debug build lets the tests change it. R8 may fold the
 #   release one into the code that reads it; then it has no class of its own.
+# - the third-party notices for the licences screen (assets/THIRD_PARTY_NOTICES.txt); with
+#   <notices>, the generated notices of the release (scripts/generate-notices.sh), they must be
+#   exactly that file. The release workflow always passes it, so a release without the generated
+#   notices fails.
 #
 # Needs aapt2 and dexdump of the build tools (ANDROID_HOME from scripts/setup-android.sh).
 set -euo pipefail
@@ -25,11 +29,12 @@ die() {
   exit 1
 }
 
-usage="usage: check-release-apk.sh <apk> <versionName> <versionCode> <mapping.txt>"
+usage="usage: check-release-apk.sh <apk> <versionName> <versionCode> <mapping.txt> [<notices>]"
 apk="${1:?${usage}}"
 version_name="${2:?${usage}}"
 version_code="${3:?${usage}}"
 mapping="${4:?${usage}}"
+notices="${5:-}"
 [[ -f "${apk}" ]] || die "${apk} does not exist"
 [[ -f "${mapping}" ]] || die "${mapping} does not exist"
 
@@ -95,6 +100,13 @@ done < <(find "${REPO_ROOT}/android" -path '*/src/debug/kotlin/*.kt' -not -path 
 manifest="$("${tools}/aapt2" dump xmltree --file AndroidManifest.xml "${apk}")"
 if grep -q 'DesignGalleryActivity' <<<"${manifest}"; then
   die "the APK declares the debug design gallery"
+fi
+
+unzip -q -o "${apk}" assets/THIRD_PARTY_NOTICES.txt -d "${tmp}" 2>/dev/null \
+  || die "the APK has no third-party notices (assets/THIRD_PARTY_NOTICES.txt)"
+if [[ -n "${notices}" ]]; then
+  cmp -s "${notices}" "${tmp}/assets/THIRD_PARTY_NOTICES.txt" \
+    || die "the notices in the APK are not the generated ${notices}; was -Pmumcord.noticesFile passed?"
 fi
 
 printf 'check-release-apk: %s is a release build of %s (%s), arm64-v8a, without debug code\n' \

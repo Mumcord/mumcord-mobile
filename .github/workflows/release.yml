@@ -144,16 +144,36 @@ jobs:
           cargo install cargo-about --version "${CARGO_ABOUT_VERSION}" --locked --features cli
           cargo install cargo-cyclonedx --version "${CARGO_CYCLONEDX_VERSION}" --locked
 
-      # lintVitalRelease runs with assembleRelease. The APK stays unsigned here: the key only
-      # exists in the signing job.
-      - name: Build the release APK and the SBOM of its Android libraries
+      # The notices go into the APK (About -> Third-party licences), so they are generated first:
+      # from the SBOM of the Android libraries and the Rust crates of the engine library.
+      - name: SBOM of the Android libraries
         working-directory: android
         env:
           VERSION_NAME: ${{ steps.version.outputs.name }}
           VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
-          ./gradlew --console=plain assembleRelease :app:cyclonedxDirectBom \
+          ./gradlew --console=plain :app:cyclonedxDirectBom \
             "-Pmumcord.versionName=${VERSION_NAME}" "-Pmumcord.versionCode=${VERSION_CODE}"
+
+      - name: Third-party notices
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          mkdir -p dist
+          scripts/generate-notices.sh "${VERSION_NAME}" android/app/build/reports/cyclonedx-direct/bom.json \
+            dist/THIRD_PARTY_NOTICES.txt
+
+      # lintVitalRelease runs with assembleRelease. The APK stays unsigned here: the key only
+      # exists in the signing job.
+      - name: Build the release APK
+        working-directory: android
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          ./gradlew --console=plain assembleRelease \
+            "-Pmumcord.versionName=${VERSION_NAME}" "-Pmumcord.versionCode=${VERSION_CODE}" \
+            "-Pmumcord.noticesFile=${GITHUB_WORKSPACE}/dist/THIRD_PARTY_NOTICES.txt"
 
       - name: Check that the APK is the product
         env:
@@ -161,18 +181,17 @@ jobs:
           VERSION_CODE: ${{ steps.version.outputs.code }}
         run: |
           scripts/check-release-apk.sh android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            "${VERSION_NAME}" "${VERSION_CODE}" android/app/build/outputs/mapping/release/mapping.txt
+            "${VERSION_NAME}" "${VERSION_CODE}" android/app/build/outputs/mapping/release/mapping.txt \
+            dist/THIRD_PARTY_NOTICES.txt
 
-      - name: SBOM, third-party notices and release notes
+      - name: SBOM and release notes
         env:
           VERSION_NAME: ${{ steps.version.outputs.name }}
         run: |
-          mkdir -p dist
           base="mumcord-mobile-${VERSION_NAME}"
           cp android/app/build/outputs/apk/release/app-release-unsigned.apk "dist/${base}-arm64-unsigned.apk"
           android_sbom=android/app/build/reports/cyclonedx-direct/bom.json
           scripts/generate-sbom.sh "${VERSION_NAME}" "${android_sbom}" "dist/${base}-android.cdx.json"
-          scripts/generate-notices.sh "${VERSION_NAME}" "${android_sbom}" dist/THIRD_PARTY_NOTICES.txt
           scripts/release-notes.sh "${VERSION_NAME}" "${base}-arm64.apk" "${base}-android.cdx.json" \
             > dist/release-notes.md
           ls -l dist

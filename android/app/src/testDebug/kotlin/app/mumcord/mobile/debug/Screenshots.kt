@@ -2,24 +2,6 @@
 
 package app.mumcord.mobile.debug
 
-import app.mumcord.mobile.ui.connected.MoreExtras
-import app.mumcord.mobile.ui.messages.messagesUiState
-import app.mumcord.mobile.ui.messages.MessagesUiState
-import app.mumcord.mobile.ui.messages.MessagesLocal
-import app.mumcord.mobile.ui.messages.MessagesController
-import app.mumcord.mobile.ui.connected.ConnectedController
-import app.mumcord.mobile.ui.connected.MoreController
-import app.mumcord.mobile.ui.connected.MoreLocal
-import app.mumcord.mobile.ui.connected.MoreUiState
-import app.mumcord.mobile.ui.connected.moreUiState
-import app.mumcord.mobile.platform.call.OutputState
-import app.mumcord.mobile.session.SessionState
-import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
-import app.mumcord.mobile.bridge.MessageRequests
-import app.mumcord.mobile.bridge.MessageRequest
-import app.mumcord.mobile.bridge.Conversation
-import app.mumcord.mobile.bridge.ChatId
-import app.mumcord.mobile.bridge.BlockedPerson
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -27,22 +9,42 @@ import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onNodeWithTag
-import com.github.takahirom.roborazzi.RoborazziOptions
-import com.github.takahirom.roborazzi.RoborazziTaskType
-import com.github.takahirom.roborazzi.captureRoboImage
-import org.robolectric.shadows.ShadowLooper
+import app.mumcord.mobile.bridge.BlockedPerson
+import app.mumcord.mobile.bridge.ChatId
+import app.mumcord.mobile.bridge.Conversation
+import app.mumcord.mobile.bridge.MessageRequest
+import app.mumcord.mobile.bridge.MessageRequests
+import app.mumcord.mobile.platform.call.OutputState
+import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
 import app.mumcord.mobile.session.SessionRepository
+import app.mumcord.mobile.session.SessionState
+import app.mumcord.mobile.ui.about.AboutController
 import app.mumcord.mobile.ui.chat.ChatClock
 import app.mumcord.mobile.ui.chat.ChatController
 import app.mumcord.mobile.ui.chat.ChatImageLoader
 import app.mumcord.mobile.ui.chat.ChatImageSystem
 import app.mumcord.mobile.ui.connected.ChatEnvironment
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.flowOf
+import app.mumcord.mobile.ui.connected.ConnectedController
+import app.mumcord.mobile.ui.connected.MoreController
+import app.mumcord.mobile.ui.connected.MoreExtras
+import app.mumcord.mobile.ui.connected.MoreLocal
+import app.mumcord.mobile.ui.connected.MoreUiState
+import app.mumcord.mobile.ui.connected.moreUiState
+import app.mumcord.mobile.ui.messages.MessagesController
+import app.mumcord.mobile.ui.messages.MessagesLocal
+import app.mumcord.mobile.ui.messages.MessagesUiState
+import app.mumcord.mobile.ui.messages.messagesUiState
+import app.mumcord.mobile.update.AppInfo
+import com.github.takahirom.roborazzi.RoborazziOptions
+import com.github.takahirom.roborazzi.RoborazziTaskType
+import com.github.takahirom.roborazzi.captureRoboImage
 import java.io.File
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.flowOf
+import org.robolectric.shadows.ShadowLooper
 
 /** The size of the mockups: 390 x 844 dp at two pixels per dp, so the files can be laid over them. */
 const val PHONE_QUALIFIERS = "w390dp-h844dp-xhdpi"
@@ -130,9 +132,18 @@ class ScreenshotMessages(repository: SessionRepository, connected: ConnectedCont
     )
 }
 
+/** The versions the screenshots show: the mockup's app version and an engine pin. */
+val SCREENSHOT_APP_INFO = AppInfo(appVersion = "0.8.0", engineVersion = "0.8.0 (6d2ac79e)", debuggable = false)
+
 /** The More tab for screenshots: its actions are never called, its state is made from what a test passes. */
 class ScreenshotMore(repository: SessionRepository, connected: ConnectedController, scope: CoroutineScope) {
-    val actions = MoreController(repository, connected, InMemoryMessageNotificationSettings(), scope)
+    val actions = MoreController(
+        repository,
+        connected,
+        InMemoryMessageNotificationSettings(),
+        scope,
+        AboutController(SCREENSHOT_APP_INFO, updates = null, repository, notices = { "" }, scope),
+    )
 
     fun state(
         session: SessionState,
