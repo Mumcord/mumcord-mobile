@@ -1059,6 +1059,9 @@ class FakeEngine(
         return publicPings["$host:$port"]
     }
 
+    // Crash reports are not part of the session yet; the fake never sends anything.
+    override suspend fun crashUpload(id: String, comment: String) {}
+
     private fun appendOwn(chat: ChatId, content: MessageContent): ChatMessage {
         val message = chatMessage(
             id = "own-${nextMessageId++}",

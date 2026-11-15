@@ -68,6 +68,17 @@
 //! pasted code is previewed ([`MumcordEngine::theme_code_preview`]), then imported; codes are
 //! untrusted input, size-capped and read as colours and plain text only.
 //!
+//! # Crash reports
+//!
+//! Crash reports work as on the desktop and follow the same privacy rules: the engine saves a
+//! report for a panic or a fatal signal on the phone (version, system, cause, stack, the redacted
+//! last log lines; the home folder shortened to `~`), and nothing is sent until the user sends
+//! one report themselves. [`crash_install`] starts it at app start, before the engine exists;
+//! [`crash_take_unseen`] names the reports for the notice after a crash, [`crash_list`],
+//! [`crash_read`] and the delete functions serve the crash list, and
+//! [`MumcordEngine::crash_upload`] sends one report after the user saw
+//! [`crash_upload_preview`] and confirmed it.
+//!
 //! # Threads
 //!
 //! The bridge owns one tokio runtime. `async` methods run on it and never block the caller.
@@ -149,6 +160,7 @@ mod android;
 mod audio_abi;
 mod chat;
 mod convert;
+mod crash;
 mod engine;
 mod error;
 mod events;
@@ -176,6 +188,10 @@ pub use chat::{
     ContentBlock, Conversation, GifFavourite, ImageData, ImageRef, LinkKind, MentionCandidate,
     MessageContent, MessageRequest, MessageRequests, NotificationKind, PrivateMessageRule,
     PrivateMessageSettings, ReplyQuote, SafeLink, SentChatRequest, Span,
+};
+pub use crash::{
+    CrashKind, CrashReport, crash_delete, crash_delete_all, crash_install, crash_list, crash_read,
+    crash_take_unseen, crash_upload_preview,
 };
 pub use engine::MumcordEngine;
 pub use error::BridgeError;
