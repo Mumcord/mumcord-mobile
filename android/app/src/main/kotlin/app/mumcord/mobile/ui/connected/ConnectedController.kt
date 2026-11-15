@@ -32,6 +32,9 @@ class ConnectedController(
     private val mutableLocal = MutableStateFlow(ConnectedLocal())
     val local: StateFlow<ConnectedLocal> = mutableLocal.asStateFlow()
 
+    /** Move, server mute, kick and ban of the person whose sheet is open. */
+    val moderation = ModerationController(repository, scope, mutableLocal)
+
     /** The microphone level, 0 to 100; changes often, so only the level meter reads it. */
     val inputLevel: StateFlow<Int> = repository.inputLevel
 
@@ -101,7 +104,7 @@ class ConnectedController(
     /** Opens the person sheet. The own entry has none: its controls only make sense for others. */
     fun openPerson(session: UInt) {
         if (repository.state.value.server?.selfSession == session) return
-        mutableLocal.update { it.copy(personSession = session, volumeDraft = null) }
+        mutableLocal.update { it.copy(personSession = session, volumeDraft = null, moderation = null) }
     }
 
     fun changeVolume(percent: Int) {
@@ -237,11 +240,16 @@ class ConnectedController(
         scope.launch { repository.joinChannel(prompt.channelId, password) }
     }
 
-    /** Closes whichever sheet is open; an open password question is given up. */
+    /**
+     * Closes whichever sheet is open; an open password question is given up. A moderation step
+     * goes back to the person sheet it came from.
+     */
     fun dismissSheet() {
         if (repository.state.value.channelPassword != null) {
             repository.dismissChannelPassword()
             mutableLocal.update { it.copy(password = "") }
+        } else if (mutableLocal.value.moderation != null) {
+            mutableLocal.update { it.copy(moderation = null) }
         } else {
             mutableLocal.update {
                 it.copy(personSession = null, volumeDraft = null, menuChannelId = null, outputOpen = false)

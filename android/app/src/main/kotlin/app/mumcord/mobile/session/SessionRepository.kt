@@ -3,6 +3,9 @@
 package app.mumcord.mobile.session
 
 import app.mumcord.mobile.bridge.AudioEndpoints
+import app.mumcord.mobile.bridge.BanInput
+import app.mumcord.mobile.bridge.BanResult
+import app.mumcord.mobile.bridge.BanTarget
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.BridgeException
 import app.mumcord.mobile.bridge.ChatId
@@ -39,7 +42,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 /** The result of a command that the screen which started it reports itself (a form, a sheet). */
 sealed interface Outcome<out T> {
     data class Ok<T>(val value: T) : Outcome<T>
-    data class Failed(val error: ConnectionError) : Outcome<Nothing>
+    /** [refusal] is the server's own text of a [ConnectionError.PermissionDenied]: untrusted, never logged. */
+    data class Failed(val error: ConnectionError, val refusal: String? = null) : Outcome<Nothing>
 }
 
 /**
@@ -450,6 +454,25 @@ class SessionRepository(
         report(call("set person mute") { it.setPersonLocalMute(session, muted) })
     }
 
+    // ----- moderation (FR-5.90 … FR-5.93) -----
+    // The commands return true when the server confirmed the change and false when it did not
+    // answer in time; either way the tree shows what happened.
+
+    suspend fun movePerson(session: UInt, channelId: UInt): Outcome<Boolean> =
+        call("move person") { it.movePerson(session, channelId) }
+
+    suspend fun setServerMute(session: UInt, muted: Boolean): Outcome<Boolean> =
+        call("set server mute") { it.setServerMute(session, muted) }
+
+    suspend fun kickPerson(session: UInt, reason: String?): Outcome<Boolean> =
+        call("kick person") { it.kickPerson(session, reason) }
+
+    /** What the ban sheet needs about a person; asks the server (up to a few seconds). */
+    suspend fun banTarget(session: UInt): Outcome<BanTarget> = call("read ban target") { it.banTarget(session) }
+
+    suspend fun banPerson(session: UInt, ban: BanInput): Outcome<BanResult> =
+        call("ban person") { it.banPerson(session, ban) }
+
     /** Mutes or unmutes the user; the new state arrives as a change of their own entry. */
     suspend fun setSelfMute(muted: Boolean) {
         report(call("set self mute") { it.setSelfMute(muted) })
@@ -548,7 +571,7 @@ class SessionRepository(
     private fun failed(command: String, error: ConnectionError, cause: Throwable): Outcome.Failed {
         // Only the kind of failure: the detail text can contain the server address.
         log("$command failed: $error (${cause.javaClass.simpleName})")
-        return Outcome.Failed(error)
+        return Outcome.Failed(error, (cause as? BridgeException.PermissionDenied)?.detail)
     }
 
     private companion object {

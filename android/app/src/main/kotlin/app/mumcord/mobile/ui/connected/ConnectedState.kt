@@ -162,6 +162,8 @@ data class ConnectedLocal(
     val outputOpen: Boolean = false,
     /** The settings are open in the More tab. */
     val settingsOpen: Boolean = false,
+    /** The moderation step that replaced the person sheet: move, kick or ban. */
+    val moderation: ModerationLocal? = null,
 )
 
 /** The sheet over the connected screens. At most one at a time. */
@@ -175,7 +177,11 @@ sealed interface ConnectedSheet {
         val volumePercent: Int,
         val locallyMuted: Boolean,
         val state: PersonFlags,
+        val moderation: ModerationRows = ModerationRows(),
     ) : ConnectedSheet
+
+    /** Moving, kicking or banning the person of the person sheet. */
+    data class Moderation(val sheet: ModerationSheet) : ConnectedSheet
 
     /** [expanded] as in [ChannelListRow.ChannelItem]; [canJoin] is false for the own channel. */
     data class ChannelMenu(val id: UInt, val name: String, val expanded: Boolean?, val canJoin: Boolean) : ConnectedSheet
@@ -230,6 +236,7 @@ fun connectedUiState(
 
     val prompt = session.channelPassword
     val person = local.personSession?.let(server.people::get)
+    val moderation = local.moderation?.takeIf { it.session == person?.session }
     val menuChannel = local.menuChannelId?.let(server.channels::get)
     val outputUi = outputUiState(output)
     val sheet = when {
@@ -247,6 +254,7 @@ fun connectedUiState(
         // Asked once the voice plays somewhere, after the two permissions.
         askOutput -> ConnectedSheet.OutputQuestion
         local.outputOpen && outputUi != null -> ConnectedSheet.AudioOutput(outputUi.rows)
+        person != null && moderation != null -> ConnectedSheet.Moderation(moderationSheet(server, person, moderation))
         person != null -> ConnectedSheet.PersonSheet(
             session = person.session,
             name = person.name,
@@ -254,6 +262,7 @@ fun connectedUiState(
             volumePercent = local.volumeDraft ?: person.localVolume.toInt(),
             locallyMuted = person.locallyMuted,
             state = person.flags(),
+            moderation = server.moderationRows(person),
         )
         menuChannel != null -> ConnectedSheet.ChannelMenu(
             id = menuChannel.id,

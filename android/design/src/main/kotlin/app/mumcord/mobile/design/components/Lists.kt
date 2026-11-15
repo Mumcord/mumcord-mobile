@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
@@ -39,7 +40,8 @@ import app.mumcord.mobile.design.tokens.MumcordSpace
 
 /**
  * Section header above a list (`.section`): small capitals, with an optional text action at the
- * end such as "Edit".
+ * end such as "Edit". Inside a bottom sheet, which has its own margin, [padding] is
+ * [SheetSectionPadding] (`.sheet .section`).
  */
 @Composable
 fun MumcordSectionHeader(
@@ -47,6 +49,7 @@ fun MumcordSectionHeader(
     modifier: Modifier = Modifier,
     action: String? = null,
     onAction: () -> Unit = {},
+    padding: PaddingValues = SectionPadding,
 ) {
     val colors = MumcordTheme.colors
     Row(
@@ -54,7 +57,7 @@ fun MumcordSectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = MumcordSpace.s4, top = MumcordSpace.s4, end = MumcordSpace.s4, bottom = MumcordSpace.s2),
+            .padding(padding),
     ) {
         LineText(
             text = title.uppercase(),
@@ -72,6 +75,12 @@ fun MumcordSectionHeader(
         }
     }
 }
+
+private val SectionPadding =
+    PaddingValues(start = MumcordSpace.s4, top = MumcordSpace.s4, end = MumcordSpace.s4, bottom = MumcordSpace.s2)
+
+/** The padding of a section header inside a bottom sheet. */
+val SheetSectionPadding = PaddingValues(start = MumcordSpace.s1, top = MumcordSpace.s1, end = MumcordSpace.s1)
 
 /**
  * Card that groups list rows (`.list`), with a 16 dp margin at the sides. [flat] drops the card

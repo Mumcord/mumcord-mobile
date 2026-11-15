@@ -30,4 +30,12 @@ object TestSettings {
      */
     @Volatile
     var qrTexts: Flow<String>? = null
+
+    /**
+     * A ban also covers the address, which every person of the local test server shares (the
+     * host): when set, a ban lasts this many seconds instead of the chosen length, so the
+     * end-to-end test can wait for its end.
+     */
+    @Volatile
+    var banSeconds: UInt? = null
 }

@@ -28,7 +28,11 @@
 #      identity and a new code in every run); its QR code texts and its code reach the test
 #      as an argument and are written to no file and no log. The public server scenario
 #      serves its own list inside the emulator (android/e2e LocalPublicList) and never
-#      contacts the real list service.
+#      contacts the real list service. In the moderation scenarios the phone connects as the
+#      test server's SuperUser (its password reaches the test as an argument, never a file or
+#      log) and moderates e2e/moderation-target.py, a foreign client that reports what the
+#      server did to it; the ban scenario is the last one, because a ban covers the address
+#      all people of the test server share, and it ends with the person let in again.
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
@@ -98,7 +102,12 @@ LOCK_PTT_SECONDS=60
 # (its process is killed instead), so it must follow a "chat" scenario; "pm" a second person
 # who sends the phone a private message whenever the test asks for one; "identity" a second
 # person who has to see the same certificate each time the phone connects; "transfer" nobody,
-# and the test gets a transfer made for this run (the camera permission is asked for in it).
+# and the test gets a transfer made for this run (the camera permission is asked for in it);
+# "moderation" a second person (e2e/moderation-target.py) whom the phone, connected as the test
+# server's SuperUser, moves and kicks, and who has to report both; "ban" the
+# same person, who has to be removed by a short ban, refused while it lasts and let in again
+# after it. A ban covers the address all people of the test server share (the host), so the
+# "ban" scenario stays the last one.
 SCENARIOS=(
   "granted granted alone ${TEST_PACKAGE}.ConnectFlowTest"
   "granted granted alone ${TEST_PACKAGE}.PublicServersFlowTest"
@@ -126,6 +135,8 @@ SCENARIOS=(
   "granted granted pm ${TEST_PACKAGE}.MessagesFlowTest"
   "granted granted identity ${TEST_PACKAGE}.IdentityFlowTest"
   "granted granted transfer ${TEST_PACKAGE}.TransferFlowTest"
+  "granted granted moderation ${TEST_PACKAGE}.ModerationFlowTest#moveAndKickReachTheOtherPerson"
+  "granted granted ban ${TEST_PACKAGE}.ModerationFlowTest#aShortBanRemovesThePersonUntilItEnds"
 )
 # A stretch of voice a person heard counts from this length (ms); the engine's own short
 # sounds, like the one for somebody entering the channel, are shorter.
@@ -163,6 +174,9 @@ CHAT_PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/chat-peer"
 CHAT_PEER_LOG="${OUT_DIR}/chat-peer.log"
 RAW_CHAT_LOG="${OUT_DIR}/raw-chat.log"
 IDENTITY_WATCH_LOG="${OUT_DIR}/identity-watch.log"
+MODERATION_LOG="${OUT_DIR}/moderation-target.log"
+# The SuperUser password of the test server, which scripts/testenv.sh wrote here.
+TESTENV_FILE="${REPO_ROOT}/.engine/testenv/.env"
 TRANSFER_MAKER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/transfer-maker"
 # The numbers of the private messages the second person of the "pm" scenario is to send.
 PM_FIFO="${OUT_DIR}/pm-requests"
@@ -309,7 +323,7 @@ check_peers() {
   local kind="$1" report="$2" spans count held longest lost
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
   if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" \
-    && "${kind}" != "identity" ]]; then
+    && "${kind}" != "identity" && "${kind}" != "moderation" && "${kind}" != "ban" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -417,6 +431,24 @@ check_peers() {
       done
       printf 'e2e: chat: the second person received the text, the link, the GIF link and the picture of the app\n'
       ;;
+    moderation)
+      local expected
+      for expected in 'MOVED Raid' 'REMOVED reason=e2e kick' 'BACK'; do
+        grep -qx "${expected}" "${MODERATION_LOG}" \
+          || die "the moderated person did not report ${expected}, see e2e/build/moderation-target.log"
+      done
+      ! grep -qx 'REFUSED' "${MODERATION_LOG}" \
+        || die "a kick kept the moderated person out, see e2e/build/moderation-target.log"
+      printf 'e2e: moderation: the other person was moved and kicked\n'
+      ;;
+    ban)
+      local expected
+      for expected in 'REMOVED reason=e2e ban' 'REFUSED' 'BACK'; do
+        grep -qx "${expected}" "${MODERATION_LOG}" \
+          || die "the banned person did not report ${expected}, see e2e/build/moderation-target.log"
+      done
+      printf 'e2e: ban: the other person was removed, refused while the ban lasted and let in after it\n'
+      ;;
     pm)
       local number
       for number in 1 2 3; do
@@ -441,7 +473,8 @@ cleanup() {
   if ((status != 0)); then
     # What the other people reported belongs next to the failure, not only into a file.
     local log
-    for log in "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}"; do
+    for log in "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" "${IDENTITY_WATCH_LOG}" \
+      "${MODERATION_LOG}"; do
       [[ -s "${log}" ]] || continue
       printf 'e2e: the end of %s:\n' "${log#"${REPO_ROOT}/"}"
       tail -n 40 "${log}"
@@ -458,9 +491,10 @@ cleanup() {
       'svc data enable; svc wifi enable; for id in $(cmd wifi list-networks | grep AndroidWifi | cut -d" " -f1); do cmd wifi forget-network "$id"; done; dumpsys deviceidle unforce; dumpsys battery reset' \
       >/dev/null 2>&1
     # adbd logs every shell command it runs; the transfer argument (the code with its QR code
-    # texts) must not reach the file.
+    # texts) and the SuperUser password must not reach the file.
     timeout 20 "${ADB}" -s "${serial}" logcat -d 2>/dev/null \
-      | sed -E 's/-e transfer [^ ]+/-e transfer (removed)/g' >"${OUT_DIR}/logcat.txt"
+      | sed -E 's/-e transfer [^ ]+/-e transfer (removed)/g; s/-e superuser [^ ]+/-e superuser (removed)/g' \
+        >"${OUT_DIR}/logcat.txt"
   fi
   if [[ -n "${emulator_pid}" ]]; then
     timeout 10 "${ADB}" -s "${serial}" emu kill >/dev/null 2>&1
@@ -607,6 +641,13 @@ run_scenario() {
     pm)
       start_messenger
       PERSON_INPUT="${PM_FIFO}" start_person "${CHAT_PEER_LOG}" "${CHAT_PEER_BINARY}" --phone "${PHONE_NAME}" --private
+      ;;
+    moderation | ban)
+      local superuser
+      superuser="$(sed -n 's/^SUPERUSER_PASSWORD=//p' "${TESTENV_FILE}")"
+      [[ -n "${superuser}" ]] || die "the test server's SuperUser password is missing in ${TESTENV_FILE#"${REPO_ROOT}/"}"
+      extra=(-e superuser "${superuser}")
+      start_person "${MODERATION_LOG}" python3 "${REPO_ROOT}/e2e/moderation-target.py"
       ;;
     whisper)
       start_peer "${PEER_LOG}" --listen-only

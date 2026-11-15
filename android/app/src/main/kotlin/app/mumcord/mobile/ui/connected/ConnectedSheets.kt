@@ -71,6 +71,8 @@ fun ConnectedSheetHost(
             OutputQuestionSheet(actions::answerOutputQuestion, actions::dismissOutputQuestion, topInsets, bottomInsets)
         is ConnectedSheet.AudioOutput ->
             AudioOutputSheet(sheet.rows, actions::selectOutput, actions::dismissSheet, topInsets, bottomInsets)
+        is ConnectedSheet.Moderation ->
+            ModerationSheetHost(sheet.sheet, actions.moderation, actions::dismissSheet, topInsets, bottomInsets)
     }
 }
 
@@ -109,7 +111,8 @@ private fun ChannelPasswordSheet(
 
 /**
  * Mockup `06-person-sheet`: the head, the two settings that apply to the user only, private
- * message and whisper. The card below them, with the chat request and blocking, has no mockup.
+ * message and whisper, and the moderation entries the server allows. The card with the chat
+ * request and blocking has no mockup; it sits between whisper and moderation.
  */
 @Composable
 private fun PersonSheet(
@@ -197,6 +200,7 @@ private fun PersonSheet(
                 modifier = Modifier.testTag(PERSON_BLOCK_TEST_TAG),
             )
         }
+        ModerationSection(sheet.moderation, actions.moderation)
     }
 }
 

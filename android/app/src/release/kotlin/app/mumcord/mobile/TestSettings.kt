@@ -17,4 +17,7 @@ object TestSettings {
 
     /** The scanner always reads from the camera. */
     val qrTexts: Flow<String>? = null
+
+    /** A ban always lasts the chosen length. */
+    val banSeconds: UInt? = null
 }

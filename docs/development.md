@@ -169,7 +169,13 @@ was on the screen in its failure message.
   the system's dialog, the slow check of the code, the wrong-code and expired-code refusals, the
   import and the connection with the imported identity are the real ones. Reading QR codes
   from a real camera image (and its focus and lighting) is only checked on a phone against the
-  desktop app.
+  desktop app. Moderation runs with the phone connected as the test server's SuperUser (the
+  password from `.engine/testenv/.env`, passed as an instrumentation argument and removed from
+  the device log) against `e2e/moderation-target.py`, a foreign client that reports being
+  moved, kicked and banned. Server mute is covered by the instrumented tests only: a standard
+  server tells the SuperUser its rights for the root channel alone. A ban covers the address that every person of the
+  test server shares, so the debug build's `TestSettings.banSeconds` shortens it to 15
+  seconds, its scenario runs last, and it only passes once the person is let in again.
 - **Public servers:** the browser is never tested against the real list service or a public
   server. `LocalPublicList` (android/e2e) serves a list of its own inside the emulator on
   127.0.0.1 and points the engine at it with `MUMCORD_PUBLIC_SERVERS_URL`, set by the test

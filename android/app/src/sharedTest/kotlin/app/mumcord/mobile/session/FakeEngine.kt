@@ -923,28 +923,14 @@ class FakeEngine(
         emit(BridgeEvent.ProfileChanged(server.selfSession))
     }
 
-    override suspend fun movePerson(session: UInt, channelId: UInt): Boolean {
-        moderationCalls += "move $session $channelId"
-        return true
-    }
+    /** Thrown by the next moderation command (move, mute, deafen, kick, ban and its target) instead of acting. */
+    @Volatile
+    var moderationFailure: BridgeException? = null
 
-    override suspend fun setServerMute(session: UInt, muted: Boolean): Boolean {
-        moderationCalls += "mute $session $muted"
-        return true
-    }
-
-    override suspend fun setServerDeafen(session: UInt, deafened: Boolean): Boolean {
-        moderationCalls += "deafen $session $deafened"
-        return true
-    }
-
-    override suspend fun kickPerson(session: UInt, reason: String?): Boolean {
-        moderationCalls += "kick $session"
-        return true
-    }
-
-    override suspend fun banTarget(session: UInt): BanTarget = BanTarget(
-        address = null,
+    /** What [banTarget] reports about a person. */
+    @Volatile
+    var banTargetAnswer = BanTarget(
+        address = "192.0.2.7",
         onlineSecs = null,
         banListReadable = true,
         hasCertificate = true,
@@ -952,9 +938,55 @@ class FakeEngine(
         canBan = true,
     )
 
+    /** What the next bans produce, in order; a ban beyond them is saved and removes the person. */
+    val banResults = CopyOnWriteArrayList<BanResult>()
+    val kickReasons = CopyOnWriteArrayList<String?>()
+    val banInputs = CopyOnWriteArrayList<BanInput>()
+
+    private fun moderate() {
+        moderationFailure?.let {
+            moderationFailure = null
+            throw it
+        }
+    }
+
+    override suspend fun movePerson(session: UInt, channelId: UInt): Boolean {
+        moderate()
+        moderationCalls += "move $session $channelId"
+        change(session) { it.copy(channelId = channelId) }
+        return true
+    }
+
+    override suspend fun setServerMute(session: UInt, muted: Boolean): Boolean {
+        moderate()
+        moderationCalls += "mute $session $muted"
+        change(session) { it.copy(serverMuted = muted) }
+        return true
+    }
+
+    override suspend fun setServerDeafen(session: UInt, deafened: Boolean): Boolean {
+        moderate()
+        moderationCalls += "deafen $session $deafened"
+        return true
+    }
+
+    override suspend fun kickPerson(session: UInt, reason: String?): Boolean {
+        moderate()
+        moderationCalls += "kick $session"
+        kickReasons += reason
+        return true
+    }
+
+    override suspend fun banTarget(session: UInt): BanTarget {
+        moderate()
+        return banTargetAnswer
+    }
+
     override suspend fun banPerson(session: UInt, ban: BanInput): BanResult {
+        moderate()
         moderationCalls += "ban $session"
-        return BanResult.Saved(removed = true)
+        banInputs += ban
+        return if (banResults.isEmpty()) BanResult.Saved(removed = true) else banResults.removeAt(0)
     }
 
     override fun activityLog(): List<ActivityEntry> = activity

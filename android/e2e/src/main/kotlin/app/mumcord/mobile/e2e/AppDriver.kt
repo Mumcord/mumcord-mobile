@@ -58,12 +58,16 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
         awaitOrFail("the server list") { exists(SERVER_ADD_TEST_TAG) }
     }
 
-    fun addServer() {
+    /** Adds the test server; [password] is the server password, saved with it. */
+    fun addServer(userName: String = USER_NAME, password: String? = null) {
         compose.onNodeWithTag(SERVER_ADD_TEST_TAG).performClick()
         awaitOrFail("the add server form") { exists(FORM_SAVE_TEST_TAG) }
         compose.onNodeWithContentDescription(FIELD_ADDRESS).performTextReplacement(server.host)
         compose.onNodeWithContentDescription(FIELD_PORT).performTextReplacement(server.port.toString())
-        compose.onNodeWithContentDescription(FIELD_USER_NAME).performTextReplacement(USER_NAME)
+        compose.onNodeWithContentDescription(FIELD_USER_NAME).performTextReplacement(userName)
+        if (password != null) {
+            compose.onNodeWithContentDescription(FIELD_PASSWORD).performScrollTo().performTextReplacement(password)
+        }
         compose.onNodeWithTag(FORM_SAVE_TEST_TAG).performScrollTo().performClick()
         awaitOrFail("the saved server in the list") { exists(SERVER_CONNECT_TEST_TAG) }
     }
@@ -181,6 +185,7 @@ class AppDriver(private val compose: ComposeTestRule, private val server: TestSe
         private const val FIELD_ADDRESS = "Address"
         private const val FIELD_PORT = "Port"
         private const val FIELD_USER_NAME = "User name"
+        private const val FIELD_PASSWORD = "Server password"
         private const val FIELD_IDENTITY_NAME = "Name on servers"
         private const val POLL_MILLIS = 100L
     }
