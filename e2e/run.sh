@@ -209,6 +209,8 @@ messenger_pid=""
 evidence_pid=""
 load_pid=""
 server_started=0
+# The animation scales the emulator had before the run switched them off, as "name=value".
+animation_scales=()
 
 adb_device() {
   "${ADB}" -s "${serial}" "$@"
@@ -506,6 +508,16 @@ cleanup() {
     timeout 20 "${ADB}" -s "${serial}" shell \
       'svc data enable; svc wifi enable; for id in $(cmd wifi list-networks | grep AndroidWifi | cut -d" " -f1); do cmd wifi forget-network "$id"; done; dumpsys deviceidle unforce; dumpsys battery reset' \
       >/dev/null 2>&1
+    # The settings outlive the emulator in its device data: without this, every later run on
+    # the same device, the instrumented tests among them, would run without animations.
+    local entry
+    for entry in "${animation_scales[@]}"; do
+      if [[ "${entry#*=}" == "null" ]]; then
+        timeout 20 "${ADB}" -s "${serial}" shell settings delete global "${entry%%=*}" >/dev/null 2>&1
+      else
+        timeout 20 "${ADB}" -s "${serial}" shell settings put global "${entry%%=*}" "${entry#*=}" >/dev/null 2>&1
+      fi
+    done
     # adbd logs every shell command it runs; the transfer argument (the code with its QR code
     # texts) and the SuperUser password must not reach the file.
     timeout 20 "${ADB}" -s "${serial}" logcat -d 2>/dev/null \
@@ -553,6 +565,7 @@ start_emulator() {
   # No animations: a system dialog that slides in takes a tap only once it has arrived.
   local scale
   for scale in window_animation_scale transition_animation_scale animator_duration_scale; do
+    animation_scales+=("${scale}=$(adb_device shell settings get global "${scale}" | tr -d '\r')")
     adb_device shell settings put global "${scale}" 0 || die "switching off the animations failed"
   done
 }
