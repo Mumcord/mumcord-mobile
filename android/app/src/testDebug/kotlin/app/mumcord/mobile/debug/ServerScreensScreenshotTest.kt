@@ -7,16 +7,12 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
-import app.mumcord.mobile.bridge.DefaultOutput
-import app.mumcord.mobile.bridge.MobileSettings
 import app.mumcord.mobile.bridge.TalkMode
-import app.mumcord.mobile.design.components.MumcordScreen
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.session.CertificatePromptState
 import app.mumcord.mobile.session.ConnectionError
 import app.mumcord.mobile.ui.connect.CertificateSheet
 import app.mumcord.mobile.ui.connect.SessionEndedSheet
-import app.mumcord.mobile.ui.connected.SettingsScreen
 import app.mumcord.mobile.ui.connect.LocalNetworkSheet
 import app.mumcord.mobile.ui.servers.ConnectFailure
 import app.mumcord.mobile.ui.servers.LocalNetworkHint
@@ -125,31 +121,6 @@ class ServerScreensScreenshotTest {
     @Test fun idleDisconnectedDark() = idleDisconnected(dark = true)
 
     @Test fun idleDisconnectedLight() = idleDisconnected(dark = false)
-
-    // Mockup `16-settings`, as far as the settings exist: mobile data and battery.
-    private fun settings(dark: Boolean) = capture("android-settings-data-battery", dark) {
-        MumcordScreen {
-            SettingsScreen(
-                MobileSettings(
-                    talkModeChosen = true,
-                    defaultOutput = DefaultOutput.ASK,
-                    mobileDataAutoplayStreams = false,
-                    mobileDataLoadMedia = true,
-                    mobileDataReducedVoice = false,
-                    idleDisconnect = false,
-                    notifySenderOnly = false,
-                    updateCheck = true,
-                ),
-                onChange = {},
-                onBack = {},
-                topInsets = top,
-            )
-        }
-    }
-
-    @Test fun settingsDark() = settings(dark = true)
-
-    @Test fun settingsLight() = settings(dark = false)
 
     @Test fun sessionEndedDark() = sessionEnded(dark = true)
 

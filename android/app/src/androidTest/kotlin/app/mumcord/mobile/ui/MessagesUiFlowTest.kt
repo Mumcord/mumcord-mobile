@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.printToString
 import androidx.test.espresso.Espresso
@@ -40,7 +41,8 @@ import app.mumcord.mobile.ui.connect.FakeLocalNetworkGateway
 import app.mumcord.mobile.ui.connect.LocalNetworkSystem
 import app.mumcord.mobile.ui.connected.FakeMicrophoneAccess
 import app.mumcord.mobile.ui.connected.MORE_BLOCKED_TEST_TAG
-import app.mumcord.mobile.ui.connected.MORE_SENDER_ONLY_TEST_TAG
+import app.mumcord.mobile.ui.connected.MORE_SETTINGS_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_SENDER_ONLY_TEST_TAG
 import app.mumcord.mobile.ui.connected.MicrophoneSystem
 import app.mumcord.mobile.ui.connected.NotificationAccess
 import app.mumcord.mobile.ui.connected.NotificationSystem
@@ -297,18 +299,22 @@ class MessagesUiFlowTest {
     }
 
     @Test
-    fun showSenderOnlyIsSwitchedOnUnderMore() {
+    fun showSenderOnlyIsSwitchedOnInTheSettings() {
         connect()
         compose.onNodeWithText("More").performClick()
+        compose.onNodeWithTag(MORE_SETTINGS_TEST_TAG).performClick()
+        await("the settings") { shown(SETTINGS_SENDER_ONLY_TEST_TAG) }
 
-        compose.onNodeWithTag(MORE_SENDER_ONLY_TEST_TAG).performClick()
+        compose.onNodeWithTag(SETTINGS_SENDER_ONLY_TEST_TAG).performScrollTo().performClick()
 
         await("the switch to be kept") { settings.senderOnly.value }
         // Blocked people leave no dead end: back returns to More.
+        Espresso.pressBack()
+        await("More again") { shown(MORE_BLOCKED_TEST_TAG) }
         compose.onNodeWithTag(MORE_BLOCKED_TEST_TAG).performClick()
         await("the blocked people") { shown(BLOCKED_SCREEN_TEST_TAG) }
         Espresso.pressBack()
-        await("More again") { shown(MORE_SENDER_ONLY_TEST_TAG) }
+        await("More again") { shown(MORE_BLOCKED_TEST_TAG) }
     }
 
     private fun shown(tag: String): Boolean = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()

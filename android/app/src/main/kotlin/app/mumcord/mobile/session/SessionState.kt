@@ -2,6 +2,8 @@
 
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.ActivityEntry
+import app.mumcord.mobile.bridge.AppSettings
 import app.mumcord.mobile.bridge.AudioWanted
 import app.mumcord.mobile.bridge.Channel
 import app.mumcord.mobile.bridge.Identity
@@ -40,6 +42,10 @@ data class SessionState(
     val identities: List<Identity>? = null,
     /** The phone settings as the engine keeps them; null until they have been read. */
     val mobileSettings: MobileSettings? = null,
+    /** The settings shared with the desktop's settings model; null until they have been read. */
+    val appSettings: AppSettings? = null,
+    /** The activity log of the connection (Spec 11), newest first, at most [MAX_ACTIVITY]. */
+    val activity: List<ActivityEntry> = emptyList(),
     /** Things the app cannot show, newest last; see [withHint]. */
     val hints: List<UnsupportedHint> = emptyList(),
 ) {
@@ -123,6 +129,9 @@ enum class UnsupportedKind { FileTransfer, WatchTogether, PluginContent }
  * [id] tells two hints of the same kind by the same person apart.
  */
 data class UnsupportedHint(val id: Long, val personName: String, val kind: UnsupportedKind)
+
+/** As many entries as the bridge keeps for a connection. */
+const val MAX_ACTIVITY = 200
 
 /** How many hints stay visible; older ones make room so the list stays calm. */
 const val MAX_HINTS = 3

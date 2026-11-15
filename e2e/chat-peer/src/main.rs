@@ -16,6 +16,11 @@
 //! there and then sends the phone one private message, "Private note <n>", for every number
 //! `<n>` it reads as a line from its standard input, and reports `PM SENT <n>`, or
 //! `PM FAILED <n>` when the phone is no longer on the server.
+//!
+//! With `--visitor` it is the person the phone's activity log watches: it starts without a
+//! connection, prints `READY`, and for every line it reads does one step as the user
+//! `e2e-visitor`: `join` connects to the server, `move` enters the channel "Raid" and `leave`
+//! disconnects. It reports each as `VISITOR JOINED`, `VISITOR MOVED` and `VISITOR LEFT`.
 
 use std::collections::HashMap;
 use std::process::ExitCode;
@@ -29,7 +34,10 @@ use mumcord_mobile::{
 };
 
 const USER_NAME: &str = "e2e-peer";
+const VISITOR_NAME: &str = "e2e-visitor";
 const CHANNEL: &str = "Lobby";
+/// Where the visitor moves to.
+const MOVE_TO: &str = "Raid";
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 /// How long the phone may take to connect and enter the channel.
 const PHONE_TIMEOUT: Duration = Duration::from_secs(240);
@@ -101,18 +109,105 @@ fn wait_for<T>(
     }
 }
 
-/// The phone's user name, and whether to write to it in private instead of into the channel.
-fn arguments() -> Result<(String, bool), String> {
+/// What the second person does.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    /// Writes into the channel and reports what it receives.
+    Channel,
+    /// Writes to the phone in private when asked.
+    Private,
+    /// Joins, moves and leaves when asked.
+    Visitor,
+}
+
+/// The phone's user name and the mode.
+fn arguments() -> Result<(String, Mode), String> {
     let mut arguments = std::env::args().skip(1);
     match (
         arguments.next().as_deref(),
         arguments.next(),
         arguments.next().as_deref(),
     ) {
-        (Some("--phone"), Some(name), None) => Ok((name, false)),
-        (Some("--phone"), Some(name), Some("--private")) => Ok((name, true)),
-        _ => Err("usage: chat-peer --phone <user name of the phone> [--private]".into()),
+        (Some("--phone"), Some(name), None) => Ok((name, Mode::Channel)),
+        (Some("--phone"), Some(name), Some("--private")) => Ok((name, Mode::Private)),
+        (Some("--phone"), Some(name), Some("--visitor")) => Ok((name, Mode::Visitor)),
+        _ => {
+            Err("usage: chat-peer --phone <user name of the phone> [--private | --visitor]".into())
+        }
     }
+}
+
+/// Connects as `name`, trusts the test server's certificate and returns the server's channels
+/// by name.
+fn connect(
+    engine: &MumcordEngine,
+    runtime: &tokio::runtime::Runtime,
+    events: &Receiver<BridgeEvent>,
+    port: u16,
+    name: &str,
+) -> Result<HashMap<String, u32>, String> {
+    runtime
+        .block_on(engine.connect(ConnectRequest {
+            address: "127.0.0.1".into(),
+            port,
+            username: name.into(),
+            password: None,
+        }))
+        .map_err(|error| format!("connecting failed: {error}"))?;
+    let fingerprint = wait_for(events, "the certificate question", |event| match event {
+        BridgeEvent::CertificatePromptRequired { prompt } => Some(prompt.fingerprint.clone()),
+        _ => None,
+    })?;
+    runtime
+        .block_on(engine.answer_certificate_prompt(fingerprint, true))
+        .map_err(|error| format!("trusting the certificate failed: {error}"))?;
+    wait_for(events, "the server's channels", |event| match event {
+        BridgeEvent::ServerSynced { server } => Some(
+            server
+                .channels
+                .iter()
+                .map(|channel| (channel.name.clone(), channel.id))
+                .collect(),
+        ),
+        _ => None,
+    })
+}
+
+/// Does one step of the visit per line read from the standard input, until the input ends.
+fn visit(
+    engine: &MumcordEngine,
+    runtime: &tokio::runtime::Runtime,
+    events: &Receiver<BridgeEvent>,
+    port: u16,
+) -> Result<(), String> {
+    println!("READY");
+    let mut channels = HashMap::new();
+    for line in std::io::stdin().lines() {
+        let line = line.map_err(|error| format!("reading the next step failed: {error}"))?;
+        match line.trim() {
+            "join" => {
+                channels = connect(engine, runtime, events, port, VISITOR_NAME)?;
+                println!("VISITOR JOINED");
+            }
+            "move" => {
+                let channel = *channels
+                    .get(MOVE_TO)
+                    .ok_or(format!("the server has no channel {MOVE_TO}"))?;
+                runtime
+                    .block_on(engine.join_channel(channel, None))
+                    .map_err(|error| format!("moving to {MOVE_TO} failed: {error}"))?;
+                println!("VISITOR MOVED");
+            }
+            "leave" => {
+                runtime
+                    .block_on(engine.disconnect())
+                    .map_err(|error| format!("leaving failed: {error}"))?;
+                println!("VISITOR LEFT");
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 /// Sends the phone one private message per number read from the standard input, until the
@@ -174,7 +269,7 @@ fn report(message: &ChatMessage) -> String {
 }
 
 fn run() -> Result<(), String> {
-    let (phone, private) = arguments()?;
+    let (phone, mode) = arguments()?;
     let port = std::env::var("MUMCORD_PORT_BASE")
         .ok()
         .and_then(|port| port.parse().ok())
@@ -196,32 +291,16 @@ fn run() -> Result<(), String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .build()
         .map_err(|error| format!("starting the runtime failed: {error}"))?;
-    runtime
-        .block_on(engine.connect(ConnectRequest {
-            address: "127.0.0.1".into(),
-            port,
-            username: USER_NAME.into(),
-            password: None,
-        }))
-        .map_err(|error| format!("connecting failed: {error}"))?;
-    let fingerprint = wait_for(&events, "the certificate question", |event| match event {
-        BridgeEvent::CertificatePromptRequired { prompt } => Some(prompt.fingerprint.clone()),
-        _ => None,
-    })?;
-    runtime
-        .block_on(engine.answer_certificate_prompt(fingerprint, true))
-        .map_err(|error| format!("trusting the certificate failed: {error}"))?;
-    let channel = wait_for(&events, "the server's channels", |event| match event {
-        BridgeEvent::ServerSynced { server } => Some(
-            server
-                .channels
-                .iter()
-                .find(|channel| channel.name == CHANNEL)
-                .map(|channel| channel.id),
-        ),
-        _ => None,
-    })?
-    .ok_or(format!("the server has no channel {CHANNEL}"))?;
+    if mode == Mode::Visitor {
+        visit(&engine, &runtime, &events, port)?;
+        // The input ended; stay until stopped, as in the other modes.
+        loop {
+            std::thread::sleep(Duration::from_secs(60));
+        }
+    }
+    let channel = *connect(&engine, &runtime, &events, port, USER_NAME)?
+        .get(CHANNEL)
+        .ok_or(format!("the server has no channel {CHANNEL}"))?;
     runtime
         .block_on(engine.join_channel(channel, None))
         .map_err(|error| format!("joining {CHANNEL} failed: {error}"))?;
@@ -245,7 +324,7 @@ fn run() -> Result<(), String> {
         std::thread::sleep(POLL);
     }
 
-    if private {
+    if mode == Mode::Private {
         write_in_private(&engine, &runtime, &phone)?;
         // The input ended; stay on the server until stopped, as in the other mode.
         loop {

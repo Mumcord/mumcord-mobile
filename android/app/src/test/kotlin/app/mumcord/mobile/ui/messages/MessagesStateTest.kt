@@ -220,16 +220,15 @@ class MessagesStateTest {
     }
 
     @Test
-    fun blockedPeopleNotificationsAndTheSwitchArePassedOn() {
+    fun blockedPeopleAndNotificationsArePassedOn() {
         val ui = state(
-            MessagesLocal(blockedOpen = true, senderOnly = true),
+            MessagesLocal(blockedOpen = true),
             blocked = listOf(blockedPerson(3, "Troll")),
             granted = false,
         )
 
         assertEquals(listOf(BlockedRow(3, "Troll", "Nordlicht")), ui.blocked)
         assertTrue(ui.blockedOpen)
-        assertTrue(ui.senderOnly)
         assertTrue(ui.notificationsOff)
         assertFalse(state().notificationsOff)
     }

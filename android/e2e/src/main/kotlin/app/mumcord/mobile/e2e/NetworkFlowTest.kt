@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import app.mumcord.mobile.MainActivity
 import app.mumcord.mobile.MumcordApplication
 import app.mumcord.mobile.platform.audio.AudioProbe
@@ -132,7 +133,7 @@ class NetworkFlowTest {
         compose.onNodeWithText(TAB_MORE).performClick()
         compose.onNodeWithTag(MORE_SETTINGS_TEST_TAG).performClick()
         app.await("the settings") { app.exists(SETTINGS_SCREEN_TEST_TAG) }
-        compose.onNodeWithTag(SETTINGS_REDUCED_VOICE_TEST_TAG).performClick()
+        compose.onNodeWithTag(SETTINGS_REDUCED_VOICE_TEST_TAG).performScrollTo().performClick()
         app.await("the bitrate limit on mobile data") { bitrateLimit() == REDUCED_KBPS }
         VoiceChecks.report("network: metered_limit_kbps=${bitrateLimit()}")
 

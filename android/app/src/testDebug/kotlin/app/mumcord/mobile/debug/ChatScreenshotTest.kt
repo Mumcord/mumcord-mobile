@@ -82,6 +82,7 @@ class ChatScreenshotTest {
     private val actions = ConnectedController(repository, scope)
     private val chatActions = screenshotChatController(repository, scope)
     private val messagesTab = ScreenshotMessages(repository, actions, scope)
+    private val more = ScreenshotMore(repository, actions, scope)
 
     private val lobby = ChatId.Channel(MOCKUP_LOBBY)
 
@@ -188,6 +189,8 @@ class ChatScreenshotTest {
                         messagesActions = messagesTab.actions,
                         conversation = null,
                         conversationActions = messagesTab.conversationActions,
+                        more = more.state(session),
+                        moreActions = more.actions,
                         onNotificationSettings = {},
                         onIdentities = {},
                         topInsets = top,

@@ -10,6 +10,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.test.espresso.Espresso
+import app.mumcord.mobile.bridge.TalkMode
+import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.session.FakeEngine
 import app.mumcord.mobile.session.FakeIdleNotifier
@@ -27,6 +31,15 @@ import app.mumcord.mobile.ui.connected.FakeMicrophoneAccess
 import app.mumcord.mobile.ui.connected.MORE_SETTINGS_TEST_TAG
 import app.mumcord.mobile.ui.connected.MicrophoneSystem
 import app.mumcord.mobile.ui.connected.SETTINGS_AUTOPLAY_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_HISTORY_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_LEVEL_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_NOISE_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_NOTIFY_MENTIONS_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_NOTIFY_PRIVATE_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_OUTPUT_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_SENDER_ONLY_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_TALK_MODE_TEST_TAG
+import app.mumcord.mobile.ui.connected.settingsOptionTestTag
 import app.mumcord.mobile.ui.connected.SETTINGS_IDLE_TEST_TAG
 import app.mumcord.mobile.ui.connected.SETTINGS_LOAD_MEDIA_TEST_TAG
 import app.mumcord.mobile.ui.connected.SETTINGS_REDUCED_VOICE_TEST_TAG
@@ -45,7 +58,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /**
- * The settings in the More tab (FR-5.41, FR-5.42) and "disconnect when alone" (AC-5.30) on a
+ * The settings in the More tab (FR-5.100) and "disconnect when alone" (AC-5.30) on a
  * device against a fake engine, where the user is alone in the Lobby. The times of the rule
  * are shortened to two seconds alone and two seconds of warning.
  */
@@ -56,6 +69,7 @@ class SettingsUiFlowTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var engine: FakeEngine
     private val notifier = FakeIdleNotifier()
+    private val messageSettings = InMemoryMessageNotificationSettings()
     private lateinit var idle: IdleDisconnect
 
     private object DoneSetup : SetupStore {
@@ -81,7 +95,14 @@ class SettingsUiFlowTest {
         )
         runBlocking { repository.loadServers() }
         idle = IdleDisconnect(repository, notifier, scope, clock = System::currentTimeMillis) { IdleTimes(ALONE_MILLIS, WARNING_MILLIS) }
-        val viewModel = AppViewModel(repository, DoneSetup, FakeLocalNetworkGateway(), FakeMicrophoneAccess(), idle = idle)
+        val viewModel = AppViewModel(
+            repository,
+            DoneSetup,
+            FakeLocalNetworkGateway(),
+            FakeMicrophoneAccess(),
+            messageSettings = messageSettings,
+            idle = idle,
+        )
         compose.setContent {
             MumcordTheme {
                 AppRoute(
@@ -97,6 +118,7 @@ class SettingsUiFlowTest {
 
     private fun openSettings() {
         compose.onNodeWithText("More").performClick()
+        await { shown(MORE_SETTINGS_TEST_TAG) }
         compose.onNodeWithTag(MORE_SETTINGS_TEST_TAG).performClick()
         await { shown(SETTINGS_SCREEN_TEST_TAG) }
     }
@@ -105,45 +127,93 @@ class SettingsUiFlowTest {
 
     private fun await(condition: () -> Boolean) = compose.waitUntil(TIMEOUT_MILLIS, condition)
 
+    /** Scrolls the settings to the node and taps it. */
+    private fun tap(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
+
     @Test
-    fun moreLeadsToTheSettingsWithMobileDataAndBatteryAndEverySwitchIsSaved() {
+    fun moreLeadsToTheSettingsAndEverySwitchIsSaved() {
         connect()
         openSettings()
 
-        compose.onNodeWithText("Mobile data", ignoreCase = true).assertIsDisplayed()
-        compose.onNodeWithText("Battery", ignoreCase = true).assertIsDisplayed()
-        compose.onNodeWithText("Start streams automatically").assertIsDisplayed()
-        compose.onNodeWithText("Load images and GIFs").assertIsDisplayed()
-        compose.onNodeWithText("Reduced voice quality").assertIsDisplayed()
-        compose.onNodeWithText("Disconnect when alone for 30 minutes").assertIsDisplayed()
-        compose.onNodeWithText("You get a notification first").assertIsDisplayed()
+        compose.onNodeWithText("VOICE").assertIsDisplayed()
+        compose.onNodeWithText("Voice activity").assertIsDisplayed()
+        compose.onNodeWithTag(SETTINGS_LEVEL_TEST_TAG).assertIsDisplayed()
+        await { shown(SETTINGS_NOISE_TEST_TAG) }
+        compose.onNodeWithTag(SETTINGS_NOISE_TEST_TAG).assertIsOff()
+        // The emulator's fake engine has no earpiece, so there is no default to choose.
+        assertTrue(!shown(SETTINGS_OUTPUT_TEST_TAG))
+        // Section headers are drawn in capitals; "Chat" is also the name of a tab.
+        for (section in listOf("MOBILE DATA", "BATTERY", "NOTIFICATIONS", "CHAT")) {
+            compose.onNodeWithText(section).performScrollTo().assertIsDisplayed()
+        }
+        compose.onNodeWithText("You get a notification first").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Notifications only arrive while you are connected to a server.").performScrollTo()
+            .assertIsDisplayed()
 
         // The defaults of the specification.
         compose.onNodeWithTag(SETTINGS_AUTOPLAY_TEST_TAG).assertIsOff()
         compose.onNodeWithTag(SETTINGS_LOAD_MEDIA_TEST_TAG).assertIsOn()
         compose.onNodeWithTag(SETTINGS_REDUCED_VOICE_TEST_TAG).assertIsOff()
         compose.onNodeWithTag(SETTINGS_IDLE_TEST_TAG).assertIsOff()
+        compose.onNodeWithTag(SETTINGS_NOTIFY_PRIVATE_TEST_TAG).assertIsOn()
+        compose.onNodeWithTag(SETTINGS_NOTIFY_MENTIONS_TEST_TAG).assertIsOn()
+        compose.onNodeWithTag(SETTINGS_SENDER_ONLY_TEST_TAG).assertIsOff()
 
-        compose.onNodeWithTag(SETTINGS_AUTOPLAY_TEST_TAG).performClick()
-        compose.onNodeWithTag(SETTINGS_LOAD_MEDIA_TEST_TAG).performClick()
-        compose.onNodeWithTag(SETTINGS_REDUCED_VOICE_TEST_TAG).performClick()
+        tap(SETTINGS_NOISE_TEST_TAG)
+        tap(SETTINGS_AUTOPLAY_TEST_TAG)
+        tap(SETTINGS_LOAD_MEDIA_TEST_TAG)
+        tap(SETTINGS_REDUCED_VOICE_TEST_TAG)
+        tap(SETTINGS_NOTIFY_PRIVATE_TEST_TAG)
+        tap(SETTINGS_NOTIFY_MENTIONS_TEST_TAG)
+        tap(SETTINGS_SENDER_ONLY_TEST_TAG)
 
         await {
-            engine.mobileSettings.run { mobileDataAutoplayStreams && !mobileDataLoadMedia && mobileDataReducedVoice }
+            engine.mobileSettings.run { mobileDataAutoplayStreams && !mobileDataLoadMedia && mobileDataReducedVoice } &&
+                engine.appSettings.run { !notifyPrivateMessages && !notifyMentions } &&
+                engine.noiseSuppression && messageSettings.senderOnly.value
         }
+        compose.onNodeWithTag(SETTINGS_NOISE_TEST_TAG).assertIsOn()
         compose.onNodeWithTag(SETTINGS_AUTOPLAY_TEST_TAG).assertIsOn()
         compose.onNodeWithTag(SETTINGS_LOAD_MEDIA_TEST_TAG).assertIsOff()
         compose.onNodeWithTag(SETTINGS_REDUCED_VOICE_TEST_TAG).assertIsOn()
+        compose.onNodeWithTag(SETTINGS_NOTIFY_PRIVATE_TEST_TAG).assertIsOff()
+        compose.onNodeWithTag(SETTINGS_NOTIFY_MENTIONS_TEST_TAG).assertIsOff()
+        compose.onNodeWithTag(SETTINGS_SENDER_ONLY_TEST_TAG).assertIsOn()
 
         compose.onNodeWithContentDescription("Back to More").performClick()
         await { shown(MORE_SETTINGS_TEST_TAG) }
     }
 
     @Test
+    fun theRowsWithAValueOpenTheirChoicesAndAChoiceIsSaved() {
+        connect()
+        openSettings()
+
+        tap(SETTINGS_TALK_MODE_TEST_TAG)
+        compose.onNodeWithTag(settingsOptionTestTag(1)).assertIsDisplayed().performClick()
+        await { engine.talkMode == TalkMode.PUSH_TO_TALK && !shown(settingsOptionTestTag(1)) }
+        compose.onNodeWithText("Push-to-talk").assertIsDisplayed()
+
+        tap(SETTINGS_HISTORY_TEST_TAG)
+        compose.onNodeWithText("Older messages are deleted from this phone automatically. The server is not affected.")
+            .assertIsDisplayed()
+        compose.onNodeWithText("90 days").performClick()
+        await { engine.appSettings.historyMaxAgeDays == 90u && !shown(settingsOptionTestTag(3)) }
+        compose.onNodeWithText("90 days").performScrollTo().assertIsDisplayed()
+
+        // Going back closes a sheet before the settings.
+        tap(SETTINGS_HISTORY_TEST_TAG)
+        await { shown(settingsOptionTestTag(0)) }
+        Espresso.pressBack()
+        await { !shown(settingsOptionTestTag(0)) }
+        assertTrue(shown(SETTINGS_SCREEN_TEST_TAG))
+    }
+
+    @Test
     fun aloneWithTheSwitchOnTheAppWarnsAndStayConnectedKeepsTheSession() {
         connect()
         openSettings()
-        compose.onNodeWithTag(SETTINGS_IDLE_TEST_TAG).performClick()
+        tap(SETTINGS_IDLE_TEST_TAG)
 
         await { notifier.warning }
         idle.stayConnected()
@@ -159,7 +229,7 @@ class SettingsUiFlowTest {
     fun withoutATapTheAppDisconnectsSaysSoAndOffersToReconnect() {
         connect()
         openSettings()
-        compose.onNodeWithTag(SETTINGS_IDLE_TEST_TAG).performClick()
+        tap(SETTINGS_IDLE_TEST_TAG)
 
         await { notifier.warning }
         await { shown(SESSION_ENDED_RECONNECT_TEST_TAG) }

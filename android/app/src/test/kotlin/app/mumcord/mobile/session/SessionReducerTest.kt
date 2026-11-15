@@ -2,6 +2,9 @@
 
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.ActivityEntry
+import app.mumcord.mobile.bridge.ActivityKind
+import app.mumcord.mobile.bridge.AppSettings
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ChannelPasswordState
 import app.mumcord.mobile.bridge.BridgeException
@@ -279,5 +282,52 @@ class SessionReducerTest {
             updateCheck = true,
         )
         assertEquals(state.copy(mobileSettings = settings), state.fold(BridgeEvent.MobileSettingsChanged(settings)))
+    }
+
+    private fun activity(id: Int, kind: ActivityKind = ActivityKind.JOINED) = BridgeEvent.ActivityAdded(
+        ActivityEntry(
+            id = id.toULong(),
+            kind = kind,
+            session = 20u,
+            name = "Anna",
+            isSelf = false,
+            channelId = 1u,
+            channelName = "Lobby",
+            atMs = id.toLong(),
+        ),
+    )
+
+    @Test
+    fun theActivityLogIsKeptNewestFirstForTheConnectionOnly() {
+        val state = fold(*connected, activity(1, ActivityKind.CONNECTED), activity(2), activity(3, ActivityKind.MOVED))
+        assertEquals(listOf(3uL, 2uL, 1uL), state.activity.map { it.id })
+
+        // As the bridge: a sync after a reconnect starts the log again, the end of a connection forgets it.
+        assertEquals(emptyList<ActivityEntry>(), state.fold(BridgeEvent.ServerSynced(server)).activity)
+        assertEquals(
+            emptyList<ActivityEntry>(),
+            state.fold(BridgeEvent.ConnectionChanged(ConnectionState.Disconnected(null))).activity,
+        )
+    }
+
+    @Test
+    fun theActivityLogKeepsAsManyEntriesAsTheBridge() {
+        val state = (1..MAX_ACTIVITY + 5).fold(fold(*connected)) { state, id -> state.fold(activity(id)) }
+        assertEquals(MAX_ACTIVITY, state.activity.size)
+        assertEquals((MAX_ACTIVITY + 5).toULong(), state.activity.first().id)
+        assertEquals(6uL, state.activity.last().id)
+    }
+
+    @Test
+    fun theSharedSettingsFollowTheEngine() {
+        val settings = AppSettings(
+            language = null,
+            linkPreviews = true,
+            historyMaxAgeDays = 30u,
+            notifyPrivateMessages = false,
+            notifyMentions = true,
+        )
+        assertNull("not known before they were read", SessionState().appSettings)
+        assertEquals(settings, SessionState().fold(BridgeEvent.AppSettingsChanged(settings)).appSettings)
     }
 }

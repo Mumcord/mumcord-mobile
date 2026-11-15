@@ -56,6 +56,7 @@ class ModerationScreenshotTest {
     private val actions = ConnectedController(repository, scope)
     private val chatActions = screenshotChatController(repository, scope)
     private val messages = ScreenshotMessages(repository, actions, scope)
+    private val more = ScreenshotMore(repository, actions, scope)
 
     // Every right on every channel: what a server admin sees.
     private val session = mockupServer().let { server ->
@@ -103,6 +104,8 @@ class ModerationScreenshotTest {
                         messagesActions = messages.actions,
                         conversation = null,
                         conversationActions = messages.conversationActions,
+                        more = more.state(session),
+                        moreActions = more.actions,
                         onNotificationSettings = {},
                         onIdentities = {},
                         topInsets = top,

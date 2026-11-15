@@ -323,16 +323,15 @@ class MessagesControllerTest {
     }
 
     @Test
-    fun theEndOfTheConnectionForgetsWhatWasOpenButNotTheSwitch() = runTest(dispatcher) {
+    fun theEndOfTheConnectionForgetsWhatWasOpen() = runTest(dispatcher) {
         val viewModel = connected()
-        viewModel.messages.setSenderOnly(true)
         viewModel.messages.messagePerson(MOCKUP_BEN)
         runCurrent()
 
         viewModel.disconnect()
         runCurrent()
 
-        assertEquals(MessagesLocal(senderOnly = true), viewModel.messages.local.value)
+        assertEquals(MessagesLocal(), viewModel.messages.local.value)
     }
 
     // ----- message requests -----
@@ -537,19 +536,5 @@ class MessagesControllerTest {
 
         assertEquals(MessagesSheet.BlockConfirm(MOCKUP_JONAS, "Jonas", failed = true), viewModel.ui.sheet)
         assertFalse(viewModel.ui.person(MOCKUP_JONAS).blocked)
-    }
-
-    // ----- notifications -----
-
-    @Test
-    fun showSenderOnlyIsKeptInTheSettings() = runTest(dispatcher) {
-        val viewModel = connected()
-        assertFalse(viewModel.ui.senderOnly)
-
-        viewModel.messages.setSenderOnly(true)
-        runCurrent()
-
-        assertTrue(settings.senderOnly.value)
-        assertTrue(viewModel.ui.senderOnly)
     }
 }

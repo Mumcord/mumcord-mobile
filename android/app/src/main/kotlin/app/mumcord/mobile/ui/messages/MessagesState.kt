@@ -49,8 +49,6 @@ data class MessagesLocal(
     val requestError: ChatRequestError? = null,
     /** The list of blocked people is open on the More tab. */
     val blockedOpen: Boolean = false,
-    /** Notifications name the sender and leave the message out. */
-    val senderOnly: Boolean = false,
 )
 
 /** The last message of a conversation as the list shows it. */
@@ -150,7 +148,6 @@ data class MessagesUiState(
     val sheet: MessagesSheet?,
     val blocked: List<BlockedRow>,
     val blockedOpen: Boolean,
-    val senderOnly: Boolean,
     private val people: Map<UInt, Person>,
     private val sentRequests: Map<UInt, Boolean>,
 ) {
@@ -219,7 +216,6 @@ fun messagesUiState(
         sheet = sheet(server, local),
         blocked = blocked.map { BlockedRow(it.id, it.name, it.serverLabel) },
         blockedOpen = local.blockedOpen,
-        senderOnly = local.senderOnly,
         people = server.people,
         sentRequests = requests.sent.associate { it.session to it.accepted },
     )

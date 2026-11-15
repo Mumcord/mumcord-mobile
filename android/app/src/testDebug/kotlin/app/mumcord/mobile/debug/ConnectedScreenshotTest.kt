@@ -21,7 +21,6 @@ import app.mumcord.mobile.ui.connected.ConnectedController
 import app.mumcord.mobile.ui.connected.ConnectedLocal
 import app.mumcord.mobile.ui.connected.ConnectedSheetHost
 import app.mumcord.mobile.ui.connected.ConnectedShell
-import app.mumcord.mobile.ui.connected.ConnectedTab
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.connectedUiState
 import kotlinx.coroutines.CoroutineScope
@@ -57,6 +56,7 @@ class ConnectedScreenshotTest {
     private val actions = ConnectedController(repository, scope)
     private val chatActions = screenshotChatController(repository, scope)
     private val messages = ScreenshotMessages(repository, actions, scope)
+    private val more = ScreenshotMore(repository, actions, scope)
 
     private val session = listOf(
         BridgeEvent.ConnectionChanged(ConnectionState.Connected),
@@ -90,6 +90,8 @@ class ConnectedScreenshotTest {
                     messagesActions = messages.actions,
                     conversation = null,
                     conversationActions = messages.conversationActions,
+                    more = more.state(session),
+                    moreActions = more.actions,
                     onNotificationSettings = {},
                     onIdentities = {},
                     topInsets = top,
@@ -125,8 +127,6 @@ class ConnectedScreenshotTest {
 
     private fun search(dark: Boolean) =
         capture("android-channel-search", dark, ConnectedLocal(searching = true, query = "mi"))
-
-    private fun more(dark: Boolean) = capture("android-more", dark, ConnectedLocal(tab = ConnectedTab.More))
 
     // No mockup exists for the two microphone states; they are built from the design system.
     private fun microphoneExplain(dark: Boolean) =
@@ -166,9 +166,4 @@ class ConnectedScreenshotTest {
     @Test fun searchDark() = search(dark = true)
 
     @Test fun searchLight() = search(dark = false)
-
-    @Test fun moreDark() = more(dark = true)
-
-    @Test fun moreLight() = more(dark = false)
-
 }

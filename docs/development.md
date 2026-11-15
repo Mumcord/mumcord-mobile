@@ -158,8 +158,10 @@ was on the screen in its failure message.
   markup a hostile client might send), followed by a restart of the app that must still show
   the history; and private messages, for which `e2e/chat-peer --private` writes to the phone
   whenever the test asks for it (notification with sender and text, tap opens the
-  conversation, no notification for the open conversation, "Show sender only", nothing after
-  disconnecting); the identity created at the first start, which `e2e/identity-watch.py` (a
+  conversation, no notification for the open conversation, "Show sender only", none with
+  "Private messages" switched off, nothing after disconnecting); the activity log, for which
+  `e2e/chat-peer --visitor` joins the server, moves to "Raid" and leaves whenever the test asks
+  for it; the identity created at the first start, which `e2e/identity-watch.py` (a
   foreign client on the host) must see with the same certificate on two connects; and
   "Scan from desktop app" with a transfer that `e2e/transfer-maker` makes for the run with
   the engine's own code, as the desktop app does (a new identity and a new 8-digit code every

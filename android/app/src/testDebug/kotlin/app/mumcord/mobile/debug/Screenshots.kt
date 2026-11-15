@@ -7,6 +7,11 @@ import app.mumcord.mobile.ui.messages.MessagesUiState
 import app.mumcord.mobile.ui.messages.MessagesLocal
 import app.mumcord.mobile.ui.messages.MessagesController
 import app.mumcord.mobile.ui.connected.ConnectedController
+import app.mumcord.mobile.ui.connected.MoreController
+import app.mumcord.mobile.ui.connected.MoreLocal
+import app.mumcord.mobile.ui.connected.MoreUiState
+import app.mumcord.mobile.ui.connected.moreUiState
+import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.session.SessionState
 import app.mumcord.mobile.session.InMemoryMessageNotificationSettings
 import app.mumcord.mobile.bridge.MessageRequests
@@ -100,7 +105,7 @@ val MOCKUP_DAY: LocalDate = LocalDate.of(2026, 5, 4)
 
 /** The Messages tab for screenshots: its actions are never called, its state is made from what a test passes. */
 class ScreenshotMessages(repository: SessionRepository, connected: ConnectedController, scope: CoroutineScope) {
-    val actions = MessagesController(repository, connected, InMemoryMessageNotificationSettings(), scope)
+    val actions = MessagesController(repository, connected, scope)
     val conversationActions = screenshotChatController(repository, scope)
 
     fun state(
@@ -122,4 +127,16 @@ class ScreenshotMessages(repository: SessionRepository, connected: ConnectedCont
             notificationsGranted,
         ),
     )
+}
+
+/** The More tab for screenshots: its actions are never called, its state is made from what a test passes. */
+class ScreenshotMore(repository: SessionRepository, connected: ConnectedController, scope: CoroutineScope) {
+    val actions = MoreController(repository, connected, InMemoryMessageNotificationSettings(), scope)
+
+    fun state(
+        session: SessionState,
+        local: MoreLocal = MoreLocal(),
+        output: OutputState = OutputState(),
+        senderOnly: Boolean = false,
+    ): MoreUiState = checkNotNull(moreUiState(session, local, "Nordlicht", output, senderOnly))
 }

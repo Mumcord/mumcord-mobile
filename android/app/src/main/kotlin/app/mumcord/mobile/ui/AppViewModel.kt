@@ -36,6 +36,9 @@ import app.mumcord.mobile.ui.connected.ConnectedTab
 import app.mumcord.mobile.ui.connected.MicrophoneAccess
 import app.mumcord.mobile.ui.connected.MicrophoneAnswer
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
+import app.mumcord.mobile.ui.connected.MoreController
+import app.mumcord.mobile.ui.connected.MoreUiState
+import app.mumcord.mobile.ui.connected.moreUiState
 import app.mumcord.mobile.ui.connected.NotificationAccess
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.platform.call.OutputState
@@ -210,7 +213,7 @@ class AppViewModel(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
 
     /** The Messages tab, message requests, chat requests and blocking. */
-    val messages = MessagesController(repository, connected, messageSettings, viewModelScope)
+    val messages = MessagesController(repository, connected, viewModelScope)
 
     val messagesState: StateFlow<MessagesUiState?> = combine(
         combine(repository.state, messages.local, ::Pair),
@@ -231,6 +234,31 @@ class AppViewModel(
         repository.chat.unread.value,
         notifications.granted.value,
     )
+
+    /** The More tab: the activity log and the settings. */
+    val more = MoreController(repository, connected, messageSettings, viewModelScope)
+
+    /** Its own flow: a new activity entry does not rebuild the other tabs. */
+    val moreState: StateFlow<MoreUiState?> =
+        combine(
+            repository.state,
+            more.local,
+            outputs.state,
+            messageSettings.senderOnly,
+            uiState.map { it.activeServerName.orEmpty() }.distinctUntilChanged(),
+        ) { session, moreLocal, output, senderOnly, serverName ->
+            moreUiState(session, moreLocal, serverName, output, senderOnly)
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            moreUiState(
+                repository.state.value,
+                more.local.value,
+                uiState.value.activeServerName.orEmpty(),
+                outputs.state.value,
+                messageSettings.senderOnly.value,
+            ),
+        )
 
     /** The open private conversation: the same chat screen as the Chat tab, for one person. */
     val conversation = ChatController(

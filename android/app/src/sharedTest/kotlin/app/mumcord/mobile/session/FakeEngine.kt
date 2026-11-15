@@ -85,6 +85,15 @@ val FAKE_IDENTITY = Identity(
 /** The name inside every identity file of the fake. */
 const val IMPORTED_NAME = "Imported"
 
+/** The shared settings of a fresh engine: everything on, history kept, the phone's language. */
+val FAKE_APP_SETTINGS = AppSettings(
+    language = null,
+    linkPreviews = true,
+    historyMaxAgeDays = null,
+    notifyPrivateMessages = true,
+    notifyMentions = true,
+)
+
 val FAKE_MOBILE_SETTINGS = MobileSettings(
     talkModeChosen = false,
     defaultOutput = DefaultOutput.ASK,
@@ -809,13 +818,7 @@ class FakeEngine(
 
     // ----- shared settings -----
 
-    var appSettings = AppSettings(
-        language = null,
-        linkPreviews = true,
-        historyMaxAgeDays = null,
-        notifyPrivateMessages = true,
-        notifyMentions = true,
-    )
+    var appSettings = FAKE_APP_SETTINGS
 
     override fun appSettings(): AppSettings = appSettings
 

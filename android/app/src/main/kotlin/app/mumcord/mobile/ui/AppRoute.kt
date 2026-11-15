@@ -61,6 +61,8 @@ import app.mumcord.mobile.ui.connected.ChatEnvironment
 import app.mumcord.mobile.ui.connected.ConnectedSheetHost
 import app.mumcord.mobile.ui.connected.ConnectedTab
 import app.mumcord.mobile.ui.connected.ConnectedShell
+import app.mumcord.mobile.ui.connected.MoreUiState
+import app.mumcord.mobile.ui.connected.SettingsSheetHost
 import app.mumcord.mobile.ui.connected.MicrophoneNotice
 import app.mumcord.mobile.ui.connected.MicrophoneSystem
 import app.mumcord.mobile.ui.connected.NotificationSystem
@@ -104,6 +106,7 @@ fun AppRoute(
     val chatBadge by viewModel.chatBadge.collectAsStateWithLifecycle()
     val messages by viewModel.messagesState.collectAsStateWithLifecycle()
     val conversation by viewModel.conversationState.collectAsStateWithLifecycle()
+    val more by viewModel.moreState.collectAsStateWithLifecycle()
     val chatEnvironment = ChatEnvironment(chatImageLoader, images, rememberChatClock())
     LifecycleResumeEffect(viewModel) {
         viewModel.refreshPings()
@@ -132,6 +135,7 @@ fun AppRoute(
             notifications,
             messages = messages,
             conversation = conversation,
+            more = more,
         )
         if (photoQuestion) {
             CameraSheet(
@@ -168,6 +172,7 @@ fun AppContent(
     notifications: NotificationSystem = NotificationSystem(ask = {}),
     messages: MessagesUiState? = null,
     conversation: ChatUiState? = null,
+    more: MoreUiState? = null,
     topInsets: WindowInsets = WindowInsets.statusBars,
     bottomInsets: WindowInsets = WindowInsets.navigationBars,
 ) {
@@ -183,6 +188,7 @@ fun AppContent(
     val covered = uiState.screen == AppScreen.Identities || uiState.screen == AppScreen.Scan
     val connectedSheet = uiState.connected?.sheet.takeIf { !covered }
     val messagesSheet = messages?.sheet.takeIf { uiState.connected != null && !covered }
+    val settingsSheet = more?.settings?.takeIf { it.sheet != null && uiState.connected?.tab == ConnectedTab.More && !covered }
     // A chat's sheets and its full-screen picture belong to the tab that shows the chat.
     val shownChat = when (uiState.connected?.tab) {
         ConnectedTab.Chat -> chat
@@ -192,7 +198,7 @@ fun AppContent(
     val chatOverlay = shownChat?.takeIf { it.sheet != null || it.viewer != null || it.urlToOpen != null }
     val chatOverlayActions = if (uiState.connected?.tab == ConnectedTab.Messages) viewModel.conversation else viewModel.chat
     val sheetOpen = prompt != null || overlay != null || scanExplain || identitySheet != null ||
-        connectedSheet != null || messagesSheet != null ||
+        connectedSheet != null || messagesSheet != null || settingsSheet != null ||
         chatOverlay?.sheet != null || chatOverlay?.viewer != null
     Box(Modifier.fillMaxSize()) {
         // While a sheet is open, the screen behind it is not offered to screen readers.
@@ -292,8 +298,8 @@ fun AppContent(
                     )
                 }
                 AppScreen.Channels -> uiState.connected?.let { connected ->
-                    // Both follow the same session, so they are there together.
-                    if (messages == null) return@let
+                    // All follow the same session, so they are there together.
+                    if (messages == null || more == null) return@let
                     ConnectedShell(
                         state = connected,
                         actions = viewModel.connected,
@@ -311,6 +317,8 @@ fun AppContent(
                         messagesActions = viewModel.messages,
                         conversation = conversation,
                         conversationActions = viewModel.conversation,
+                        more = more,
+                        moreActions = viewModel.more,
                         onNotificationSettings = notifications.openSettings,
                         onIdentities = viewModel.identities::open,
                         topInsets = topInsets,
@@ -398,6 +406,7 @@ fun AppContent(
                 onNotificationsNotNow = viewModel::notificationsNotNow,
             )
             messagesSheet != null -> MessagesSheetHost(messagesSheet, viewModel.messages, topInsets, bottomInsets)
+            settingsSheet != null -> SettingsSheetHost(settingsSheet, viewModel.more, topInsets, bottomInsets)
             chatOverlay != null -> ChatOverlays(
                 state = chatOverlay,
                 actions = chatOverlayActions,

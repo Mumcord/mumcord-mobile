@@ -10,10 +10,15 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isOff
 import app.mumcord.mobile.MainActivity
 import app.mumcord.mobile.platform.audio.AudioProbe
 import app.mumcord.mobile.ui.chat.CHAT_SCREEN_TEST_TAG
-import app.mumcord.mobile.ui.connected.MORE_SENDER_ONLY_TEST_TAG
+import app.mumcord.mobile.ui.connected.MORE_SETTINGS_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_NOTIFY_PRIVATE_TEST_TAG
+import app.mumcord.mobile.ui.connected.SETTINGS_SENDER_ONLY_TEST_TAG
 import app.mumcord.mobile.ui.messages.MESSAGES_SCREEN_TEST_TAG
 import org.junit.After
 import org.junit.Assert.assertNotNull
@@ -27,7 +32,8 @@ import org.junit.Test
  * on the host (`e2e/chat-peer --private`) writes to the phone whenever this test asks for it.
  * A message that arrives while another tab is shown is in the notification shade with sender
  * and text, and a tap opens the conversation; while the conversation is open there is no
- * notification; with "Show sender only" the text is absent; and after disconnecting the
+ * notification; with "Show sender only" (in the settings) the text is absent; with "Private
+ * messages" switched off there is no notification at all; and after disconnecting the
  * notifications are gone and nothing new appears.
  * Expects fresh app data with local network access, the microphone and notifications granted.
  */
@@ -92,12 +98,15 @@ class MessagesFlowTest {
         assertNull("Opening the conversation removed its notification", notification(text(1), GONE_TIMEOUT_MILLIS))
         phone.closeShade()
 
-        // "Show sender only": the next notification names the sender and leaves the text out.
+        // "Show sender only" in the settings: the next notification names the sender and leaves
+        // the text out.
         compose.onNodeWithContentDescription(BACK_TO_CONVERSATIONS).performClick()
         app.awaitOrFail("the conversation list") { app.exists(MESSAGES_SCREEN_TEST_TAG) }
         openTab(TAB_MORE)
-        app.awaitOrFail("the More tab") { app.exists(MORE_SENDER_ONLY_TEST_TAG) }
-        compose.onNodeWithTag(MORE_SENDER_ONLY_TEST_TAG).performClick()
+        app.awaitOrFail("the More tab") { app.exists(MORE_SETTINGS_TEST_TAG) }
+        compose.onNodeWithTag(MORE_SETTINGS_TEST_TAG).performClick()
+        app.awaitOrFail("the settings") { app.exists(SETTINGS_SENDER_ONLY_TEST_TAG) }
+        compose.onNodeWithTag(SETTINGS_SENDER_ONLY_TEST_TAG).performScrollTo().performClick()
         askForMessage(3)
         phone.openShade()
         assertNotNull("The notification names the sender", notification(PEER_NAME))
@@ -105,15 +114,42 @@ class MessagesFlowTest {
         assertNull("With \"Show sender only\" the text is absent", notification(text(3), GONE_TIMEOUT_MILLIS))
         phone.closeShade()
 
-        // Disconnecting removes the notification, and a later private message produces nothing.
-        // The More tab is open already; the leave button of the voice bar is on every tab.
-        app.leave()
+        // "Private messages" switched off: a private message still arrives, but no notification.
+        // Opening the conversation first takes the earlier notification away.
+        openTab(TAB_MESSAGES)
+        // A conversation's row names the person in its description for screen readers.
+        val row = hasContentDescription("$PEER_NAME, ", substring = true)
+        app.awaitOrFail("the conversation list") {
+            app.exists(MESSAGES_SCREEN_TEST_TAG) && compose.onAllNodes(row).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onAllNodes(row)[0].performClick()
+        app.awaitOrFail("the conversation") { app.exists(CHAT_SCREEN_TEST_TAG) && onScreen(text(3)) }
+        compose.onNodeWithContentDescription(BACK_TO_CONVERSATIONS).performClick()
+        openTab(TAB_MORE)
+        app.awaitOrFail("the settings") { app.exists(SETTINGS_NOTIFY_PRIVATE_TEST_TAG) }
+        compose.onNodeWithTag(SETTINGS_NOTIFY_PRIVATE_TEST_TAG).performScrollTo().performClick()
+        app.awaitOrFail("the switch to be off") {
+            compose.onAllNodes(hasTestTag(SETTINGS_NOTIFY_PRIVATE_TEST_TAG) and isOff()).fetchSemanticsNodes().isNotEmpty()
+        }
         askForMessage(4)
+        app.awaitOrFail("the message as unread on the Messages tab") {
+            compose.onAllNodes(hasContentDescription("$TAB_MESSAGES, ", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
+        phone.openShade()
+        assertNull("No notification with \"Private messages\" off", notification(PEER_NAME, GONE_TIMEOUT_MILLIS))
+        assertNull("No notification with \"Private messages\" off", notification(NEW_MESSAGE, GONE_TIMEOUT_MILLIS))
+        phone.closeShade()
+        compose.onNodeWithTag(SETTINGS_NOTIFY_PRIVATE_TEST_TAG).performScrollTo().performClick()
+
+        // Disconnecting removes the notifications, and a later private message produces nothing.
+        // The leave button of the voice bar is on every tab.
+        app.leave()
+        askForMessage(5)
         Thread.sleep(AFTER_DISCONNECT_MILLIS)
         phone.openShade()
         assertNull("No message notification after disconnecting", notification(PEER_NAME, GONE_TIMEOUT_MILLIS))
         assertNull("No message notification after disconnecting", notification(NEW_MESSAGE, GONE_TIMEOUT_MILLIS))
-        assertNull("No message notification after disconnecting", notification(text(4), GONE_TIMEOUT_MILLIS))
+        assertNull("No message notification after disconnecting", notification(text(5), GONE_TIMEOUT_MILLIS))
         phone.closeShade()
     }
 
@@ -123,6 +159,7 @@ class MessagesFlowTest {
         const val NEW_MESSAGE = "New message"
         const val BACK_TO_CONVERSATIONS = "Back to the conversations"
         const val TAB_MORE = "More"
+        const val TAB_MESSAGES = "Messages"
         const val LOG_TAG = "MumcordE2E"
         const val GONE_TIMEOUT_MILLIS = 2_000L
 

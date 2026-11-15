@@ -103,6 +103,7 @@ LOCK_PTT_SECONDS=60
 # who sends the phone a private message whenever the test asks for one; "identity" a second
 # person who has to see the same certificate each time the phone connects; "transfer" nobody,
 # and the test gets a transfer made for this run (the camera permission is asked for in it);
+# "activity" a second person who joins the server, moves and leaves whenever the test asks;
 # "moderation" a second person (e2e/moderation-target.py) whom the phone, connected as the test
 # server's SuperUser, moves and kicks, and who has to report both; "ban" the
 # same person, who has to be removed by a short ban, refused while it lasts and let in again
@@ -135,6 +136,7 @@ SCENARIOS=(
   "granted granted pm ${TEST_PACKAGE}.MessagesFlowTest"
   "granted granted identity ${TEST_PACKAGE}.IdentityFlowTest"
   "granted granted transfer ${TEST_PACKAGE}.TransferFlowTest"
+  "granted granted activity ${TEST_PACKAGE}.ActivityFlowTest"
   "granted granted moderation ${TEST_PACKAGE}.ModerationFlowTest#moveAndKickReachTheOtherPerson"
   "granted granted ban ${TEST_PACKAGE}.ModerationFlowTest#aShortBanRemovesThePersonUntilItEnds"
 )
@@ -178,7 +180,8 @@ MODERATION_LOG="${OUT_DIR}/moderation-target.log"
 # The SuperUser password of the test server, which scripts/testenv.sh wrote here.
 TESTENV_FILE="${REPO_ROOT}/.engine/testenv/.env"
 TRANSFER_MAKER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/transfer-maker"
-# The numbers of the private messages the second person of the "pm" scenario is to send.
+# The numbers of the private messages the second person of the "pm" scenario is to send, and
+# the steps of the visitor of the "activity" scenario.
 PM_FIFO="${OUT_DIR}/pm-requests"
 # The user name the app connects with in the tests (AppDriver.USER_NAME).
 PHONE_NAME="e2e-phone"
@@ -238,7 +241,8 @@ start_person() {
   "$@" <"${PERSON_INPUT:-/dev/null}" >"${log}" 2>&1 &
   pid=$!
   peer_pids+=("${pid}")
-  until grep -q '^CONNECTED' "${log}"; do
+  # The visitor of the "activity" scenario only connects when the test asks; it says READY.
+  until grep -Eq '^(CONNECTED|READY)' "${log}"; do
     kill -0 "${pid}" 2>/dev/null || die "a second person ended early, see ${log#"${REPO_ROOT}/"}"
     ((waited < PEER_CONNECT_TIMEOUT)) \
       || die "a second person did not connect within ${PEER_CONNECT_TIMEOUT} s, see ${log#"${REPO_ROOT}/"}"
@@ -269,8 +273,9 @@ stop_phone_network() {
 }
 
 # Passes on what the test of the "pm" scenario asks for in the device log ("pm send <n>"): the
-# second person then sends the phone the private message with that number. The pipe is held
-# open here (descriptor 9) so that the second person can keep reading from it.
+# second person then sends the phone the private message with that number. The same for the
+# "activity" scenario ("visitor join|move|leave"). The pipe is held open here (descriptor 9) so
+# that the second person can keep reading from it.
 start_messenger() {
   rm -f "${PM_FIFO}"
   mkfifo "${PM_FIFO}"
@@ -279,6 +284,8 @@ start_messenger() {
     "${ADB}" -s "${serial}" logcat -v raw -T 1 -s MumcordE2E:I | while read -r word command number; do
       if [[ "${word}" == "pm" && "${command}" == "send" && "${number}" =~ ^[0-9]+$ ]]; then
         printf '%s\n' "${number}" >&9
+      elif [[ "${word}" == "visitor" && "${command}" =~ ^(join|move|leave)$ ]]; then
+        printf '%s\n' "${command}" >&9
       fi
     done
   ) &
@@ -323,7 +330,8 @@ check_peers() {
   local kind="$1" report="$2" spans count held longest lost
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
   if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" \
-    && "${kind}" != "identity" && "${kind}" != "moderation" && "${kind}" != "ban" ]]; then
+    && "${kind}" != "identity" && "${kind}" != "activity" && "${kind}" != "moderation" \
+    && "${kind}" != "ban" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -451,15 +459,23 @@ check_peers() {
       ;;
     pm)
       local number
-      for number in 1 2 3; do
+      for number in 1 2 3 4; do
         grep -qx "PM SENT ${number}" "${CHAT_PEER_LOG}" \
           || die "the second person did not get private message ${number} out, see e2e/build/chat-peer.log"
       done
-      # The fourth is asked for after the phone left. Usually there is nobody to send it to
+      # The fifth is asked for after the phone left. Usually there is nobody to send it to
       # any more; what counts is that the second person tried, and that the phone shows nothing.
-      grep -Eqx 'PM (SENT|FAILED) 4' "${CHAT_PEER_LOG}" \
+      grep -Eqx 'PM (SENT|FAILED) 5' "${CHAT_PEER_LOG}" \
         || die "the second person did not try the private message after the phone disconnected, see e2e/build/chat-peer.log"
-      printf 'e2e: pm: the second person sent three private messages and tried a fourth after the phone left\n'
+      printf 'e2e: pm: the second person sent four private messages and tried a fifth after the phone left\n'
+      ;;
+    activity)
+      local visit
+      for visit in JOINED MOVED LEFT; do
+        grep -qx "VISITOR ${visit}" "${CHAT_PEER_LOG}" \
+          || die "the visitor did not report ${visit}, see e2e/build/chat-peer.log"
+      done
+      printf 'e2e: activity: the visitor joined, moved and left while the phone watched\n'
       ;;
   esac
 }
@@ -641,6 +657,10 @@ run_scenario() {
     pm)
       start_messenger
       PERSON_INPUT="${PM_FIFO}" start_person "${CHAT_PEER_LOG}" "${CHAT_PEER_BINARY}" --phone "${PHONE_NAME}" --private
+      ;;
+    activity)
+      start_messenger
+      PERSON_INPUT="${PM_FIFO}" start_person "${CHAT_PEER_LOG}" "${CHAT_PEER_BINARY}" --phone "${PHONE_NAME}" --visitor
       ;;
     moderation | ban)
       local superuser

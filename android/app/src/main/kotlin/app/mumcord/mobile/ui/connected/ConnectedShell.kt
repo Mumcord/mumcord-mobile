@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -24,17 +23,8 @@ import app.mumcord.mobile.ui.messages.MessagesUiState
 import app.mumcord.mobile.ui.messages.MessagesScreen
 import app.mumcord.mobile.ui.messages.MessagesController
 import app.mumcord.mobile.ui.messages.BlockedPeopleScreen
-import app.mumcord.mobile.design.theme.MumcordTheme
-import app.mumcord.mobile.design.components.MumcordToggle
-import app.mumcord.mobile.design.components.MumcordSectionHeader
-import app.mumcord.mobile.design.components.MumcordIcon
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Spacer
-import app.mumcord.mobile.design.components.MumcordAppBar
 import app.mumcord.mobile.design.components.MumcordBanner
 import app.mumcord.mobile.design.components.MumcordBannerTone
-import app.mumcord.mobile.design.components.MumcordList
-import app.mumcord.mobile.design.components.MumcordListRow
 import app.mumcord.mobile.design.components.MumcordScreen
 import app.mumcord.mobile.design.components.MumcordTab
 import app.mumcord.mobile.design.components.MumcordTabBar
@@ -48,11 +38,6 @@ import app.mumcord.mobile.ui.chat.ChatScreen
 import app.mumcord.mobile.ui.chat.ChatUiState
 
 const val DENIED_BANNER_TEST_TAG = "denied-banner"
-const val MORE_DISCONNECT_TEST_TAG = "more-disconnect"
-const val MORE_BLOCKED_TEST_TAG = "more-blocked"
-const val MORE_SENDER_ONLY_TEST_TAG = "more-sender-only"
-const val MORE_SETTINGS_TEST_TAG = "more-settings"
-const val MORE_IDENTITIES_TEST_TAG = "more-identities"
 
 /**
  * The frame of the app while connected: the selected tab's screen, the banners, the whisper
@@ -72,6 +57,8 @@ fun ConnectedShell(
     messagesActions: MessagesController,
     conversation: ChatUiState?,
     conversationActions: ChatController,
+    more: MoreUiState,
+    moreActions: MoreController,
     onNotificationSettings: () -> Unit,
     onIdentities: () -> Unit,
     topInsets: WindowInsets,
@@ -83,10 +70,10 @@ fun ConnectedShell(
         ConnectedTab.More -> messages.blockedOpen
         else -> false
     }
-    val settings = state.settings.takeIf { state.tab == ConnectedTab.More }
+    val morePage = more.page.takeIf { state.tab == ConnectedTab.More } ?: MorePage.Main
     BackHandler(enabled = state.searching || state.tab != ConnectedTab.Channels) {
         when {
-            settings != null -> actions.closeSettings()
+            morePage != MorePage.Main -> moreActions.back()
             insideTab -> messagesActions.back()
             state.tab != ConnectedTab.Channels -> actions.selectTab(ConnectedTab.Channels)
             else -> actions.closeSearch()
@@ -121,17 +108,13 @@ fun ConnectedShell(
                     )
                 }
                 ConnectedTab.More -> when {
-                    settings != null -> SettingsScreen(settings, actions::changeSettings, actions::closeSettings, topInsets)
+                    morePage == MorePage.Activity -> ActivityScreen(more, moreActions, chatEnvironment.clock, topInsets)
+                    // Null for the moment the voice settings are being read.
+                    morePage == MorePage.Settings -> more.settings?.let {
+                        SettingsScreen(it, moreActions, actions.inputLevel, topInsets)
+                    }
                     messages.blockedOpen -> BlockedPeopleScreen(messages, messagesActions, topInsets)
-                    else -> MoreScreen(
-                        state.serverName,
-                        messages,
-                        messagesActions,
-                        actions::openSettings,
-                        onIdentities,
-                        onDisconnect,
-                        topInsets,
-                    )
+                    else -> MoreScreen(more, moreActions, messagesActions::openBlocked, onIdentities, onDisconnect, topInsets)
                 }
             }
         }
@@ -212,83 +195,6 @@ internal fun ConnectedBanners(state: ConnectedUiState, onDismissDenied: () -> Un
                     .testTag(DENIED_BANNER_TEST_TAG)
                     .clickable(onClickLabel = stringResource(R.string.denied_dismiss), onClick = onDismissDenied)
                     .semantics { liveRegion = LiveRegionMode.Polite },
-            )
-        }
-    }
-}
-
-/**
- * The More tab: what belongs to messages (the blocked people and what notifications show),
- * the settings, and leaving the server.
- */
-@Composable
-private fun MoreScreen(
-    serverName: String,
-    messages: MessagesUiState,
-    messagesActions: MessagesController,
-    onSettings: () -> Unit,
-    onIdentities: () -> Unit,
-    onDisconnect: () -> Unit,
-    topInsets: WindowInsets,
-) {
-    Column(Modifier.fillMaxSize()) {
-        MumcordAppBar(title = stringResource(R.string.tab_more), large = true, windowInsets = topInsets)
-        MumcordSectionHeader(stringResource(R.string.more_section_messages))
-        MumcordList {
-            MumcordListRow(
-                title = stringResource(R.string.more_blocked),
-                icon = MumcordIcons.Shield,
-                trailing = {
-                    MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted)
-                },
-                onClick = messagesActions::openBlocked,
-                modifier = Modifier.testTag(MORE_BLOCKED_TEST_TAG),
-            )
-            MumcordListRow(
-                title = stringResource(R.string.more_sender_only),
-                subtitle = stringResource(R.string.more_sender_only_sub),
-                icon = MumcordIcons.Bell,
-                divider = true,
-                trailing = {
-                    MumcordToggle(
-                        checked = messages.senderOnly,
-                        onCheckedChange = messagesActions::setSenderOnly,
-                        contentDescription = stringResource(R.string.more_sender_only),
-                        modifier = Modifier.testTag(MORE_SENDER_ONLY_TEST_TAG),
-                    )
-                },
-            )
-        }
-        Spacer(Modifier.height(MumcordSpace.s4))
-        MumcordList {
-            MumcordListRow(
-                title = stringResource(R.string.identities_title),
-                icon = MumcordIcons.Key,
-                trailing = {
-                    MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted)
-                },
-                onClick = onIdentities,
-                modifier = Modifier.testTag(MORE_IDENTITIES_TEST_TAG),
-            )
-            MumcordListRow(
-                title = stringResource(R.string.settings_title),
-                divider = true,
-                icon = MumcordIcons.Settings,
-                trailing = {
-                    MumcordIcon(MumcordIcons.ChevronRight, contentDescription = null, tint = MumcordTheme.colors.textMuted)
-                },
-                onClick = onSettings,
-                modifier = Modifier.testTag(MORE_SETTINGS_TEST_TAG),
-            )
-        }
-        Spacer(Modifier.height(MumcordSpace.s4))
-        MumcordList {
-            MumcordListRow(
-                title = stringResource(R.string.more_disconnect, serverName),
-                icon = MumcordIcons.PhoneOff,
-                danger = true,
-                onClick = onDisconnect,
-                modifier = Modifier.testTag(MORE_DISCONNECT_TEST_TAG),
             )
         }
     }

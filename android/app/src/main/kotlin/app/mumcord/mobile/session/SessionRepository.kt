@@ -2,6 +2,7 @@
 
 package app.mumcord.mobile.session
 
+import app.mumcord.mobile.bridge.AppSettings
 import app.mumcord.mobile.bridge.AudioEndpoints
 import app.mumcord.mobile.bridge.BanInput
 import app.mumcord.mobile.bridge.BanResult
@@ -147,11 +148,15 @@ class SessionRepository(
     /** Reads the saved servers once; later changes arrive as events. A failure can be retried. */
     suspend fun loadServers() {
         if (mutableState.value.serversLoaded) return
-        when (val loaded = call("load servers") { it.snapshot() to it.talkMode() }) {
+        when (val loaded = call("load servers") { Triple(it.snapshot(), it.talkMode(), it.appSettings()) }) {
             // An event that arrived in between is newer than the snapshot.
             is Outcome.Ok -> mutableState.update {
-                val (snapshot, talkMode) = loaded.value
-                val known = it.copy(talkMode = talkMode, mobileSettings = it.mobileSettings ?: snapshot.mobileSettings)
+                val (snapshot, talkMode, appSettings) = loaded.value
+                val known = it.copy(
+                    talkMode = talkMode,
+                    mobileSettings = it.mobileSettings ?: snapshot.mobileSettings,
+                    appSettings = it.appSettings ?: appSettings,
+                )
                 val identified = known.copy(identities = it.identities ?: snapshot.identities)
                 if (it.serversLoaded) identified else identified.copy(servers = snapshot.servers, serversLoaded = true)
             }
@@ -261,6 +266,17 @@ class SessionRepository(
      */
     suspend fun updateMobileSettings(change: (MobileSettings) -> MobileSettings): Outcome<Unit> =
         call("save phone settings") { it.setMobileSettings(change(it.mobileSettings())) }
+
+    /**
+     * Changes the settings shared with the desktop (notifications, chat history). Reading and
+     * writing are one command, as with [updateMobileSettings].
+     */
+    suspend fun updateAppSettings(change: (AppSettings) -> AppSettings): Outcome<Unit> =
+        call("save app settings") { it.setAppSettings(change(it.appSettings())) }
+
+    /** Saves whether noise suppression runs; the engine applies it at once. */
+    suspend fun setNoiseSuppression(on: Boolean): Outcome<Unit> =
+        call("set noise suppression") { it.setNoiseSuppression(on) }
 
     /** The target of a `mumble://` link. Nothing is saved or connected by reading it. */
     fun parseLink(url: String): Outcome<MumbleLink> =

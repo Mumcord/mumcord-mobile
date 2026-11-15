@@ -39,6 +39,7 @@ class SessionRepositoryTest {
         serversLoaded = true,
         identities = listOf(FAKE_IDENTITY),
         mobileSettings = FAKE_MOBILE_SETTINGS,
+        appSettings = FAKE_APP_SETTINGS,
     )
 
     private suspend fun TestScope.repository(prompt: CertificatePrompt? = this@SessionRepositoryTest.prompt) =

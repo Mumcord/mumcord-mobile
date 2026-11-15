@@ -5,7 +5,6 @@ package app.mumcord.mobile.ui.messages
 import app.mumcord.mobile.bridge.ChatId
 import app.mumcord.mobile.session.ChatRepository
 import app.mumcord.mobile.session.ConnectionError
-import app.mumcord.mobile.session.MessageNotificationSettings
 import app.mumcord.mobile.session.Outcome
 import app.mumcord.mobile.session.SessionRepository
 import app.mumcord.mobile.ui.connected.ConnectedController
@@ -28,17 +27,16 @@ import kotlinx.coroutines.launch
 class MessagesController(
     private val repository: SessionRepository,
     private val connected: ConnectedController,
-    private val settings: MessageNotificationSettings,
     private val scope: CoroutineScope,
 ) {
     private val chats: ChatRepository = repository.chat
-    private val mutableLocal = MutableStateFlow(MessagesLocal(senderOnly = settings.senderOnly.value))
+    private val mutableLocal = MutableStateFlow(MessagesLocal())
     val local: StateFlow<MessagesLocal> = mutableLocal.asStateFlow()
 
     init {
         scope.launch {
             repository.state.map { it.showsServer }.distinctUntilChanged().collect { shown ->
-                if (!shown) mutableLocal.update { MessagesLocal(senderOnly = it.senderOnly) }
+                if (!shown) mutableLocal.value = MessagesLocal()
             }
         }
         // Who is online is part of the conversation list, which has no event of its own.
@@ -52,10 +50,6 @@ class MessagesController(
             chats.requests.map { it.incoming.isEmpty() }.distinctUntilChanged().collect { none ->
                 if (none) mutableLocal.update { if (it.page == MessagesPage.Requests) it.copy(page = MessagesPage.List) else it }
             }
-        }
-        // The setting is read from the engine, which can take longer than drawing the switch.
-        scope.launch {
-            settings.senderOnly.collect { senderOnly -> mutableLocal.update { it.copy(senderOnly = senderOnly) } }
         }
     }
 
@@ -207,12 +201,6 @@ class MessagesController(
     /** Closes whichever sheet is open. */
     fun dismissSheet() = mutableLocal.update {
         it.copy(blockSession = null, blockFailed = false, requestSession = null, requestNote = "", requestError = null)
-    }
-
-    // ----- notifications -----
-
-    fun setSenderOnly(senderOnly: Boolean) {
-        settings.setSenderOnly(senderOnly)
     }
 
     private fun report(outcome: Outcome<Unit>) {

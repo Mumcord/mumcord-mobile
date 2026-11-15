@@ -33,6 +33,7 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
             channelPassword = null,
             denied = null,
             hints = emptyList(),
+            activity = emptyList(),
         )
         ConnectionState.Connecting -> copy(phase = ConnectionPhase.Connecting)
         ConnectionState.Connected ->
@@ -56,7 +57,9 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
             previousFingerprint = event.prompt.previousFingerprint,
         ),
     )
+    // A sync starts the activity log again, as the bridge does; its "connected" entry follows.
     is BridgeEvent.ServerSynced -> copy(
+        activity = emptyList(),
         server = ServerModel(
             selfSession = event.server.selfSession,
             channels = event.server.channels.associateBy { it.id },
@@ -87,11 +90,10 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.WhisperEnded -> copy(whispersEnded = whispersEnded + 1)
     is BridgeEvent.IdentitiesChanged -> copy(identities = event.identities)
     is BridgeEvent.MobileSettingsChanged -> copy(mobileSettings = event.settings)
-    // Profile, activity log, settings and theme screens (tasks 8.3 to 8.5) follow these
-    // themselves.
+    is BridgeEvent.AppSettingsChanged -> copy(appSettings = event.settings)
+    is BridgeEvent.ActivityAdded -> copy(activity = (listOf(event.entry) + activity).take(MAX_ACTIVITY))
+    // The profile and theme screens (task 8.3) follow these themselves.
     is BridgeEvent.ProfileChanged,
-    is BridgeEvent.ActivityAdded,
-    is BridgeEvent.AppSettingsChanged,
     is BridgeEvent.ThemesChanged -> this
     // Chat phase (tasks 5.2/5.3): the state does not follow chat yet.
     is BridgeEvent.BlockedPeopleChanged,

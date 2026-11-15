@@ -67,6 +67,7 @@ class VoiceScreenshotTest {
     private val actions = ConnectedController(repository, scope)
     private val chatActions = screenshotChatController(repository, scope)
     private val messages = ScreenshotMessages(repository, actions, scope)
+    private val more = ScreenshotMore(repository, actions, scope)
 
     private fun session(talkMode: TalkMode, selfMuted: Boolean = false): SessionState {
         val server = mockupVoiceServer()
@@ -107,6 +108,8 @@ class VoiceScreenshotTest {
                     messagesActions = messages.actions,
                     conversation = null,
                     conversationActions = messages.conversationActions,
+                    more = more.state(session),
+                    moreActions = more.actions,
                     onNotificationSettings = {},
                     onIdentities = {},
                     topInsets = top,
