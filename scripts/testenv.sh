@@ -7,10 +7,12 @@
 # mumble-server in Docker with the channels Lobby, Raid and AFK), taken at the engine commit
 # pinned in engine.lock.toml and checked out into the git-ignored .engine/.
 #
-# Usage: scripts/testenv.sh <fetch|up|down>
+# Usage: scripts/testenv.sh <fetch|up [--cert A|B]|down>
 #   fetch   check out testenv/ and the desktop translations (ui/src/locales/, read by
 #           scripts/translations.py) of the pinned Mumcord commit into .engine/
-#   up      fetch, then start the server and wait until it accepts connections
+#   up      fetch, then start the server and wait until it accepts connections. With
+#           --cert B the server presents the test environment's second certificate (A is the
+#           default); a running server is restarted with it and keeps its data.
 #   down    stop the server and delete its data, so the next start is a fresh server
 #
 # Environment:
@@ -123,7 +125,7 @@ up() {
     )
   fi
   compose_environment
-  "${TESTENV_DIR}/up.sh" v15
+  "${TESTENV_DIR}/up.sh" v15 "$@"
 
   local waited=0
   until port_open; do
@@ -148,10 +150,13 @@ down() {
 
 case "${1:-}" in
   fetch) fetch ;;
-  up) up ;;
+  up)
+    shift
+    up "$@"
+    ;;
   down) down ;;
   *)
-    printf 'usage: %s <fetch|up|down>\n' "$0" >&2
+    printf 'usage: %s <fetch|up [--cert A|B]|down>\n' "$0" >&2
     exit 2
     ;;
 esac

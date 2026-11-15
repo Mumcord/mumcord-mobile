@@ -35,7 +35,9 @@
 #      test server's SuperUser (its password reaches the test as an argument, never a file or
 #      log) and moderates e2e/moderation-target.py, a foreign client that reports what the
 #      server did to it; the ban scenario is the last one, because a ban covers the address
-#      all people of the test server share, and it ends with the person let in again.
+#      all people of the test server share, and it ends with the person let in again. In the
+#      certificate scenario this script restarts the test server with the test environment's
+#      second certificate when the test asks for it, and puts the first one back afterwards.
 #      A scenario that fails is run once more (E2E_RETRIES); the retry is reported in
 #      e2e/build/summary.md (and the job summary on GitHub), never hidden.
 #   6. stop the server, and the emulator if this script started it
@@ -105,6 +107,10 @@ LOCK_PTT_SECONDS=60
 # the phone loses every network for a while; "idle" nobody, and the picture of the warning
 # notification is fetched;
 # "whisper" a second person who has to hear the whisper and a third who must hear nothing;
+# "person" a second person who talks and a third who has to hear them without a break while
+# the phone has them muted;
+# "certificate" nobody, and the test server is restarted with its second certificate when the
+# test asks for it;
 # "chat" a second person who writes and has to receive what the app wrote, and a third who
 # sends raw markup; "chat-restart" nobody, and the app keeps the data of the scenario before it
 # (its process is killed instead), so it must follow a "chat" scenario; "pm" a second person
@@ -123,12 +129,15 @@ LOCK_PTT_SECONDS=60
 # "ban" scenario stays the last one.
 SCENARIOS=(
   "granted granted alone ${TEST_PACKAGE}.ConnectFlowTest"
+  "granted granted certificate ${TEST_PACKAGE}.CertificateFlowTest"
+  "granted granted alone ${TEST_PACKAGE}.LinkFlowTest"
   "granted granted alone ${TEST_PACKAGE}.PublicServersFlowTest"
   "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#aLocalServerIsExplainedThenTheSystemAsksAndAllowingItConnects"
   "ask granted alone ${TEST_PACKAGE}.LocalNetworkFlowTest#refusingItIsNamedInTheErrorWhichLeadsToTheSystemSettingsAndBackToAConnection"
   "granted ask alone ${TEST_PACKAGE}.MicrophoneFlowTest#itIsExplainedWhenTalkingBecomesPossibleThenTheSystemAsksAndAllowingItLeavesNoNotice"
   "granted ask alone ${TEST_PACKAGE}.MicrophoneFlowTest#refusingItKeepsTheConnectionWithANoticeThatLeadsToTheQuestionAndThenToTheSystemSettings"
   "granted granted peer ${TEST_PACKAGE}.VoiceFlowTest"
+  "granted granted person ${TEST_PACKAGE}.PersonSheetFlowTest"
   "granted granted ptt ${TEST_PACKAGE}.PushToTalkFlowTest"
   "granted granted mute ${TEST_PACKAGE}.MuteDeafenFlowTest"
   "granted granted whisper ${TEST_PACKAGE}.WhisperFlowTest"
@@ -187,6 +196,8 @@ SUMMARY_FILE="${OUT_DIR}/summary.md"
 summary_rows=()
 # How many scenarios passed only on their retry.
 retried=0
+# Created on the device once the test server presents its second certificate.
+CERT_SWITCHED_MARK="/data/local/tmp/mumcord-cert-switched"
 # The third person of the evidence: hears the second person without the emulator in between.
 MONITOR_NAME="e2e-monitor"
 # What the other people of the running scenario report; set by run_scenario.
@@ -233,6 +244,7 @@ network_pid=""
 messenger_pid=""
 evidence_pid=""
 evidence_file=""
+switcher_pid=""
 load_pid=""
 server_started=0
 # The animation scales the emulator had before the run switched them off, as "name=value".
@@ -332,6 +344,32 @@ stop_messenger() {
   rm -f "${PM_FIFO}"
 }
 
+# Restarts the test server with the certificate set the test asks for in the device log
+# ("testenv cert B"), then tells the test by a file on the device.
+start_cert_switcher() {
+  (
+    "${ADB}" -s "${serial}" logcat -v raw -T 1 -s MumcordE2E:I | while read -r word command set; do
+      if [[ "${word}" == "testenv" && "${command}" == "cert" && "${set}" =~ ^[AB]$ ]] \
+        && "${REPO_ROOT}/scripts/testenv.sh" up --cert "${set}" >>"${OUT_DIR}/testenv-cert.log" 2>&1 </dev/null; then
+        "${ADB}" -s "${serial}" shell touch "${CERT_SWITCHED_MARK}" </dev/null || true
+      fi
+    done
+  ) &
+  switcher_pid=$!
+}
+
+# Stops listening and gives the test server its first certificate back, whatever the test did.
+stop_cert_switcher() {
+  [[ -n "${switcher_pid}" ]] || return 0
+  pkill -P "${switcher_pid}" 2>/dev/null || true
+  kill "${switcher_pid}" 2>/dev/null || true
+  wait "${switcher_pid}" 2>/dev/null || true
+  switcher_pid=""
+  "${REPO_ROOT}/scripts/testenv.sh" up --cert A >>"${OUT_DIR}/testenv-cert.log" 2>&1 \
+    || printf 'e2e: giving the test server its first certificate back failed, see e2e/build/testenv-cert.log\n' >&2
+  timeout 20 "${ADB}" -s "${serial}" shell rm -f "${CERT_SWITCHED_MARK}" >/dev/null 2>&1 || true
+}
+
 # adbd logs every shell command it runs; the transfer argument (the code with its QR code
 # texts) and the SuperUser password must not reach a file that is kept.
 redact_device_log() {
@@ -370,7 +408,7 @@ check_peers() {
   local peer_log="${PEER_LOG#"${REPO_ROOT}/"}" bystander_log="${BYSTANDER_LOG#"${REPO_ROOT}/"}"
   if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" \
     && "${kind}" != "identity" && "${kind}" != "activity" && "${kind}" != "moderation" \
-    && "${kind}" != "ban" && "${kind}" != "profile" && "${kind}" != "stream" ]]; then
+    && "${kind}" != "ban" && "${kind}" != "profile" && "${kind}" != "stream" && "${kind}" != "certificate" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -440,6 +478,19 @@ check_peers() {
       adb_device pull "${IDLE_PICTURE}" "${OUT_DIR}/idle-notification.png" >/dev/null 2>&1 \
         || die "the picture of the warning notification is missing"
       adb_device shell rm -f "${IDLE_PICTURE}"
+      ;;
+    person)
+      grep '^HEARD' "${PEER_LOG}" || die "the second person did not hear the app, see ${peer_log}"
+      sed -n 's/^person sheet: /e2e: person sheet: /p' "${report}" | tr -d '\r'
+      held="$(sed -n 's/^person sheet: muted for me ms=//p' "${report}" | tr -d '\r')"
+      [[ -n "${held}" ]] || die "the test did not report how long the second person was muted for the phone"
+      # The second person stops talking, which ends the stretch the third one is hearing.
+      kill "${peer_pids[0]}" 2>/dev/null || true
+      sleep 2
+      longest="$(voice_spans "${BYSTANDER_LOG}" | sort -n | tail -n 1)"
+      printf 'e2e: person sheet: the third person heard the second one for %s ms without a break\n' "${longest:-0}"
+      ((${longest:-0} >= held)) \
+        || die "the third person did not hear the second one while the phone had them muted, see ${bystander_log}"
       ;;
     whisper)
       held="$(sed -n 's/^whisper: held_ms=//p' "${report}" | tr -d '\r')"
@@ -704,6 +755,11 @@ run_scenario() {
   local extra=()
   case "${peer}" in
     alone | notify | chat-restart | gap | idle) ;;
+    certificate) start_cert_switcher ;;
+    person)
+      start_peer "${PEER_LOG}"
+      start_peer "${BYSTANDER_LOG}" --name "${BYSTANDER_NAME}" --listen-only
+      ;;
     identity)
       start_person "${IDENTITY_WATCH_LOG}" python3 "${REPO_ROOT}/e2e/identity-watch.py" "${PHONE_NAME}"
       ;;
@@ -777,19 +833,21 @@ run_scenario() {
   fi
   stop_phone_network
   stop_messenger
-  if [[ "${peer}" != "alone" && "${peer}" != "notify" && "${peer}" != "chat-restart" && "${peer}" != "transfer" ]]; then
+  stop_cert_switcher
+  if [[ "${peer}" != "alone" && "${peer}" != "notify" && "${peer}" != "chat-restart" && "${peer}" != "transfer" \
+    && "${peer}" != "certificate" ]]; then
     check_peers "${peer}" "${report}"
     stop_peers
   fi
 }
 
 # Runs one scenario in a shell of its own, so that a failure ends only that attempt: whatever
-# the attempt started (other people and listeners) is stopped with it.
+# the attempt started (other people, listeners, the second certificate) is stopped with it.
 # Called with "set +e" and never as a condition, which would switch "set -e" off inside.
 attempt_scenario() {
   (
     set -e
-    trap 'stop_peers; stop_phone_network; stop_messenger; stop_evidence' EXIT
+    trap 'stop_peers; stop_phone_network; stop_messenger; stop_evidence; stop_cert_switcher' EXIT
     run_scenario "$@"
   )
 }
