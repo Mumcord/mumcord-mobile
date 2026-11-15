@@ -60,7 +60,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("{part}");
     }
     println!("EXPIRED");
-    let old = expired.parts().first().ok_or("the expired transfer has no part")?;
+    let old = expired
+        .parts()
+        .first()
+        .ok_or("the expired transfer has no part")?;
     println!("{old}");
     Ok(())
 }
