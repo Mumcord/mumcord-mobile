@@ -4,6 +4,7 @@
 
 ### Added
 
+- Manual device checklist for every release: what to try on real phones and headsets, with battery and data measurements
 - Android and iOS: the Mumcord app icon (the desktop icon) on the home screen, with a themed icon on Android 13 and later, and the Mumcord glyph in Android notifications
 - Repository skeleton: directory layout, Rust workspace, pinned engine reference, contributor rules
 - Bridge between the Mumcord engine and the apps: connect, certificate question, disconnect, live view of channels and people

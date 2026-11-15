@@ -3,6 +3,8 @@
 How to get a machine ready to build and test the Mumcord mobile apps. This page covers the
 Android toolchain on Linux; the iOS toolchain needs a Mac and is described in [iOS](#ios) below.
 
+Before every APK or TestFlight release, run the [manual device checklist](device-checklist.md) on real phones (battery and data measurements included).
+
 ## What you need beforehand
 
 - Linux on x86_64 with KVM available (`/dev/kvm` readable and writable for your user). The
