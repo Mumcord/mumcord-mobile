@@ -21,6 +21,8 @@ on:
   push:
     branches: [main]
     paths: *paths
+  # On demand, for example to run the end-to-end tests again on a branch without a new commit.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -135,8 +137,9 @@ jobs:
   emulator:
     name: Emulator tests
     runs-on: ubuntu-24.04
-    # A green run takes about half an hour; the rest is room for a cold cache.
-    timeout-minutes: 60
+    # A green run takes 35 to 50 minutes; the rest is room for a cold cache and for retried
+    # end-to-end scenarios.
+    timeout-minutes: 75
     env:
       E2E_AVD: mumcord-test
       E2E_BOOT_TIMEOUT: 600
@@ -274,9 +277,14 @@ jobs:
 
       # The real app with the real engine against the stock Mumble test server in Docker. Also
       # run when an instrumented test failed: the two do not depend on each other, and one run
-      # then shows everything that is broken.
+      # then shows everything that is broken. A failed scenario is run once more; every retry
+      # is a warning on the run and a row of the job summary, so a flake never passes unseen.
+      # The evidence folder keeps each scenario's device log (without the test server's
+      # password or a transfer code) for the artifact.
       - name: End-to-end tests
         if: ${{ !cancelled() && steps.emulator.outcome == 'success' }}
+        env:
+          E2E_EVIDENCE_DIR: e2e/build/evidence
         run: e2e/run.sh
 
       - name: Stop the emulator
