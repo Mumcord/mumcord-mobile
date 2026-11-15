@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # Builds everything the iOS app needs from the Rust bridge and generates the Xcode project.
-# Runs on macOS only (needs Xcode, XcodeGen, cmake and the Rust toolchain of this repository).
+# Runs on macOS only (needs Xcode, XcodeGen, cmake, meson, ninja and the Rust toolchain of this
+# repository). The video codec libraries come from scripts/build-codecs.sh (kept in .codecs/).
 #
 #   scripts/build-ios.sh          bridge for device and simulator, Swift bindings,
 #                                 MumcordBridge.xcframework, design tokens, Mumcord.xcodeproj
@@ -185,15 +186,24 @@ if [[ "${mode}" == test-without-building ]]; then
 fi
 
 check_groups
-for tool in cargo xcodebuild xcrun xcodegen cmake python3; do
-  command -v "${tool}" >/dev/null || die "'${tool}' not found (Xcode, 'brew install xcodegen cmake', rustup; python3 ships with the Xcode command line tools)"
+for tool in cargo xcodebuild xcrun xcodegen cmake meson ninja python3; do
+  command -v "${tool}" >/dev/null || die "'${tool}' not found (Xcode, 'brew install xcodegen cmake meson ninja', rustup; python3 ships with the Xcode command line tools)"
 done
 
 cd "${REPO_ROOT}"
 
 for target in "${DEVICE_TARGET}" "${SIMULATOR_TARGET}"; do
+  codecs="$("${REPO_ROOT}/scripts/build-codecs.sh" "${target}")"
+  case "${target}" in
+    "${DEVICE_TARGET}") sdk="iphoneos" ;;
+    *) sdk="iphonesimulator" ;;
+  esac
   log "Building the bridge for ${target}"
-  cargo build --package "${BRIDGE_PACKAGE}" --lib --release --target "${target}"
+  # The engine generates the codec bindings with libclang, which needs the target's SDK for the
+  # C library headers.
+  env "BINDGEN_EXTRA_CLANG_ARGS_${target//-/_}=-isysroot $(xcrun --sdk "${sdk}" --show-sdk-path)" \
+    LIBVPX_STATIC_DIR="${codecs}/libvpx" DAV1D_STATIC_DIR="${codecs}/dav1d" \
+    cargo build --package "${BRIDGE_PACKAGE}" --lib --release --target "${target}"
 done
 device_library="${CARGO_TARGET}/${DEVICE_TARGET}/release/${RUST_LIBRARY}"
 simulator_library="${CARGO_TARGET}/${SIMULATOR_TARGET}/release/${RUST_LIBRARY}"

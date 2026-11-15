@@ -561,6 +561,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.73.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "787ef8ef523575546b106a58213d6e6b06198a05c2f757258c68a74273670cfa"
+dependencies = [
+ "bitflags 2.13.2",
+ "cexpr",
+ "clang-sys",
+ "log",
+ "prettyplease 0.2.37",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash 2.1.3",
+ "shlex 2.0.1",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "bit-vec"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2639,6 +2658,8 @@ name = "mumcord-screenshare"
 version = "0.8.0"
 source = "git+https://github.com/Mumcord/mumcord?rev=b258e927e1af54bfd122dfa1976cd90f4f74af74#b258e927e1af54bfd122dfa1976cd90f4f74af74"
 dependencies = [
+ "bindgen 0.73.2",
+ "pkg-config",
  "thiserror 2.0.21",
 ]
 

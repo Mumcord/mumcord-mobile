@@ -47,6 +47,13 @@ uniffi = "=0.32.2"
 unicode-segmentation = "1"
 url = "2"
 
+# The video codecs of streams (libvpx for VP9, dav1d for AV1), cross-built by
+# scripts/build-codecs.sh. Only for the phones: builds for this machine (binding generator, tests,
+# end-to-end helpers) stay free of the C libraries; without the features the engine keeps the same
+# API and reports the codec as unavailable.
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+mumcord-engine = { workspace = true, features = ["vp9", "av1-decode"] }
+
 [target.'cfg(target_os = "android")'.dependencies]
 # Same versions as the engine uses, so there is one verifier and one JNI layer in the library.
 jni = { version = "0.22", default-features = false }

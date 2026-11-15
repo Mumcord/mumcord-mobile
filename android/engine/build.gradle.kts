@@ -46,6 +46,7 @@ val buildRustBridge = tasks.register<Exec>("buildRustBridge") {
         repositoryRoot.resolve("engine.lock.toml"),
         repositoryRoot.resolve("rust-toolchain.toml"),
         repositoryRoot.resolve("scripts/build-android.sh"),
+        repositoryRoot.resolve("scripts/build-codecs.sh"),
     )
     outputs.dir(layout.projectDirectory.dir("src/main/jniLibs"))
     outputs.dir(layout.projectDirectory.dir("src/main/kotlin"))
