@@ -36,6 +36,8 @@
 #      log) and moderates e2e/moderation-target.py, a foreign client that reports what the
 #      server did to it; the ban scenario is the last one, because a ban covers the address
 #      all people of the test server share, and it ends with the person let in again.
+#      A scenario that fails is run once more (E2E_RETRIES); the retry is reported in
+#      e2e/build/summary.md (and the job summary on GitHub), never hidden.
 #   6. stop the server, and the emulator if this script started it
 #
 # Usage: e2e/run.sh [extra arguments for "am instrument"]
@@ -56,6 +58,7 @@
 #                         just before the first answer, so the test has to repeat the call
 #                         (the path for an emulator that loses an answered call by itself)
 #   E2E_RELEASE_BOUND_MS  how much longer than a hold the app may be heard (default 200)
+#   E2E_RETRIES           how often a failed scenario is run again (default 1, 0 for none)
 #   E2E_EVIDENCE_DIR      a folder that keeps what explains a speaker gap after the run: the
 #                         device log of every scenario in its own file, this machine's load
 #                         every second, and in the locked push-to-talk scenario the report of
@@ -63,8 +66,10 @@
 #
 # Logs of the run land in e2e/build/: the test output (instrument.txt), the device log of all
 # scenarios (logcat.txt), the emulator log, what each other person reported
-# (voice-peer-<scenario>.log, voice-bystander-<scenario>.log) and, for a scenario that hung,
-# the screen at that moment (hung-screen.png, hung-screen.xml).
+# (voice-peer-<scenario>.log, voice-bystander-<scenario>.log), for a scenario that hung, the
+# screen at that moment (hung-screen.png, hung-screen.xml), the outcome of every scenario with
+# its duration and retries (summary.md), and what a failed attempt left before its retry
+# (retried/).
 set -euo pipefail
 
 export MUMCORD_PORT_BASE="${MUMCORD_PORT_BASE:-64838}"
@@ -176,6 +181,12 @@ APP_APK="${REPO_ROOT}/android/app/build/outputs/apk/debug/app-debug.apk"
 TEST_APK="${REPO_ROOT}/android/e2e/build/outputs/apk/debug/e2e-debug.apk"
 PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/voice-peer"
 EVIDENCE_DIR="${E2E_EVIDENCE_DIR:-}"
+RETRIES="${E2E_RETRIES:-1}"
+SUMMARY_FILE="${OUT_DIR}/summary.md"
+# The outcome of each scenario, one table row each, for the summary.
+summary_rows=()
+# How many scenarios passed only on their retry.
+retried=0
 # The third person of the evidence: hears the second person without the emulator in between.
 MONITOR_NAME="e2e-monitor"
 # What the other people of the running scenario report; set by run_scenario.
@@ -221,6 +232,7 @@ peer_pids=()
 network_pid=""
 messenger_pid=""
 evidence_pid=""
+evidence_file=""
 load_pid=""
 server_started=0
 # The animation scales the emulator had before the run switched them off, as "name=value".
@@ -320,11 +332,18 @@ stop_messenger() {
   rm -f "${PM_FIFO}"
 }
 
+# adbd logs every shell command it runs; the transfer argument (the code with its QR code
+# texts) and the SuperUser password must not reach a file that is kept.
+redact_device_log() {
+  sed -E 's/-e transfer [^ ]+/-e transfer (removed)/g; s/-e superuser [^ ]+/-e superuser (removed)/g'
+}
+
 # Keeps the device log of one scenario in its own file of the evidence folder, with the
 # difference between the device's clock and this machine's in its first line.
 start_evidence() {
   [[ -n "${EVIDENCE_DIR}" ]] || return 0
   local file="${EVIDENCE_DIR}/logcat-$1.txt"
+  evidence_file="${file}"
   printf 'clocks: host_unix_ms=%s device_unix_ms=%s\n' \
     "$(date +%s%3N)" "$(adb_device shell date +%s%3N | tr -d '\r')" >"${file}"
   "${ADB}" -s "${serial}" logcat -v threadtime -T 1 >>"${file}" 2>/dev/null &
@@ -336,6 +355,8 @@ stop_evidence() {
   kill "${evidence_pid}" 2>/dev/null || true
   wait "${evidence_pid}" 2>/dev/null || true
   evidence_pid=""
+  local redacted="${evidence_file}.redacted"
+  redact_device_log <"${evidence_file}" >"${redacted}" && mv "${redacted}" "${evidence_file}"
 }
 
 # The lengths (ms) of the stretches of voice a person heard that count as voice, one per line.
@@ -538,6 +559,7 @@ cleanup() {
   stop_phone_network
   stop_messenger
   stop_evidence
+  write_summary
   [[ -z "${load_pid}" ]] || kill "${load_pid}" 2>/dev/null
   if [[ -n "${serial}" ]]; then
     # What the network and idle scenarios change is put back, also after a test that died:
@@ -555,11 +577,7 @@ cleanup() {
         timeout 20 "${ADB}" -s "${serial}" shell settings put global "${entry%%=*}" "${entry#*=}" >/dev/null 2>&1
       fi
     done
-    # adbd logs every shell command it runs; the transfer argument (the code with its QR code
-    # texts) and the SuperUser password must not reach the file.
-    timeout 20 "${ADB}" -s "${serial}" logcat -d 2>/dev/null \
-      | sed -E 's/-e transfer [^ ]+/-e transfer (removed)/g; s/-e superuser [^ ]+/-e superuser (removed)/g' \
-        >"${OUT_DIR}/logcat.txt"
+    timeout 20 "${ADB}" -s "${serial}" logcat -d 2>/dev/null | redact_device_log >"${OUT_DIR}/logcat.txt"
   fi
   if [[ -n "${emulator_pid}" ]]; then
     timeout 10 "${ADB}" -s "${serial}" emu kill >/dev/null 2>&1
@@ -765,12 +783,82 @@ run_scenario() {
   fi
 }
 
+# Runs one scenario in a shell of its own, so that a failure ends only that attempt: whatever
+# the attempt started (other people and listeners) is stopped with it.
+# Called with "set +e" and never as a condition, which would switch "set -e" off inside.
+attempt_scenario() {
+  (
+    set -e
+    trap 'stop_peers; stop_phone_network; stop_messenger; stop_evidence' EXIT
+    run_scenario "$@"
+  )
+}
+
+# Keeps what a failed attempt left, before its retry writes over it.
+keep_failed_attempt() {
+  local folder="${OUT_DIR}/retried/$1" log
+  mkdir -p "${folder}"
+  for log in "${OUT_DIR}/instrument-scenario.txt" "${PEER_LOG}" "${BYSTANDER_LOG}" "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}" \
+    "${IDENTITY_WATCH_LOG}" "${MODERATION_LOG}" "${PROFILE_WATCH_LOG}" "${STREAM_PEER_LOG}" "${OUT_DIR}/hung-screen.png" \
+    "${OUT_DIR}/hung-screen.xml"; do
+    [[ -s "${log}" ]] && mv "${log}" "${folder}/"
+  done
+  timeout 20 "${ADB}" -s "${serial}" logcat -d 2>/dev/null | redact_device_log >"${folder}/logcat.txt"
+}
+
+# The outcome of every scenario as a table: e2e/build/summary.md, and the job summary on GitHub.
+write_summary() {
+  {
+    printf '## End-to-end scenarios\n\n'
+    if ((${#summary_rows[@]} == 0)); then
+      printf 'No scenario finished.\n'
+    else
+      printf '| Scenario | Result | Duration | Attempts |\n|---|---|---|---|\n'
+      printf '%s\n' "${summary_rows[@]}"
+    fi
+    if ((retried > 0)); then
+      printf '\n%s scenario(s) failed once and passed on the retry: a flake to look into (logs in e2e/build/retried/).\n' "${retried}"
+    fi
+  } >"${SUMMARY_FILE}"
+  [[ -z "${GITHUB_STEP_SUMMARY:-}" ]] || cat "${SUMMARY_FILE}" >>"${GITHUB_STEP_SUMMARY}"
+}
+
 scenarios_run=0
 for scenario in "${SCENARIOS[@]}"; do
   read -r permission microphone peer test <<<"${scenario}"
   [[ "${test}" == *"${E2E_SCENARIO:-}"* ]] || continue
-  run_scenario "${permission}" "${microphone}" "${peer}" "${test}" "$@"
+  name="${test##*.}"
+  # As run_scenario names them; also read here, to keep them from a failed attempt and to show
+  # their end after a failure.
+  PEER_LOG="${OUT_DIR}/voice-peer-${peer}.log"
+  BYSTANDER_LOG="${OUT_DIR}/voice-bystander-${peer}.log"
+  started="${SECONDS}"
+  attempt=1
+  while true; do
+    set +e
+    attempt_scenario "${permission}" "${microphone}" "${peer}" "${test}" "$@"
+    status=$?
+    set -e
+    ((status != 0)) || break
+    if ((attempt > RETRIES)); then
+      summary_rows+=("| ${name} | failed | $((SECONDS - started)) s | ${attempt} |")
+      die "${name} failed (attempts: ${attempt})"
+    fi
+    keep_failed_attempt "$((scenarios_run + 1))-${peer}-attempt-${attempt}"
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+      printf '::warning title=End-to-end retry::%s failed and is run again (logs in e2e/build/retried/)\n' "${name}"
+    fi
+    step "RETRY: ${name} failed, running it again"
+    attempt=$((attempt + 1))
+  done
+  if ((attempt > 1)); then
+    retried=$((retried + 1))
+    summary_rows+=("| ${name} | passed on retry | $((SECONDS - started)) s | ${attempt} |")
+  else
+    summary_rows+=("| ${name} | passed | $((SECONDS - started)) s | 1 |")
+  fi
   scenarios_run=$((scenarios_run + 1))
 done
 ((scenarios_run > 0)) || die "no scenario matches E2E_SCENARIO=${E2E_SCENARIO:-}"
+((retried == 0)) || step "PASSED with ${retried} retried scenario(s), see e2e/build/summary.md"
 step "PASSED"
