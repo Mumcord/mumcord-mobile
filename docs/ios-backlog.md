@@ -144,7 +144,9 @@ simulator app; linking for a real device is first proven here.
   leaves the session, only the CallKit mute action toggles mute. Wired EarPods' single press
   therefore leaves. Decide after trying real headsets (one function, `endRequestMeans`).
 - A test with real QR transfer parts (host tool `e2e/transfer-maker`) is not run on iOS.
-- There are no iOS end-to-end tests against the local test server yet (task 10.4).
+- There are no iOS end-to-end tests against the local test server yet (task 10.4): the
+  simulator half of `e2e/run.sh` (the same scenarios against the test server on `localhost`, run
+  in the iOS CI job) and the iOS column of [acceptance.md](acceptance.md) are open.
 
 ## CI notes
 

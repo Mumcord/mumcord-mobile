@@ -160,6 +160,15 @@ people of the voice scenarios reported (`voice-peer-<scenario>.log`) and, for a 
 hung, the screen at that moment (`hung-screen.png`). A test that fails while waiting says what
 was on the screen in its failure message.
 
+Which test proves which acceptance criterion of the specification, and what is left to the
+manual device checklist, is listed in [acceptance.md](acceptance.md).
+
+A scenario that fails is run once more (`E2E_RETRIES=0` switches that off). A retry is never
+hidden: the run ends with `e2e: PASSED with 1 retried scenario(s)`, `e2e/build/summary.md`
+lists every scenario with its result, duration and attempts, and what the failed attempt left
+(its test output, the reports of the other people and the device log) is kept in
+`e2e/build/retried/`. A scenario that fails twice fails the run.
+
 - **Test server:** `scripts/testenv.sh up` and `down` start and stop it on their own. It is the
   test environment of the Mumcord repository (a stock `mumble-server` in Docker with the
   channels Lobby, Raid and AFK) at the commit pinned in `engine.lock.toml`, checked out into
@@ -171,9 +180,13 @@ was on the screen in its failure message.
   themselves when started without the script (for example by `./gradlew connectedDebugAndroidTest`),
   because they then have no server.
 - **Scenarios:** `e2e/run.sh` runs each test as its own scenario with fresh app data and the
-  permissions it needs: connecting; the local network and the microphone question with the
-  system's own dialogs; voice in both directions, push-to-talk, mute and deafen, and whisper
-  with a second person on the host (`e2e/voice-peer`); the notification question (allowed,
+  permissions it needs: connecting; a changed server certificate (the script restarts the
+  test server with the test environment's second certificate, `scripts/testenv.sh up --cert B`,
+  when the test asks for it, and gives it the first one back afterwards, also after a
+  failure); a `mumble://` link opened by the system; the local network and the microphone
+  question with the system's own dialogs; voice in both directions, push-to-talk, mute and
+  deafen, whisper, and the person sheet's volume and "Mute for me" with a second person on the
+  host (`e2e/voice-peer`); the notification question (allowed,
   and "not now"); the session's notification and its buttons; voice with the app in the
   background and the screen locked, with voice activity (three minutes) and with
   push-to-talk (one minute, silent while locked); the audio output as the emulator has it
@@ -310,7 +323,13 @@ the versions listed above:
   `./gradlew connectedDebugAndroidTest` and then `e2e/run.sh` against the test server in Docker
   (also when an instrumented test failed, so one run shows everything that is broken). The
   contents of `e2e/build/`, the device log of the instrumented tests among them, and the test
-  reports are attached to the run as `emulator-test-logs`, also when it fails.
+  reports are attached to the run as `emulator-test-logs`, also when it fails. The end-to-end
+  step keeps each scenario's device log in `e2e/build/evidence/` (`E2E_EVIDENCE_DIR`), with the
+  test server's password and the transfer codes removed. Its summary table (one row per
+  scenario, retries marked) is the run's job summary, and every retry is also a warning on the
+  run. A green run of this job takes 35 to 50 minutes, of which the end-to-end tests take about
+  20; it runs on every push to a pull request, and by hand with "Run workflow" (it has a
+  `workflow_dispatch` trigger).
 
 The Rust build, the Gradle downloads, the toolchain and the video codecs are cached between
 runs. The emulator
