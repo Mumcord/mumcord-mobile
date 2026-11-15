@@ -21,6 +21,7 @@ final class SessionStoreTests: XCTestCase {
         // Loading the servers also reads the phone settings of the engine that was created.
         var state = SessionState(servers: [saved], serversLoaded: true)
         state.mobileSettings = box.engines.last?.mobileSettings()
+        state.identities = box.engines.last?.savedIdentities()
         return state
     }
 

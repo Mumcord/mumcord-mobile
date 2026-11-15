@@ -48,7 +48,12 @@ final class IdentitiesFlowUITests: XCTestCase {
         expectAppears(app.row("scan-camera-action", containing: "Allow the camera"))
         tapWhenReady(app.element("scan-camera-action"))
         expectAppears(app.row("scan-camera-action", containing: "Open settings"))
-        tapWhenReady(app.element("scan-close"))
+        let close = app.element("scan-close")
+        if !close.waitForExistence(timeout: 5) {
+            // Only fake data is on screen: the tree says why the close button is not there.
+            print(app.debugDescription)
+        }
+        tapWhenReady(close)
         expectAppears(app.element("server-add"))
     }
 
@@ -82,8 +87,10 @@ final class IdentitiesFlowUITests: XCTestCase {
         let confirm = app.element("identity-delete-confirm")
         expectAppears(confirm)
         XCTAssertFalse(confirm.isEnabled)
-        typeText("Lea", into: app.input("Type the identity label to confirm"))
-        dismissKeyboard(in: app)
+        // The return key puts the keyboard away; the keyboard's own Done key was invalidated by
+        // the sheet moving up with it in CI.
+        typeText("Lea\n", into: app.input("Type the identity label to confirm"))
+        reveal(confirm, in: app)
         tapWhenReady(confirm)
         expectGone(app.row("identity-card", containing: "Lea"))
     }
