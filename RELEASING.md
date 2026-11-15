@@ -106,7 +106,7 @@ git push origin v0.1.0
 
 Open **Actions** → **Release** and follow the run of the tag (about 30 to 60 minutes). Its jobs:
 
-1. **Build the release APK**: works out the version from the tag, builds the release APK (arm64 only, without signing), checks that it is the product (`scripts/check-release-apk.sh`: right app id and version, not debuggable, no debug-only screens or test switches), and writes the SBOM, the third-party notices and the release notes. It fails when a dependency has a licence that is not allowed (`about.toml`).
+1. **Build the release APK**: works out the version from the tag, builds the release APK (arm64 only, without signing), checks that it is the product (`scripts/check-release-apk.sh`: right app id and version, not debuggable, no debug-only screens or test switches), and writes the SBOM, the third-party notices and the release notes. It fails when a dependency has a licence that is not allowed (`about.toml`). The release build shrinks the app: R8 removes unused Kotlin code and resources and renames the rest, and the engine library is packaged without its symbols. What turns a crash report back into readable names is kept for 90 days as the run artifact `android-symbols` (the unstripped engine libraries and R8's `mapping.txt`); download it and keep it with your release records if crash reports of that version may come in later.
 2. **Sign with the release key**: the only job that gets the secrets of `android-release`. It signs the APK with APK signature schemes v2 and v3 (`scripts/sign-apk.sh`), checks the signature and writes `SHA256SUMS`.
 3. **Create the draft release**: attaches the files and writes the notes. Running it again for the same tag replaces the files of the draft; a published release is never changed.
 
@@ -123,7 +123,7 @@ Rename `## [Unreleased]` in `CHANGELOG.md` to `## [0.1.0] - <date>` and start a 
 
 ## Test run without the release key
 
-Every pull request that changes the release pipeline (the workflow, its scripts, `about.toml`, the app's build file or the version catalog) runs the same build as a test, and **Actions → Release → Run workflow** starts one by hand. A test run signs with a throwaway key made inside the job, never touches the environment or its secrets, and creates no release. Its files are kept for 14 days as the run artifact `android-dry-run`. Its APK cannot update a real release: its key and version code differ.
+Every pull request that changes the release pipeline (the workflow, its scripts, `about.toml`, the app's build file and R8 rules or the version catalog) runs the same build as a test, and **Actions → Release → Run workflow** starts one by hand. A test run signs with a throwaway key made inside the job, never touches the environment or its secrets, and creates no release. Its files are kept for 14 days as the run artifact `android-dry-run`. Its APK cannot update a real release: its key and version code differ.
 
 ## Building and checking a release locally
 
@@ -132,7 +132,8 @@ The same scripts work on a developer machine (toolchain from `scripts/setup-andr
 ```sh
 eval "$(scripts/setup-android.sh --env)"
 (cd android && ./gradlew assembleRelease :app:cyclonedxDirectBom -Pmumcord.versionName=0.1.0 -Pmumcord.versionCode=100)
-scripts/check-release-apk.sh android/app/build/outputs/apk/release/app-release-unsigned.apk 0.1.0 100
+scripts/check-release-apk.sh android/app/build/outputs/apk/release/app-release-unsigned.apk 0.1.0 100 \
+  android/app/build/outputs/mapping/release/mapping.txt
 scripts/generate-sbom.sh 0.1.0 android/app/build/reports/cyclonedx-direct/bom.json mumcord-mobile-0.1.0-android.cdx.json
 scripts/generate-notices.sh 0.1.0 android/app/build/reports/cyclonedx-direct/bom.json THIRD_PARTY_NOTICES.txt
 ```

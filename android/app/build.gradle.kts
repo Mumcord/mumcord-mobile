@@ -48,6 +48,11 @@ android {
         }
         release {
             ndk { abiFilters += "arm64-v8a" }
+            // R8 drops the code and resources the app never uses (most of the Compose and
+            // Material libraries); proguard-rules.pro keeps what native code and JNA reach by name.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
