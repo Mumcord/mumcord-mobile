@@ -18,6 +18,7 @@ use tokio::runtime::{Handle, Runtime};
 use tokio::sync::{mpsc, oneshot};
 
 use crate::audio_abi::Endpoint;
+use crate::camera_send::{CameraFeed, PhoneCamera};
 use crate::chat::SharedChat;
 use crate::convert;
 use crate::error::BridgeError;
@@ -135,6 +136,8 @@ pub struct MumcordEngine {
     pub(crate) streams_changed: Arc<tokio::sync::Notify>,
     /// The pictures of the watched streams, behind the handle of `video_handle`. Emptied on drop.
     pub(crate) video: &'static VideoFrames,
+    /// Where the app's camera pictures go, behind the handle of `camera_handle`.
+    pub(crate) camera: &'static CameraFeed,
     /// The engine does not tell its runtime bitrate limit; 0 is none.
     bitrate_limit_kbps: AtomicU32,
     handle: Handle,
@@ -212,6 +215,8 @@ impl MumcordEngine {
             kind: StreamKind::Camera,
         }));
         engine.camera_set_decode_codecs(&[Codec::Vp9, Codec::Av1]);
+        let camera = CameraFeed::start();
+        engine.camera_set_backend(Arc::new(PhoneCamera(camera)));
         let streams = SharedStreams::default();
         let streams_changed = Arc::new(tokio::sync::Notify::new());
         let (stop_events, stop) = oneshot::channel();
@@ -259,6 +264,7 @@ impl MumcordEngine {
             streams,
             streams_changed,
             video,
+            camera,
             bitrate_limit_kbps: AtomicU32::new(0),
             handle,
             runtime: Some(runtime),

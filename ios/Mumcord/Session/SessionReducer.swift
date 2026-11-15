@@ -95,7 +95,7 @@ extension SessionState {
              .blockedPeopleChanged:
             break
         // Streams phase (task 7.5): the state does not follow streams yet.
-        case .streamsChanged, .directConnectionsQuestion:
+        case .streamsChanged, .directConnectionsQuestion, .ownCameraChanged:
             break
         }
         return next

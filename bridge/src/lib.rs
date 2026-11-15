@@ -123,6 +123,14 @@
 //! C functions (`bridge/include/mumcord_video.h`, handle of [`MumcordEngine::video_handle`]) and
 //! uploads the planes straight from the bridge's memory.
 //!
+//! # Camera
+//!
+//! The user's own camera is shared by the engine (VP9, as on the desktop) from pictures the app
+//! captures: [`MumcordEngine::set_camera_capture`] gives the engine the app's camera, which it
+//! starts with [`MumcordEngine::open_camera_preview`] and stops when sharing ends. The app's
+//! camera thread pushes every picture with a C function (`bridge/include/mumcord_camera.h`,
+//! handle of [`MumcordEngine::camera_handle`]); [`BridgeEvent::OwnCameraChanged`] tells the state.
+//!
 //! # Android start-up
 //!
 //! Checking certificates against the system store needs the app context once per process, before
@@ -158,6 +166,7 @@ mod activity;
 #[cfg(target_os = "android")]
 mod android;
 mod audio_abi;
+mod camera_send;
 mod chat;
 mod convert;
 mod crash;
@@ -182,6 +191,10 @@ mod video;
 pub use audio_abi::{
     mumcord_audio_capture_push_f32, mumcord_audio_capture_push_i16,
     mumcord_audio_playback_pull_f32, mumcord_audio_playback_pull_i16,
+};
+pub use camera_send::{
+    CameraCapture, CameraProblem, CaptureFailure, MumcordCameraImage, OwnCamera, OwnCameraState,
+    mumcord_camera_push_frame,
 };
 pub use chat::{
     BlockedPerson, ChatId, ChatLimits, ChatMessage, ChatNotification, ChatPage, ChatUnread,

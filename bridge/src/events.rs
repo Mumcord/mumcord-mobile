@@ -14,6 +14,7 @@ use tokio::runtime::Handle;
 use tokio::sync::{mpsc, oneshot};
 
 use crate::activity::ActivityLog;
+use crate::camera_send::{self, OwnCamera};
 use crate::chat::{
     self, BlockedPerson, ChatId, ChatMessage, ChatNotification, MessageRequests, NotificationKind,
     SharedChat,
@@ -147,6 +148,10 @@ pub enum BridgeEvent {
     /// [`MumcordEngine::answer_direct_connections`](crate::MumcordEngine::answer_direct_connections);
     /// the watch waits for it. Asked once, the answer is kept.
     DirectConnectionsQuestion,
+    /// The user's own camera changed: preview, starting, shared, off, or a problem.
+    OwnCameraChanged {
+        camera: OwnCamera,
+    },
 }
 
 /// Receives the events; implemented by the app (Kotlin, Swift). Called on one bridge thread, in
@@ -571,6 +576,9 @@ fn apply(connection: &mut Connection, event: EngineEvent) -> Vec<BridgeEvent> {
             connection.blocked = blocked;
             connection.changed_people(&before, &connection.blocked_sessions())
         }
+        EngineEvent::CameraChanged(view) => one(BridgeEvent::OwnCameraChanged {
+            camera: camera_send::own_camera(&view),
+        }),
         // The engine has already switched the voice target back.
         EngineEvent::WhisperEnded => one(BridgeEvent::WhisperEnded),
         EngineEvent::DirectConsentRequired => {
