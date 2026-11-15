@@ -107,8 +107,10 @@ compose_environment() {
   export COMPOSE_FILE="docker-compose.yml:${REPO_ROOT}/e2e/compose.bridge.yml"
 }
 
-port_open() {
-  (exec 3<>"/dev/tcp/127.0.0.1/${MUMCORD_PORT_BASE}") 2>/dev/null
+# Docker opens the host port before the server in the container listens, so an open port
+# says nothing; only a finished TLS handshake shows that the server accepts connections.
+server_ready() {
+  timeout 5 openssl s_client -connect "127.0.0.1:${MUMCORD_PORT_BASE}" </dev/null >/dev/null 2>&1
 }
 
 up() {
@@ -128,7 +130,7 @@ up() {
   "${TESTENV_DIR}/up.sh" v15 "$@"
 
   local waited=0
-  until port_open; do
+  until server_ready; do
     if ((waited >= READY_TIMEOUT)); then
       (cd "${TESTENV_DIR}" && docker compose logs --tail 30 v15 >&2) || true
       die "the server did not accept connections on port ${MUMCORD_PORT_BASE} within ${READY_TIMEOUT} s"
