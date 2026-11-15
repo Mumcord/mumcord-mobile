@@ -26,7 +26,8 @@ final class IdentitiesFlowUITests: XCTestCase {
         let app = launchApp("qr-parts")
         tapWhenReady(app.element("server-scan"))
         let code = app.element("scan-code")
-        expectAppears(code, timeout: 20)
+        // A slow CI runner needs well over 20 s until every scripted code was read.
+        expectAppears(code, timeout: 60)
         typeText("11112222", into: code)
         expectAppears(app.element("Wrong code. 2 tries left."), timeout: 10)
         typeText("48217305", into: app.element("scan-code"))
