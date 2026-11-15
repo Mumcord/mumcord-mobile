@@ -32,6 +32,15 @@ import app.mumcord.mobile.bridge.PrivateMessageRule
 import app.mumcord.mobile.bridge.PrivateMessageSettings
 import app.mumcord.mobile.bridge.ReplyQuote
 import app.mumcord.mobile.bridge.SentChatRequest
+import app.mumcord.mobile.bridge.Theme
+import app.mumcord.mobile.bridge.ThemeCodeException
+import app.mumcord.mobile.bridge.ThemeCodePreview
+import app.mumcord.mobile.bridge.ThemeColors
+import app.mumcord.mobile.bridge.ThemeMode
+import app.mumcord.mobile.bridge.ThemeSettings
+import app.mumcord.mobile.bridge.ThemeShare
+import app.mumcord.mobile.bridge.ThemeTokens
+import app.mumcord.mobile.bridge.ThemeVariant
 import app.mumcord.mobile.bridge.EchoCancellation
 import app.mumcord.mobile.bridge.VoiceSettings
 import app.mumcord.mobile.bridge.WhisperTarget
@@ -86,6 +95,69 @@ val FAKE_MOBILE_SETTINGS = MobileSettings(
     notifySenderOnly = false,
     updateCheck = true,
 )
+
+/** The one built-in theme of the fake, with Mumcord's key colours. */
+val FAKE_THEME = Theme(
+    id = "preset:mumcord",
+    name = "Mumcord",
+    builtIn = true,
+    dark = ThemeColors(
+        background = "#1a1342",
+        surface = "#231b55",
+        text = "#f6f0e8",
+        accent = "#a78bff",
+        talking = "#3ee39e",
+        warning = "#fbbf24",
+        error = "#ff8f8f",
+    ),
+    light = ThemeColors(
+        background = "#ffffff",
+        surface = "#eee9f8",
+        text = "#17113a",
+        accent = "#6a40e0",
+        talking = "#15803d",
+        warning = "#7f4d00",
+        error = "#b01c1c",
+    ),
+)
+
+/** The only text the fake reads as a theme code. */
+const val FAKE_THEME_CODE = "mct1.fake"
+
+/** Tokens made of the key colours only: enough for screens that need some colours. */
+private fun fakeTokens(themeId: String, variant: ThemeVariant): ThemeTokens {
+    val colors = if (variant == ThemeVariant.DARK) FAKE_THEME.dark else FAKE_THEME.light
+    return ThemeTokens(
+        themeId = themeId,
+        variant = variant,
+        base = variant,
+        bgServers = colors.background,
+        bgSidebar = colors.background,
+        bgChat = colors.background,
+        bgElevated = colors.surface,
+        bgHover = colors.surface,
+        bgSelected = colors.surface,
+        text = colors.text,
+        textSecondary = colors.text,
+        textMuted = colors.text,
+        accent = colors.accent,
+        onAccent = colors.background,
+        accentText = colors.accent,
+        success = colors.talking,
+        warning = colors.warning,
+        danger = colors.error,
+        localMuted = colors.error,
+        talking = colors.talking,
+        accentStop1 = colors.accent,
+        accentStop2 = colors.accent,
+        accentStop3 = colors.accent,
+        primaryBg = colors.accent,
+        primaryText = colors.background,
+        border = colors.surface,
+        borderStrong = colors.text,
+        focus = colors.accent,
+    )
+}
 
 /** One call of [FakeEngine.connectServer]. */
 data class ConnectCall(val serverId: Long, val password: String?, val channelPath: List<String>)
@@ -750,6 +822,88 @@ class FakeEngine(
     override suspend fun setAppSettings(settings: AppSettings) {
         appSettings = settings
         emit(BridgeEvent.AppSettingsChanged(settings))
+    }
+
+    // ----- themes -----
+
+    var themeSettings = ThemeSettings(
+        mode = ThemeMode.SYSTEM,
+        appThemeId = FAKE_THEME.id,
+        customThemes = emptyList(),
+        serverThemes = emptyMap(),
+    )
+
+    override fun themeSettings(): ThemeSettings = themeSettings
+
+    override fun builtInThemes(): List<Theme> = listOf(FAKE_THEME)
+
+    override fun themeTokens(themeId: String?, variant: ThemeVariant): ThemeTokens =
+        fakeTokens(themeId ?: themeSettings.appThemeId, variant)
+
+    override suspend fun setThemeMode(mode: ThemeMode) {
+        changeThemes(themeSettings.copy(mode = mode))
+    }
+
+    override suspend fun setAppTheme(themeId: String) {
+        findTheme(themeId)
+        changeThemes(themeSettings.copy(appThemeId = themeId))
+    }
+
+    /** Reads only [FAKE_THEME_CODE], as the theme named "Imported". */
+    override fun themeCodePreview(text: String): ThemeCodePreview {
+        if (FAKE_THEME_CODE !in text) throw ThemeCodeException.Invalid()
+        return ThemeCodePreview(
+            name = "Imported",
+            dark = FAKE_THEME.dark,
+            light = FAKE_THEME.light,
+            createdWith = "0.8.0",
+            madeWithNewer = false,
+            importedId = themeSettings.customThemes.firstOrNull()?.id,
+        )
+    }
+
+    override suspend fun importThemeCode(text: String): Theme {
+        if (FAKE_THEME_CODE !in text) throw BridgeException.InvalidInput("this is not a valid theme code")
+        themeSettings.customThemes.firstOrNull()?.let { return it }
+        val theme = FAKE_THEME.copy(id = "custom:1", name = "Imported", builtIn = false)
+        changeThemes(themeSettings.copy(customThemes = listOf(theme)))
+        return theme
+    }
+
+    override fun themeShare(themeId: String): ThemeShare {
+        val theme = findTheme(themeId)
+        return ThemeShare(FAKE_THEME_CODE, "🎨 Mumcord theme \"${theme.name}\" – $FAKE_THEME_CODE")
+    }
+
+    override suspend fun deleteCustomTheme(themeId: String) {
+        if (findTheme(themeId).builtIn) throw BridgeException.InvalidInput("built-in themes cannot be deleted")
+        val appThemeId = if (themeSettings.appThemeId == themeId) FAKE_THEME.id else themeSettings.appThemeId
+        changeThemes(
+            themeSettings.copy(
+                appThemeId = appThemeId,
+                customThemes = themeSettings.customThemes.filter { it.id != themeId },
+            ),
+        )
+    }
+
+    override suspend fun setServerTheme(serverId: Long, themeId: String?) {
+        themeId?.let(::findTheme)
+        val serverThemes = if (themeId == null) {
+            themeSettings.serverThemes - serverId
+        } else {
+            themeSettings.serverThemes + (serverId to themeId)
+        }
+        changeThemes(themeSettings.copy(serverThemes = serverThemes))
+    }
+
+    private fun findTheme(themeId: String): Theme =
+        (listOf(FAKE_THEME) + themeSettings.customThemes).firstOrNull { it.id == themeId }
+            ?: throw BridgeException.NotFound("unknown theme")
+
+    private fun changeThemes(settings: ThemeSettings) {
+        if (settings == themeSettings) return
+        themeSettings = settings
+        emit(BridgeEvent.ThemesChanged(settings))
     }
 
     // ----- profile, moderation, activity -----

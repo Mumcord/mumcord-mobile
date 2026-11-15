@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 //! What stays on the phone, through the bridge as the apps use it: identities, the transfer
-//! from the desktop and the phone settings. No server is needed. No test prints or compares in
+//! from the desktop, the phone settings and the themes. No server is needed. No test prints or compares in
 //! its messages a key, a code, a label or a QR text: failures name the step only.
 //!
 //! Inside the crate, not under `tests/`: the desktop side of a transfer is made with the
@@ -22,7 +22,8 @@ use crate::transfer::TransferScan;
 use crate::{
     AppSettings, BanInput, BridgeError, BridgeEvent, DefaultOutput, EngineConfig, EngineListener,
     Identity, MobileSettings, MumcordEngine, PasswordInput, SecureStorage, SecureStorageError,
-    ServerInput, TalkMode, TransferError, TransferProgress, TransferSkipReason,
+    ServerInput, TalkMode, ThemeCodeError, ThemeMode, ThemeSettings, ThemeVariant, TransferError,
+    TransferProgress, TransferSkipReason,
 };
 
 #[derive(Default)]
@@ -252,7 +253,7 @@ async fn identities_are_created_exported_imported_and_deleted_by_the_rules() {
         .expect("import");
     assert!(imported.fingerprint == work.fingerprint);
     assert!(imported.label == "ada at work" && imported.is_default);
-    assert!(other.wait_identities() == [imported.clone()]);
+    assert!(other.wait_identities() == std::slice::from_ref(&imported));
     assert_eq!(other.identity_files(), 0);
     // The key is in the secure storage, and what the export hands out is the same identity.
     assert!(!other.storage.0.lock().expect("storage").is_empty());
@@ -694,6 +695,219 @@ async fn the_shared_settings_are_saved_checked_and_survive_a_restart() {
     let restarted = Phone::open(name, storage);
     assert_eq!(restarted.engine.app_settings(), changed);
     restarted.remove();
+}
+
+impl Phone {
+    fn wait_themes(&self) -> ThemeSettings {
+        self.wait("the themes", |event| match event {
+            BridgeEvent::ThemesChanged { settings } => Some(settings),
+            _ => None,
+        })
+    }
+}
+
+/// A custom theme shared from the desktop, with the shades the desktop draws it in
+/// (`themes/vectors.json`, written from the desktop code).
+fn desktop_theme() -> serde_json::Value {
+    let vectors: serde_json::Value =
+        serde_json::from_str(include_str!("themes/vectors.json")).expect("vectors");
+    vectors["desktopTheme"].clone()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_theme_from_the_desktop_is_imported_shown_shared_and_kept() {
+    let name = "themes";
+    let phone = Phone::fresh(name);
+    let defaults = phone.engine.theme_settings();
+    assert_eq!(defaults.mode, ThemeMode::System);
+    assert_eq!(defaults.app_theme_id, "preset:mumcord");
+    assert!(defaults.custom_themes.is_empty() && defaults.server_themes.is_empty());
+    let built_in = phone.engine.built_in_themes();
+    assert_eq!(built_in.len(), 4);
+    assert!(built_in.iter().all(|theme| theme.built_in));
+
+    phone
+        .engine
+        .set_theme_mode(ThemeMode::Light)
+        .await
+        .expect("mode");
+    assert_eq!(phone.wait_themes().mode, ThemeMode::Light);
+
+    // Pasted with the text around it, as copied from a chat.
+    let desktop = desktop_theme();
+    // Written for the pinned engine; after moving the pin, run `scripts/theme-vectors.mjs`.
+    assert_eq!(desktop["version"], env!("MUMCORD_ENGINE_VERSION"));
+    let message = desktop["message"].as_str().expect("message");
+    let pasted = format!("look at this: {message} :)");
+    let preview = phone
+        .engine
+        .theme_code_preview(pasted.clone())
+        .expect("preview");
+    assert_eq!(preview.name, "From the desktop");
+    assert_eq!(preview.imported_id, None);
+    assert!(!preview.made_with_newer);
+    let imported = phone
+        .engine
+        .import_theme_code(pasted.clone())
+        .await
+        .expect("imported");
+    assert!(imported.id.starts_with("custom:") && !imported.built_in);
+    assert_eq!(imported.dark.background, desktop["dark"]["background"]);
+    assert_eq!(
+        phone.wait_themes().custom_themes,
+        std::slice::from_ref(&imported)
+    );
+    // A second import adds nothing.
+    let again = phone
+        .engine
+        .import_theme_code(pasted.clone())
+        .await
+        .expect("again");
+    assert_eq!(again, imported);
+    assert_eq!(phone.engine.theme_settings().custom_themes.len(), 1);
+    assert_eq!(
+        phone
+            .engine
+            .theme_code_preview(pasted)
+            .expect("preview")
+            .imported_id,
+        Some(imported.id.clone())
+    );
+
+    phone
+        .engine
+        .set_app_theme(imported.id.clone())
+        .await
+        .expect("app theme");
+    assert_eq!(phone.wait_themes().app_theme_id, imported.id);
+    // The same shades as on the desktop, in both versions.
+    for (variant, tokens) in [
+        (ThemeVariant::Dark, &desktop["tokensDark"]),
+        (ThemeVariant::Light, &desktop["tokensLight"]),
+    ] {
+        let shown = phone.engine.theme_tokens(None, variant);
+        assert_eq!(shown.theme_id, imported.id);
+        assert_eq!(shown.base, variant);
+        assert_eq!(shown.bg_servers, tokens["bg-servers"]);
+        assert_eq!(shown.text_muted, tokens["text-muted"]);
+        assert_eq!(shown.accent_stop_2, tokens["accent-stop-2"]);
+        assert_eq!(shown.focus, tokens["focus"]);
+    }
+    // Shared again, it is the desktop's code byte for byte.
+    let share = phone
+        .engine
+        .theme_share(imported.id.clone())
+        .expect("share");
+    assert_eq!(share.code, desktop["code"].as_str().expect("code"));
+    assert_eq!(share.message, message);
+
+    let server = phone
+        .engine
+        .add_server(server("home", PasswordInput::Keep, None))
+        .await
+        .expect("server");
+    phone
+        .engine
+        .set_server_theme(server.id, Some("preset:forest".into()))
+        .await
+        .expect("server theme");
+    let themes = phone.wait("the server theme", |event| match event {
+        BridgeEvent::ThemesChanged { settings } if !settings.server_themes.is_empty() => {
+            Some(settings)
+        }
+        _ => None,
+    });
+    assert_eq!(
+        themes.server_themes.get(&server.id).map(String::as_str),
+        Some("preset:forest")
+    );
+    let forest = phone
+        .engine
+        .theme_tokens(Some("preset:forest".into()), ThemeVariant::Dark);
+    assert_eq!(forest.theme_id, "preset:forest");
+
+    let storage = phone.storage.clone();
+    drop(phone);
+    let restarted = Phone::open(name, storage);
+    let kept = restarted.engine.theme_settings();
+    assert_eq!(kept.mode, ThemeMode::Light);
+    assert_eq!(kept.app_theme_id, imported.id);
+    assert_eq!(kept.custom_themes, std::slice::from_ref(&imported));
+    assert_eq!(kept.server_themes, themes.server_themes);
+
+    // Deleting the app theme goes back to Mumcord.
+    restarted
+        .engine
+        .delete_custom_theme(imported.id.clone())
+        .await
+        .expect("deleted");
+    let after = restarted.wait_themes();
+    assert_eq!(after.app_theme_id, "preset:mumcord");
+    assert!(after.custom_themes.is_empty());
+    restarted.remove();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn wrong_theme_codes_and_unknown_themes_are_refused() {
+    let phone = Phone::fresh("theme-errors");
+    assert_eq!(
+        phone.engine.theme_code_preview("no code here".into()),
+        Err(ThemeCodeError::Invalid)
+    );
+    assert_eq!(
+        phone
+            .engine
+            .theme_code_preview(format!("mct1.{}", "A".repeat(3000))),
+        Err(ThemeCodeError::Invalid)
+    );
+    // Readable nowhere: the text is the background colour.
+    let murky = "mct1.eyJ2IjoiMC40LjAiLCJuIjoiTXVya3kiLCJjIjp7ImJhY2tncm91bmQiOiIjMTExMTExIiwidGV4dCI6IiMxMTExMTEifX0";
+    assert_eq!(
+        phone.engine.theme_code_preview(murky.into()),
+        Err(ThemeCodeError::Unreadable)
+    );
+    assert!(is_kind(
+        &phone.engine.import_theme_code(murky.into()).await,
+        "InvalidInput"
+    ));
+    assert!(phone.engine.theme_settings().custom_themes.is_empty());
+    assert!(is_kind(
+        &phone.engine.set_app_theme("custom:nothing".into()).await,
+        "NotFound"
+    ));
+    assert!(is_kind(
+        &phone.engine.theme_share("custom:nothing".into()),
+        "NotFound"
+    ));
+    assert!(is_kind(
+        &phone
+            .engine
+            .delete_custom_theme("preset:mumcord".into())
+            .await,
+        "InvalidInput"
+    ));
+    assert!(is_kind(
+        &phone
+            .engine
+            .delete_custom_theme("custom:nothing".into())
+            .await,
+        "NotFound"
+    ));
+    assert!(is_kind(
+        &phone
+            .engine
+            .set_server_theme(1, Some("preset:forest".into()))
+            .await,
+        "NotFound"
+    ));
+    assert!(is_kind(
+        &phone
+            .engine
+            .set_server_theme(1, Some("custom:nothing".into()))
+            .await,
+        "NotFound"
+    ));
+    phone.remove();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

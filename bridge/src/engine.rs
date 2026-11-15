@@ -2,6 +2,7 @@
 
 //! Commands in: the one object the apps hold.
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -22,6 +23,7 @@ use crate::events::{self, BridgeEvent, Connection, EngineListener, SharedConnect
 use crate::identities;
 use crate::public_servers::PublicList;
 use crate::storage::{SecureStorage, StorageBackend};
+use crate::themes::{self, SharedThemes, ThemeState};
 use crate::types::{
     AppSettings, AudioEndpoints, BridgeSnapshot, ConnectRequest, EngineConfig, Identity,
     MobileSettings, SavedServer, ServerInput, ServerPing, TalkMode, VoiceSettings, WhisperTarget,
@@ -36,6 +38,7 @@ pub(crate) struct Saved {
     mobile: Arc<Mutex<MobileSettings>>,
     /// Also read by the event thread, which holds back the notifications switched off here.
     pub(crate) app: Arc<Mutex<AppSettings>>,
+    pub(crate) themes: SharedThemes,
     /// Serialises the commands that change the lists, so every change is reported in order.
     pub(crate) gate: Arc<tokio::sync::Mutex<()>>,
     pub(crate) events: mpsc::UnboundedSender<BridgeEvent>,
@@ -44,10 +47,11 @@ pub(crate) struct Saved {
 impl Saved {
     /// Reads the server list again after a change and reports it.
     pub(crate) async fn refresh(&self, engine: &Engine) -> Result<(), BridgeError> {
-        let servers = saved_servers(engine).await?;
+        let (servers, server_themes) = saved_servers(engine).await?;
         lock(&self.servers).clone_from(&servers);
         // The event thread is gone only while the engine object is being released.
         let _ = self.events.send(BridgeEvent::ServersChanged { servers });
+        self.set_server_themes(server_themes);
         Ok(())
     }
 
@@ -91,9 +95,16 @@ impl Saved {
     }
 }
 
-async fn saved_servers(engine: &Engine) -> Result<Vec<SavedServer>, BridgeError> {
+/// The server list, and the theme each server names (the list leaves themes out).
+async fn saved_servers(
+    engine: &Engine,
+) -> Result<(Vec<SavedServer>, HashMap<i64, String>), BridgeError> {
     let servers = engine.servers().await?;
-    Ok(servers.into_iter().map(convert::saved_server).collect())
+    let server_themes = themes::server_theme_ids(&servers);
+    Ok((
+        servers.into_iter().map(convert::saved_server).collect(),
+        server_themes,
+    ))
 }
 
 /// The Mumcord engine of the app. Create one per process and keep it for the app's lifetime.
@@ -160,7 +171,7 @@ impl MumcordEngine {
         let data_dir = PathBuf::from(&config.data_dir);
         // What an identity import or export left behind when the app was ended in the middle.
         identities::sweep(&data_dir);
-        let (listed, known) = std::thread::scope(|scope| {
+        let ((listed, server_themes), known) = std::thread::scope(|scope| {
             scope
                 .spawn(|| {
                     handle.block_on(async {
@@ -176,6 +187,7 @@ impl MumcordEngine {
         let settings = engine.settings()?;
         let mobile = convert::mobile_settings(&settings.mobile);
         let app = Arc::new(Mutex::new(convert::app_settings(&settings)));
+        let themes = Arc::new(Mutex::new(ThemeState::new(&settings, server_themes)));
         let connection = SharedConnection::default();
         let chat = SharedChat::default();
         let (stop_events, stop) = oneshot::channel();
@@ -203,6 +215,7 @@ impl MumcordEngine {
                 identities: Arc::new(Mutex::new(known)),
                 mobile: Arc::new(Mutex::new(mobile)),
                 app,
+                themes,
                 gate: Arc::default(),
                 events: own_events,
             },

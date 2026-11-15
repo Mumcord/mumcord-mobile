@@ -24,6 +24,8 @@ bindgen = ["uniffi/cli"]
 [dependencies]
 # Chat: the versions the engine already uses, so no second copy ends up in the library.
 base64 = "0.23"
+# Random ids of the user's own themes; the version the engine already uses.
+getrandom = "0.4"
 html5ever = "0.40"
 icu_normalizer = { version = "2", default-features = false, features = ["compiled_data"] }
 icu_properties = { version = "2", default-features = false, features = ["compiled_data"] }
@@ -34,11 +36,15 @@ mumcord-store.workspace = true
 # Markdown of typed messages. Exact version: what the user typed must turn into the same message
 # with every build. Only the parser; the HTML is written by `chat::wire`.
 pulldown-cmark = { version = "=0.13.6", default-features = false }
+# Theme codes: JSON as the desktop writes it, names capped in visible characters like the
+# desktop's grapheme count.
+serde_json = "1"
 thiserror = "2"
 tokio = { version = "1.54", features = ["rt-multi-thread", "sync"] }
 tracing = "0.1"
 # Exact version: the generated Kotlin and Swift code must match the library it was built from.
 uniffi = "=0.32.2"
+unicode-segmentation = "1"
 url = "2"
 
 [target.'cfg(target_os = "android")'.dependencies]

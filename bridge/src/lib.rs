@@ -59,6 +59,15 @@
 //! The activity log of the connection ([`MumcordEngine::activity_log`],
 //! [`BridgeEvent::ActivityAdded`]) is kept in memory and ends with the connection.
 //!
+//! # Themes
+//!
+//! [`ThemeSettings`] (appearance mode, app theme, the user's own themes, the servers' themes)
+//! come from [`MumcordEngine::theme_settings`] and arrive again as [`BridgeEvent::ThemesChanged`].
+//! The app draws with [`ThemeTokens`] ([`MumcordEngine::theme_tokens`]), the colours the
+//! desktop derives from a theme's key colours. Theme codes are the desktop's, byte for byte: a
+//! pasted code is previewed ([`MumcordEngine::theme_code_preview`]), then imported; codes are
+//! untrusted input, size-capped and read as colours and plain text only.
+//!
 //! # Threads
 //!
 //! The bridge owns one tokio runtime. `async` methods run on it and never block the caller.
@@ -141,6 +150,7 @@ mod moderation;
 mod profile;
 mod public_servers;
 mod storage;
+mod themes;
 mod transfer;
 mod types;
 
@@ -158,6 +168,10 @@ pub use engine::MumcordEngine;
 pub use error::BridgeError;
 pub use events::{BridgeEvent, EngineListener};
 pub use storage::{SecureStorage, SecureStorageError};
+pub use themes::{
+    Theme, ThemeCodeError, ThemeCodePreview, ThemeColors, ThemeMode, ThemeSettings, ThemeShare,
+    ThemeTokens, ThemeVariant,
+};
 pub use transfer::{
     ImportReport, SkippedIdentity, SkippedServer, TransferError, TransferIdentityPreview,
     TransferPreview, TransferProgress, TransferScan, TransferServerPreview, TransferSkipReason,

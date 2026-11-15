@@ -19,6 +19,7 @@ use crate::chat::{
     SharedChat,
 };
 use crate::convert::{self, PersonFlags};
+use crate::themes::ThemeSettings;
 use crate::types::{
     ActivityEntry, ActivityKind, AppSettings, AudioWanted, CertificatePrompt, Channel,
     ChannelPasswordState, ConnectionState, Identity, MobileSettings, Person, SavedServer,
@@ -129,6 +130,11 @@ pub enum BridgeEvent {
     /// The settings after `set_app_settings`.
     AppSettingsChanged {
         settings: AppSettings,
+    },
+    /// The themes after a theme command: appearance mode, app theme, the user's own themes or a
+    /// server's theme changed.
+    ThemesChanged {
+        settings: ThemeSettings,
     },
 }
 
