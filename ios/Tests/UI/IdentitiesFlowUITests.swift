@@ -48,12 +48,7 @@ final class IdentitiesFlowUITests: XCTestCase {
         expectAppears(app.row("scan-camera-action", containing: "Allow the camera"))
         tapWhenReady(app.element("scan-camera-action"))
         expectAppears(app.row("scan-camera-action", containing: "Open settings"))
-        let close = app.element("scan-close")
-        if !close.waitForExistence(timeout: 5) {
-            // Only fake data is on screen: the tree says why the close button is not there.
-            print(app.debugDescription)
-        }
-        tapWhenReady(close)
+        tapWhenReady(app.element("scan-close"))
         expectAppears(app.element("server-add"))
     }
 

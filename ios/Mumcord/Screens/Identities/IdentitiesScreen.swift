@@ -42,6 +42,8 @@ struct IdentitiesScreen: View {
                 }
             }
         }
+        // Found as a whole while its buttons keep their own identifiers.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("identities-screen")
     }
 }
@@ -80,6 +82,8 @@ struct IdentitySetupScreen: View {
                 .padding(EdgeInsets(top: MumcordSpace.s5, leading: MumcordSpace.s4, bottom: MumcordSpace.s3, trailing: MumcordSpace.s4))
             }
         }
+        // Found as a whole while its buttons keep their own identifiers.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("identity-setup")
     }
 }

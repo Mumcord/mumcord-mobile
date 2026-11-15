@@ -33,6 +33,8 @@ struct ScanScreen: View {
                 }
             }
         }
+        // Found as a whole while the close button and the rest keep their own identifiers.
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("scan-screen")
     }
 
