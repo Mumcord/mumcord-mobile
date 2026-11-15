@@ -23,7 +23,7 @@ use std::f32::consts::PI;
 use std::process::ExitCode;
 use std::sync::mpsc::{Receiver, channel};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use mumcord_mobile::{
     AudioConfig, BridgeEvent, ConnectRequest, EngineConfig, EngineListener, MumcordEngine,
@@ -53,6 +53,12 @@ const TALK_TIMEOUT: Duration = Duration::from_secs(300);
 /// that the engine's own sounds (0.13 s each, for people entering the channel one after the
 /// other) do not add up to a stretch that counts as voice.
 const SPAN_GAP: Duration = Duration::from_millis(600);
+/// The loop of this program running this late is reported: this machine was too busy to keep
+/// the second person talking evenly, which the phone hears as a gap that is not its own.
+const STALL: Duration = Duration::from_millis(100);
+/// Silence longer than the pauses inside the test signal (0.125 s) and shorter than
+/// [`SPAN_GAP`] is reported as a dropout of what this person hears.
+const DROPOUT: Duration = Duration::from_millis(200);
 
 /// How this person was started.
 struct Options {
@@ -139,6 +145,13 @@ fn speech_like(len: usize, amplitude: f32) -> Vec<f32> {
             amplitude * envelope * voiced
         })
         .collect()
+}
+
+/// The time of day in milliseconds, to find a line of the report in the other logs of a run.
+fn unix_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis())
 }
 
 fn wait_for<T>(
@@ -235,6 +248,7 @@ fn run() -> Result<bool, String> {
     let mut heard_at = None;
     // The first and the latest loud block of the stretch of voice that is being heard.
     let mut span: Option<(Instant, Instant)> = None;
+    let mut last_loud: Option<Instant> = None;
     let start = Instant::now();
     let mut next = start;
     loop {
@@ -254,7 +268,24 @@ fn run() -> Result<bool, String> {
 
         let block_sum = pulled.iter().map(|sample| sample * sample).sum::<f32>();
         let now = Instant::now();
+        if now.duration_since(next) > STALL {
+            println!(
+                "STALL unix_ms={} ms={}",
+                unix_ms(),
+                now.duration_since(next).as_millis()
+            );
+        }
         if (block_sum / BLOCK as f32).sqrt() >= HEARD {
+            if let Some(last) = last_loud
+                && now.duration_since(last) > DROPOUT
+            {
+                println!(
+                    "DROPOUT unix_ms={} ms={}",
+                    unix_ms(),
+                    now.duration_since(last).as_millis()
+                );
+            }
+            last_loud = Some(now);
             span = Some((span.map_or(now, |(first, _)| first), now));
         } else if let Some((first, last)) = span
             && now.duration_since(last) > SPAN_GAP

@@ -95,6 +95,7 @@ class BackgroundVoiceFlowTest {
                 // When it happened, for the device checklist: a gap right at a change (home
                 // screen, lock) may be the app's own.
                 VoiceChecks.report("gap $where at ${(System.nanoTime() - start) / 1_000_000} ms after it began")
+                GapEvidence.record(phone)
                 assertTrue(
                     "The second person was not heard $where for $gapsInARow checks in a row (check $checks)",
                     gapsInARow < MAX_GAPS_IN_A_ROW,

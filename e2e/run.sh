@@ -42,6 +42,10 @@
 #                         just before the first answer, so the test has to repeat the call
 #                         (the path for an emulator that loses an answered call by itself)
 #   E2E_RELEASE_BOUND_MS  how much longer than a hold the app may be heard (default 200)
+#   E2E_EVIDENCE_DIR      a folder that keeps what explains a speaker gap after the run: the
+#                         device log of every scenario in its own file, this machine's load
+#                         every second, and in the locked push-to-talk scenario the report of
+#                         a third person who only listens to the second one on this machine
 #
 # Logs of the run land in e2e/build/: the test output (instrument.txt), the device log of all
 # scenarios (logcat.txt), the emulator log, what each other person reported
@@ -137,6 +141,9 @@ OUT_DIR="${REPO_ROOT}/e2e/build"
 APP_APK="${REPO_ROOT}/android/app/build/outputs/apk/debug/app-debug.apk"
 TEST_APK="${REPO_ROOT}/android/e2e/build/outputs/apk/debug/e2e-debug.apk"
 PEER_BINARY="${CARGO_TARGET_DIR:-${REPO_ROOT}/target}/debug/voice-peer"
+EVIDENCE_DIR="${E2E_EVIDENCE_DIR:-}"
+# The third person of the evidence: hears the second person without the emulator in between.
+MONITOR_NAME="e2e-monitor"
 # What the other people of the running scenario report; set by run_scenario.
 PEER_LOG=""
 BYSTANDER_LOG=""
@@ -168,6 +175,8 @@ emulator_pid=""
 peer_pids=()
 network_pid=""
 messenger_pid=""
+evidence_pid=""
+load_pid=""
 server_started=0
 
 adb_device() {
@@ -256,6 +265,24 @@ stop_messenger() {
   messenger_pid=""
   exec 9>&-
   rm -f "${PM_FIFO}"
+}
+
+# Keeps the device log of one scenario in its own file of the evidence folder, with the
+# difference between the device's clock and this machine's in its first line.
+start_evidence() {
+  [[ -n "${EVIDENCE_DIR}" ]] || return 0
+  local file="${EVIDENCE_DIR}/logcat-$1.txt"
+  printf 'clocks: host_unix_ms=%s device_unix_ms=%s\n' \
+    "$(date +%s%3N)" "$(adb_device shell date +%s%3N | tr -d '\r')" >"${file}"
+  "${ADB}" -s "${serial}" logcat -v threadtime -T 1 >>"${file}" 2>/dev/null &
+  evidence_pid=$!
+}
+
+stop_evidence() {
+  [[ -n "${evidence_pid}" ]] || return 0
+  kill "${evidence_pid}" 2>/dev/null || true
+  wait "${evidence_pid}" 2>/dev/null || true
+  evidence_pid=""
 }
 
 # The lengths (ms) of the stretches of voice a person heard that count as voice, one per line.
@@ -398,6 +425,8 @@ cleanup() {
   fi
   stop_phone_network
   stop_messenger
+  stop_evidence
+  [[ -z "${load_pid}" ]] || kill "${load_pid}" 2>/dev/null
   if [[ -n "${serial}" ]]; then
     # What the network and idle scenarios change is put back, also after a test that died:
     # mobile data on, no saved Wi-Fi network, awake and on its normal power state.
@@ -455,6 +484,11 @@ mkdir -p "${OUT_DIR}"
 rm -f "${OUT_DIR}/instrument.txt" "${OUT_DIR}/logcat.txt" "${OUT_DIR}/emulator.log" \
   "${OUT_DIR}"/voice-*.log "${OUT_DIR}"/hung-screen.* "${CHAT_PEER_LOG}" "${RAW_CHAT_LOG}"
 trap cleanup EXIT
+if [[ -n "${EVIDENCE_DIR}" ]]; then
+  mkdir -p "${EVIDENCE_DIR}"
+  (while sleep 1; do printf '%s %s\n' "$(date +%s%3N)" "$(cat /proc/loadavg)"; done) >"${EVIDENCE_DIR}/host-load.txt" &
+  load_pid=$!
+fi
 
 step "building the app and the tests"
 (cd "${REPO_ROOT}/android" && ./gradlew --console=plain --quiet :app:assembleDebug :e2e:assembleDebug)
@@ -518,6 +552,8 @@ run_scenario() {
     lockptt)
       extra=(-e lockSeconds "${LOCK_PTT_SECONDS}")
       start_peer "${PEER_LOG}"
+      [[ -z "${EVIDENCE_DIR}" ]] \
+        || start_peer "${EVIDENCE_DIR}/voice-monitor-${peer}.log" --name "${MONITOR_NAME}" --listen-only
       ;;
     call)
       [[ "${E2E_DROP_FIRST_ANSWER:-}" != 1 ]] || extra=(-e dropFirstAnswer true)
@@ -538,10 +574,12 @@ run_scenario() {
       ;;
     *) start_peer "${PEER_LOG}" ;;
   esac
+  start_evidence "$((scenarios_run + 1))-${peer}"
   timeout "${TEST_TIMEOUT}" "${ADB}" -s "${serial}" shell am instrument -w \
     -e serverHost "${HOST_FROM_EMULATOR}" -e serverPort "${MUMCORD_PORT_BASE}" -e class "${test}" \
     "${extra[@]}" "${@:5}" "${TEST_PACKAGE}/${RUNNER}" | tee "${report}" || status=$?
   cat "${report}" >>"${OUT_DIR}/instrument.txt"
+  stop_evidence
   if ((status == 124)); then
     # The test still runs, so the screen shows where it hangs.
     timeout 20 "${ADB}" -s "${serial}" exec-out screencap -p >"${OUT_DIR}/hung-screen.png" 2>/dev/null || true

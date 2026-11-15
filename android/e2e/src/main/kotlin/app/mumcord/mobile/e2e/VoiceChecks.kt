@@ -40,12 +40,31 @@ object VoiceChecks {
     /** Whether the speaker played a voice without a gap during the next [polls] polls. */
     fun speakerLoudFor(polls: Int): Boolean {
         AudioProbe.takePlaybackLevel()
+        lastPolls.clear()
         repeat(polls) {
+            val before = System.nanoTime()
+            val framesBefore = AudioProbe.frames(AudioDirection.Playback)
             Thread.sleep(POLL_MILLIS)
-            if (AudioProbe.takePlaybackLevel() < HEARD) return false
+            val level = AudioProbe.takePlaybackLevel()
+            lastPolls += Poll(
+                millis = (System.nanoTime() - before) / 1_000_000,
+                level = level,
+                frames = AudioProbe.frames(AudioDirection.Playback) - framesBefore,
+            )
+            if (level < HEARD) return false
         }
         return true
     }
+
+    /**
+     * One poll of [speakerLoudFor]: how long it really took, the level it found and how many
+     * frames the speaker stream took from the engine meanwhile (none: the stream stood still;
+     * many but silent: the engine had nothing to play).
+     */
+    data class Poll(val millis: Long, val level: Float, val frames: Long)
+
+    /** The polls of the last [speakerLoudFor], for the evidence of a gap. */
+    val lastPolls = mutableListOf<Poll>()
 
     /** How many frames the microphone stream handed to the engine in the next [millis]. */
     fun microphoneFramesIn(millis: Long): Long {
