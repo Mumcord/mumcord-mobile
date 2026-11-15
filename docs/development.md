@@ -5,6 +5,8 @@ Android toolchain on Linux; the iOS toolchain needs a Mac and is described in [i
 
 Before every APK or TestFlight release, run the [manual device checklist](device-checklist.md) on real phones (battery and data measurements included).
 
+iOS work is paused; what iOS still needs is listed in the [iOS backlog](ios-backlog.md).
+
 ## What you need beforehand
 
 - Linux on x86_64 with KVM available (`/dev/kvm` readable and writable for your user). The
