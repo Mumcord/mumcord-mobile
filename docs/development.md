@@ -245,6 +245,10 @@ The Rust build, the Gradle downloads, the toolchain and the video codecs are cac
 runs. The emulator
 and its image are not (they are several GB) and are downloaded on every run.
 
+`.github/workflows/release.yml` builds the signed release APK for a version tag, and a test
+release with a throwaway key on pull requests that change the release pipeline; see
+[RELEASING.md](../RELEASING.md).
+
 ## Updating a version
 
 All versions and checksums are pinned at the top of `scripts/setup-android.sh`. Change them
