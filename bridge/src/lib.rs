@@ -103,6 +103,15 @@
 //! [`MumcordEngine::audio_endpoints`]. [`AudioWanted`] ([`BridgeEvent::AudioWantedChanged`],
 //! [`BridgeSnapshot::audio`]) says when to open the microphone and the speaker.
 //!
+//! # Streams
+//!
+//! Screen shares and cameras in the user's channel are listed in [`BridgeSnapshot::streams`] and
+//! [`BridgeEvent::StreamsChanged`]; [`MumcordEngine::watch_stream`] fetches one. The engine
+//! decodes the video (VP9 with libvpx, AV1 with dav1d) and keeps the newest I420 picture per
+//! stream; [`VideoSink`] says when one is ready, and the app's render thread takes it with two
+//! C functions (`bridge/include/mumcord_video.h`, handle of [`MumcordEngine::video_handle`]) and
+//! uploads the planes straight from the bridge's memory.
+//!
 //! # Android start-up
 //!
 //! Checking certificates against the system store needs the app context once per process, before
@@ -144,15 +153,19 @@ mod engine;
 mod error;
 mod events;
 mod identities;
+#[cfg(all(test, feature = "live-video"))]
+mod live_streams;
 #[cfg(test)]
 mod local_tests;
 mod moderation;
 mod profile;
 mod public_servers;
 mod storage;
+mod streams;
 mod themes;
 mod transfer;
 mod types;
+mod video;
 
 pub use audio_abi::{
     mumcord_audio_capture_push_f32, mumcord_audio_capture_push_i16,
@@ -168,6 +181,7 @@ pub use engine::MumcordEngine;
 pub use error::BridgeError;
 pub use events::{BridgeEvent, EngineListener};
 pub use storage::{SecureStorage, SecureStorageError};
+pub use streams::{Stream, StreamKind, StreamPath, StreamUnreachable, StreamWatch};
 pub use themes::{
     Theme, ThemeCodeError, ThemeCodePreview, ThemeColors, ThemeMode, ThemeSettings, ThemeShare,
     ThemeTokens, ThemeVariant,
@@ -183,6 +197,9 @@ pub use types::{
     EngineConfig, Identity, MobileSettings, MumbleLink, PasswordInput, Person, Profile,
     ProfileImage, PublicServer, PublicServerPage, PublicServerQuery, SavedServer, ServerInput,
     ServerPing, ServerState, TalkMode, VoiceSettings, WhisperTarget,
+};
+pub use video::{
+    MumcordVideoFrame, VideoSink, mumcord_video_frame_acquire, mumcord_video_frame_release,
 };
 
 uniffi::setup_scaffolding!();

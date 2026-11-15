@@ -57,6 +57,8 @@ import app.mumcord.mobile.bridge.PasswordInput
 import app.mumcord.mobile.bridge.SavedServer
 import app.mumcord.mobile.bridge.ServerInput
 import app.mumcord.mobile.bridge.ServerPing
+import app.mumcord.mobile.bridge.StreamKind
+import app.mumcord.mobile.bridge.VideoSink
 import app.mumcord.mobile.bridge.DefaultOutput
 import app.mumcord.mobile.bridge.Identity
 import app.mumcord.mobile.bridge.MobileSettings
@@ -463,6 +465,19 @@ class FakeEngine(
         private set
 
     override fun audioEndpoints(): AudioEndpoints = AudioEndpoints(capture = 0uL, playback = 0uL)
+
+    // Streams phase (task 7.3): the app does not watch streams yet.
+    override suspend fun watchStream(session: UInt, kind: StreamKind) {}
+
+    override suspend fun stopWatchingStream(session: UInt, kind: StreamKind) {}
+
+    override suspend fun setStreamVolume(session: UInt, percent: UShort) {}
+
+    override fun setVideoSink(sink: VideoSink?) {}
+
+    override fun videoHandle(): ULong = 0uL
+
+    override suspend fun answerDirectConnections(allow: Boolean) {}
 
     /** Every press (true) and release (false) of the hold-to-talk button, in order. */
     val pushToTalkCalls = CopyOnWriteArrayList<Boolean>()

@@ -19,6 +19,7 @@ use crate::chat::{
     SharedChat,
 };
 use crate::convert::{self, PersonFlags};
+use crate::streams::{self, Stream, StreamParts};
 use crate::themes::ThemeSettings;
 use crate::types::{
     ActivityEntry, ActivityKind, AppSettings, AudioWanted, CertificatePrompt, Channel,
@@ -136,6 +137,16 @@ pub enum BridgeEvent {
     ThemesChanged {
         settings: ThemeSettings,
     },
+    /// The streams in the user's channel after one started or stopped, a watch changed state or
+    /// a path changed; the full list ([`crate::streams`]).
+    StreamsChanged {
+        streams: Vec<Stream>,
+    },
+    /// Watching a stream needs the user's answer whether direct connections between clients
+    /// are allowed (they reveal the user's IP address to the other person). Answer with
+    /// [`MumcordEngine::answer_direct_connections`](crate::MumcordEngine::answer_direct_connections);
+    /// the watch waits for it. Asked once, the answer is kept.
+    DirectConnectionsQuestion,
 }
 
 /// Receives the events; implemented by the app (Kotlin, Swift). Called on one bridge thread, in
@@ -172,6 +183,8 @@ pub(crate) struct Connection {
     pub(crate) activity: ActivityLog,
     /// Whether the address the server reported for a person to `ban_target` is IPv6.
     pub(crate) ban_addresses_v6: HashMap<u32, bool>,
+    /// The direct connection question is waiting for the user's answer.
+    pub(crate) direct_question: bool,
 }
 
 impl Default for Connection {
@@ -192,6 +205,7 @@ impl Default for Connection {
             channel_names: HashMap::new(),
             activity: ActivityLog::default(),
             ban_addresses_v6: HashMap::new(),
+            direct_question: false,
         }
     }
 }
@@ -308,8 +322,13 @@ impl Connection {
         }
     }
 
+    /// The user's own session, once the server is synced.
+    pub(crate) fn self_session(&self) -> Option<u32> {
+        self.self_session
+    }
+
     /// Whether the server's first sync is done: only changes after it are activity.
-    fn synced(&self) -> bool {
+    pub(crate) fn synced(&self) -> bool {
         self.self_session.is_some()
     }
 
@@ -554,6 +573,10 @@ fn apply(connection: &mut Connection, event: EngineEvent) -> Vec<BridgeEvent> {
         }
         // The engine has already switched the voice target back.
         EngineEvent::WhisperEnded => one(BridgeEvent::WhisperEnded),
+        EngineEvent::DirectConsentRequired => {
+            connection.direct_question = true;
+            one(BridgeEvent::DirectConnectionsQuestion)
+        }
         // A refusal the engine marks as handled is told through its own event (the channel
         // password).
         EngineEvent::ServerDenied {
@@ -588,6 +611,7 @@ pub(crate) struct PumpState {
     pub(crate) chat: SharedChat,
     /// The notification switches of the app settings.
     pub(crate) app: Arc<Mutex<AppSettings>>,
+    pub(crate) streams: StreamParts,
 }
 
 /// Starts the bridge thread that delivers events to `listener` until `stop` is dropped or the
@@ -608,6 +632,7 @@ pub(crate) fn spawn_pump(
                 connection,
                 chat,
                 app,
+                streams: stream_parts,
             } = state;
             // Only waits on channels, so it keeps working while the runtime shuts down.
             runtime.block_on(async {
@@ -622,7 +647,11 @@ pub(crate) fn spawn_pump(
                                 || matches!(event.1, EngineEvent::BlockedUsersChanged(_));
                             let for_chat = (of_connection && chat::wants(&event.1))
                                 .then(|| event.1.clone());
+                            let for_streams = of_connection && streams::affected_by(&event.1);
                             for event in translate(&connection, event) {
+                                listener.on_event(event);
+                            }
+                            if let Some(event) = for_streams.then(|| stream_parts.refresh()).flatten() {
                                 listener.on_event(event);
                             }
                             if let Some(event) = for_chat {
@@ -635,6 +664,11 @@ pub(crate) fn spawn_pump(
                         }
                         // The sender lives as long as the engine object, which also holds `stop`.
                         Some(event) = own.recv() => listener.on_event(event),
+                        () = stream_parts.changed.notified() => {
+                            if let Some(event) = stream_parts.refresh() {
+                                listener.on_event(event);
+                            }
+                        }
                     }
                 }
             });

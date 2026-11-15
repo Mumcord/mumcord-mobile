@@ -101,4 +101,7 @@ fun SessionState.fold(event: BridgeEvent): SessionState = when (event) {
     is BridgeEvent.ChatNotification,
     is BridgeEvent.ChatUnreadChanged,
     is BridgeEvent.MessageRequestsChanged -> this
+    // Streams phase (task 7.3): the state does not follow streams yet.
+    is BridgeEvent.StreamsChanged,
+    is BridgeEvent.DirectConnectionsQuestion -> this
 }

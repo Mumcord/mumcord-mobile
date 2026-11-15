@@ -5,6 +5,7 @@
 
 use crate::chat::{ChatId, ChatUnread, ImageData, MessageContent};
 use crate::error::BridgeError;
+use crate::streams::Stream;
 
 /// Start-up settings of [`MumcordEngine`](crate::MumcordEngine).
 #[derive(Debug, Clone, PartialEq, Eq, uniffi::Record)]
@@ -499,4 +500,10 @@ pub struct BridgeSnapshot {
     /// Every identity, the default one first.
     pub identities: Vec<Identity>,
     pub mobile_settings: MobileSettings,
+    /// The streams in the user's channel, as last sent with `StreamsChanged`.
+    #[uniffi(default = [])]
+    pub streams: Vec<Stream>,
+    /// The direct connection question is waiting for an answer (`DirectConnectionsQuestion`).
+    #[uniffi(default = false)]
+    pub direct_connections_question: bool,
 }

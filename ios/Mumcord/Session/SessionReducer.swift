@@ -94,6 +94,9 @@ extension SessionState {
         case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,
              .blockedPeopleChanged:
             break
+        // Streams phase (task 7.5): the state does not follow streams yet.
+        case .streamsChanged, .directConnectionsQuestion:
+            break
         }
         return next
     }

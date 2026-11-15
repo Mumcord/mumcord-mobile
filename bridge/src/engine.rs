@@ -9,6 +9,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use mumcord_audio::io::{ExternalCapture, ExternalPlayback};
+use mumcord_engine::screen_share::wire::Codec;
+use mumcord_engine::store::CameraShow;
 use mumcord_engine::{
     Engine, PasswordChange, QueryOutcome, SecretStore, ServerFields, ServerId, ServerQueries,
 };
@@ -23,11 +25,13 @@ use crate::events::{self, BridgeEvent, Connection, EngineListener, SharedConnect
 use crate::identities;
 use crate::public_servers::PublicList;
 use crate::storage::{SecureStorage, StorageBackend};
+use crate::streams::{SharedStreams, StreamKind, StreamParts};
 use crate::themes::{self, SharedThemes, ThemeState};
 use crate::types::{
     AppSettings, AudioEndpoints, BridgeSnapshot, ConnectRequest, EngineConfig, Identity,
     MobileSettings, SavedServer, ServerInput, ServerPing, TalkMode, VoiceSettings, WhisperTarget,
 };
+use crate::video::{Router, VideoFrames};
 
 /// What is saved on the phone as the app last got it (the server list, the identities, the
 /// phone settings), and the way to tell the app about a change.
@@ -125,6 +129,12 @@ pub struct MumcordEngine {
     /// The app's ends of the audio, behind the handles of `audio_endpoints`. Emptied on drop.
     capture: &'static Endpoint<ExternalCapture>,
     playback: &'static Endpoint<ExternalPlayback>,
+    /// The watches of the streams and the list as last reported.
+    pub(crate) streams: SharedStreams,
+    /// Wakes the event thread to look at the streams again after a command.
+    pub(crate) streams_changed: Arc<tokio::sync::Notify>,
+    /// The pictures of the watched streams, behind the handle of `video_handle`. Emptied on drop.
+    pub(crate) video: &'static VideoFrames,
     /// The engine does not tell its runtime bitrate limit; 0 is none.
     bitrate_limit_kbps: AtomicU32,
     handle: Handle,
@@ -175,6 +185,7 @@ impl MumcordEngine {
             scope
                 .spawn(|| {
                     handle.block_on(async {
+                        fetch_cameras_on_request(&engine).await?;
                         Ok::<_, BridgeError>((
                             saved_servers(&engine).await?,
                             identities::list(&engine).await?,
@@ -190,6 +201,19 @@ impl MumcordEngine {
         let themes = Arc::new(Mutex::new(ThemeState::new(&settings, server_themes)));
         let connection = SharedConnection::default();
         let chat = SharedChat::default();
+        let video = VideoFrames::start()
+            .map_err(|e| BridgeError::internal(format!("starting the video thread failed: {e}")))?;
+        engine.set_screen_frame_sink(Arc::new(Router {
+            frames: video,
+            kind: StreamKind::Screen,
+        }));
+        engine.camera_set_frame_sink(Arc::new(Router {
+            frames: video,
+            kind: StreamKind::Camera,
+        }));
+        engine.camera_set_decode_codecs(&[Codec::Vp9, Codec::Av1]);
+        let streams = SharedStreams::default();
+        let streams_changed = Arc::new(tokio::sync::Notify::new());
         let (stop_events, stop) = oneshot::channel();
         let (own_events, own) = mpsc::unbounded_channel();
         events::spawn_pump(
@@ -201,6 +225,13 @@ impl MumcordEngine {
                 connection: connection.clone(),
                 chat: chat.clone(),
                 app: app.clone(),
+                streams: StreamParts {
+                    engine: engine.clone(),
+                    connection: connection.clone(),
+                    streams: streams.clone(),
+                    video,
+                    changed: streams_changed.clone(),
+                },
             },
             listener,
             stop,
@@ -225,6 +256,9 @@ impl MumcordEngine {
             connect_gate: Arc::default(),
             capture: Endpoint::leak(capture),
             playback: Endpoint::leak(playback),
+            streams,
+            streams_changed,
+            video,
             bitrate_limit_kbps: AtomicU32::new(0),
             handle,
             runtime: Some(runtime),
@@ -640,6 +674,8 @@ impl MumcordEngine {
             let chat = lock(&self.chat);
             (chat.unread_list(), chat.open.clone())
         };
+        // Before the connection is locked: the streams are always locked first.
+        let streams = lock(&self.streams).reported.clone();
         let mut connection = lock(&self.connection);
         // The connection may have ended or changed meanwhile; its state then has no server.
         let server = synced
@@ -658,6 +694,8 @@ impl MumcordEngine {
                 && self.engine.dsp_controls().voice_target() != 0,
             identities: lock(&self.saved.identities).clone(),
             mobile_settings: self.mobile_settings(),
+            streams,
+            direct_connections_question: connection.direct_question,
         }
     }
 }
@@ -688,6 +726,7 @@ impl Drop for MumcordEngine {
         // From here on the app's audio callbacks find nothing behind their handles.
         self.capture.close();
         self.playback.close();
+        self.video.shut_down();
         if let Some(runtime) = self.runtime.take() {
             // The object can be released from any thread, also from inside the runtime, where a
             // blocking shutdown would panic.
@@ -700,6 +739,17 @@ fn unknown_server() -> BridgeError {
     BridgeError::NotFound {
         detail: "unknown server".to_owned(),
     }
+}
+
+/// The phone fetches a camera only when the user watches it (AC-5.23): the engine must not open
+/// the camera room by itself when the first camera turns on, as the desktop's default does.
+async fn fetch_cameras_on_request(engine: &Engine) -> Result<(), BridgeError> {
+    let mut settings = engine.settings()?;
+    if settings.camera_show != CameraShow::OnOpen {
+        settings.camera_show = CameraShow::OnOpen;
+        engine.update_settings(settings).await?;
+    }
+    Ok(())
 }
 
 pub(crate) fn connected_server(connection: &SharedConnection) -> Result<ServerId, BridgeError> {

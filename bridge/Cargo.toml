@@ -20,6 +20,9 @@ required-features = ["bindgen"]
 [features]
 # The binding generator for Kotlin and Swift. A host tool: never switched on for phone builds.
 bindgen = ["uniffi/cli"]
+# The live stream test (`src/live_streams.rs`): a second engine shares the engine's test pattern
+# and this machine decodes it, so it needs libvpx installed. Never on for the phones or in CI.
+live-video = ["mumcord-engine/vp9", "mumcord-engine/test-backend"]
 
 [dependencies]
 # Chat: the versions the engine already uses, so no second copy ends up in the library.

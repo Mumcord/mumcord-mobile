@@ -2493,6 +2493,7 @@ dependencies = [
  "cpal",
  "dasp_sample",
  "futures",
+ "hound",
  "libc",
  "mumcord-codec",
  "pulseaudio",
