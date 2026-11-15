@@ -10,9 +10,8 @@ Before every APK or TestFlight release, run the [manual device checklist](device
 - Linux on x86_64 with KVM available (`/dev/kvm` readable and writable for your user). The
   emulator is unusably slow without it.
 - `rustup` and `cargo`, plus `curl`, `unzip`, `tar` and `sha256sum`.
-- `meson`, `ninja`, `nasm`, `make` and `perl` for the video codecs (see
-  [Video codecs](#video-codecs)), e.g. `sudo apt install meson ninja-build nasm` or
-  `sudo pacman -S meson ninja nasm`.
+- `meson`, `ninja`, `nasm`, `make` and `perl` for the video codecs; see
+  [Video codecs](#video-codecs) for the packages and for using codecs that were built already.
 - About 12 GB of free disk space and a download of roughly 4 GB.
 
 ## One-time setup
@@ -222,6 +221,21 @@ top of the script), cross-builds them as static libraries with the NDK or Xcode 
 first build takes a minute or two longer and later builds reuse the result. A new version of the
 script, a new NDK or a new Xcode builds them again. `CODECS_JOBS` limits the parallel compile
 jobs.
+
+Building them needs meson, ninja and nasm (nasm only for the x86_64 emulator target):
+
+| System | Install |
+| --- | --- |
+| Debian, Ubuntu | `sudo apt install meson ninja-build nasm` |
+| Fedora | `sudo dnf install meson ninja-build nasm` |
+| Arch, CachyOS | `sudo pacman -S meson ninja nasm` |
+| macOS | `brew install meson ninja nasm` |
+
+Without these tools, point `MUMCORD_CODECS_DIR` at a folder with codecs that were already built
+(one subfolder per target, as `scripts/build-codecs.sh` leaves them). Several working copies on
+one machine can share one such folder too. The script uses a prebuilt target as it is when its
+`BUILD-ID` matches the current script and toolchain, and only then needs none of the tools; after
+a change to the script it builds again.
 
 Builds for this machine (the binding generator, `cargo test`, the end-to-end helpers) leave the
 codecs out: the bridge switches the engine's `vp9` and `av1-decode` features on for Android and iOS
