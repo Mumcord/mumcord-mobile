@@ -150,6 +150,13 @@ simulator app; linking for a real device is first proven here.
   `scripts/build-ios.sh` is still open.
 - The first UI test of a group on a cold simulator used to time out; every test group now
   starts the app once before its tests.
+- On a Mac whose simulator has a camera (seen with Xcode 26.6 and the iOS 26.5 simulator),
+  `ChatFlowUITests.testAddingAnImageOffersThePhotoLibraryAndTheCamera` fails: it expects the
+  simulator to have no camera, and there the camera screen opens. It fails the same way on the
+  commit before the More tab and moderation were built.
+- Seen once each in a full local run and green on the next run:
+  `DesignReferenceUITests.testComponentGalleryShowsEveryGroup` ("the gallery does not scroll to
+  its last group") and `IdentitiesScreenshotUITests.testImportWrongPasswordDark`.
 - Every pushed commit gets its own complete CI run. When the macOS queue is long, cancel the
   queued iOS runs of superseded commits that do not change `ios/**`.
 - SwiftUI section headers are drawn in capitals; UI tests must look for "MOBILE DATA", not
