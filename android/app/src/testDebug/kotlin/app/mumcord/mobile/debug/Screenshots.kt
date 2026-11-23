@@ -58,7 +58,7 @@ private const val CHANGE_THRESHOLD = 0.02f
  * Draws [content] and handles the picture as the way the tests were started asks for (see
  * app/build.gradle.kts): a normal test run only draws it into build/outputs/screenshots,
  * `recordScreenshots` writes it to docs/images/screenshots, and `verifyScreenshots` compares it
- * with the file there.
+ * with the file there. Every screen also goes through the accessibility checks ([checkAccessibility]).
  */
 fun ComposeContentTestRule.captureScreenshot(name: String, scale: Double = 1.0, content: @Composable () -> Unit) {
     val mode = System.getProperty("mumcord.screenshots.mode") ?: "render"
@@ -90,6 +90,7 @@ fun ComposeContentTestRule.captureScreenshot(name: String, scale: Double = 1.0, 
             recordOptions = RoborazziOptions.RecordOptions(resizeScale = scale),
         ),
     )
+    checkAccessibility(name)
 }
 
 /** A chat controller for screens that show no chat: nothing is open and nothing is asked for. */

@@ -124,6 +124,11 @@ android {
                     "mumcord.screenshots.output",
                     layout.buildDirectory.dir("outputs/screenshots").get().asFile.absolutePath,
                 )
+                it.systemProperty(
+                    "mumcord.accessibility.output",
+                    layout.buildDirectory.dir("outputs/accessibility").get().asFile.absolutePath,
+                )
+                it.systemProperty("mumcord.accessibility.audit", providers.gradleProperty("accessibilityAudit").isPresent)
             }
         }
     }
@@ -167,6 +172,7 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.roborazzi)
     testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.accessibility.test.framework)
     testImplementation(libs.compose.ui.test.junit4)
     // The Espresso that the Compose test library asks for is too old for the Android version
     // the tests are drawn with.
