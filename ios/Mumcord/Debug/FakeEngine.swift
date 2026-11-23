@@ -112,6 +112,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     )
     private var _noiseSuppression = false
     private var _voiceSettingsFailure: BridgeError?
+    private var _mobileSettingsSaveDelay: Duration?
     private var _activityOnConnect: [ActivityEntry] = []
     /// The user's own mute before a deafen, which comes back when the deafen ends.
     private var _identities: [Identity]
@@ -779,6 +780,12 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         set { locked { _appSettings = newValue } }
     }
 
+    /// How long `setMobileSettings` takes, for two changes that meet in the engine.
+    var mobileSettingsSaveDelay: Duration? {
+        get { locked { _mobileSettingsSaveDelay } }
+        set { locked { _mobileSettingsSaveDelay = newValue } }
+    }
+
     /// Whether the engine has noise suppression switched on.
     var noiseSuppression: Bool {
         get { locked { _noiseSuppression } }
@@ -921,6 +928,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     }
 
     func setMobileSettings(settings: MobileSettings) async throws {
+        if let delay = mobileSettingsSaveDelay { try await Task.sleep(for: delay) }
         locked { _mobileSettings = settings }
     }
 

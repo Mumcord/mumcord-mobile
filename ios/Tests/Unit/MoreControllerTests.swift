@@ -18,6 +18,7 @@ final class MoreControllerTests: XCTestCase {
     /// A model that is already connected to the mockup server, on a phone with these outputs.
     private func makeConnected(
         outputs: [AudioOutput] = [],
+        messageSettings: ((SessionStore) -> MessageNotificationSettings)? = nil,
         configure: @escaping @Sendable (FakeEngine) -> Void = { _ in }
     ) async -> AppModel {
         let store = makeStore(box, server: mockupVoiceServer(), servers: [savedServer(1, "Nordlicht")], configure: configure)
@@ -25,7 +26,7 @@ final class MoreControllerTests: XCTestCase {
         let model = PhoneFakes().makeModel(
             store: store,
             setupStore: InMemorySetupStore(firstStartDone: true),
-            messageSettings: messageSettings,
+            messageSettings: messageSettings?(store) ?? self.messageSettings,
             outputs: outputs.isEmpty ? nil : VoiceOutput(store: store, outputs: SessionOutputs(device: device))
         )
         await assertEventually { model.uiState.session.serversLoaded }
@@ -112,6 +113,24 @@ final class MoreControllerTests: XCTestCase {
         XCTAssertEqual(shown.noiseSuppression, true)
     }
 
+    /// "Show sender only" is saved by the notification settings, the other switches by the More
+    /// tab: two writers of the same record, which must not save over each other.
+    func testASwitchAndShowSenderOnlyFlippedTogetherAreBothSaved() async {
+        let model = await makeConnected(
+            messageSettings: { EngineMessageNotificationSettings(store: $0) },
+            configure: { $0.mobileSettingsSaveDelay = .milliseconds(50) }
+        )
+        model.more.openSettings()
+
+        model.more.changeMobile { $0.idleDisconnect = true }
+        model.more.setSenderOnly(true)
+
+        await assertEventually { self.engine.storedMobileSettings.notifySenderOnly }
+        await assertEventually { self.engine.storedMobileSettings.idleDisconnect }
+        XCTAssertTrue(engine.storedMobileSettings.notifySenderOnly, "both switches are stored")
+        XCTAssertEqual(settings(model)?.mobile, engine.storedMobileSettings, "the screen shows what was saved")
+    }
+
     func testShowSenderOnlyChangesItsValueBothWays() async {
         let model = await makeConnected()
         model.more.openSettings()
@@ -185,7 +204,7 @@ final class MoreControllerTests: XCTestCase {
     }
 
     func testVoiceSettingsThatCannotBeReadAreReportedAndTheRowStaysAway() async {
-        let model = await makeConnected { $0.voiceSettingsFailure = .Internal(detail: "disk full") }
+        let model = await makeConnected(configure: { $0.voiceSettingsFailure = .Internal(detail: "disk full") })
         model.more.openSettings()
         await assertEventually { model.uiState.connected?.denied != nil }
         XCTAssertNotNil(settings(model), "the other settings are shown")

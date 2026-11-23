@@ -41,6 +41,8 @@ final class SessionStore: @unchecked Sendable {
     /// What the engine last said about the connection, also what `resuming` hides.
     private var raw = RawConnection()
     private var rawObservers: [UUID: AsyncStream<RawConnection>.Continuation] = [:]
+    /// The last change of the settings, see `afterEarlierSettingsChanges`.
+    private var settingsChange: Task<Outcome<Void>, Never>?
 
     private struct RawConnection {
         var connection: ConnectionState?
@@ -641,48 +643,71 @@ final class SessionStore: @unchecked Sendable {
     }
 
     /// Reads the phone settings, changes them and saves the result.
-    func updateMobileSettings(_ change: (inout MobileSettings) -> Void) async -> Outcome<Void> {
-        let read = await call("mobile settings") { $0.mobileSettings() }
-        guard case .ok(var settings) = read else {
-            if case .failed(let error) = read { return .failed(error) }
-            return .failed(.internalError)
-        }
-        change(&settings)
-        let changed = settings
-        let saved: Outcome<Void> = await call("set mobile settings") {
-            try await $0.setMobileSettings(settings: changed)
-        }
-        if case .ok = saved {
-            update { state in
-                var next = state
-                next.mobileSettings = changed
-                return next
+    func updateMobileSettings(_ change: @escaping @Sendable (inout MobileSettings) -> Void) async -> Outcome<Void> {
+        await afterEarlierSettingsChanges { [self] in
+            let read = await call("mobile settings") { $0.mobileSettings() }
+            guard case .ok(var settings) = read else {
+                if case .failed(let error) = read { return .failed(error) }
+                return .failed(.internalError)
             }
+            change(&settings)
+            let changed = settings
+            let saved: Outcome<Void> = await call("set mobile settings") {
+                try await $0.setMobileSettings(settings: changed)
+            }
+            if case .ok = saved {
+                update { state in
+                    var next = state
+                    next.mobileSettings = changed
+                    return next
+                }
+            }
+            return saved
         }
-        return saved
     }
 
     /// Reads the settings shared with the desktop (notifications, chat history), changes them
     /// and saves the result, as `updateMobileSettings` does for the phone settings.
-    func updateAppSettings(_ change: (inout AppSettings) -> Void) async -> Outcome<Void> {
-        let read = await call("app settings") { $0.appSettings() }
-        guard case .ok(var settings) = read else {
-            if case .failed(let error) = read { return .failed(error) }
-            return .failed(.internalError)
-        }
-        change(&settings)
-        let changed = settings
-        let saved: Outcome<Void> = await call("set app settings") {
-            try await $0.setAppSettings(settings: changed)
-        }
-        if case .ok = saved {
-            update { state in
-                var next = state
-                next.appSettings = changed
-                return next
+    func updateAppSettings(_ change: @escaping @Sendable (inout AppSettings) -> Void) async -> Outcome<Void> {
+        await afterEarlierSettingsChanges { [self] in
+            let read = await call("app settings") { $0.appSettings() }
+            guard case .ok(var settings) = read else {
+                if case .failed(let error) = read { return .failed(error) }
+                return .failed(.internalError)
             }
+            change(&settings)
+            let changed = settings
+            let saved: Outcome<Void> = await call("set app settings") {
+                try await $0.setAppSettings(settings: changed)
+            }
+            if case .ok = saved {
+                update { state in
+                    var next = state
+                    next.appSettings = changed
+                    return next
+                }
+            }
+            return saved
         }
-        return saved
+    }
+
+    /// Runs a change of the settings once every earlier one is done. A change reads the whole
+    /// record and saves it back, and the settings have several writers (the More tab, the
+    /// notification settings, the audio output): two changes at the same time would each save
+    /// what they read, and the later save would undo the earlier one.
+    private func afterEarlierSettingsChanges(
+        _ change: @escaping @Sendable () async -> Outcome<Void>
+    ) async -> Outcome<Void> {
+        let task = lock.withLock {
+            let previous = settingsChange
+            let task = Task {
+                _ = await previous?.value
+                return await change()
+            }
+            settingsChange = task
+            return task
+        }
+        return await task.value
     }
 
     /// The voice settings as they apply now, or nil when they cannot be read.

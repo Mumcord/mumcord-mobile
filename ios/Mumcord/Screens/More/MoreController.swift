@@ -21,8 +21,9 @@ final class MoreController {
 
     @ObservationIgnored private let store: SessionStore
     @ObservationIgnored private let messageSettings: MessageNotificationSettings
-    /// The last change of a setting; the next one waits for it, so that two switches flipped
-    /// quickly do not save over each other.
+    /// The last change of a setting; the next one waits for it, so that a switch flipped twice
+    /// quickly ends as it was left. (The store keeps two changes from saving over each other,
+    /// but not in the order they were made.)
     @ObservationIgnored private var save: Task<Void, Never>?
 
     init(store: SessionStore, messageSettings: MessageNotificationSettings) {
