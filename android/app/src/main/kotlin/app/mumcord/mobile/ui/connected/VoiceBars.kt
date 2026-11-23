@@ -41,6 +41,16 @@ fun VoiceUiState.statusLine(): String = stringResource(
     serverName,
 )
 
+/**
+ * The state TalkBack reads on a mute button while the microphone is off; null while it is on and
+ * when muted by the server, whose action label already says so.
+ */
+@Composable
+fun MuteControl.stateLabel(): String? = when (this) {
+    MuteControl.Unmuted, MuteControl.ServerMuted -> null
+    MuteControl.Muted, MuteControl.NoMicrophone -> stringResource(R.string.person_muted)
+}
+
 /** What TalkBack reads for the mute button, which also says why it cannot be used. */
 @Composable
 fun MuteControl.actionLabel(): String = stringResource(
@@ -79,6 +89,8 @@ fun VoiceBar(
             deafen = stringResource(R.string.voice_deafen),
             undeafen = stringResource(R.string.voice_undeafen),
             leave = stringResource(R.string.voice_leave_server),
+            muted = voice.mute.stateLabel(),
+            deafened = stringResource(R.string.person_deafened),
         ),
         onOpen = actions::openVoice,
         onToggleMute = if (voice.mute == MuteControl.NoMicrophone) onMicrophone else actions::toggleMute,

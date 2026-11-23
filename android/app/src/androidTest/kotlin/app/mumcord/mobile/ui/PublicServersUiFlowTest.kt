@@ -203,7 +203,8 @@ class PublicServersUiFlowTest {
         start(fontScale = 2f)
         compose.onNodeWithTag(SERVER_BROWSE_PUBLIC_TEST_TAG).performScrollTo().assertIsDisplayed().assertHeightIsAtLeast(48.dp)
         openBrowser()
-        await { rows() == 4 }
+        // At this size each row wraps its texts and puts its button below them, so fewer rows fit.
+        await { rows() > 0 }
         // The row's button is the small button of the server list, drawn at the design's touch size.
         compose.onAllNodesWithTag(PUBLIC_SERVER_ADD_TEST_TAG)[0].assertIsDisplayed().assertHeightIsAtLeast(MumcordSize.touchVisual)
     }

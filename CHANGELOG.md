@@ -4,6 +4,7 @@
 
 ### Added
 
+- Android: accessibility pass – TalkBack says politely who starts talking in your channel (at most every five seconds, nobody twice within half a minute), mute and deafen buttons say their state, tablet columns are read one after the other, every control has a touch area of at least 48 dp (channel tree rows are 48 dp instead of the mockup's 44 dp for this), and with the largest system font list rows wrap their texts and tab labels shrink to fit instead of being cut off; every screen is checked automatically with Google's Accessibility Test Framework
 - Android: two-column layout on tablets and other wide windows – a navigation rail, the channels with the voice bar on the left and the chat on the right; a stream you watch fills the right column with the chat below, and the layout follows rotation and split-screen resizing without losing what you were doing
 - Android: the 24 languages of the desktop app, following the phone's language, with "Language" in Settings to pick another one (Android 13 and later); texts that only the phone app has are in English and German so far
 - Android: opt-in crash reports as on the desktop – after a crash the server list says so and offers to report it; the report shows exactly what will be sent, takes an optional comment and is sent only with "Send report"; saved reports can be reported or deleted under More → About → Crash reports

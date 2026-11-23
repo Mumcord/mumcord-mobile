@@ -223,6 +223,13 @@
     <string name="voice_view">Voice view</string>
     <string name="voice_talking">A falar</string>
     <string name="voice_not_talking">Not talking</string>
+    <string name="talking_announcement_one">%1$s está a falar</string>
+    <string name="talking_announcement_two">%1$s e %2$s estão a falar</string>
+    <plurals name="talking_announcement_more">
+        <item quantity="one">%1$s and %2$d other person are talking</item>
+        <item quantity="many">%1$s and %2$d other people are talking</item>
+        <item quantity="other">%1$s and %2$d other people are talking</item>
+    </plurals>
     <string name="voice_mute">Silenciar microfone</string>
     <string name="voice_unmute">Unmute</string>
     <string name="voice_mute_microphone">Silenciar microfone</string>
@@ -739,6 +746,8 @@
     <string name="crash_row_details">%1$s · v%2$s</string>
     <string name="crash_report">Comunicar falha…</string>
     <string name="crash_delete">Eliminar</string>
+    <string name="crash_report_label">Report crash of %1$s…</string>
+    <string name="crash_delete_label">Delete crash report of %1$s</string>
     <string name="crash_delete_all">Eliminar tudo</string>
     <string name="crash_status_sent">Relatório enviado. Obrigado!</string>
     <string name="crash_status_deleted">Relatório eliminado.</string>

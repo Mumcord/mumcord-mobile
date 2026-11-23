@@ -41,6 +41,10 @@ data class MumcordVoiceBarLabels(
     val deafen: String,
     val undeafen: String,
     val leave: String,
+    /** The state read on the mute button while the microphone is off; null when [unmute] says it. */
+    val muted: String?,
+    /** The state read on the deafen button while the sound is off. */
+    val deafened: String,
 )
 
 /**
@@ -102,12 +106,14 @@ fun MumcordVoiceBar(
                 onClick = onToggleMute,
                 style = if (muted) MumcordIconButtonStyle.Off else MumcordIconButtonStyle.Tonal,
                 enabled = muteEnabled,
+                stateDescription = labels.muted?.takeIf { muted },
             )
             MumcordIconButton(
                 icon = if (deafened) MumcordIcons.HeadphonesOff else MumcordIcons.Headphones,
                 contentDescription = if (deafened) labels.undeafen else labels.deafen,
                 onClick = onToggleDeafen,
                 style = if (deafened) MumcordIconButtonStyle.Off else MumcordIconButtonStyle.Tonal,
+                stateDescription = labels.deafened.takeIf { deafened },
             )
             MumcordIconButton(
                 icon = MumcordIcons.PhoneOff,
@@ -162,6 +168,8 @@ internal fun VoiceBarSample() {
         deafen = "Deafen",
         undeafen = "Undeafen",
         leave = "Leave server",
+        muted = "Muted",
+        deafened = "Deafened",
     )
     MumcordVoiceBar("Lobby", "Nordlicht · Voice connected", false, false, false, labels, {}, {}, {}, {})
     MumcordVoiceBar("Lobby", "Nordlicht · Voice connected", true, true, true, labels, {}, {}, {}, {})

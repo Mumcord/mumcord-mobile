@@ -345,7 +345,8 @@ fun MumcordInputBar(
     val colors = MumcordTheme.colors
     val textStyle = MumcordTheme.typography.body.copy(color = colors.text)
     Row(
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        // 4 dp between the 44 dp buttons leaves each the full 48 dp touch area that Compose adds around it.
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()

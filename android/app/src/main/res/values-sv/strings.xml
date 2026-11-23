@@ -217,6 +217,12 @@
     <string name="voice_view">Voice view</string>
     <string name="voice_talking">Pratar</string>
     <string name="voice_not_talking">Not talking</string>
+    <string name="talking_announcement_one">%1$s pratar</string>
+    <string name="talking_announcement_two">%1$s och %2$s pratar</string>
+    <plurals name="talking_announcement_more">
+        <item quantity="one">%1$s and %2$d other person are talking</item>
+        <item quantity="other">%1$s and %2$d other people are talking</item>
+    </plurals>
     <string name="voice_mute">Stäng av mikrofonen</string>
     <string name="voice_unmute">Unmute</string>
     <string name="voice_mute_microphone">Stäng av mikrofonen</string>
@@ -715,6 +721,8 @@
     <string name="crash_row_details">%1$s · v%2$s</string>
     <string name="crash_report">Rapportera krasch…</string>
     <string name="crash_delete">Ta bort</string>
+    <string name="crash_report_label">Report crash of %1$s…</string>
+    <string name="crash_delete_label">Delete crash report of %1$s</string>
     <string name="crash_delete_all">Ta bort alla</string>
     <string name="crash_status_sent">Rapporten skickades. Tack!</string>
     <string name="crash_status_deleted">Rapporten har tagits bort.</string>

@@ -229,6 +229,14 @@
     <string name="voice_view">Voice view</string>
     <string name="voice_talking">Kalba</string>
     <string name="voice_not_talking">Not talking</string>
+    <string name="talking_announcement_one">%1$s kalba</string>
+    <string name="talking_announcement_two">%1$s ir %2$s kalba</string>
+    <plurals name="talking_announcement_more">
+        <item quantity="one">%1$s and %2$d other person are talking</item>
+        <item quantity="few">%1$s and %2$d other people are talking</item>
+        <item quantity="many">%1$s and %2$d other people are talking</item>
+        <item quantity="other">%1$s and %2$d other people are talking</item>
+    </plurals>
     <string name="voice_mute">Nutildyti mikrofoną</string>
     <string name="voice_unmute">Unmute</string>
     <string name="voice_mute_microphone">Nutildyti mikrofoną</string>
@@ -763,6 +771,8 @@
     <string name="crash_row_details">%1$s · v%2$s</string>
     <string name="crash_report">Pranešti apie strigį…</string>
     <string name="crash_delete">Ištrinti</string>
+    <string name="crash_report_label">Report crash of %1$s…</string>
+    <string name="crash_delete_label">Delete crash report of %1$s</string>
     <string name="crash_delete_all">Ištrinti visas</string>
     <string name="crash_status_sent">Ataskaita išsiųsta. Ačiū!</string>
     <string name="crash_status_deleted">Ataskaita ištrinta.</string>

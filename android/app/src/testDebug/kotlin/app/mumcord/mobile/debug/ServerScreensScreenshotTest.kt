@@ -111,7 +111,7 @@ class ServerScreensScreenshotTest {
             MumcordTheme(darkTheme = dark) { content() }
         }
 
-    private fun serverList(dark: Boolean) = capture("android-server-list", dark) { ServerList(rows()) }
+    private fun serverList(dark: Boolean, name: String = "android-server-list") = capture(name, dark) { ServerList(rows()) }
 
     // No mockup: the notice after the system closed the app in the middle of a session.
     private fun sessionEnded(dark: Boolean) = capture("android-session-ended-notice", dark) {
@@ -163,7 +163,7 @@ class ServerScreensScreenshotTest {
         )
     }
 
-    private fun serverForm(dark: Boolean) = capture("android-server-form", dark) {
+    private fun serverForm(dark: Boolean, name: String = "android-server-form") = capture(name, dark) {
         ServerFormScreen(
             form = ServerFormState(address = "nordlicht.example", port = "99999", name = "Nordlicht", showErrors = true),
             onChange = {},
@@ -249,4 +249,21 @@ class ServerScreensScreenshotTest {
     @Test fun localNetworkDeniedDark() = localNetworkDenied(dark = true)
 
     @Test fun localNetworkDeniedLight() = localNetworkDenied(dark = false)
+
+    // AC-5.33: the system font size at 200 %, checked for clipped text and by the accessibility checks.
+    @Config(fontScale = 2f)
+    @Test
+    fun serverListLargeTextDark() = serverList(dark = true, name = "android-large-text-server-list")
+
+    @Config(fontScale = 2f)
+    @Test
+    fun serverListLargeTextLight() = serverList(dark = false, name = "android-large-text-server-list")
+
+    @Config(fontScale = 2f)
+    @Test
+    fun serverFormLargeTextDark() = serverForm(dark = true, name = "android-large-text-server-form")
+
+    @Config(fontScale = 2f)
+    @Test
+    fun serverFormLargeTextLight() = serverForm(dark = false, name = "android-large-text-server-form")
 }

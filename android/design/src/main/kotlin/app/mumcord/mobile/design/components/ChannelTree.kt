@@ -105,7 +105,9 @@ fun MumcordChannelRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = MumcordSize.touchVisual)
+            // 48 dp instead of the mockup's 44: the rows sit back to back, so the drawn row is the
+            // whole touch area and must reach Android's minimum touch target.
+            .defaultMinSize(minHeight = MumcordSize.touchTargetAndroid)
             .clip(shape)
             .then(highlight)
             .combinedClickable(onLongClickLabel = longClickLabel, onLongClick = onLongClick, onClick = onClick)
@@ -291,7 +293,9 @@ fun MumcordPersonRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = MumcordSize.touchVisual)
+            // 48 dp instead of the mockup's 44: the rows sit back to back, so the drawn row is the
+            // whole touch area and must reach Android's minimum touch target.
+            .defaultMinSize(minHeight = MumcordSize.touchTargetAndroid)
             .clip(RoundedCornerShape(MumcordRadius.md))
             .clickable(onClick = onClick)
             .semantics(mergeDescendants = true) {

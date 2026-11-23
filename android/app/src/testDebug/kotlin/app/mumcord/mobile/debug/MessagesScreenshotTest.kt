@@ -168,7 +168,7 @@ class MessagesScreenshotTest {
     private fun list(local: MessagesLocal = MessagesLocal(), granted: Boolean = true) =
         messages.state(session, local, conversations, requests.take(1), unread = unread, notificationsGranted = granted)
 
-    private fun messages(dark: Boolean) = capture("android-messages", dark) { list() }
+    private fun messages(dark: Boolean, name: String = "android-messages") = capture(name, dark) { list() }
 
     // No mockup exists for the states below; they are built from the design system.
     private fun empty(dark: Boolean) = capture("android-messages-empty", dark) { messages.state(session) }
@@ -270,4 +270,13 @@ class MessagesScreenshotTest {
     @Test fun blockedDark() = blocked(dark = true)
 
     @Test fun blockedLight() = blocked(dark = false)
+
+    // AC-5.33: the system font size at 200 %, checked for clipped text and by the accessibility checks.
+    @Config(fontScale = 2f)
+    @Test
+    fun messagesLargeTextDark() = messages(dark = true, name = "android-large-text-messages")
+
+    @Config(fontScale = 2f)
+    @Test
+    fun messagesLargeTextLight() = messages(dark = false, name = "android-large-text-messages")
 }

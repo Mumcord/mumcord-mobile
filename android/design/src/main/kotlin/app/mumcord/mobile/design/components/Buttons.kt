@@ -22,6 +22,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -84,7 +86,7 @@ fun MumcordButton(
         modifier = modifier
             .alpha(if (enabled) 1f else DISABLED_ALPHA)
             .then(glow)
-            .defaultMinSize(minHeight = if (small) MumcordSize.touchVisual else 48.dp)
+            .defaultMinSize(minHeight = MumcordSize.touchTargetAndroid)
             .clip(CircleShape)
             .background(background)
             .then(outline)
@@ -110,7 +112,8 @@ enum class MumcordIconButtonStyle { Plain, Tonal, Outline, On, Off, Danger, Acce
 /**
  * Round icon button. It is drawn 44 dp wide as in the mockups (56 dp when [large]); Compose
  * widens the area that reacts to touch to 48 dp around it. [contentDescription] is what
- * TalkBack reads and must name the action.
+ * TalkBack reads and must name the action; [stateDescription] says what is on now, such as
+ * "Muted", for buttons that switch something.
  */
 @Composable
 fun MumcordIconButton(
@@ -122,6 +125,7 @@ fun MumcordIconButton(
     large: Boolean = false,
     iconSize: Dp = MumcordSize.icon,
     enabled: Boolean = true,
+    stateDescription: String? = null,
 ) {
     val colors = MumcordTheme.colors
     val background = when (style) {
@@ -152,7 +156,8 @@ fun MumcordIconButton(
             .clip(CircleShape)
             .background(background)
             .then(outline)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .withStateDescription(stateDescription),
     ) {
         MumcordIcon(icon, contentDescription = contentDescription, tint = tint, size = iconSize)
     }
@@ -224,3 +229,7 @@ internal fun ButtonsSample() {
     )
     MumcordFab(MumcordIcons.Plus, contentDescription = "Add server", onClick = {}, modifier = padded)
 }
+
+/** Adds [description] as the state TalkBack reads after the label, when there is one. */
+internal fun Modifier.withStateDescription(description: String?): Modifier =
+    if (description == null) this else semantics { stateDescription = description }

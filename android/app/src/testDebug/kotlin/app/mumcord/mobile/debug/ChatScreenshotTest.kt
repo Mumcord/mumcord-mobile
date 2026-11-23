@@ -201,7 +201,7 @@ class ChatScreenshotTest {
             }
         }
 
-    private fun chat(dark: Boolean) = capture("android-chat", dark, chat)
+    private fun chat(dark: Boolean, name: String = "android-chat") = capture(name, dark, chat)
 
     private fun gifFavourites(dark: Boolean) =
         capture("android-gif-favourites", dark, chat.copy(sheet = ChatSheetKind.Gifs, gifs = favourites))
@@ -270,4 +270,13 @@ class ChatScreenshotTest {
     @Test fun emptyDark() = empty(dark = true)
 
     @Test fun emptyLight() = empty(dark = false)
+
+    // AC-5.33: the system font size at 200 %, checked for clipped text and by the accessibility checks.
+    @Config(fontScale = 2f)
+    @Test
+    fun chatLargeTextDark() = chat(dark = true, name = "android-large-text-chat")
+
+    @Config(fontScale = 2f)
+    @Test
+    fun chatLargeTextLight() = chat(dark = false, name = "android-large-text-chat")
 }

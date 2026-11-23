@@ -235,6 +235,15 @@
     <string name="voice_view">Voice view</string>
     <string name="voice_talking">Qed jitkellem</string>
     <string name="voice_not_talking">Not talking</string>
+    <string name="talking_announcement_one">%1$s qed jitkellem</string>
+    <string name="talking_announcement_two">%1$s u %2$s qed jitkellmu</string>
+    <plurals name="talking_announcement_more">
+        <item quantity="one">%1$s and %2$d other person are talking</item>
+        <item quantity="two">%1$s and %2$d other people are talking</item>
+        <item quantity="few">%1$s and %2$d other people are talking</item>
+        <item quantity="many">%1$s and %2$d other people are talking</item>
+        <item quantity="other">%1$s and %2$d other people are talking</item>
+    </plurals>
     <string name="voice_mute">Sikket</string>
     <string name="voice_unmute">Unmute</string>
     <string name="voice_mute_microphone">Sikket il-mikrofonu</string>
@@ -787,6 +796,8 @@
     <string name="crash_row_details">%1$s · v%2$s</string>
     <string name="crash_report">Irrapporta l-ħabta…</string>
     <string name="crash_delete">Ħassar</string>
+    <string name="crash_report_label">Report crash of %1$s…</string>
+    <string name="crash_delete_label">Delete crash report of %1$s</string>
     <string name="crash_delete_all">Ħassar kollha</string>
     <string name="crash_status_sent">Ir-rapport intbagħat. Grazzi!</string>
     <string name="crash_status_deleted">Ir-rapport tħassar.</string>

@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -34,6 +36,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
@@ -161,10 +164,19 @@ private fun TabItem(tab: MumcordTab, selected: Boolean, onClick: () -> Unit, mod
                 )
             }
         }
-        LineText(
+        val style = MumcordTheme.typography.tab
+        BasicText(
             text = tab.label,
-            style = MumcordTheme.typography.tab,
-            color = if (selected) colors.text else colors.textMuted,
+            style = style.copy(color = if (selected) colors.text else colors.textMuted),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            // With a large system font the label shrinks to fit its tab, down to the normal size,
+            // instead of being cut off ("Chann…"); only then does it end in an ellipsis.
+            // Sizes in sp grow with the font scale, so dividing by it gives the normal size on screen.
+            autoSize = TextAutoSize.StepBased(
+                minFontSize = style.fontSize / LocalDensity.current.fontScale.coerceAtLeast(1f),
+                maxFontSize = style.fontSize,
+            ),
             modifier = if (description != null) Modifier.clearAndSetSemantics {} else Modifier,
         )
     }

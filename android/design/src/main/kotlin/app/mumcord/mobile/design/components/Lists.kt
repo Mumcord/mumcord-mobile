@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -26,16 +28,20 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.theme.MumcordTheme
 import app.mumcord.mobile.design.tokens.MumcordRadius
+import app.mumcord.mobile.design.tokens.MumcordSize
 import app.mumcord.mobile.design.tokens.MumcordSpace
 
 /**
@@ -52,26 +58,37 @@ fun MumcordSectionHeader(
     padding: PaddingValues = SectionPadding,
 ) {
     val colors = MumcordTheme.colors
+    val direction = LocalLayoutDirection.current
+    val start = padding.calculateStartPadding(direction)
+    val end = padding.calculateEndPadding(direction)
+    val bottom = padding.calculateBottomPadding()
+    // Both texts sit on the bottom padding. The action's touch area is Android's 48 dp minimum,
+    // reaching up into the top padding and beyond the text at the sides.
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(padding),
+        verticalAlignment = Alignment.Bottom,
+        modifier = modifier.fillMaxWidth(),
     ) {
         LineText(
             text = title.uppercase(),
             style = MumcordTheme.typography.section,
             color = colors.textMuted,
-            modifier = Modifier.weight(1f, fill = false).semantics { heading() },
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .padding(start = start, top = padding.calculateTopPadding(), end = if (action == null) end else 0.dp, bottom = bottom)
+                .semantics { heading() },
         )
         if (action != null) {
-            LineText(
-                text = action,
-                style = MumcordTheme.typography.smallStrong,
-                color = colors.accentText,
-                modifier = Modifier.clickable(role = Role.Button, onClick = onAction),
-            )
+            Box(
+                contentAlignment = Alignment.BottomCenter,
+                modifier = Modifier
+                    .padding(end = end)
+                    .defaultMinSize(minWidth = MumcordSize.touchTargetAndroid, minHeight = MumcordSize.touchTargetAndroid)
+                    .clickable(role = Role.Button, onClick = onAction)
+                    .padding(bottom = bottom),
+            ) {
+                LineText(text = action, style = MumcordTheme.typography.smallStrong, color = colors.accentText)
+            }
         }
     }
 }
@@ -168,18 +185,27 @@ fun MumcordListRow(
                 MumcordIcon(icon, contentDescription = null, tint = if (danger) colors.danger else colors.textSecondary)
             }
         }
+        // With a very large system font the texts wrap instead of being cut off, and what sits at
+        // the end of the row moves below them, where it does not squeeze the texts to a few letters.
+        val largeText = LocalDensity.current.fontScale >= LARGE_FONT_SCALE
+        val trailingRow: @Composable () -> Unit = {
+            if (trailing != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(MumcordSpace.s2),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = if (largeText) Modifier.padding(top = MumcordSpace.s2) else Modifier,
+                    content = trailing,
+                )
+            }
+        }
         Column(Modifier.weight(1f)) {
             val titleColor = if (danger) colors.danger else colors.text
-            if (wrapTitle) {
-                BasicText(title, style = MumcordTheme.typography.bodyStrong.copy(color = titleColor))
-            } else {
-                LineText(title, MumcordTheme.typography.bodyStrong, titleColor)
-            }
+            RowText(title, MumcordTheme.typography.bodyStrong, titleColor, wrap = wrapTitle || largeText)
             if (subtitle != null) {
                 if (subtitleEmphasis) {
-                    LineText(subtitle, MumcordTheme.typography.small.copy(fontWeight = FontWeight.Medium), colors.text)
+                    RowText(subtitle, MumcordTheme.typography.small.copy(fontWeight = FontWeight.Medium), colors.text, largeText)
                 } else {
-                    LineText(subtitle, MumcordTheme.typography.small, colors.textMuted)
+                    RowText(subtitle, MumcordTheme.typography.small, colors.textMuted, largeText)
                 }
             }
             if (status != null) {
@@ -189,15 +215,18 @@ fun MumcordListRow(
                     content = status,
                 )
             }
+            if (largeText) trailingRow()
         }
-        if (trailing != null) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(MumcordSpace.s2),
-                verticalAlignment = Alignment.CenterVertically,
-                content = trailing,
-            )
-        }
+        if (!largeText) trailingRow()
     }
+}
+
+/** From this font scale on (Android's "largest" steps), list rows wrap their texts. */
+private const val LARGE_FONT_SCALE = 1.5f
+
+@Composable
+private fun RowText(text: String, style: TextStyle, color: Color, wrap: Boolean) {
+    if (wrap) BasicText(text, style = style.copy(color = color)) else LineText(text, style, color)
 }
 
 /** Small muted text for the end or the status line of a list row, such as the current value of a setting. */

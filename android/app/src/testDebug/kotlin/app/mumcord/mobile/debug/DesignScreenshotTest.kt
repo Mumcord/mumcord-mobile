@@ -74,7 +74,7 @@ class DesignScreenshotTest {
         const val PHONE = PHONE_QUALIFIERS
 
         // Tall enough for the whole gallery; the picture is cut to the content's height.
-        const val TALL = "w390dp-h4800dp-xhdpi"
+        const val TALL = "w390dp-h6400dp-xhdpi"
 
         // The gallery is only looked at, never laid over a mockup: half size keeps the files small.
         const val GALLERY_SCALE = 0.5

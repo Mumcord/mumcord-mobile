@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -116,6 +117,7 @@ fun ConnectedShell(
         val twoColumns = connectedLayout(maxWidth, maxHeight) == ConnectedLayout.TwoColumns
         // The view model needs it too: in two columns the channel chat is on screen beside the channels.
         LaunchedEffect(actions, twoColumns) { actions.setTwoColumns(twoColumns) }
+        state.voice?.takeIf { it.connected }?.let { TalkingAnnouncements(it.tileRows.flatten()) }
         ConnectedContent(
             state, actions, onDisconnect, onMicrophone, chat, chatBadge, chatActions, chatEnvironment, messages,
             messagesActions, conversation, conversationActions, more, moreActions, onNotificationSettings, onIdentities,
@@ -280,7 +282,7 @@ private fun ConnectedContent(
                     selectedIndex = RAIL_TABS.indexOf(tab),
                     onSelect = { actions.selectTab(RAIL_TABS[it]) },
                     windowInsets = topInsets,
-                    modifier = Modifier.testTag(NAVIGATION_RAIL_TEST_TAG),
+                    modifier = Modifier.testTag(NAVIGATION_RAIL_TEST_TAG).semantics { isTraversalGroup = true },
                 )
                 val border = MumcordTheme.colors.border
                 Column(
@@ -292,7 +294,10 @@ private fun ConnectedContent(
                             drawLine(border, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
                         }
                         .windowInsetsPadding(bottomInsets)
-                        .testTag(SIDE_COLUMN_TEST_TAG),
+                        .testTag(SIDE_COLUMN_TEST_TAG)
+                        // TalkBack reads the rail, then the whole left column, then the right one,
+                        // instead of hopping between the columns row by row.
+                        .semantics { isTraversalGroup = true },
                 ) {
                     Box(Modifier.weight(1f)) {
                         ChannelsScreen(
@@ -312,7 +317,8 @@ private fun ConnectedContent(
                         .fillMaxHeight()
                         .background(MumcordTheme.colors.bgChat)
                         .windowInsetsPadding(bottomInsets)
-                        .testTag(MAIN_COLUMN_TEST_TAG),
+                        .testTag(MAIN_COLUMN_TEST_TAG)
+                        .semantics { isTraversalGroup = true },
                 ) {
                     if (streamInColumn && opened != null && streamActions != null) {
                         StreamColumn(opened, streamActions, chat, chatActions, topInsets)

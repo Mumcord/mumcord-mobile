@@ -235,6 +235,15 @@
     <string name="voice_view">Voice view</string>
     <string name="voice_talking">Ag caint</string>
     <string name="voice_not_talking">Not talking</string>
+    <string name="talking_announcement_one">Tá %1$s ag caint</string>
+    <string name="talking_announcement_two">Tá %1$s agus %2$s ag caint</string>
+    <plurals name="talking_announcement_more">
+        <item quantity="one">%1$s and %2$d other person are talking</item>
+        <item quantity="two">%1$s and %2$d other people are talking</item>
+        <item quantity="few">%1$s and %2$d other people are talking</item>
+        <item quantity="many">%1$s and %2$d other people are talking</item>
+        <item quantity="other">%1$s and %2$d other people are talking</item>
+    </plurals>
     <string name="voice_mute">Balbhaigh</string>
     <string name="voice_unmute">Unmute</string>
     <string name="voice_mute_microphone">Balbhaigh an micreafón</string>
@@ -787,6 +796,8 @@
     <string name="crash_row_details">%1$s · v%2$s</string>
     <string name="crash_report">Tuairiscigh an tuairteáil…</string>
     <string name="crash_delete">Scrios</string>
+    <string name="crash_report_label">Report crash of %1$s…</string>
+    <string name="crash_delete_label">Delete crash report of %1$s</string>
     <string name="crash_delete_all">Scrios gach ceann</string>
     <string name="crash_status_sent">Seoladh an tuairisc. Go raibh maith agat!</string>
     <string name="crash_status_deleted">Scriosadh an tuairisc.</string>

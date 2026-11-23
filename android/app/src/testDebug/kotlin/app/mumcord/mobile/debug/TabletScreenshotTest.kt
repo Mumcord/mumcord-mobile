@@ -7,7 +7,11 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ChatId
@@ -40,6 +44,9 @@ import app.mumcord.mobile.ui.connected.ConnectedController
 import app.mumcord.mobile.ui.connected.ConnectedLocal
 import app.mumcord.mobile.ui.connected.ConnectedShell
 import app.mumcord.mobile.ui.connected.ConnectedTab
+import app.mumcord.mobile.ui.connected.MAIN_COLUMN_TEST_TAG
+import app.mumcord.mobile.ui.connected.NAVIGATION_RAIL_TEST_TAG
+import app.mumcord.mobile.ui.connected.SIDE_COLUMN_TEST_TAG
 import app.mumcord.mobile.ui.connected.connectedUiState
 import app.mumcord.mobile.ui.streams.LocalStreamPicture
 import app.mumcord.mobile.ui.streams.OpenStream
@@ -49,6 +56,7 @@ import app.mumcord.mobile.ui.streams.StreamsController
 import app.mumcord.mobile.ui.streams.StreamsLocal
 import app.mumcord.mobile.ui.streams.key
 import app.mumcord.mobile.ui.streams.streamsUiState
+import java.time.ZoneOffset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -60,7 +68,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.time.ZoneOffset
 
 /** The tablet of the mockups in landscape: 1180 x 820 dp at two pixels per dp, so the files can be laid over them. */
 const val TABLET_LANDSCAPE_QUALIFIERS = "w1180dp-h820dp-land-xhdpi"
@@ -214,7 +221,13 @@ class TabletScreenshotTest {
     )
 
     @Test
-    fun channelsAndChatLandscapeDark() = channelsAndChat("android-tablet-channels-chat-landscape", true)
+    fun channelsAndChatLandscapeDark() {
+        channelsAndChat("android-tablet-channels-chat-landscape", true)
+        // TalkBack finishes one column before it moves to the next.
+        for (tag in listOf(NAVIGATION_RAIL_TEST_TAG, SIDE_COLUMN_TEST_TAG, MAIN_COLUMN_TEST_TAG)) {
+            composeRule.onNodeWithTag(tag).assert(SemanticsMatcher.expectValue(SemanticsProperties.IsTraversalGroup, true))
+        }
+    }
 
     @Test
     fun channelsAndChatLandscapeLight() = channelsAndChat("android-tablet-channels-chat-landscape", false)

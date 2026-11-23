@@ -214,12 +214,15 @@ private fun ReportCard(report: CrashReport, actions: CrashController, clock: Cra
             horizontalArrangement = Arrangement.spacedBy(MumcordSpace.s2),
             modifier = Modifier.padding(start = MumcordSpace.s4, top = MumcordSpace.s2, end = MumcordSpace.s4, bottom = MumcordSpace.s3),
         ) {
+            // Every card has the same two buttons; TalkBack names the report they belong to.
+            val reportLabel = stringResource(R.string.crash_report_label, clock.format(report.createdMs))
+            val deleteLabel = stringResource(R.string.crash_delete_label, clock.format(report.createdMs))
             MumcordButton(
                 text = stringResource(R.string.crash_report),
                 onClick = { actions.openUpload(report) },
                 style = MumcordButtonStyle.Secondary,
                 small = true,
-                modifier = Modifier.testTag(CRASH_REPORT_UPLOAD_TEST_TAG),
+                modifier = Modifier.testTag(CRASH_REPORT_UPLOAD_TEST_TAG).semantics { contentDescription = reportLabel },
             )
             MumcordButton(
                 text = stringResource(R.string.crash_delete),
@@ -227,7 +230,7 @@ private fun ReportCard(report: CrashReport, actions: CrashController, clock: Cra
                 style = MumcordButtonStyle.Ghost,
                 small = true,
                 icon = MumcordIcons.Trash,
-                modifier = Modifier.testTag(CRASH_REPORT_DELETE_TEST_TAG),
+                modifier = Modifier.testTag(CRASH_REPORT_DELETE_TEST_TAG).semantics { contentDescription = deleteLabel },
             )
         }
     }

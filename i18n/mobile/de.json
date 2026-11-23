@@ -430,5 +430,9 @@
   "idle_warning_title": "Trennung in 1 Minute",
   "idle_warning_text": "Du bist allein in deinem Kanal.",
   "idle_stay_connected": "Verbunden bleiben",
-  "idle_disconnected_text": "Du warst 30 Minuten allein in einem Kanal."
+  "idle_disconnected_text": "Du warst 30 Minuten allein in einem Kanal.",
+  "talking_announcement_more_one": "{{arg1}} und {{arg2}} weitere Person sprechen",
+  "talking_announcement_more_other": "{{arg1}} und {{arg2}} weitere Personen sprechen",
+  "crash_report_label": "Absturz vom {{arg1}} melden…",
+  "crash_delete_label": "Absturzbericht vom {{arg1}} löschen"
 }

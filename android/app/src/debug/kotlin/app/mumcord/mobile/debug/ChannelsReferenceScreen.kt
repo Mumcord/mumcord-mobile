@@ -74,6 +74,8 @@ fun ChannelsReferenceScreen(
                 deafen = "Deafen",
                 undeafen = "Undeafen",
                 leave = "Leave server",
+                muted = "Muted",
+                deafened = "Deafened",
             ),
             onOpen = {},
             onToggleMute = {},

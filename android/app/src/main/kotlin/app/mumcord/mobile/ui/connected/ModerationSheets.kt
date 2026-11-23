@@ -262,9 +262,10 @@ private fun BanForm(sheet: ModerationSheet.Ban, target: BanTarget, actions: Mode
         return
     }
     val durationLabel = stringResource(R.string.ban_duration)
-    // Two rows: all five chips fit a phone's width only in small type.
+    // Two rows: all five chips fit a phone's width only in small type. 12 dp between the rows
+    // leaves each 36 dp chip its full 48 dp touch area.
     Column(
-        verticalArrangement = Arrangement.spacedBy(MumcordSpace.s2),
+        verticalArrangement = Arrangement.spacedBy(MumcordSpace.s3),
         modifier = Modifier.selectableGroup().semantics { contentDescription = durationLabel },
     ) {
         BAN_DURATIONS_SECS.chunked(DURATIONS_PER_ROW).forEach { row ->

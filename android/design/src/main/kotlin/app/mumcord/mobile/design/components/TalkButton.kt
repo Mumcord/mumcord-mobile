@@ -150,5 +150,6 @@ internal fun TalkButtonSample() {
     val padded = Modifier.padding(horizontal = MumcordSpace.s5, vertical = MumcordSpace.s5)
     MumcordTalkButton("Hold to talk", active = false, onPressedChange = {}, stateDescription = "Not talking", modifier = padded)
     MumcordTalkButton("Talking", active = true, onPressedChange = {}, stateDescription = "Talking", modifier = padded)
-    MumcordTalkButton("Hold to talk", false, {}, "Not talking", modifier = padded, wide = true)
+    // The wide button has a fixed height; the margin goes around it, not into it.
+    Box(padded) { MumcordTalkButton("Hold to talk", false, {}, "Not talking", wide = true) }
 }

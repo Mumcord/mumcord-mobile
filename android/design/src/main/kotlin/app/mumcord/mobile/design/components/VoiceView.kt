@@ -104,8 +104,8 @@ fun MumcordVoiceTile(
 
 /**
  * A large round action of the full voice view with its name below (`.vaction`): a 64 dp
- * [MumcordIconButton] and a label. [contentDescription] is what TalkBack reads for the button;
- * the visible [label] is not read a second time.
+ * [MumcordIconButton] and a label. [contentDescription] is what TalkBack reads for the button,
+ * [stateDescription] what is on now; the visible [label] is not read a second time.
  */
 @Composable
 fun MumcordVoiceAction(
@@ -116,6 +116,7 @@ fun MumcordVoiceAction(
     modifier: Modifier = Modifier,
     style: MumcordIconButtonStyle = MumcordIconButtonStyle.Tonal,
     enabled: Boolean = true,
+    stateDescription: String? = null,
 ) {
     val colors = MumcordTheme.colors
     val danger = style == MumcordIconButtonStyle.Danger
@@ -141,7 +142,8 @@ fun MumcordVoiceAction(
                 .size(64.dp)
                 .clip(CircleShape)
                 .background(background)
-                .clickable(enabled = enabled, role = Role.Button, onClick = onClick),
+                .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+                .withStateDescription(stateDescription),
         ) {
             MumcordIcon(icon, contentDescription = contentDescription, tint = tint, size = MumcordSize.iconLg)
         }

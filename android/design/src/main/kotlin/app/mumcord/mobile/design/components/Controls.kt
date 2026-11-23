@@ -194,6 +194,8 @@ fun MumcordChip(
     }
 }
 
+private val CHIP_ROW_PADDING = 6.dp
+
 /** Row of chips (`.chips`) that scrolls sideways when the chips do not fit. */
 @Composable
 fun MumcordChipRow(
@@ -207,7 +209,9 @@ fun MumcordChipRow(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = MumcordSpace.s4, vertical = MumcordSpace.s1)
+            // 6 dp above and below the 36 dp chips: the scrolling row cuts off anything outside
+            // it, and this leaves the chips their full 48 dp touch area.
+            .padding(horizontal = MumcordSpace.s4, vertical = CHIP_ROW_PADDING)
             .selectableGroup(),
     ) {
         options.forEachIndexed { index, option ->

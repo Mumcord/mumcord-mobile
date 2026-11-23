@@ -217,6 +217,12 @@
     <string name="voice_view">Sprachansicht</string>
     <string name="voice_talking">Spricht</string>
     <string name="voice_not_talking">Spricht nicht</string>
+    <string name="talking_announcement_one">%1$s spricht</string>
+    <string name="talking_announcement_two">%1$s und %2$s sprechen</string>
+    <plurals name="talking_announcement_more">
+        <item quantity="one">%1$s und %2$d weitere Person sprechen</item>
+        <item quantity="other">%1$s und %2$d weitere Personen sprechen</item>
+    </plurals>
     <string name="voice_mute">Stummschalten</string>
     <string name="voice_unmute">Stummschaltung aufheben</string>
     <string name="voice_mute_microphone">Mikrofon stummschalten</string>
@@ -715,6 +721,8 @@
     <string name="crash_row_details">%1$s · v%2$s</string>
     <string name="crash_report">Absturz melden…</string>
     <string name="crash_delete">Löschen</string>
+    <string name="crash_report_label">Absturz vom %1$s melden…</string>
+    <string name="crash_delete_label">Absturzbericht vom %1$s löschen</string>
     <string name="crash_delete_all">Alle löschen</string>
     <string name="crash_status_sent">Bericht gesendet. Danke!</string>
     <string name="crash_status_deleted">Bericht gelöscht.</string>

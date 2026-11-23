@@ -5,13 +5,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.filterToOne
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onChildren
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.bridge.BridgeEvent
 import app.mumcord.mobile.bridge.ConnectionState
 import app.mumcord.mobile.bridge.TalkMode
 import app.mumcord.mobile.bridge.WhisperTarget
 import app.mumcord.mobile.design.theme.MumcordTheme
+import app.mumcord.mobile.platform.call.AudioOutput
+import app.mumcord.mobile.platform.call.OutputKind
+import app.mumcord.mobile.platform.call.OutputState
 import app.mumcord.mobile.session.FakeEngine
 import app.mumcord.mobile.session.MOCKUP_JONAS
 import app.mumcord.mobile.session.MOCKUP_LEA
@@ -23,13 +31,11 @@ import app.mumcord.mobile.ui.connected.ConnectedController
 import app.mumcord.mobile.ui.connected.ConnectedLocal
 import app.mumcord.mobile.ui.connected.ConnectedSheetHost
 import app.mumcord.mobile.ui.connected.ConnectedShell
+import app.mumcord.mobile.ui.connected.VOICE_MUTE_TEST_TAG
 import app.mumcord.mobile.ui.connected.connectedUiState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
-import app.mumcord.mobile.platform.call.AudioOutput
-import app.mumcord.mobile.platform.call.OutputKind
-import app.mumcord.mobile.platform.call.OutputState
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Rule
@@ -131,9 +137,9 @@ class VoiceScreenshotTest {
         }
     }
 
-    private fun voiceBar(dark: Boolean) = capture("android-channels-voice-bar", dark, ConnectedLocal())
+    private fun voiceBar(dark: Boolean, name: String = "android-channels-voice-bar") = capture(name, dark, ConnectedLocal())
 
-    private fun pushToTalk(dark: Boolean) = capture("android-voice-view-ptt", dark, ConnectedLocal(voiceOpen = true))
+    private fun pushToTalk(dark: Boolean, name: String = "android-voice-view-ptt") = capture(name, dark, ConnectedLocal(voiceOpen = true))
 
     // No mockup exists for the voice activity mode, the muted state and the whisper bar; they
     // are built from the design system.
@@ -210,7 +216,15 @@ class VoiceScreenshotTest {
 
     @Test fun voiceActivityLight() = voiceActivity(dark = false)
 
-    @Test fun mutedDark() = muted(dark = true)
+    @Test
+    fun mutedDark() {
+        muted(dark = true)
+        // The mute button says what it does and, as its state, that the microphone is off.
+        composeRule.onNodeWithTag(VOICE_MUTE_TEST_TAG, useUnmergedTree = true)
+            .onChildren()
+            .filterToOne(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Muted"))
+            .assertExists()
+    }
 
     @Test fun mutedLight() = muted(dark = false)
 
@@ -221,4 +235,21 @@ class VoiceScreenshotTest {
     @Test fun personSheetDark() = personSheet(dark = true)
 
     @Test fun personSheetLight() = personSheet(dark = false)
+
+    // AC-5.33: the system font size at 200 %, checked for clipped text and by the accessibility checks.
+    @Config(fontScale = 2f)
+    @Test
+    fun voiceBarLargeTextDark() = voiceBar(dark = true, name = "android-large-text-channels-voice-bar")
+
+    @Config(fontScale = 2f)
+    @Test
+    fun voiceBarLargeTextLight() = voiceBar(dark = false, name = "android-large-text-channels-voice-bar")
+
+    @Config(fontScale = 2f)
+    @Test
+    fun pushToTalkLargeTextDark() = pushToTalk(dark = true, name = "android-large-text-voice-view-ptt")
+
+    @Config(fontScale = 2f)
+    @Test
+    fun pushToTalkLargeTextLight() = pushToTalk(dark = false, name = "android-large-text-voice-view-ptt")
 }
