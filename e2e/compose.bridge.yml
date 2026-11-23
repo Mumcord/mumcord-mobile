@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Added on top of the test environment's docker-compose.yml by scripts/testenv.sh.
+# Puts the server on Docker's built-in bridge network instead of a network of its own. Creating
+# a network per project fails on machines whose Docker address pools are used up, and the
+# built-in bridge exists everywhere, CI runners included. The server itself stays unchanged.
+services:
+  v15:
+    network_mode: bridge

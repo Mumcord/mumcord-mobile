@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Written by scripts/translations.py from Mumcord b258e927e1af (ui/src/locales/fi) and i18n/mobile/fi.json. Do not edit by hand. -->
+<resources>
+    <string name="call_channel_name">Voice session</string>
+    <string name="call_channel_description">Shown while you are connected to a server, with Mute, Deafen and Leave.</string>
+    <string name="call_status_connected">Voice connected</string>
+    <string name="call_status_muted">Mykistetty</string>
+    <string name="call_status_deafened">Kuulokkeet hiljennetty</string>
+    <string name="call_action_mute">Mykistä mikrofoni</string>
+    <string name="call_action_unmute">Unmute</string>
+    <string name="call_action_deafen">Hiljennä kuulokkeet</string>
+    <string name="call_action_undeafen">Undeafen</string>
+</resources>

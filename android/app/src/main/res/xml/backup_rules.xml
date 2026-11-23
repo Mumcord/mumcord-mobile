@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!--
+    The same exclusion as data_extraction_rules.xml in the older format, which backup tools
+    that do not know the newer rules still read.
+-->
+<full-backup-content>
+    <exclude domain="file" path="securestore/" />
+</full-backup-content>

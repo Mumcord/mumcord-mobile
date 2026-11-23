@@ -1,0 +1,626 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import Foundation
+import MumcordBridge
+import Observation
+
+/// The state of the app and what the user can do with it. Views read `uiState` and call the
+/// methods; none of them talks to the engine.
+///
+/// This file holds everything before the connected screens: first-start setup, the server list,
+/// the add and edit form, connecting with its questions and errors, and opened links. The
+/// connected screens' part is in `AppModel+Connected.swift`.
+@MainActor
+@Observable
+final class AppModel {
+    @ObservationIgnored let store: SessionStore
+    @ObservationIgnored private let setupStore: SetupStore
+    @ObservationIgnored let microphone: MicrophoneAccess
+    @ObservationIgnored private let localNetwork: LocalNetworkGateway
+    /// Opens the app's page in the system settings.
+    @ObservationIgnored let openSettings: () -> Void
+    /// The session as a call of the phone; nil where the app runs without the phone's services.
+    @ObservationIgnored let call: VoiceCall?
+    /// The look at a server's address before its connection starts.
+    @ObservationIgnored private var addressCheck: Task<Void, Never>?
+    /// The microphone level, 0 to 100. An object of its own: it changes up to 20 times a
+    /// second, and only the level meter reads it.
+    @ObservationIgnored let inputLevel = InputLevel()
+    /// The chat of the channel the user is in. An object of its own, read only by the chat
+    /// views, so arriving messages do not redraw the other screens.
+    @ObservationIgnored let chat: ChatController
+    /// Gets the pictures of the chat.
+    @ObservationIgnored let chatImages: ChatImageLoader
+    /// The chat commands and streams of the connection; the message notifications follow it too.
+    @ObservationIgnored let chatStore: ChatStore
+    /// The Messages tab: conversations, requests, blocking. Read only by its own views.
+    @ObservationIgnored let messages: MessagesController
+    /// The identity screens and "Scan from desktop app".
+    @ObservationIgnored let identities: IdentitiesController
+    /// The camera permission, for the scanner and the chat's "Take photo".
+    @ObservationIgnored let camera: CameraGateway
+    /// Where the scanner gets the texts of QR codes from.
+    @ObservationIgnored let qrSource: QrSource
+    /// The private conversation that is open on the Messages tab. It does not keep what was
+    /// typed for the next person.
+    @ObservationIgnored let conversation: ChatController
+    /// The question about notifications and whether the phone shows them.
+    @ObservationIgnored let notifications: NotificationAccess
+    /// Where the voice plays and the first-connect question about it.
+    @ObservationIgnored let outputs: OutputAccess
+    /// "Disconnect when alone": the notice after the app disconnected by itself.
+    @ObservationIgnored let idle: IdleAccess?
+    /// The last change of the phone settings; the next one waits for it, so that two switches
+    /// flipped quickly do not save over each other.
+    @ObservationIgnored var settingsSave: Task<Void, Never>?
+    /// The last connect, so "Try again" and the password retry keep a link's channel.
+    @ObservationIgnored private var lastTarget: ConnectTarget?
+
+    /// The app's own part of the state; `session` and `connected` in it are not used.
+    private var local: AppUiState
+    private var session = SessionState()
+    var connectedLocal = ConnectedLocal()
+    private var microphoneNotice = MicrophoneNotice.none
+    private var notificationState: NotificationState
+    private var outputNotice: OutputNotice
+
+    init(
+        store: SessionStore,
+        setupStore: SetupStore,
+        microphone: MicrophoneAccess,
+        localNetwork: LocalNetworkGateway,
+        openSettings: @escaping () -> Void,
+        call: VoiceCall? = nil,
+        sessionEnded: SessionEndedNotice? = nil,
+        notifications: NotificationAccess = NoNotificationQuestion(),
+        messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(senderOnly: false),
+        outputs: OutputAccess? = nil,
+        idle: IdleAccess? = nil,
+        mediaPolicy: @escaping MediaPolicy = { true },
+        camera: CameraGateway = NoCamera(),
+        qrSource: QrSource = NoQrSource()
+    ) {
+        self.store = store
+        self.setupStore = setupStore
+        self.microphone = microphone
+        self.localNetwork = localNetwork
+        self.openSettings = openSettings
+        self.call = call
+        self.notifications = notifications
+        notificationState = notifications.state
+        let outputs = outputs ?? NoOutputs()
+        self.outputs = outputs
+        self.idle = idle
+        outputNotice = outputs.notice
+        let chatStore = ChatStore(session: store, mediaPolicy: mediaPolicy)
+        self.chatStore = chatStore
+        chat = ChatController(chats: chatStore)
+        conversation = ChatController(chats: chatStore, keepDraft: false)
+        messages = MessagesController(store: store, chats: chatStore, settings: messageSettings)
+        self.camera = camera
+        self.qrSource = qrSource
+        identities = IdentitiesController(store: store, camera: camera)
+        chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
+        local = AppUiState(setupDone: setupStore.firstStartDone)
+        if let sessionEnded {
+            local.overlay = .sessionEnded(serverId: sessionEnded.serverId, serverName: sessionEnded.serverName)
+        }
+        let states = store.states()
+        Task { [weak self] in
+            for await state in states {
+                guard let self else { return }
+                self.apply(state)
+            }
+        }
+        let notices = microphone.notices()
+        Task { [weak self] in
+            for await notice in notices {
+                guard let self else { return }
+                self.microphoneNotice = notice
+            }
+        }
+        let notificationStates = notifications.states()
+        Task { [weak self] in
+            for await state in notificationStates {
+                guard let self else { return }
+                self.notificationState = state
+            }
+        }
+        let outputNotices = outputs.notices()
+        Task { [weak self] in
+            for await notice in outputNotices {
+                guard let self else { return }
+                self.outputNotice = notice
+            }
+        }
+        if let idleNotices = idle?.notices() {
+            Task { [weak self] in
+                for await notice in idleNotices {
+                    guard let self else { return }
+                    self.showIdleNotice(notice)
+                }
+            }
+        }
+        messages.showMessagesTab = { [weak self] in self?.showTab(.messages) }
+        messages.dismissConnectedSheet = { [weak self] in self?.dismissSheet() }
+        let levels = store.inputLevels()
+        Task { [inputLevel] in
+            for await percent in levels {
+                inputLevel.percent = percent
+            }
+        }
+        Task { await store.loadServers() }
+    }
+
+    var uiState: AppUiState {
+        var merged = local
+        merged.session = session
+        merged.connected = connectedUiState(
+            session: session,
+            local: connectedLocal,
+            serverName: merged.activeServerName ?? "",
+            microphone: microphoneNotice,
+            explainNotifications: notificationState.explain,
+            output: outputNotice.state,
+            askOutput: outputNotice.asking
+        )
+        merged.identities = identitiesUiState(session: session, local: identities.local)
+        return merged
+    }
+
+    private func apply(_ state: SessionState) {
+        let serversChanged = state.servers != session.servers
+        let previousPhase = session.phase
+        let whisperEnded = state.whispersEnded != session.whispersEnded
+        session = state
+        if serversChanged { ping(state.servers) }
+        if !state.showsServer {
+            // The end of a connection starts the connected screens afresh.
+            releaseHolds()
+            if connectedLocal != ConnectedLocal() { connectedLocal = ConnectedLocal() }
+        } else if let target = connectedLocal.whisperTarget, state.server?.whisperName(target) == nil {
+            // The whisper bar goes away with the person or channel it is for.
+            closeWhisper()
+        }
+        if whisperEnded {
+            // The engine ended the whisper by itself and already talks to the channel again,
+            // so there is nothing to stop: only the bar goes away.
+            connectedLocal.whisperHeld = false
+            connectedLocal.whisperTarget = nil
+        }
+        if state.phase != previousPhase { askSystemAboutLocalNetwork(state) }
+        syncChat()
+    }
+
+    /// Tells the chat which chat to show (the one of the user's channel) and whether its
+    /// screen is the one on top. Called whenever the connection, the tab or the voice view
+    /// changes.
+    func syncChat() {
+        chat.open(currentChannelChat(session))
+        chat.setShown(session.showsServer && connectedLocal.tab == .chat && !connectedLocal.voiceOpen)
+        let open = session.showsServer ? messages.local.open?.chat : nil
+        conversation.open(open)
+        conversation.setShown(open != nil && connectedLocal.tab == .messages && !connectedLocal.voiceOpen)
+    }
+
+    /// The chat controller of the tab on screen; the chat's sheets and pictures go to it.
+    var activeChat: ChatController {
+        connectedLocal.tab == .messages ? conversation : chat
+    }
+
+    /// The chat on screen as a value: the open conversation on the Messages tab, else the
+    /// channel's chat.
+    func activeChatUiState(calendar: Calendar) -> ChatUiState? {
+        connectedLocal.tab == .messages ? conversationUiState(calendar: calendar) : chatUiState(calendar: calendar)
+    }
+
+    /// The Messages tab and the blocking screens as a value. Only their own views read it.
+    var messagesUiState: MessagesUiState? {
+        messages.uiState(session: session, notificationsGranted: notificationState.granted)
+    }
+
+    /// The open private conversation as a value, or nil while there is none to show.
+    func conversationUiState(calendar: Calendar) -> ChatUiState? {
+        guard let state = messagesUiState, let open = state.open else { return nil }
+        return Mumcord.conversationUiState(
+            session: session,
+            local: conversation.local,
+            chat: open.chat,
+            peerName: open.name,
+            peerOnline: state.openOnline,
+            serverName: local.activeServerName(session) ?? "",
+            calendar: calendar
+        )
+    }
+
+    /// The number on the Messages tab.
+    var messagesBadge: Int {
+        messagesTabBadge(messages.unread)
+    }
+
+    /// Brings a tab in front of whatever is open: a sheet and the full voice view go away.
+    func showTab(_ tab: ConnectedTab) {
+        connectedLocal.voiceOpen = false
+        connectedLocal.personSession = nil
+        connectedLocal.volumeDraft = nil
+        connectedLocal.menuChannelId = nil
+        connectedLocal.tab = tab
+        syncChat()
+    }
+
+    /// A message notification was tapped: a mention opens the Chat tab, a private message its
+    /// conversation. Nothing happens without a connection.
+    func openChat(_ chat: ChatId) {
+        guard session.showsServer else { return }
+        if chat.isChannel {
+            showTab(.chat)
+        } else {
+            showTab(.messages)
+            messages.openConversation(chat, name: "", session: nil)
+            syncChat()
+        }
+    }
+
+    // MARK: Notifications
+
+    /// The explanation was put away without letting the system ask.
+    func notificationsNotNow() {
+        notifications.notNow()
+    }
+
+    /// Lets the system ask for notifications.
+    func askNotifications() {
+        notifications.ask()
+    }
+
+    /// The app is on screen again: notifications may have been allowed in the system settings.
+    func recheckNotifications() {
+        notifications.recheck()
+    }
+
+    /// The Chat tab as a value, or nil while there is no chat to show. Only the chat views
+    /// read it.
+    func chatUiState(calendar: Calendar) -> ChatUiState? {
+        Mumcord.chatUiState(
+            session: session,
+            local: chat.local,
+            serverName: local.activeServerName(session) ?? "",
+            calendar: calendar
+        )
+    }
+
+    /// The number on the Chat tab.
+    var chatBadge: Int {
+        chatTabBadge(unread: chat.unread, session: session, chatTabOpen: connectedLocal.tab == .chat)
+    }
+
+    /// After a server on a local or private address could not be reached: asks the system
+    /// whether it refuses local network access, which is the only moment iOS tells. The error
+    /// is on screen meanwhile; it only becomes more exact.
+    private func askSystemAboutLocalNetwork(_ state: SessionState) {
+        guard state.phase == .failed(.serverUnreachable),
+              let serverId = state.activeServerId,
+              serverId == local.localNetworkSuspectServerId,
+              let server = server(serverId)
+        else { return }
+        Task {
+            guard await localNetwork.accessRefused(host: server.address, port: server.port) else { return }
+            // Only while that failure is still the one on screen.
+            if session.phase == .failed(.serverUnreachable), session.activeServerId == serverId,
+               local.localNetworkSuspectServerId == serverId {
+                local.localNetworkDeniedServerId = serverId
+            }
+        }
+    }
+
+    // MARK: First-start setup
+
+    func selectTalkMode(_ mode: TalkMode) {
+        local.talkModeChoice = mode
+    }
+
+    func confirmTalkMode() {
+        guard let mode = local.talkModeChoice, !local.setupSaving else { return }
+        local.setupSaving = true
+        local.setupError = nil
+        Task {
+            switch await store.setTalkMode(mode) {
+            case .ok:
+                setupStore.markFirstStartDone()
+                local.setupDone = true
+                local.setupSaving = false
+            case .failed(let error):
+                local.setupSaving = false
+                local.setupError = error
+            }
+        }
+    }
+
+    // MARK: Server list
+
+    /// Asks the servers again for people online and latency; called when the app comes back.
+    func refreshPings() {
+        ping(store.state.servers)
+    }
+
+    private func ping(_ servers: [SavedServer]) {
+        local.pings = local.pings.filter { id, _ in servers.contains { $0.id == id } }
+        for server in servers {
+            Task {
+                // The engine reuses a recent answer, so asking again is cheap.
+                let state = PingState(await store.pingServer(server.id, refresh: false))
+                local.pings[server.id] = state
+            }
+        }
+    }
+
+    func toggleEditing() {
+        local.editing.toggle()
+    }
+
+    func openAddServer() {
+        local.form = ServerFormState()
+    }
+
+    func openEditServer(_ serverId: Int64) {
+        guard let server = server(serverId) else { return }
+        local.form = .edit(server)
+    }
+
+    func changeForm(_ change: (inout ServerFormState) -> Void) {
+        guard var form = local.form else { return }
+        change(&form)
+        local.form = form
+    }
+
+    func closeForm() {
+        local.form = nil
+    }
+
+    func saveForm() {
+        guard let form = local.form else { return }
+        guard let input = form.toInput() else {
+            changeForm { $0.showErrors = true }
+            return
+        }
+        if form.saving { return }
+        changeForm {
+            $0.saving = true
+            $0.saveError = nil
+        }
+        Task {
+            let saved: Outcome<SavedServer>
+            if let serverId = form.serverId {
+                saved = await store.updateServer(serverId, input)
+            } else {
+                saved = await store.addServer(input)
+            }
+            switch saved {
+            case .ok:
+                closeForm()
+            case .failed(let error):
+                changeForm {
+                    $0.saving = false
+                    $0.saveError = error
+                }
+            }
+        }
+    }
+
+    func requestRemove(_ serverId: Int64) {
+        guard let server = server(serverId) else { return }
+        local.overlay = .confirmRemove(server: server)
+    }
+
+    func confirmRemove() {
+        guard case .confirmRemove(let server) = local.overlay else { return }
+        dismissOverlay()
+        Task {
+            // A failure means the entry is already gone, which is what was asked for; the list
+            // shows what the engine reports.
+            _ = await store.removeServer(server.id)
+        }
+    }
+
+    func dismissOverlay() {
+        if case .sessionEnded(_, _, true) = local.overlay { idle?.dismiss() }
+        local.overlay = nil
+    }
+
+    /// The app disconnected because the user was alone for too long: says so and offers to
+    /// reconnect, unless something else is on screen.
+    private func showIdleNotice(_ notice: IdleNotice?) {
+        guard let notice else { return }
+        if local.overlay == nil {
+            local.overlay = .sessionEnded(serverId: notice.serverId, serverName: notice.serverName, alone: true)
+        }
+    }
+
+    // MARK: Connecting
+
+    func connect(_ serverId: Int64) {
+        request(ConnectTarget(serverId: serverId))
+    }
+
+    /// One server at a time: while a connection is alive, connecting elsewhere asks first.
+    private func request(_ target: ConnectTarget) {
+        let session = store.state
+        guard let targetName = server(target.serverId)?.name else { return }
+        if session.isBusy {
+            let currentName = session.servers.first { $0.id == session.activeServerId }?.name ?? ""
+            local.overlay = .confirmSwitch(target: target, currentName: currentName, targetName: targetName)
+        } else {
+            start(target)
+        }
+    }
+
+    func confirmSwitch() {
+        guard case .confirmSwitch(let target, _, _) = local.overlay else { return }
+        dismissOverlay()
+        Task {
+            await store.disconnect()
+            // The engine allows a new connection only once the old one has ended.
+            _ = await store.first { !$0.isBusy }
+            start(target)
+        }
+    }
+
+    /// Connects, unless the server is on the local network and the user has not been told yet
+    /// that iOS will ask for access to it: then the reason is explained first (FR-5.8).
+    /// `explained` is true when that explanation has just been continued.
+    private func start(_ target: ConnectTarget, explained: Bool = false) {
+        guard let server = server(target.serverId) else { return }
+        lastTarget = target
+        addressCheck?.cancel()
+        local.overlay = nil
+        local.editing = false
+        local.checkingServerId = target.serverId
+        local.localNetworkSuspectServerId = nil
+        local.localNetworkDeniedServerId = nil
+        addressCheck = Task {
+            let check = await localNetwork.check(host: server.address)
+            if Task.isCancelled { return }
+            local.checkingServerId = nil
+            if check.step == .explain && !explained {
+                // An error of an earlier attempt would otherwise stay behind the question.
+                store.dismissFailure()
+                local.overlay = .localNetwork(target: target, serverName: server.name)
+                return
+            }
+            local.localNetworkSuspectServerId = check.suspect ? target.serverId : nil
+            await store.connectServer(target.serverId, password: target.password, channelPath: target.channelPath)
+        }
+    }
+
+    /// The explanation was read: connect, which makes iOS ask for local network access.
+    func continueLocalNetwork() {
+        guard case .localNetwork(let target, _) = local.overlay else { return }
+        localNetwork.explained = true
+        start(target, explained: true)
+    }
+
+    /// Connects again to the server of the session that was cut off.
+    func reconnectAfterSessionEnded() {
+        guard case .sessionEnded(let serverId, _, _) = local.overlay else { return }
+        dismissOverlay()
+        connect(serverId)
+    }
+
+    /// Ends the connection, also while it is still being made.
+    func disconnect() {
+        addressCheck?.cancel()
+        local.checkingServerId = nil
+        Task { await store.disconnect() }
+    }
+
+    func answerCertificatePrompt(fingerprint: String, trust: Bool) {
+        Task { await store.answerCertificatePrompt(fingerprint: fingerprint, trust: trust) }
+    }
+
+    /// The action of a shown error: connects again, asks for the password after a wrong one, or
+    /// reads the server list again when that was what failed.
+    func retry() {
+        let session = store.state
+        guard case .failed(let error) = session.phase else { return }
+        guard let serverId = session.activeServerId, let serverName = server(serverId)?.name else {
+            store.dismissFailure()
+            Task { await store.loadServers() }
+            return
+        }
+        var target = lastTarget.flatMap { $0.serverId == serverId ? $0 : nil } ?? ConnectTarget(serverId: serverId)
+        target.password = nil
+        if error == .wrongPassword {
+            local.overlay = .enterPassword(target: target, serverName: serverName, password: "")
+        } else {
+            start(target)
+        }
+    }
+
+    func changePassword(_ password: String) {
+        guard case .enterPassword(let target, let serverName, _) = local.overlay else { return }
+        local.overlay = .enterPassword(target: target, serverName: serverName, password: password)
+    }
+
+    func submitPassword() {
+        guard case .enterPassword(var target, _, let password) = local.overlay, !password.isEmpty else { return }
+        target.password = password
+        start(target)
+    }
+
+    func dismissError() {
+        local.localNetworkSuspectServerId = nil
+        local.localNetworkDeniedServerId = nil
+        store.dismissFailure()
+    }
+
+    // MARK: Microphone
+
+    /// The explanation was put away: the user keeps listening and a notice says so.
+    func microphoneNotNow() {
+        microphone.notNow()
+    }
+
+    /// What the explanation's button and the notice do: lets the system ask, or opens the
+    /// system settings once the system no longer asks.
+    func requestMicrophone() {
+        if microphoneNotice == .blocked {
+            openSettings()
+        } else {
+            microphone.ask()
+        }
+    }
+
+    /// The app is on screen again: the permission may have changed in the system settings.
+    func recheckMicrophone() {
+        microphone.recheck()
+    }
+
+    // MARK: mumble:// links
+
+    /// Shows the target of an opened link. Nothing is saved or connected before the user confirms.
+    func openLink(_ url: String) {
+        Task {
+            // A saved entry of the same server is reused, so the list must be known first.
+            await store.loadServers()
+            switch store.parseLink(url) {
+            case .ok(let link):
+                local.overlay = .link(linkConfirmState(link: link, servers: store.state.servers))
+            case .failed:
+                local.overlay = .invalidLink
+            }
+        }
+    }
+
+    func changeLinkUsername(_ username: String) {
+        guard case .link(var state) = local.overlay else { return }
+        state.typedUsername = username
+        local.overlay = .link(state)
+    }
+
+    func confirmLink() {
+        guard case .link(var state) = local.overlay, state.canConnect else { return }
+        if let saved = state.savedServer {
+            request(ConnectTarget(serverId: saved.id, channelPath: state.link.channelPath))
+            return
+        }
+        state.working = true
+        state.error = nil
+        local.overlay = .link(state)
+        Task {
+            switch await store.addServer(state.toInput()) {
+            case .ok(let added):
+                // The list event may still be on its way; the row is needed to name the server.
+                _ = await store.first { session in session.servers.contains { $0.id == added.id } }
+                request(ConnectTarget(serverId: added.id, channelPath: state.link.channelPath))
+            case .failed(let error):
+                state.working = false
+                state.error = error
+                local.overlay = .link(state)
+            }
+        }
+    }
+
+    private func server(_ serverId: Int64) -> SavedServer? {
+        store.state.servers.first { $0.id == serverId }
+    }
+}

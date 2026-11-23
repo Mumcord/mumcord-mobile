@@ -1,0 +1,6 @@
+[bindings.kotlin]
+package_name = "app.mumcord.mobile.bridge"
+cdylib_name = "mumcord_mobile"
+
+[bindings.swift]
+module_name = "MumcordBridge"

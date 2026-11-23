@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Written by scripts/translations.py from Mumcord b258e927e1af (ui/src/locales/it) and i18n/mobile/it.json. Do not edit by hand. -->
+<resources>
+    <string name="stream_title_screen">Schermo di %1$s</string>
+    <string name="stream_title_camera">%1$s\'s camera</string>
+    <string name="stream_live">LIVE</string>
+    <plurals name="stream_watching">
+        <item quantity="one">%d watching</item>
+        <item quantity="many">%d watching</item>
+        <item quantity="other">%d watching</item>
+    </plurals>
+    <plurals name="stream_viewers">
+        <item quantity="one">%1$d spettatore</item>
+        <item quantity="many">%1$d spettatori</item>
+        <item quantity="other">%1$d spettatori</item>
+    </plurals>
+    <string name="stream_tile_description">%1$s, live</string>
+    <string name="stream_description_part">%1$s, %2$s</string>
+    <string name="stream_tap_to_watch">Tap to watch</string>
+    <string name="stream_connecting">Connecting …</string>
+    <string name="stream_paused">In pausa</string>
+    <string name="stream_open_elsewhere">Playing in the mini window</string>
+    <string name="stream_rotate_hint">Rotate for landscape</string>
+    <string name="stream_collapse">Collapse to mini window</string>
+    <string name="stream_rotate_landscape">Turn to landscape</string>
+    <string name="stream_rotate_portrait">Back to portrait</string>
+    <string name="stream_stop">Smetti di guardare</string>
+    <string name="stream_expand">Open full screen</string>
+    <string name="stream_leave_full_screen">Esci dallo schermo intero</string>
+    <string name="stream_chat_strip">%1$s chat</string>
+    <string name="stream_chat_strip_open">Show the whole chat</string>
+    <string name="stream_volume">Stream volume</string>
+    <string name="stream_try_again">Riprova</string>
+    <string name="stream_unreachable_no_path">Stream not reachable from this network</string>
+    <string name="stream_unreachable_peer_to_peer_off">Peer-to-peer is off for this server.</string>
+    <string name="stream_unreachable_direct_declined">You said no to direct connections and this server has no relay.</string>
+    <string name="stream_unreachable_relay_unavailable">The relay can\'t be used right now.</string>
+    <string name="stream_unreachable_sharer_unsupported">%1$s\'s app doesn\'t take direct connections.</string>
+    <string name="stream_unreachable_no_answer">%1$s did not answer.</string>
+    <string name="stream_unreachable_full">Too many people are watching %1$s.</string>
+    <string name="stream_unreachable_needs_update">%1$s needs a newer Mumcord for this.</string>
+    <string name="stream_unreachable_join_failed">Couldn\'t join %1$s\'s camera. Trying again …</string>
+    <string name="direct_connections_title">Consentire le connessioni dirette?</string>
+    <string name="direct_connections_body">Direct connections are faster, but the other person can see your IP address. Mumcord uses them for streams with other Mumcord users. If you say no, streams come through the server\'s relay where the server has one; then the other person doesn\'t see your IP address.</string>
+    <string name="direct_connections_no">No</string>
+    <string name="direct_connections_yes">Sì</string>
+</resources>
