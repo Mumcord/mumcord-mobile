@@ -37,6 +37,15 @@ tests `ModerationFlowUITests`, screenshots `ios-moderation-*`. A debug build sta
 `-mumcordBanSeconds <seconds>` bans for that long instead of the chosen length, for the
 end-to-end test that is still open (task 10.4).
 
+More tab, activity log and settings (8.6, the scope of the Android task 8.5): built after the
+pause, mirroring Android commit `fcceffa`. More has Activity (with a count of new entries),
+Identities, Blocked people, Settings and Disconnect; the activity log has the days, the filters
+All, Joins and Streams and its empty states; Settings have Voice, Mobile data, Battery,
+Notifications (with "Show sender only", which left More) and Chat. Differences from Android:
+"Default audio output" is hidden while a wired headset is plugged in, because iOS then does not
+offer the earpiece; the whole settings do not fit one picture, so the screenshots show them in
+two parts.
+
 ## Open tasks
 
 ### 2.10 Public server browser (FR-5.9, AC-5.38)
@@ -57,25 +66,10 @@ Mirror Android commit `525a028` (`feat(android): browse public servers`):
 - Tests only against a fake list; never contact the real list service or public servers.
   The browser screen has no mockup and needs product review.
 
-### 8.6 More tab, activity log, settings, profile and themes (FR-5.80 … FR-5.100)
+### 8.6 Profile and themes (FR-5.80 … FR-5.100)
 
-Task 8.6 is the iOS scope of the Android tasks 8.3, 8.4 and 8.5. Its moderation part (8.4) is
-built, see "State when paused".
-
-More tab, activity log and settings, mirroring Android commit `fcceffa`
-(`feat(android): activity log and the full settings under More`):
-
-- More: Activity (with a count of new entries), Identities, Blocked people, Settings,
-  Disconnect.
-- "Show sender only" moves from More to Settings → Notifications.
-- Activity log: groups Today / Yesterday / date, filters All, Joins and Streams (no Moderation
-  filter until the engine reports who kicked or banned), updates live, empty states.
-- Settings: Voice (talk mode sheet, noise suppression, microphone level, default audio output
-  only where an earpiece exists), Mobile data, Battery, Notifications (private messages,
-  mentions, "Show sender only", note "only while connected"), Chat (delete history older than
-  Never / 7 / 30 / 90 / 365 days).
-- `ios/Mumcord/Session/SessionReducer.swift` ignores `ActivityAdded` and `AppSettingsChanged`
-  today; they must be handled as the Android reducer does.
+Task 8.6 is the iOS scope of the Android tasks 8.3, 8.4 and 8.5. Moderation (8.4) and the More
+tab, the activity log and the settings (8.5) are built, see "State when paused".
 
 Profile, appearance and themes, mirroring the Android task 8.3 commit (in progress on Android
 when iOS was paused):
@@ -128,13 +122,14 @@ simulator app; linking for a real device is first proven here.
 
 ## Open points from the iOS work so far
 
-- Tests missing in the Messages feature: the person row turning to "Unblock" after blocking,
-  unblocking from the blocked list, the "Show sender only" switch changing its value,
-  `keepDraft: false`, `AppModel.openChat`.
-- Screenshots are large (about 37 MB for the Messages set alone); shrink the PNGs. The
-  moderation set shows how: saved with a palette of 256 colours and no dithering (Pillow,
-  `quantize(colors=256, method=MAXCOVERAGE, dither=NONE)`), 14 pictures take 1.6 MB instead of
-  12.3 MB, and no colour is off by more than 7 of 255. The older sets are still as they were.
+- Screenshots are large (about 37 MB for the Messages set alone); shrink the PNGs. The sets
+  of moderation, More, the activity log and the settings show how: saved with a palette of 256
+  colours and no dithering (Pillow, `quantize(colors=256, method=MAXCOVERAGE, dither=NONE)`),
+  a picture takes about 0.1 to 0.2 MB instead of 0.9 to 1.7 MB, and no colour is off by more
+  than 7 of 255. The older sets are still as they were.
+- "Show sender only" flipped on and off very quickly: the settings are saved one after the
+  other, but that switch saves through its own task, so the order of two quick flips of this
+  one switch is not guaranteed.
 - Wording needing product review: the notification explanation sheet ("Mumcord shows private
   messages and mentions as notifications while you are connected.") and the camera permission
   text ("Mumcord uses the camera to read the codes shown by the desktop app and to take photos
