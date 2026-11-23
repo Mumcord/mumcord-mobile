@@ -46,42 +46,6 @@ struct MessagesTab: View {
     }
 }
 
-/// The More tab's part that belongs to messages: the blocked people and what notifications show.
-struct MoreMessagesSection: View {
-    let model: AppModel
-    @Environment(\.mumcordTheme) private var theme
-
-    var body: some View {
-        MumcordSectionHeader(title: Strings.moreSectionMessages)
-        MumcordList {
-            MumcordListRow(
-                title: Strings.moreBlocked,
-                icon: MumcordIcons.shield,
-                action: model.messages.openBlocked,
-                trailing: {
-                    MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted)
-                }
-            )
-            .accessibilityIdentifier("more-blocked")
-            MumcordListRow(
-                title: Strings.moreSenderOnly,
-                subtitle: Strings.moreSenderOnlySub,
-                icon: MumcordIcons.bell,
-                divider: true,
-                trailing: {
-                    MumcordToggle(
-                        checked: model.messages.local.senderOnly,
-                        label: Strings.moreSenderOnly,
-                        onCheckedChange: model.messages.setSenderOnly
-                    )
-                    .accessibilityIdentifier("more-sender-only")
-                }
-            )
-        }
-        .padding(.bottom, MumcordSpace.s4)
-    }
-}
-
 /// The list of blocked people over the More tab while it is open, else nothing.
 struct MoreBlockedHost<More: View>: View {
     let model: AppModel

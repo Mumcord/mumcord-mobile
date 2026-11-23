@@ -104,6 +104,11 @@ final class MessagesFlowUITests: XCTestCase {
         expectAppears(app.element("block-sheet"))
         tapWhenReady(app.element("block-confirm"))
         expectGone(app.element("block-sheet"))
+        // The person sheet now offers to lift the block.
+        tapWhenReady(app.row("person-row", containing: "Anna"))
+        expectAppears(app.row("person-block", containing: "Unblock"))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+        expectGone(app.element("person-block"))
         tapWhenReady(tab(app, "More"))
         tapWhenReady(app.element("more-blocked"))
         expectAppears(app.element("blocked-screen"))
@@ -139,11 +144,21 @@ final class MessagesFlowUITests: XCTestCase {
         XCTAssertFalse(app.element("messages-notifications-off").exists)
     }
 
-    func testMoreHasTheSenderOnlySwitch() {
+    /// "Show sender only" is a setting under Notifications; the switch changes its value.
+    func testShowSenderOnlyIsASettingAndChangesItsValue() {
         let app = connect("messages")
         tapWhenReady(tab(app, "More"))
-        expectAppears(app.element("more-sender-only"))
-        tapWhenReady(app.element("more-sender-only"))
         expectAppears(app.element("more-blocked"))
+        XCTAssertFalse(app.element(containing: "Show sender only").exists)
+        tapWhenReady(app.element("more-settings"))
+        expectAppears(app.element("settings"))
+        app.swipeUp()
+        let senderOnly = app.switches.matching(identifier: "settings-sender-only").firstMatch
+        expectAppears(senderOnly)
+        XCTAssertEqual(senderOnly.value as? String, "0")
+        senderOnly.tapCenter()
+        expectAppears(app.switches.matching(NSPredicate(format: "identifier == %@ AND value == %@", "settings-sender-only", "1")).firstMatch)
+        senderOnly.tapCenter()
+        expectAppears(app.switches.matching(NSPredicate(format: "identifier == %@ AND value == %@", "settings-sender-only", "0")).firstMatch)
     }
 }

@@ -2,8 +2,8 @@
 
 import XCTest
 
-/// The settings under More (mockup `16-settings`) and "Disconnect when alone" (AC-5.30), against
-/// the fake engine.
+/// The settings under More (mockup `16-settings`, FR-5.100) and "Disconnect when alone"
+/// (AC-5.30), against the fake engine.
 final class SettingsFlowUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
@@ -21,36 +21,129 @@ final class SettingsFlowUITests: XCTestCase {
         app.switches.matching(identifier: id).firstMatch
     }
 
-    private func isOn(_ element: XCUIElement) -> Bool {
-        (element.value as? String) == "1"
-    }
-
-    /// The four switches show the saved settings, are saved at once and are still set after
-    /// the screen was closed and opened again.
-    func testTheSwitchesAreSavedAndShownAgain() {
-        let app = connect("voice-server")
+    private func openSettings(_ app: XCUIApplication) {
         tapWhenReady(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "More")).firstMatch)
         tapWhenReady(app.element("more-settings"))
-        // Section headers are shown in capitals, and the label is what is shown.
-        expectAppears(app.element(containing: "MOBILE DATA"))
-        let media = toggle(app, "settings-load-media")
-        let idle = toggle(app, "settings-idle-disconnect")
-        expectAppears(media)
-        XCTAssertTrue(isOn(media))
-        XCTAssertFalse(isOn(toggle(app, "settings-autoplay-streams")))
-        XCTAssertFalse(isOn(toggle(app, "settings-reduced-voice")))
-        XCTAssertFalse(isOn(idle))
+        expectAppears(app.element("settings-talk-mode"))
+    }
 
-        media.tapCenter()
-        idle.tapCenter()
-        XCTAssertTrue(waitFor { !self.isOn(media) && self.isOn(idle) })
+    /// Scrolls the settings until the element is above the bars at the bottom, so it can be tapped.
+    private func scrollTo(_ element: XCUIElement, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let bars = app.element(containing: "Voice connected")
+        var swipes = 0
+        while swipes < 4, !element.exists || element.frame.isEmpty || element.frame.maxY > bars.frame.minY {
+            app.swipeUp()
+            swipes += 1
+        }
+        expectAppears(element, file: file, line: line)
+    }
+
+    private func expect(_ app: XCUIApplication, _ id: String, on: Bool, file: StaticString = #filePath, line: UInt = #line) {
+        let wanted = NSPredicate(format: "identifier == %@ AND value == %@", id, on ? "1" : "0")
+        expectAppears(app.switches.matching(wanted).firstMatch, file: file, line: line)
+    }
+
+    /// Every section is there, the switches show the defaults of the specification, are saved
+    /// at once and are still set after the screen was closed and opened again.
+    func testMoreLeadsToTheSettingsAndEverySwitchIsSaved() {
+        let app = connect("voice-server")
+        openSettings(app)
+
+        // Section headers are shown in capitals, and the label is what is shown.
+        expectAppears(app.element(containing: "VOICE"))
+        expectAppears(app.row("settings-talk-mode", containing: "Voice activity"))
+        expectAppears(app.element("settings-input-level"))
+        expect(app, "settings-noise-suppression", on: false)
+        // The fake phone has no earpiece, so there is no default to choose.
+        XCTAssertFalse(app.element("settings-default-output").exists)
+        expectAppears(app.element(containing: "MOBILE DATA"))
+        expectAppears(app.element(containing: "BATTERY"))
+        expectAppears(app.element(containing: "You get a notification first"))
+        expect(app, "settings-autoplay-streams", on: false)
+        expect(app, "settings-load-media", on: true)
+        expect(app, "settings-reduced-voice", on: false)
+        expect(app, "settings-idle-disconnect", on: false)
+
+        for id in ["settings-noise-suppression", "settings-autoplay-streams", "settings-load-media", "settings-reduced-voice", "settings-idle-disconnect"] {
+            toggle(app, id).tapCenter()
+        }
+        expect(app, "settings-noise-suppression", on: true)
+        expect(app, "settings-autoplay-streams", on: true)
+        expect(app, "settings-load-media", on: false)
+        expect(app, "settings-reduced-voice", on: true)
+        expect(app, "settings-idle-disconnect", on: true)
+
+        scrollTo(toggle(app, "settings-sender-only"), in: app)
+        expectAppears(app.element(containing: "NOTIFICATIONS"))
+        expectAppears(app.element(containing: "Notifications only arrive while you are connected to a server."))
+        // "Chat" is also the name of a tab; the section is found by its row.
+        expectAppears(app.row("settings-history", containing: "Never"))
+        expect(app, "settings-notify-private", on: true)
+        expect(app, "settings-notify-mentions", on: true)
+        expect(app, "settings-sender-only", on: false)
+        for id in ["settings-notify-private", "settings-notify-mentions", "settings-sender-only"] {
+            toggle(app, id).tapCenter()
+        }
+        expect(app, "settings-notify-private", on: false)
+        expect(app, "settings-notify-mentions", on: false)
+        expect(app, "settings-sender-only", on: true)
 
         tapWhenReady(app.element("Back to More"))
         expectAppears(app.element("more-disconnect"))
-        tapWhenReady(app.element("more-settings"))
-        expectAppears(toggle(app, "settings-load-media"))
-        XCTAssertFalse(isOn(toggle(app, "settings-load-media")))
-        XCTAssertTrue(isOn(toggle(app, "settings-idle-disconnect")))
+        openSettings(app)
+        expect(app, "settings-noise-suppression", on: true)
+        expect(app, "settings-autoplay-streams", on: true)
+        expect(app, "settings-load-media", on: false)
+        expect(app, "settings-reduced-voice", on: true)
+        expect(app, "settings-idle-disconnect", on: true)
+        scrollTo(toggle(app, "settings-sender-only"), in: app)
+        expect(app, "settings-notify-private", on: false)
+        expect(app, "settings-notify-mentions", on: false)
+        expect(app, "settings-sender-only", on: true)
+    }
+
+    /// The rows with a value open their choices; a choice is saved, shown in the row and
+    /// closes the sheet.
+    func testTheRowsWithAValueOpenTheirChoicesAndAChoiceIsSaved() {
+        let app = connect("voice-server,outputs")
+        openSettings(app)
+
+        tapWhenReady(app.element("settings-talk-mode"))
+        expectAppears(app.row("settings-option-0", containing: "Voice activity"))
+        tapWhenReady(app.row("settings-option-1", containing: "Push-to-talk"))
+        expectGone(app.element("settings-option-1"))
+        expectAppears(app.row("settings-talk-mode", containing: "Push-to-talk"))
+
+        // A phone with an earpiece can choose where the voice plays without a headset.
+        expectAppears(app.row("settings-default-output", containing: "Loudspeaker"))
+        tapWhenReady(app.element("settings-default-output"))
+        expectAppears(app.element(containing: "Used when no headset is connected"))
+        expectAppears(app.row("settings-option-0", containing: "Ask"))
+        tapWhenReady(app.row("settings-option-2", containing: "Earpiece"))
+        expectGone(app.element("settings-option-2"))
+        expectAppears(app.row("settings-default-output", containing: "Earpiece"))
+
+        scrollTo(app.element("settings-history"), in: app)
+        tapWhenReady(app.element("settings-history"))
+        expectAppears(app.element(containing: "Older messages are deleted from this phone automatically. The server is not affected."))
+        for choice in ["Never", "7 days", "30 days", "90 days", "365 days"] {
+            expectAppears(app.element(containing: choice))
+        }
+        tapWhenReady(app.row("settings-option-3", containing: "90 days"))
+        expectGone(app.element("settings-option-3"))
+        expectAppears(app.row("settings-history", containing: "90 days"))
+
+        // Tapping beside a sheet closes it without a choice.
+        tapWhenReady(app.element("settings-history"))
+        expectAppears(app.element("settings-option-0"))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap()
+        expectGone(app.element("settings-option-0"))
+        expectAppears(app.row("settings-history", containing: "90 days"))
+
+        // The talk mode is the one of the voice view.
+        tapWhenReady(app.element("Back to More"))
+        tapWhenReady(app.element(containing: "Voice connected"))
+        expectAppears(app.element("voice-hold"))
     }
 
     /// Alone in a channel with the setting on: the app disconnects by itself when nobody
@@ -68,14 +161,5 @@ final class SettingsFlowUITests: XCTestCase {
         let app = connect("voice-server,idle-on,idle-short")
         XCTAssertFalse(app.element("session-ended-reconnect").waitForExistence(timeout: 10))
         XCTAssertTrue(app.row("channel-row", containing: "Lobby").exists)
-    }
-
-    private func waitFor(_ condition: @escaping () -> Bool) -> Bool {
-        let deadline = Date().addingTimeInterval(5)
-        while Date() < deadline {
-            if condition() { return true }
-            Thread.sleep(forTimeInterval: 0.1)
-        }
-        return condition()
     }
 }

@@ -369,10 +369,31 @@ enum Strings {
     static func blockVoice(_ p1: String) -> String { format("block_voice", p1) }
     static var blockSilent: String { text("block_silent") }
     static var blockFailed: String { text("block_failed") }
-    static var moreSectionMessages: String { text("more_section_messages") }
     static var moreBlocked: String { text("more_blocked") }
-    static var moreSenderOnly: String { text("more_sender_only") }
-    static var moreSenderOnlySub: String { text("more_sender_only_sub") }
+    static var moreActivity: String { text("more_activity") }
+    static func moreActivityNew(_ p1: Int) -> String {
+        format(p1 == 1 ? "more_activity_new.one" : "more_activity_new.other", p1)
+    }
+    static var activityTitle: String { text("activity_title") }
+    static var activityBack: String { text("activity_back") }
+    static var activityFilterAll: String { text("activity_filter_all") }
+    static var activityFilterJoins: String { text("activity_filter_joins") }
+    static var activityFilterStreams: String { text("activity_filter_streams") }
+    static var activityEmpty: String { text("activity_empty") }
+    static var activityEmptyText: String { text("activity_empty_text") }
+    static var activityEmptyFilter: String { text("activity_empty_filter") }
+    static var activityYou: String { text("activity_you") }
+    // The sentences of the activity log are templates: `activitySentence` puts the name and
+    // the place in, so that the name can be bold.
+    static var activityConnected: String { text("activity_connected") }
+    static var activityJoined: String { text("activity_joined") }
+    static var activityJoinedServer: String { text("activity_joined_server") }
+    static var activityMoved: String { text("activity_moved") }
+    static var activityMovedElsewhere: String { text("activity_moved_elsewhere") }
+    static var activityLeft: String { text("activity_left") }
+    static var activityStreamStarted: String { text("activity_stream_started") }
+    static var activityStreamStartedElsewhere: String { text("activity_stream_started_elsewhere") }
+    static var activityStreamStopped: String { text("activity_stream_stopped") }
     static var blockedTitle: String { text("blocked_title") }
     static var blockedBack: String { text("blocked_back") }
     static var blockedEmpty: String { text("blocked_empty") }
@@ -398,6 +419,23 @@ enum Strings {
     static func sessionEndedAloneText(_ p1: String) -> String { format("session_ended_alone_text", p1) }
     static var settingsTitle: String { text("settings_title") }
     static var settingsBack: String { text("settings_back") }
+    static var settingsSectionVoice: String { text("settings_section_voice") }
+    static var settingsNoiseSuppression: String { text("settings_noise_suppression") }
+    static var settingsDefaultOutput: String { text("settings_default_output") }
+    static var settingsOutputAsk: String { text("settings_output_ask") }
+    static var settingsOutputNote: String { text("settings_output_note") }
+    static var settingsSectionNotifications: String { text("settings_section_notifications") }
+    static var settingsNotifyPrivate: String { text("settings_notify_private") }
+    static var settingsNotifyMentions: String { text("settings_notify_mentions") }
+    static var settingsSenderOnly: String { text("settings_sender_only") }
+    static var settingsNotifyNote: String { text("settings_notify_note") }
+    static var settingsSectionChat: String { text("settings_section_chat") }
+    static var settingsHistory: String { text("settings_history") }
+    static var settingsHistoryNever: String { text("settings_history_never") }
+    static func settingsHistoryDays(_ p1: Int) -> String {
+        format(p1 == 1 ? "settings_history_days.one" : "settings_history_days.other", p1)
+    }
+    static var settingsHistoryNote: String { text("settings_history_note") }
     static var settingsSectionMobileData: String { text("settings_section_mobile_data") }
     static var settingsAutoplayStreams: String { text("settings_autoplay_streams") }
     static var settingsLoadMedia: String { text("settings_load_media") }

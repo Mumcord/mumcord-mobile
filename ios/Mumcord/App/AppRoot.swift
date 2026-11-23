@@ -50,8 +50,9 @@ struct AppContent: View {
         let messagesSheet = messagesLocal.blockSession != nil || messagesLocal.requestSession != nil
         let identitySheet = uiState.screen == .identities || uiState.screen == .identitySetup ? uiState.identities.sheet : nil
         let cameraQuestion = uiState.screen == .scan && uiState.identities.scan?.camera == .explain
+        let settingsSheet = model.more.local.sheet != nil
         let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
-            || identitySheet != nil || cameraQuestion
+            || settingsSheet || identitySheet != nil || cameraQuestion
         ZStack {
             screen
                 // While a sheet is open, the screen behind it is not offered to screen readers.
@@ -77,7 +78,7 @@ struct AppContent: View {
             } else if let connectedSheet {
                 ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model), model: model)
             } else if uiState.connected != nil {
-                MessagesOverlayHost(model: model)
+                MoreOverlayHost(model: model)
             }
         }
         .modifier(IdentityFiles(

@@ -153,6 +153,7 @@ final class PhoneFakes {
         store: SessionStore,
         setupStore: SetupStore,
         sessionEnded: SessionEndedNotice? = nil,
+        messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(),
         outputs: OutputAccess? = nil
     ) -> AppModel {
         AppModel(
@@ -169,6 +170,7 @@ final class PhoneFakes {
             localNetwork: localNetwork,
             openSettings: { [weak self] in self?.settingsOpened += 1 },
             sessionEnded: sessionEnded,
+            messageSettings: messageSettings,
             outputs: outputs
         )
     }

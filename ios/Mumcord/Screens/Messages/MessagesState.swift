@@ -44,8 +44,6 @@ struct MessagesLocal: Equatable {
     var requestError: ChatRequestError?
     /// The list of blocked people is open on the More tab.
     var blockedOpen = false
-    /// Notifications name the sender and leave the message out.
-    var senderOnly = false
 }
 
 /// The last message of a conversation as the list shows it.
@@ -142,7 +140,6 @@ struct MessagesUiState: Equatable {
     let sheet: MessagesSheet?
     let blocked: [BlockedRow]
     let blockedOpen: Bool
-    let senderOnly: Bool
     fileprivate let people: [UInt32: Person]
     fileprivate let sentRequests: [UInt32: Bool]
 
@@ -214,7 +211,6 @@ func messagesUiState(
         sheet: messagesSheet(server, local),
         blocked: blocked.map { BlockedRow(id: $0.id, name: $0.name, serverLabel: $0.serverLabel) },
         blockedOpen: local.blockedOpen,
-        senderOnly: local.senderOnly,
         people: server.people,
         sentRequests: sentRequests
     )

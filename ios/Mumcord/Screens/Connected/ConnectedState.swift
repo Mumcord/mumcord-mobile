@@ -179,8 +179,6 @@ struct ConnectedLocal: Equatable {
     var whisperHeld = false
     /// The choice of the audio output is open.
     var outputOpen = false
-    /// The settings are open in the More tab.
-    var settingsOpen = false
     /// The moderation step that replaced the person sheet: move, kick or ban.
     var moderation: ModerationLocal?
 }
@@ -242,8 +240,6 @@ struct ConnectedUiState: Equatable {
     /// user is.
     let voice: VoiceUiState?
     let sheet: ConnectedSheet?
-    /// The phone settings while the settings screen is open in the More tab.
-    let settings: MobileSettings?
 }
 
 /// The connected screens as a value, or nil while no server is shown.
@@ -334,7 +330,6 @@ func connectedUiState(
             microphone: microphone,
             output: output.current
         ),
-        sheet: sheet,
-        settings: local.settingsOpen ? session.mobileSettings : nil
+        sheet: sheet
     )
 }

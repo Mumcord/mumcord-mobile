@@ -137,13 +137,6 @@ final class AppScreenshotUITests: XCTestCase {
         capture(app, "channel-search", theme: theme)
     }
 
-    private func more(theme: String) {
-        let app = launchConnected("servers", theme: theme)
-        tapWhenReady(app.element("More"))
-        expectAppears(app.element("more-disconnect"))
-        capture(app, "more", theme: theme)
-    }
-
     private func tabEmpty(theme: String) {
         let app = launchConnected("servers", theme: theme)
         tapWhenReady(app.element("Messages"))
@@ -239,14 +232,6 @@ final class AppScreenshotUITests: XCTestCase {
 
     func testChannelSearchLight() {
         channelSearch(theme: "light")
-    }
-
-    func testMoreDark() {
-        more(theme: "dark")
-    }
-
-    func testMoreLight() {
-        more(theme: "light")
     }
 
     func testTabEmptyDark() {

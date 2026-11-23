@@ -35,6 +35,8 @@ final class AppModel {
     @ObservationIgnored let chatStore: ChatStore
     /// The Messages tab: conversations, requests, blocking. Read only by its own views.
     @ObservationIgnored let messages: MessagesController
+    /// The More tab: the activity log and the settings. Read only by its own views.
+    @ObservationIgnored let more: MoreController
     /// The identity screens and "Scan from desktop app".
     @ObservationIgnored let identities: IdentitiesController
     /// The camera permission, for the scanner and the chat's "Take photo".
@@ -50,9 +52,6 @@ final class AppModel {
     @ObservationIgnored let outputs: OutputAccess
     /// "Disconnect when alone": the notice after the app disconnected by itself.
     @ObservationIgnored let idle: IdleAccess?
-    /// The last change of the phone settings; the next one waits for it, so that two switches
-    /// flipped quickly do not save over each other.
-    @ObservationIgnored var settingsSave: Task<Void, Never>?
     /// The last connect, so "Try again" and the password retry keep a link's channel.
     @ObservationIgnored private var lastTarget: ConnectTarget?
 
@@ -96,7 +95,8 @@ final class AppModel {
         self.chatStore = chatStore
         chat = ChatController(chats: chatStore)
         conversation = ChatController(chats: chatStore, keepDraft: false)
-        messages = MessagesController(store: store, chats: chatStore, settings: messageSettings)
+        messages = MessagesController(store: store, chats: chatStore)
+        more = MoreController(store: store, messageSettings: messageSettings)
         self.camera = camera
         self.qrSource = qrSource
         identities = IdentitiesController(store: store, camera: camera)
@@ -143,6 +143,7 @@ final class AppModel {
         }
         messages.showMessagesTab = { [weak self] in self?.showTab(.messages) }
         messages.dismissConnectedSheet = { [weak self] in self?.dismissSheet() }
+        more.switchTalkMode = { [weak self] in self?.switchTalkMode($0) }
         let levels = store.inputLevels()
         Task { [inputLevel] in
             for await percent in levels {
@@ -219,6 +220,15 @@ final class AppModel {
         messages.uiState(session: session, notificationsGranted: notificationState.granted)
     }
 
+    /// The More tab as a value, or nil while no server is shown. Only its own views read it.
+    var moreUiState: MoreUiState? {
+        more.uiState(
+            session: session,
+            serverName: local.activeServerName(session) ?? "",
+            output: outputNotice.state
+        )
+    }
+
     /// The open private conversation as a value, or nil while there is none to show.
     func conversationUiState(calendar: Calendar) -> ChatUiState? {
         guard let state = messagesUiState, let open = state.open else { return nil }
@@ -243,6 +253,7 @@ final class AppModel {
         connectedLocal.voiceOpen = false
         closePerson()
         connectedLocal.menuChannelId = nil
+        more.closeSheet()
         connectedLocal.tab = tab
         syncChat()
     }

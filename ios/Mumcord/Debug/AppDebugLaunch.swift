@@ -39,6 +39,9 @@ import MumcordBridge
 ///         idle-on          "Disconnect when alone for 30 minutes" is switched on
 ///         idle-short       "Disconnect when alone" warns after 3 s and disconnects 3 s later
 ///         metered          the phone is on mobile data (a metered network), not on Wi-Fi
+///         activity         the activity log of the mockup: yesterday evening and today
+///         activity-live    a second after the activity log was opened Ben joins the Lobby; a
+///                          second after it was left again Mira stops her screen share
 ///         no-identity      the phone has no identity yet, so the first start asks for one
 ///         two-identities   besides the default identity "Lea" there is "Work"
 ///         file-password    every identity file has the password "secret" (otherwise none)
@@ -138,6 +141,9 @@ struct AppDebugLaunch {
             }
             if options.contains("idle-on") {
                 engine.storedMobileSettings.idleDisconnect = true
+            }
+            if options.contains("activity") {
+                engine.activityOnConnect = ActivityMockup.entries()
             }
             if options.contains("level") {
                 engine.levelOnConnect = 60
@@ -280,7 +286,16 @@ extension AppDebugLaunch {
 
     @MainActor
     func makeModel() -> AppModel {
-        let store = SessionStore(engineFactory: engineFactory, log: AppLog.write)
+        let factory = engineFactory
+        let engine = Observed<FakeEngine?>(nil)
+        let store = SessionStore(
+            engineFactory: { listener in
+                let created = try factory(listener)
+                engine.set(created as? FakeEngine)
+                return created
+            },
+            log: AppLog.write
+        )
         let monitor = FakeNetworkMonitor(network)
         Self.networkSession = NetworkSession(store: store, monitor: monitor)
         let idleTimes = idleTimes
@@ -319,7 +334,25 @@ extension AppDebugLaunch {
         if options.contains("chat") {
             presetChat(model, store)
         }
+        if options.contains("activity-live") {
+            reportLiveActivity(model, engine)
+        }
         return model
+    }
+
+    /// Lets the engine report activity at the moments a test waits for it: while the log is
+    /// open, and after it was left again.
+    @MainActor
+    private func reportLiveActivity(_ model: AppModel, _ engine: Observed<FakeEngine?>) {
+        Task { @MainActor in
+            for (page, entry) in [(MorePage.activity, ActivityMockup.benJoins), (.main, ActivityMockup.miraStops)] {
+                while model.more.local.page != page {
+                    try? await Task.sleep(nanoseconds: 50_000_000)
+                }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                engine.value?.emit(.activityAdded(entry: entry(Date())))
+            }
+        }
     }
 
     /// Puts the Chat tab into the state the options name once its messages are there, through

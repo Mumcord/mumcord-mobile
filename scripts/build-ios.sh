@@ -67,12 +67,13 @@ group_tests() {
       printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests ;;
     chat-flow)
       printf '%s\n' MumcordUITests/ChatFlowUITests MumcordUITests/SessionEndedUITests \
-        MumcordUITests/ModerationFlowUITests MumcordUITests/ModerationScreenshotUITests ;;
+        MumcordUITests/ModerationFlowUITests MumcordUITests/ModerationScreenshotUITests \
+        MumcordUITests/ActivityFlowUITests ;;
     messages)
       printf '%s\n' MumcordUITests/MessagesFlowUITests MumcordUITests/MessagesScreenshotUITests ;;
     output-settings)
       printf '%s\n' MumcordUITests/OutputFlowUITests MumcordUITests/PhoneScreenshotUITests \
-        MumcordUITests/SettingsFlowUITests ;;
+        MumcordUITests/SettingsFlowUITests MumcordUITests/MoreScreenshotUITests ;;
     identities)
       printf '%s\n' MumcordUITests/IdentitiesFlowUITests MumcordUITests/IdentitiesScreenshotUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;

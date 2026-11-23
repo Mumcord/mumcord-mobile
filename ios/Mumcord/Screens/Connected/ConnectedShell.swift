@@ -11,7 +11,7 @@ struct ConnectedShell<Chat: View>: View {
     let onDisconnect: () -> Void
     /// Unread messages of the current channel's chat, shown on the Chat tab.
     let chatBadge: Int
-    /// For the Messages tab and the messages part of More, which read their own state.
+    /// For the Messages tab and the More tab, which read their own state.
     let model: AppModel
     @ViewBuilder let chat: () -> Chat
 
@@ -75,13 +75,7 @@ struct ConnectedShell<Chat: View>: View {
         case .messages:
             MessagesTab(model: model)
         case .more:
-            if let settings = state.settings {
-                SettingsScreen(settings: settings, onChange: model.changeSettings, onBack: model.closeSettingsScreen)
-            } else {
-                MoreBlockedHost(model: model) {
-                    MoreScreen(serverName: state.serverName, model: model, onDisconnect: onDisconnect)
-                }
-            }
+            MoreTab(model: model, onDisconnect: onDisconnect)
         }
     }
 }
@@ -159,51 +153,5 @@ private enum MessagesTabItem {
             badge: badge > 0 ? String(badge) : nil,
             accessibilityLabel: badge > 0 ? Strings.messagesTabUnread(badge) : nil
         )
-    }
-}
-
-private struct MoreScreen: View {
-    let serverName: String
-    let model: AppModel
-    let onDisconnect: () -> Void
-    @Environment(\.mumcordTheme) private var theme
-
-    var body: some View {
-        VStack(spacing: 0) {
-            MumcordAppBar(title: Strings.tabMore, large: true)
-            MumcordList {
-                MumcordListRow(
-                    title: Strings.settingsTitle,
-                    icon: MumcordIcons.settings,
-                    action: model.openSettingsScreen,
-                    trailing: {
-                        MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted)
-                    }
-                )
-                .accessibilityIdentifier("more-settings")
-                MumcordListRow(
-                    title: Strings.identitiesTitle,
-                    icon: MumcordIcons.key,
-                    divider: true,
-                    action: model.identities.open,
-                    trailing: {
-                        MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted)
-                    }
-                )
-                .accessibilityIdentifier("more-identities")
-            }
-            .padding(.bottom, MumcordSpace.s4)
-            MoreMessagesSection(model: model)
-            MumcordList {
-                MumcordListRow(
-                    title: Strings.moreDisconnect(serverName),
-                    icon: MumcordIcons.phoneOff,
-                    danger: true,
-                    action: onDisconnect
-                )
-                .accessibilityIdentifier("more-disconnect")
-            }
-            Spacer(minLength: 0)
-        }
     }
 }

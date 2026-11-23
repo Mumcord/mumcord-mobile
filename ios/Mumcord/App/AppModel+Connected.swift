@@ -104,25 +104,4 @@ extension AppModel {
     func dismissDenied() {
         store.dismissDenied()
     }
-
-    // MARK: Settings
-
-    /// Opens the settings in the More tab.
-    func openSettingsScreen() {
-        connectedLocal.settingsOpen = true
-    }
-
-    func closeSettingsScreen() {
-        connectedLocal.settingsOpen = false
-    }
-
-    /// Saves a change of the phone settings at once. A failure is logged by the store; the
-    /// switch then shows what the engine still has.
-    func changeSettings(_ change: @escaping @Sendable (inout MobileSettings) -> Void) {
-        let previous = settingsSave
-        settingsSave = Task { [store] in
-            await previous?.value
-            _ = await store.updateMobileSettings(change)
-        }
-    }
 }

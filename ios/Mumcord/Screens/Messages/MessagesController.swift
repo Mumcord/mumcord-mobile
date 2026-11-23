@@ -5,8 +5,7 @@ import MumcordBridge
 import Observation
 
 /// What the user does with private messages: the conversation list, message requests, starting
-/// a conversation, chat requests, blocking, and the "Show sender only" switch. The messages of
-/// the open conversation are the business of a `ChatController` that follows `local.open`.
+/// a conversation, chat requests and blocking. The messages of the open conversation are the business of a `ChatController` that follows `local.open`.
 ///
 /// An object of its own, apart from `AppModel`, like the chat: the conversation list changes
 /// with every private message, which must not redraw the channel list.
@@ -30,13 +29,10 @@ final class MessagesController {
 
     @ObservationIgnored private let store: SessionStore
     @ObservationIgnored private let chats: ChatStore
-    @ObservationIgnored private let settings: MessageNotificationSettings
 
-    init(store: SessionStore, chats: ChatStore, settings: MessageNotificationSettings) {
+    init(store: SessionStore, chats: ChatStore) {
         self.store = store
         self.chats = chats
-        self.settings = settings
-        local.senderOnly = settings.senderOnly
         let states = store.states()
         Task { [weak self] in
             var shown = false
@@ -45,11 +41,7 @@ final class MessagesController {
                 guard let self else { return }
                 if state.showsServer != shown {
                     shown = state.showsServer
-                    if !shown {
-                        var fresh = MessagesLocal()
-                        fresh.senderOnly = self.local.senderOnly
-                        self.local = fresh
-                    }
+                    if !shown { self.local = MessagesLocal() }
                 }
                 // Who is online is part of the conversation list, which has no event of its own.
                 let now = Set((state.server?.people ?? [:]).keys)
@@ -86,13 +78,6 @@ final class MessagesController {
         Task { [weak self] in
             for await counts in unreadStates {
                 self?.unread = counts
-            }
-        }
-        // The setting is read from the engine, which can take longer than drawing the switch.
-        let senderOnlyStates = settings.senderOnlyStates()
-        Task { [weak self] in
-            for await senderOnly in senderOnlyStates {
-                self?.local.senderOnly = senderOnly
             }
         }
     }
@@ -285,11 +270,5 @@ final class MessagesController {
         local.requestSession = nil
         local.requestNote = ""
         local.requestError = nil
-    }
-
-    // MARK: Notifications
-
-    func setSenderOnly(_ senderOnly: Bool) {
-        settings.setSenderOnly(senderOnly)
     }
 }
