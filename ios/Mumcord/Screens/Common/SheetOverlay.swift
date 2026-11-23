@@ -34,10 +34,15 @@ struct SheetOverlay<Content: View>: View {
                 .onTapGesture { onDismiss?() }
                 .accessibilityHidden(true)
             MumcordSheetFrame(title: title) {
-                // As tall as its content, scrolling only when that does not fit.
-                ViewThatFits(in: .vertical) {
-                    column
-                    ScrollView { column }
+                // As tall as its content, scrolling only when that does not fit. It is the same
+                // scroll view in both cases: a sheet that changed its views when the keyboard
+                // takes away space would take the focus from the field being typed in.
+                FittedHeight {
+                    // The focus ring of a text field lies outside the field, where a scroll
+                    // view cuts off.
+                    ScrollView { column.padding(.horizontal, Self.ringInset) }
+                        .scrollBounceBehavior(.basedOnSize)
+                        .padding(.horizontal, -Self.ringInset)
                 }
             }
             .accessibilityElement(children: .contain)
@@ -48,9 +53,24 @@ struct SheetOverlay<Content: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private static var ringInset: CGFloat { 2 }
+
     private var column: some View {
         VStack(alignment: .leading, spacing: MumcordSpace.s3) { content }
             .padding(.bottom, MumcordSpace.s2)
+    }
+}
+
+/// Gives its one view the height that view asks for, or the height there is when that is less.
+private struct FittedHeight: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let view = subviews.first else { return .zero }
+        let wanted = view.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        return CGSize(width: wanted.width, height: min(wanted.height, proposal.height ?? wanted.height))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, proposal: ProposedViewSize(bounds.size))
     }
 }
 
