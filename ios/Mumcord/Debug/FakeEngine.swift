@@ -113,6 +113,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _noiseSuppression = false
     private var _voiceSettingsFailure: BridgeError?
     private var _mobileSettingsSaveDelay: Duration?
+    private var _settingsSaveFailure: BridgeError?
     private var _activityOnConnect: [ActivityEntry] = []
     /// The user's own mute before a deafen, which comes back when the deafen ends.
     private var _identities: [Identity]
@@ -780,6 +781,12 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         set { locked { _appSettings = newValue } }
     }
 
+    /// Thrown by the next `setMobileSettings` or `setAppSettings`.
+    var settingsSaveFailure: BridgeError? {
+        get { locked { _settingsSaveFailure } }
+        set { locked { _settingsSaveFailure = newValue } }
+    }
+
     /// How long `setMobileSettings` takes, for two changes that meet in the engine.
     var mobileSettingsSaveDelay: Duration? {
         get { locked { _mobileSettingsSaveDelay } }
@@ -929,7 +936,13 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func setMobileSettings(settings: MobileSettings) async throws {
         if let delay = mobileSettingsSaveDelay { try await Task.sleep(for: delay) }
-        locked { _mobileSettings = settings }
+        try locked {
+            if let failure = _settingsSaveFailure {
+                _settingsSaveFailure = nil
+                throw failure
+            }
+            _mobileSettings = settings
+        }
     }
 
     func appSettings() -> AppSettings {
@@ -938,7 +951,13 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     /// As the engine: the saved settings arrive as an event.
     func setAppSettings(settings: AppSettings) async throws {
-        locked { _appSettings = settings }
+        try locked {
+            if let failure = _settingsSaveFailure {
+                _settingsSaveFailure = nil
+                throw failure
+            }
+            _appSettings = settings
+        }
         emit(.appSettingsChanged(settings: settings))
     }
 

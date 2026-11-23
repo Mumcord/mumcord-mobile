@@ -203,6 +203,42 @@ final class MoreControllerTests: XCTestCase {
         XCTAssertFalse(engine.noiseSuppression)
     }
 
+    func testAPhoneSettingThatCannotBeSavedStaysAsItWasAndIsReported() async {
+        let model = await makeConnected()
+        model.more.openSettings()
+        await assertEventually { self.settings(model) != nil }
+        let before = engine.storedMobileSettings
+        XCTAssertNil(model.uiState.connected?.denied)
+
+        engine.settingsSaveFailure = .Internal(detail: "disk full")
+        model.more.changeMobile { $0.idleDisconnect = true }
+        await assertEventually { model.uiState.connected?.denied != nil }
+        XCTAssertEqual(engine.storedMobileSettings, before)
+        XCTAssertEqual(settings(model)?.mobile, before, "the switch shows what is stored")
+
+        model.more.changeMobile { $0.idleDisconnect = true }
+        await assertEventually { self.settings(model)?.mobile.idleDisconnect == true }
+        XCTAssertTrue(engine.storedMobileSettings.idleDisconnect, "the next change is saved again")
+    }
+
+    func testASharedSettingThatCannotBeSavedStaysAsItWasAndIsReported() async {
+        let model = await makeConnected()
+        model.more.openSettings()
+        await assertEventually { self.settings(model) != nil }
+        let before = engine.storedAppSettings
+        XCTAssertNil(model.uiState.connected?.denied)
+
+        engine.settingsSaveFailure = .Internal(detail: "disk full")
+        model.more.changeApp { $0.notifyMentions = false }
+        await assertEventually { model.uiState.connected?.denied != nil }
+        XCTAssertEqual(engine.storedAppSettings, before)
+        XCTAssertEqual(settings(model)?.app, before, "the switch shows what is stored")
+
+        model.more.changeApp { $0.notifyMentions = false }
+        await assertEventually { self.settings(model)?.app.notifyMentions == false }
+        XCTAssertFalse(engine.storedAppSettings.notifyMentions, "the next change is saved again")
+    }
+
     func testVoiceSettingsThatCannotBeReadAreReportedAndTheRowStaysAway() async {
         let model = await makeConnected(configure: { $0.voiceSettingsFailure = .Internal(detail: "disk full") })
         model.more.openSettings()
