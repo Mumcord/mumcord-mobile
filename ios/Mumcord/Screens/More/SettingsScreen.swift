@@ -4,6 +4,7 @@ import MumcordBridge
 import SwiftUI
 
 private let levelMeterWidth: CGFloat = 120
+private let settingsFigureSize: CGFloat = 30
 /// The talk modes and default outputs in the order of their sheets.
 private let talkModes: [TalkMode] = [.voiceActivity, .pushToTalk]
 private let defaultOutputs: [DefaultOutput] = [.ask, .speaker, .earpiece]
@@ -22,31 +23,46 @@ struct SettingsScreen: View {
         VStack(spacing: 0) {
             MumcordAppBar(title: Strings.settingsTitle, onBack: actions.back, backLabel: Strings.settingsBack)
             ScrollView {
-                VStack(spacing: 0) {
-                    voice
-                    mobileData
-                    MumcordSectionHeader(title: Strings.settingsSectionBattery)
-                    MumcordList {
-                        SettingsSwitchRow(
-                            title: Strings.settingsIdleDisconnect,
-                            subtitle: Strings.settingsIdleDisconnectSub,
-                            icon: MumcordIcons.phoneOff,
-                            checked: state.mobile.idleDisconnect,
-                            id: "settings-idle-disconnect"
-                        ) { on in actions.changeMobile { $0.idleDisconnect = on } }
+                // At least as tall as the list's own space, so the figure below never shows at rest.
+                ZStack(alignment: .top) {
+                    Color.clear.containerRelativeFrame(.vertical)
+                    VStack(spacing: 0) {
+                        voice
+                        mobileData
+                        MumcordSectionHeader(title: Strings.settingsSectionBattery)
+                        MumcordList {
+                            SettingsSwitchRow(
+                                title: Strings.settingsIdleDisconnect,
+                                subtitle: Strings.settingsIdleDisconnectSub,
+                                icon: MumcordIcons.phoneOff,
+                                checked: state.mobile.idleDisconnect,
+                                id: "settings-idle-disconnect"
+                            ) { on in actions.changeMobile { $0.idleDisconnect = on } }
+                        }
+                        notifications
+                        MumcordSectionHeader(title: Strings.settingsSectionChat)
+                        MumcordList {
+                            SettingsValueRow(
+                                title: Strings.settingsHistory,
+                                value: historyAgeText(state.app.historyMaxAgeDays),
+                                icon: MumcordIcons.trash,
+                                id: "settings-history"
+                            ) { actions.openSheet(.historyAge) }
+                        }
                     }
-                    notifications
-                    MumcordSectionHeader(title: Strings.settingsSectionChat)
-                    MumcordList {
-                        SettingsValueRow(
-                            title: Strings.settingsHistory,
-                            value: historyAgeText(state.app.historyMaxAgeDays),
-                            icon: MumcordIcons.trash,
-                            id: "settings-history"
-                        ) { actions.openSheet(.historyAge) }
-                    }
+                    .padding(.bottom, MumcordSpace.s4)
                 }
-                .padding(.bottom, MumcordSpace.s4)
+                // A small hidden figure below the end of the settings: it shows only while the
+                // list is pulled past its end. Decorative, it has no function.
+                .overlay(alignment: .bottom) {
+                    Image("SettingsFigure")
+                        .resizable()
+                        .interpolation(.none)
+                        .frame(width: settingsFigureSize, height: settingsFigureSize)
+                        .offset(y: settingsFigureSize + MumcordSpace.s2)
+                        .accessibilityHidden(true)
+                        .allowsHitTesting(false)
+                }
             }
         }
         .accessibilityIdentifier("settings")
