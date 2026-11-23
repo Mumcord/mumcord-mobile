@@ -85,6 +85,51 @@ final class SessionReducerTests: XCTestCase {
         XCTAssertEqual(state.fold(.mobileSettingsChanged(settings: settings)).mobileSettings, settings)
     }
 
+    private func activity(_ id: UInt64, _ kind: ActivityKind = .joined) -> BridgeEvent {
+        .activityAdded(entry: ActivityEntry(
+            id: id,
+            kind: kind,
+            session: 20,
+            name: "Anna",
+            isSelf: false,
+            channelId: 1,
+            channelName: "Lobby",
+            atMs: Int64(id)
+        ))
+    }
+
+    func testTheActivityLogIsKeptNewestFirstForTheConnectionOnly() {
+        let state = fold(connected + [activity(1, .connected), activity(2), activity(3, .moved)])
+        XCTAssertEqual(state.activity.map(\.id), [3, 2, 1])
+
+        // As the bridge: a sync after a reconnect starts the log again, the end of a
+        // connection forgets it.
+        XCTAssertEqual(state.fold(.serverSynced(server: server)).activity, [])
+        XCTAssertEqual(state.fold(.connectionChanged(state: .disconnected(error: nil))).activity, [])
+        // While the engine tries to get back in, the log stays.
+        let reconnecting = state.fold(.connectionChanged(state: .reconnecting(attempt: 1, maxAttempts: 5, nextRetrySecs: 1)))
+        XCTAssertEqual(reconnecting.activity.map(\.id), [3, 2, 1])
+    }
+
+    func testTheActivityLogKeepsAsManyEntriesAsTheBridge() {
+        let state = (1...UInt64(maxActivity + 5)).reduce(fold(connected)) { state, id in state.fold(activity(id)) }
+        XCTAssertEqual(state.activity.count, maxActivity)
+        XCTAssertEqual(state.activity.first?.id, UInt64(maxActivity + 5))
+        XCTAssertEqual(state.activity.last?.id, 6)
+    }
+
+    func testTheSharedSettingsFollowTheEngine() {
+        let settings = AppSettings(
+            language: nil,
+            linkPreviews: true,
+            historyMaxAgeDays: 30,
+            notifyPrivateMessages: false,
+            notifyMentions: true
+        )
+        XCTAssertNil(SessionState().appSettings, "not known before they were read")
+        XCTAssertEqual(SessionState().fold(.appSettingsChanged(settings: settings)).appSettings, settings)
+    }
+
     func testANewSessionIsIdleAndShowsNoServer() {
         let state = SessionState()
         XCTAssertEqual(state.phase, .idle)

@@ -18,9 +18,10 @@ final class SessionStoreTests: XCTestCase {
     private let box = EngineBox()
 
     private var idle: SessionState {
-        // Loading the servers also reads the phone settings of the engine that was created.
+        // Loading the servers also reads the settings of the engine that was created.
         var state = SessionState(servers: [saved], serversLoaded: true)
         state.mobileSettings = box.engines.last?.mobileSettings()
+        state.appSettings = box.engines.last?.appSettings()
         state.identities = box.engines.last?.savedIdentities()
         return state
     }

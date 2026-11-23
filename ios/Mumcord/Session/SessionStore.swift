@@ -210,6 +210,14 @@ final class SessionStore: @unchecked Sendable {
                     return next
                 }
             }
+            if case .ok(let settings) = await call("app settings", { $0.appSettings() }) {
+                update { state in
+                    if state.appSettings != nil { return state }
+                    var next = state
+                    next.appSettings = settings
+                    return next
+                }
+            }
         case .failed(let error):
             update { state in
                 var next = state
@@ -652,6 +660,39 @@ final class SessionStore: @unchecked Sendable {
             }
         }
         return saved
+    }
+
+    /// Reads the settings shared with the desktop (notifications, chat history), changes them
+    /// and saves the result, as `updateMobileSettings` does for the phone settings.
+    func updateAppSettings(_ change: (inout AppSettings) -> Void) async -> Outcome<Void> {
+        let read = await call("app settings") { $0.appSettings() }
+        guard case .ok(var settings) = read else {
+            if case .failed(let error) = read { return .failed(error) }
+            return .failed(.internalError)
+        }
+        change(&settings)
+        let changed = settings
+        let saved: Outcome<Void> = await call("set app settings") {
+            try await $0.setAppSettings(settings: changed)
+        }
+        if case .ok = saved {
+            update { state in
+                var next = state
+                next.appSettings = changed
+                return next
+            }
+        }
+        return saved
+    }
+
+    /// The voice settings as they apply now, or nil when they cannot be read.
+    func voiceSettings() async -> VoiceSettings? {
+        await call("voice settings") { try await $0.voiceSettings() }.value
+    }
+
+    /// Saves whether noise suppression runs; the engine applies it at once.
+    func setNoiseSuppression(_ on: Bool) async -> Outcome<Void> {
+        await call("set noise suppression") { try await $0.setNoiseSuppression(on: on) }
     }
 
     /// Runs a command on the engine, creating it on first use. `name` is what the log calls it.

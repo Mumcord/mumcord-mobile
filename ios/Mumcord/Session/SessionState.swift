@@ -28,6 +28,10 @@ struct SessionState: Equatable {
     var talkMode = TalkMode.voiceActivity
     /// The phone settings as the engine keeps them; nil until they have been read.
     var mobileSettings: MobileSettings?
+    /// The settings shared with the desktop's settings model; nil until they have been read.
+    var appSettings: AppSettings?
+    /// The activity log of the connection (Spec 11), newest first, at most `maxActivity`.
+    var activity: [ActivityEntry] = []
     /// Which of the phone's speaker and microphone the engine needs right now.
     var audio = AudioWanted(capture: false, playback: false)
 
@@ -138,6 +142,9 @@ struct UnsupportedHint: Equatable, Identifiable {
     let personName: String
     let kind: UnsupportedKind
 }
+
+/// As many entries as the bridge keeps for a connection.
+let maxActivity = 200
 
 /// How many hints stay visible; older ones make room so the list stays calm.
 let maxHints = 3

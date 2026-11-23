@@ -103,6 +103,16 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         notifySenderOnly: false,
         updateCheck: true
     )
+    private var _appSettings = AppSettings(
+        language: nil,
+        linkPreviews: true,
+        historyMaxAgeDays: nil,
+        notifyPrivateMessages: true,
+        notifyMentions: true
+    )
+    private var _noiseSuppression = false
+    private var _voiceSettingsFailure: BridgeError?
+    private var _activityOnConnect: [ActivityEntry] = []
     /// The user's own mute before a deafen, which comes back when the deafen ends.
     private var _identities: [Identity]
     private var nextIdentityId: Int64
@@ -764,6 +774,29 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         set { locked { _mobileSettings = newValue } }
     }
 
+    var storedAppSettings: AppSettings {
+        get { locked { _appSettings } }
+        set { locked { _appSettings = newValue } }
+    }
+
+    /// Whether the engine has noise suppression switched on.
+    var noiseSuppression: Bool {
+        get { locked { _noiseSuppression } }
+        set { locked { _noiseSuppression = newValue } }
+    }
+
+    /// While set, reading the voice settings and switching noise suppression fail with it.
+    var voiceSettingsFailure: BridgeError? {
+        get { locked { _voiceSettingsFailure } }
+        set { locked { _voiceSettingsFailure = newValue } }
+    }
+
+    /// The activity entries the engine reports right after the server's channels, oldest first.
+    var activityOnConnect: [ActivityEntry] {
+        get { locked { _activityOnConnect } }
+        set { locked { _activityOnConnect = newValue } }
+    }
+
     /// The engine found a message worth a system notification.
     func notify(_ notification: ChatNotification) {
         emit(.chatNotification(notification: notification))
@@ -889,6 +922,36 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func setMobileSettings(settings: MobileSettings) async throws {
         locked { _mobileSettings = settings }
+    }
+
+    func appSettings() -> AppSettings {
+        locked { _appSettings }
+    }
+
+    /// As the engine: the saved settings arrive as an event.
+    func setAppSettings(settings: AppSettings) async throws {
+        locked { _appSettings = settings }
+        emit(.appSettingsChanged(settings: settings))
+    }
+
+    func voiceSettings() async throws -> VoiceSettings {
+        try locked {
+            if let failure = _voiceSettingsFailure { throw failure }
+            return VoiceSettings(
+                talkMode: _talkMode,
+                noiseSuppression: _noiseSuppression,
+                autoGain: true,
+                echoCancellation: .system,
+                bitrateLimitKbps: _bitrateLimits.last ?? nil
+            )
+        }
+    }
+
+    func setNoiseSuppression(on: Bool) async throws {
+        try locked {
+            if let failure = _voiceSettingsFailure { throw failure }
+            _noiseSuppression = on
+        }
     }
 
     func setBitrateLimitKbps(kbps: UInt32?) {
@@ -1045,6 +1108,9 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private func finishConnecting() {
         emit(.connectionChanged(state: .connected))
         emit(.serverSynced(server: server))
+        for entry in activityOnConnect {
+            emit(.activityAdded(entry: entry))
+        }
         emit(.audioWantedChanged(audio: audioOnConnect))
         if let level = levelOnConnect {
             emit(.inputLevelChanged(percent: level))

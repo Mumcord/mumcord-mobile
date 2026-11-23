@@ -65,6 +65,12 @@ protocol EngineClient: AnyObject, Sendable {
     func unblockPerson(id: Int64) async throws
     func mobileSettings() -> MobileSettings
     func setMobileSettings(settings: MobileSettings) async throws
+    /// The settings shared with the desktop's settings model (notifications, chat history).
+    func appSettings() -> AppSettings
+    func setAppSettings(settings: AppSettings) async throws
+    /// The voice settings as they apply now; they have no event of their own.
+    func voiceSettings() async throws -> VoiceSettings
+    func setNoiseSuppression(on: Bool) async throws
 
     /// Every identity, the default one first, as they are when asked; later changes arrive as
     /// events. Certificates and keys never leave the engine.

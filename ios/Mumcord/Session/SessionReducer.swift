@@ -18,6 +18,7 @@ extension SessionState {
                 next.channelPassword = nil
                 next.denied = nil
                 next.hints = []
+                next.activity = []
             case .connecting:
                 next.phase = .connecting
             case .connected:
@@ -33,7 +34,9 @@ extension SessionState {
                 fingerprint: prompt.fingerprint,
                 previousFingerprint: prompt.previousFingerprint
             )
+        // A sync starts the activity log again, as the bridge does; its "connected" entry follows.
         case .serverSynced(let server):
+            next.activity = []
             next.server = ServerModel(
                 selfSession: server.selfSession,
                 channels: Dictionary(server.channels.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }),
@@ -86,8 +89,12 @@ extension SessionState {
             next.mobileSettings = settings
         case .identitiesChanged(let identities):
             next.identities = identities
-        // Profile, activity log, settings and theme screens (task 8.6) follow these themselves.
-        case .profileChanged, .activityAdded, .appSettingsChanged, .themesChanged:
+        case .appSettingsChanged(let settings):
+            next.appSettings = settings
+        case .activityAdded(let entry):
+            next.activity = Array(([entry] + activity).prefix(maxActivity))
+        // The profile and theme screens (task 8.6) follow these themselves.
+        case .profileChanged, .themesChanged:
             break
         // Messages and unread counts go to `ChatStore` and never reach this state. The rest
         // belongs to the Messages tab.
