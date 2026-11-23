@@ -67,6 +67,26 @@ final class ChatControllerTests: XCTestCase {
         )
     }
 
+    func testAControllerThatDoesNotKeepDraftsStartsTheNextChatEmpty() async {
+        let store = makeStore(box, server: mockupServer(), servers: [savedServer(1, "Nordlicht")])
+        let conversation = ChatController(chats: ChatStore(session: store), keepDraft: false)
+        await store.loadServers()
+        await store.connectServer(1, password: nil, channelPath: [])
+        await assertEventually { store.state.showsServer }
+        let anna = ChatId.person(certHash: "hash-anna")
+        let ben = ChatId.person(certHash: "hash-ben")
+
+        conversation.open(anna)
+        conversation.changeDraft("half a sentence", cursor: 15)
+        conversation.open(anna)
+        XCTAssertEqual(conversation.local.draft, "half a sentence", "the same chat keeps what was typed")
+
+        conversation.open(ben)
+        XCTAssertEqual(conversation.local.chat, ben)
+        XCTAssertEqual(conversation.local.draft, "", "the text was for somebody else")
+        XCTAssertEqual(conversation.local.cursor, 0)
+    }
+
     // MARK: History
 
     func testOpeningAChatShowsItsNewestPage() async throws {
