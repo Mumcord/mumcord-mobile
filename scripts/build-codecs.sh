@@ -31,9 +31,9 @@ set -euo pipefail
 LIBVPX_VERSION="1.15.2"
 LIBVPX_URL="https://github.com/webmproject/libvpx/archive/refs/tags/v${LIBVPX_VERSION}.tar.gz"
 LIBVPX_SHA256="26fcd3db88045dee380e581862a6ef106f49b74b6396ee95c2993a260b4636aa"
-DAV1D_VERSION="1.5.4"
+DAV1D_VERSION="1.5.5"
 DAV1D_URL="https://code.videolan.org/videolan/dav1d/-/archive/${DAV1D_VERSION}/dav1d-${DAV1D_VERSION}.tar.gz"
-DAV1D_SHA256="a1d5b63d2d38ec9bd03acf643caa51fa22edd1e89c5a109c4807717216bbec07"
+DAV1D_SHA256="76ad07ab121d68407b64a6f50f540c90ca0b066d178bdc9adbea14acf4ce25a9"
 
 # Lowest Android version (minSdk, scripts/build-android.sh) and iOS version (deployment target,
 # ios/project.yml) the app supports: the libraries must not use anything newer.

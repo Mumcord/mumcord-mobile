@@ -105,7 +105,7 @@ for these implementations of WebM shall terminate as of the date such
 litigation is filed.
 
 --------------------------------------------------------------------------------
-dav1d 1.5.4 (AV1 video decoder, built into the engine library by scripts/build-codecs.sh)
+dav1d 1.5.5 (AV1 video decoder, built into the engine library by scripts/build-codecs.sh)
 --------------------------------------------------------------------------------
 
 License: BSD 2-Clause License (BSD-2-Clause)
