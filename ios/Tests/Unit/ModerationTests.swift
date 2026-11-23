@@ -220,4 +220,18 @@ final class ModerationTests: XCTestCase {
         XCTAssertEqual(moderationFailure(.notConnected), .disconnected)
         XCTAssertEqual(moderationFailure(.internalError, refusal: "ignored"), .failed)
     }
+
+    func testARefusalIsCutByItsSizeAndNotByItsLetters() {
+        // Any number of combining marks stack on one letter and count as a single character.
+        let stacked = "e" + String(repeating: "\u{0301}", count: 1_000)
+        guard case .refused(let cut) = moderationFailure(.permissionDenied, refusal: stacked)
+        else { return XCTFail("not a refusal") }
+        XCTAssertEqual(cut.utf16.count, 200)
+        XCTAssertEqual(cut, "e" + String(repeating: "\u{0301}", count: 199))
+        // A character outside the basic plane is two units; the cut never leaves half of one.
+        let wide = "x" + String(repeating: "\u{1F600}", count: 150)
+        guard case .refused(let whole) = moderationFailure(.permissionDenied, refusal: wide)
+        else { return XCTFail("not a refusal") }
+        XCTAssertEqual(whole, "x" + String(repeating: "\u{1F600}", count: 99))
+    }
 }

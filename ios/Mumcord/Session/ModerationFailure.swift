@@ -11,7 +11,7 @@ enum ModerationFailure: Error, Equatable {
     case failed
 }
 
-/// The longest server text a sheet shows; the rest is cut off.
+/// The longest server text a sheet shows, in UTF-16 units as on Android; the rest is cut off.
 private let maxServerText = 200
 
 /// What a failed moderation command says. `refusal` is the server's own text of a
@@ -24,7 +24,14 @@ func moderationFailure(_ error: ConnectionError, refusal: String? = nil) -> Mode
         let visible = (refusal ?? "").unicodeScalars.filter { scalar in
             scalar.properties.generalCategory != .control && scalar.properties.generalCategory != .format
         }
-        return .refused(serverText: String(String(String.UnicodeScalarView(visible)).trimmed.prefix(maxServerText)))
+        // Cut by size and not by letters: one letter carries any number of combining marks. A
+        // scalar is kept or dropped as a whole, so the text stays valid.
+        var units = 0
+        let cut = String(String.UnicodeScalarView(visible)).trimmed.unicodeScalars.prefix { scalar in
+            units += UTF16.width(scalar)
+            return units <= maxServerText
+        }
+        return .refused(serverText: String(Substring(cut)))
     case .notFound: return .gone
     case .notConnected: return .disconnected
     default: return .failed
