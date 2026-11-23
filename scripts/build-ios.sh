@@ -66,7 +66,8 @@ group_tests() {
     voice-chat-screens)
       printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests ;;
     chat-flow)
-      printf '%s\n' MumcordUITests/ChatFlowUITests MumcordUITests/SessionEndedUITests ;;
+      printf '%s\n' MumcordUITests/ChatFlowUITests MumcordUITests/SessionEndedUITests \
+        MumcordUITests/ModerationFlowUITests MumcordUITests/ModerationScreenshotUITests ;;
     messages)
       printf '%s\n' MumcordUITests/MessagesFlowUITests MumcordUITests/MessagesScreenshotUITests ;;
     output-settings)

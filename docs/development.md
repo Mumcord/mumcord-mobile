@@ -417,7 +417,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `app-screens` | app screenshots, design reference, launch test |
 | `core` | all unit tests (`MumcordTests`), app flow, voice flow |
 | `voice-chat-screens` | voice screenshots, chat screenshots |
-| `chat-flow` | chat flow, session-ended notice (the lightest group: the place for new tests) |
+| `chat-flow` | chat flow, session-ended notice, moderation flow and its screenshots (the lightest group: the place for new tests) |
 | `messages` | messages flow, messages screenshots |
 | `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots |
 | `identities` | identities and "Scan from desktop app" flow, their screenshots |
