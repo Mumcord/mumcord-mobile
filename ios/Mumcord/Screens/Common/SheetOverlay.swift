@@ -13,6 +13,8 @@ struct SheetOverlay<Content: View>: View {
     private let onDismiss: (() -> Void)?
     private let content: Content
     @Environment(\.mumcordTheme) private var theme
+    @State private var contentHeight: CGFloat = 0
+    @State private var areaHeight: CGFloat = 0
 
     init(
         title: String?,
@@ -38,11 +40,17 @@ struct SheetOverlay<Content: View>: View {
                 // scroll view in both cases: a sheet that changed its views when the keyboard
                 // takes away space would take the focus from the field being typed in.
                 FittedHeight {
-                    // The focus ring of a text field lies outside the field, where a scroll
-                    // view cuts off.
-                    ScrollView { column.padding(.horizontal, Self.ringInset) }
-                        .scrollBounceBehavior(.basedOnSize)
-                        .padding(.horizontal, -Self.ringInset)
+                    ScrollView {
+                        column.onGeometryChange(for: CGFloat.self, of: \.size.height) { contentHeight = $0 }
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    // A scroll view cuts its content off at its own edges, and with it the glow
+                    // of a button and the focus ring of a text field, which lie outside them.
+                    // So the sheet cuts by itself: never at the sides, and at the top and
+                    // bottom only while there is something to scroll.
+                    .scrollClipDisabled()
+                    .clipShape(ScrollArea(open: contentHeight <= areaHeight + Self.rounding))
+                    .onGeometryChange(for: CGFloat.self, of: \.size.height) { areaHeight = $0 }
                 }
             }
             .accessibilityElement(children: .contain)
@@ -53,11 +61,25 @@ struct SheetOverlay<Content: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private static var ringInset: CGFloat { 2 }
+    /// Content and area are laid out on whole pixels and may differ by less than a point.
+    private static var rounding: CGFloat { 1 }
 
     private var column: some View {
         VStack(alignment: .leading, spacing: MumcordSpace.s3) { content }
             .padding(.bottom, MumcordSpace.s2)
+    }
+}
+
+/// The part of a sheet its scrolling content is drawn in: the scroll view's own area and the
+/// room beside it, and when `open` also the room above and below it.
+private struct ScrollArea: Shape {
+    let open: Bool
+
+    /// More than any shadow reaches past its view.
+    private static var room: CGFloat { 64 }
+
+    func path(in rect: CGRect) -> Path {
+        Path(rect.insetBy(dx: -Self.room, dy: open ? -Self.room : 0))
     }
 }
 
