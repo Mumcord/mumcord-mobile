@@ -28,6 +28,15 @@ second half), app icon.
 Identities and "Scan from desktop app" (6.5): built and pushed (commits `1666543`, `bb58722`,
 `32e72eb`); see the last CI iOS run on `feat/first-version` for its final state.
 
+Moderation in the person sheet (the moderation part of 8.6, mirroring Android commit `1218b43`):
+built on a Mac and checked in the simulator against the fake engine. The "Moderation" section
+with Move to channel…, Server mute, Kick… and Ban…, each only with the server's right; the
+channel picker, the kick question and the ban sheet with the server's default ban and the
+"changed meanwhile" conflict. Unit tests `ModerationTests` and `AppModelModerationTests`, UI
+tests `ModerationFlowUITests`, screenshots `ios-moderation-*`. A debug build started with
+`-mumcordBanSeconds <seconds>` bans for that long instead of the chosen length, for the
+end-to-end test that is still open (task 10.4).
+
 ## Open tasks
 
 ### 2.10 Public server browser (FR-5.9, AC-5.38)
@@ -48,23 +57,10 @@ Mirror Android commit `525a028` (`feat(android): browse public servers`):
 - Tests only against a fake list; never contact the real list service or public servers.
   The browser screen has no mockup and needs product review.
 
-### 8.6 Moderation, More tab, activity log, settings, profile and themes (FR-5.80 … FR-5.100)
+### 8.6 More tab, activity log, settings, profile and themes (FR-5.80 … FR-5.100)
 
-Task 8.6 is the iOS scope of the Android tasks 8.3, 8.4 and 8.5.
-
-Moderation, mirroring Android commit `1218b43` (`feat(android): moderation in the person sheet`):
-
-- A "Moderation" section at the end of the person sheet with Move to channel…, Server mute
-  ("Remove server mute" when muted), Kick… and Ban…, each only when the server grants that
-  right: move and mute by the rights in the person's channel, kick and ban by the root
-  channel. No section for yourself; no mute in a temporary channel.
-- Every step returns to the person sheet. Move and mute act at once; a refusal appears in the
-  existing refusal banner.
-- Ban sheet: reason, length (1 hour, 1 day, 7 days, 30 days, permanent) with the end date, ban
-  by certificate (only if the person has one), "Remove from server now" (only with the kick
-  right), "Kick only instead"; the server's default-ban case and the "changed meanwhile"
-  conflict. A standard server always bans the address too, which the sheet says in text.
-- A debug-only override of the ban length for tests.
+Task 8.6 is the iOS scope of the Android tasks 8.3, 8.4 and 8.5. Its moderation part (8.4) is
+built, see "State when paused".
 
 More tab, activity log and settings, mirroring Android commit `fcceffa`
 (`feat(android): activity log and the full settings under More`):
@@ -135,7 +131,10 @@ simulator app; linking for a real device is first proven here.
 - Tests missing in the Messages feature: the person row turning to "Unblock" after blocking,
   unblocking from the blocked list, the "Show sender only" switch changing its value,
   `keepDraft: false`, `AppModel.openChat`.
-- Screenshots are large (about 37 MB for the Messages set alone); shrink the PNGs.
+- Screenshots are large (about 37 MB for the Messages set alone); shrink the PNGs. The
+  moderation set shows how: saved with a palette of 256 colours and no dithering (Pillow,
+  `quantize(colors=256, method=MAXCOVERAGE, dither=NONE)`), 14 pictures take 1.6 MB instead of
+  12.3 MB, and no colour is off by more than 7 of 255. The older sets are still as they were.
 - Wording needing product review: the notification explanation sheet ("Mumcord shows private
   messages and mentions as notifications while you are connected.") and the camera permission
   text ("Mumcord uses the camera to read the codes shown by the desktop app and to take photos
