@@ -51,6 +51,10 @@ import MumcordBridge
 ///         camera-ask       the camera has not been asked for; the user allows it
 ///         camera-refuse    the camera has not been asked for; the user refuses it
 ///         camera-blocked   the camera was refused before; only the system settings help
+///         admin            the server grants the user every right on every channel
+///         moderation-refused the server refuses the next moderation command
+///         ban-quick        the server's ban list cannot be read: only its default ban
+///         ban-conflict     the first ban finds the server's entry changed meanwhile
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
@@ -106,6 +110,9 @@ struct AppDebugLaunch {
                     if person.isSelf { changed.selfMuted = true }
                     return changed
                 }
+            }
+            if options.contains("admin") {
+                server = server.granting { $0.grantAllRights() }
             }
             let engine = FakeEngine(
                 listener: listener,
@@ -170,6 +177,15 @@ struct AppDebugLaunch {
                 transfer.importFailure = .SecureStorageUnavailable(detail: "locked")
             }
             engine.transfer = transfer
+            if options.contains("moderation-refused") {
+                engine.moderationFailure = .PermissionDenied(detail: Mockup.refusal)
+            }
+            if options.contains("ban-quick") {
+                engine.banTargetAnswer.banListReadable = false
+            }
+            if options.contains("ban-conflict") {
+                engine.banResults = [.conflict]
+            }
             if options.contains("locks") {
                 engine.channelPasswords = [Mockup.music: "secret"]
                 engine.deniedChannels = [Mockup.afk]

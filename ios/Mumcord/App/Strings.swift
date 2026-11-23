@@ -312,6 +312,50 @@ enum Strings {
     static var personChatRequestPending: String { text("person_chat_request_pending") }
     static var personBlock: String { text("person_block") }
     static var personUnblock: String { text("person_unblock") }
+    static var moderationTitle: String { text("moderation_title") }
+    static var moderationMove: String { text("moderation_move") }
+    static var moderationServerMute: String { text("moderation_server_mute") }
+    static var moderationServerUnmute: String { text("moderation_server_unmute") }
+    static var moderationKick: String { text("moderation_kick") }
+    static var moderationBan: String { text("moderation_ban") }
+    static func moderationPersonLine(_ p1: String, _ p2: String) -> String { format("moderation_person_line", p1, p2) }
+    static var moderationReason: String { text("moderation_reason") }
+    static var moderationRefusedTitle: String { text("moderation_refused_title") }
+    static var moderationRefused: String { text("moderation_refused") }
+    static func moderationGone(_ p1: String) -> String { format("moderation_gone", p1) }
+    static var moderationDisconnected: String { text("moderation_disconnected") }
+    static var moderationFailed: String { text("moderation_failed") }
+    static var moveTitle: String { text("move_title") }
+    static func moveText(_ p1: String) -> String { format("move_text", p1) }
+    static func kickTitle(_ p1: String) -> String { format("kick_title", p1) }
+    static var kickReconnect: String { text("kick_reconnect") }
+    static func kickReasonHint(_ p1: String) -> String { format("kick_reason_hint", p1) }
+    static var kickConfirm: String { text("kick_confirm") }
+    static func banTitle(_ p1: String) -> String { format("ban_title", p1) }
+    static var banLoading: String { text("ban_loading") }
+    static func banReasonHint(_ p1: String) -> String { format("ban_reason_hint", p1) }
+    static var banDuration: String { text("ban_duration") }
+    static var banDurationHour: String { text("ban_duration_hour") }
+    static var banDurationDay: String { text("ban_duration_day") }
+    static var banDurationWeek: String { text("ban_duration_week") }
+    static var banDurationMonth: String { text("ban_duration_month") }
+    static var banDurationPermanent: String { text("ban_duration_permanent") }
+    static func banEndsOn(_ p1: String) -> String { format("ban_ends_on", p1) }
+    static var banQuick: String { text("ban_quick") }
+    static var banQuickTargets: String { text("ban_quick_targets") }
+    static var banByCertificate: String { text("ban_by_certificate") }
+    static var banByCertificateHint: String { text("ban_by_certificate_hint") }
+    static var banNoCertificate: String { text("ban_no_certificate") }
+    static var banAddress: String { text("ban_address") }
+    static var banRemoveNow: String { text("ban_remove_now") }
+    static var banRemoveNowHint: String { text("ban_remove_now_hint") }
+    static var banConfirm: String { text("ban_confirm") }
+    static func banConfirmFor(_ p1: String) -> String { format("ban_confirm_for", p1) }
+    static var banConfirmPermanent: String { text("ban_confirm_permanent") }
+    static var banKickInstead: String { text("ban_kick_instead") }
+    static var banConflictTitle: String { text("ban_conflict_title") }
+    static var banConflictText: String { text("ban_conflict_text") }
+    static var banSaveAnyway: String { text("ban_save_anyway") }
     static func chatRequestTitle(_ p1: String) -> String { format("chat_request_title", p1) }
     static func chatRequestText(_ p1: String) -> String { format("chat_request_text", p1) }
     static var chatRequestNote: String { text("chat_request_note") }

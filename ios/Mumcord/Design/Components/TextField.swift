@@ -6,7 +6,8 @@ import UIKit
 /// Single-line text field of a form (`.label` over `.field`): the `label` above, the field with
 /// a focus ring while it is being edited, and below it the `error` in the danger colour or else
 /// the `hint`. VoiceOver reads the label with the field and the error as the text after it.
-/// `password` hides the typed characters. The text is taken as typed: no autocorrection, no automatic capitals.
+/// `password` hides the typed characters. The text is taken as typed: no autocorrection, and
+/// automatic capitals only with a `capitalization`.
 struct MumcordTextField: View {
     private let value: String
     private let onValueChange: (String) -> Void
@@ -19,6 +20,7 @@ struct MumcordTextField: View {
     private let submitLabel: SubmitLabel
     private let onSubmit: (() -> Void)?
     private let autoFocus: Bool
+    private let capitalization: TextInputAutocapitalization
     @FocusState private var focused: Bool
     @Environment(\.mumcordTheme) private var theme
     @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
@@ -34,7 +36,8 @@ struct MumcordTextField: View {
         keyboard: UIKeyboardType = .default,
         submitLabel: SubmitLabel = .done,
         onSubmit: (() -> Void)? = nil,
-        autoFocus: Bool = false
+        autoFocus: Bool = false,
+        capitalization: TextInputAutocapitalization = .never
     ) {
         self.value = value
         self.onValueChange = onValueChange
@@ -47,6 +50,7 @@ struct MumcordTextField: View {
         self.submitLabel = submitLabel
         self.onSubmit = onSubmit
         self.autoFocus = autoFocus
+        self.capitalization = capitalization
     }
 
     var body: some View {
@@ -61,7 +65,7 @@ struct MumcordTextField: View {
                 .foregroundStyle(colors.text)
                 .tint(colors.accent)
                 .autocorrectionDisabled(true)
-                .textInputAutocapitalization(.never)
+                .textInputAutocapitalization(capitalization)
                 .keyboardType(keyboard)
                 .submitLabel(submitLabel)
                 .focused($focused)

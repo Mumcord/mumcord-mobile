@@ -541,6 +541,49 @@ final class SessionStore: @unchecked Sendable {
         report(await call("set person mute") { try await $0.setPersonLocalMute(session: session, muted: muted) })
     }
 
+    // MARK: Moderation (FR-5.90 … FR-5.93)
+
+    // The commands that change a person give true when the server confirmed the change and
+    // false when it did not answer in time; either way the tree shows what happened.
+
+    func movePerson(_ session: UInt32, to channelId: UInt32) async -> Result<Bool, ModerationFailure> {
+        await moderate("move person") { try await $0.movePerson(session: session, channelId: channelId) }
+    }
+
+    func setServerMute(_ session: UInt32, muted: Bool) async -> Result<Bool, ModerationFailure> {
+        await moderate("set server mute") { try await $0.setServerMute(session: session, muted: muted) }
+    }
+
+    func kickPerson(_ session: UInt32, reason: String?) async -> Result<Bool, ModerationFailure> {
+        await moderate("kick person") { try await $0.kickPerson(session: session, reason: reason) }
+    }
+
+    /// What the ban sheet needs about a person; asks the server (up to a few seconds).
+    func banTarget(_ session: UInt32) async -> Result<BanTarget, ModerationFailure> {
+        await moderate("read ban target") { try await $0.banTarget(session: session) }
+    }
+
+    func banPerson(_ session: UInt32, _ ban: BanInput) async -> Result<BanResult, ModerationFailure> {
+        await moderate("ban person") { try await $0.banPerson(session: session, ban: ban) }
+    }
+
+    /// Runs a moderation command. Its sheet shows a refusal in the server's own words, which
+    /// are kept out of the log like every other detail.
+    private func moderate<Value>(
+        _ name: String,
+        _ command: (EngineClient) async throws -> Value
+    ) async -> Result<Value, ModerationFailure> {
+        do {
+            let client = try await engine.get()
+            lock.withLock { createdEngine = client }
+            return .success(try await command(client))
+        } catch {
+            var refusal: String?
+            if case .PermissionDenied(let detail) = error as? BridgeError { refusal = detail }
+            return .failure(moderationFailure(logged(name, error), refusal: refusal))
+        }
+    }
+
     /// Gives up on a channel password question.
     func dismissChannelPassword() {
         update { state in
@@ -634,6 +677,11 @@ final class SessionStore: @unchecked Sendable {
     #endif
 
     private func failed<Value>(_ command: String, _ error: Error) -> Outcome<Value> {
+        .failed(logged(command, error))
+    }
+
+    /// The kind of a failed command, written to the log.
+    private func logged(_ command: String, _ error: Error) -> ConnectionError {
         let kind: ConnectionError
         if let bridgeError = error as? BridgeError {
             kind = bridgeError.connectionError
@@ -645,7 +693,7 @@ final class SessionStore: @unchecked Sendable {
         }
         // Only the kind of failure: the detail text can contain the server address.
         log("\(command) failed: \(kind) (\(type(of: error)))")
-        return .failed(kind)
+        return kind
     }
 }
 

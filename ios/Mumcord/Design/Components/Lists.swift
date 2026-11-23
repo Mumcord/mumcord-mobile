@@ -3,12 +3,23 @@
 import SwiftUI
 
 /// Section header above a list (`.section`): small capitals, with an optional text action at
-/// the end such as "Edit".
+/// the end such as "Edit". Inside a bottom sheet, which has its own margin, `padding` is
+/// `sheetPadding` (`.sheet .section`).
 struct MumcordSectionHeader: View {
     let title: String
     var action: String?
     var onAction: () -> Void = {}
+    var padding = MumcordSectionHeader.screenPadding
     @Environment(\.mumcordTheme) private var theme
+
+    static let screenPadding = EdgeInsets(
+        top: MumcordSpace.s4,
+        leading: MumcordSpace.s4,
+        bottom: MumcordSpace.s2,
+        trailing: MumcordSpace.s4
+    )
+    /// The padding of a section header inside a bottom sheet.
+    static let sheetPadding = EdgeInsets(top: MumcordSpace.s1, leading: MumcordSpace.s1, bottom: 0, trailing: MumcordSpace.s1)
 
     var body: some View {
         HStack(spacing: MumcordSpace.s2) {
@@ -25,7 +36,7 @@ struct MumcordSectionHeader: View {
                 .layoutPriority(1)
             }
         }
-        .padding(EdgeInsets(top: MumcordSpace.s4, leading: MumcordSpace.s4, bottom: MumcordSpace.s2, trailing: MumcordSpace.s4))
+        .padding(padding)
     }
 }
 

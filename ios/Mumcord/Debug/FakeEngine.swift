@@ -44,6 +44,19 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _bitrateLimits: [UInt32?] = []
     private var _joinCalls: [(channelId: UInt32, password: String?)] = []
     private var _volumeCalls: [(session: UInt32, percent: Int)] = []
+    private var _moderationCalls: [String] = []
+    private var _moderationFailure: BridgeError?
+    private var _banTargetAnswer = BanTarget(
+        address: "192.0.2.7",
+        onlineSecs: nil,
+        banListReadable: true,
+        hasCertificate: true,
+        canKick: true,
+        canBan: true
+    )
+    private var _banResults: [BanResult] = []
+    private var _kickReasons: [String?] = []
+    private var _banInputs: [BanInput] = []
     private var _pings: [Int64: ServerPing] = [:]
     private var _connectFailure: BridgeError?
     private var _saveFailure: BridgeError?
@@ -134,6 +147,27 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     var bitrateLimits: [UInt32?] { locked { _bitrateLimits } }
     var joinCalls: [(channelId: UInt32, password: String?)] { locked { _joinCalls } }
     var volumeCalls: [(session: UInt32, percent: Int)] { locked { _volumeCalls } }
+    /// Every move ("move <session> <channel>") and server mute ("mute <session> <muted>"), in order.
+    var moderationCalls: [String] { locked { _moderationCalls } }
+    /// The reason of every kick, in order.
+    var kickReasons: [String?] { locked { _kickReasons } }
+    /// Every ban as it was sent, in order.
+    var banInputs: [BanInput] { locked { _banInputs } }
+    /// Thrown by the next moderation command (move, mute, kick, ban and its target) instead of acting.
+    var moderationFailure: BridgeError? {
+        get { locked { _moderationFailure } }
+        set { locked { _moderationFailure = newValue } }
+    }
+    /// What `banTarget` reports about a person.
+    var banTargetAnswer: BanTarget {
+        get { locked { _banTargetAnswer } }
+        set { locked { _banTargetAnswer = newValue } }
+    }
+    /// What the next bans produce, in order; a ban beyond them is saved.
+    var banResults: [BanResult] {
+        get { locked { _banResults } }
+        set { locked { _banResults = newValue } }
+    }
     var currentTalkMode: TalkMode { locked { _talkMode } }
     /// Every press (true) and release (false) of the hold-to-talk button, in order.
     var pushToTalkCalls: [Bool] { locked { _pushToTalkCalls } }
@@ -335,6 +369,80 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func setPersonLocalMute(session: UInt32, muted: Bool) async throws {
         change(session) { $0.locallyMuted = muted }
+    }
+
+    // MARK: Moderation
+
+    /// Call with the lock held.
+    private func failModerationOnce() throws {
+        if let failure = _moderationFailure {
+            _moderationFailure = nil
+            throw failure
+        }
+    }
+
+    /// Runs a move or a server mute. As the engine: the server's refusal of one is also told
+    /// as its refusal event.
+    private func moderate(_ call: String) throws {
+        do {
+            try locked {
+                try failModerationOnce()
+                _moderationCalls.append(call)
+            }
+        } catch BridgeError.PermissionDenied(let detail) {
+            emit(.actionDenied(channelId: nil, detail: detail))
+            throw BridgeError.PermissionDenied(detail: detail)
+        }
+    }
+
+    func movePerson(session: UInt32, channelId: UInt32) async throws -> Bool {
+        try moderate("move \(session) \(channelId)")
+        change(session) { $0.channelId = channelId }
+        return true
+    }
+
+    func setServerMute(session: UInt32, muted: Bool) async throws -> Bool {
+        try moderate("mute \(session) \(muted)")
+        change(session) { $0.serverMuted = muted }
+        return true
+    }
+
+    func kickPerson(session: UInt32, reason: String?) async throws -> Bool {
+        try locked {
+            try failModerationOnce()
+            _kickReasons.append(reason)
+        }
+        remove(session)
+        return true
+    }
+
+    func banTarget(session: UInt32) async throws -> BanTarget {
+        try locked {
+            try failModerationOnce()
+            return _banTargetAnswer
+        }
+    }
+
+    /// As a server: the person is taken off when the ban says so, and always by its default ban.
+    func banPerson(session: UInt32, ban: BanInput) async throws -> BanResult {
+        let result: BanResult = try locked {
+            try failModerationOnce()
+            _banInputs.append(ban)
+            if !_banResults.isEmpty { return _banResults.removeFirst() }
+            return ban.quick ? .quickBanned : .saved(removed: ban.removeNow)
+        }
+        if result != .conflict, ban.quick || ban.removeNow {
+            remove(session)
+        }
+        return result
+    }
+
+    /// Takes a person off the server and reports it, as the engine does.
+    private func remove(_ session: UInt32) {
+        let removed = locked { people.removeValue(forKey: session) != nil }
+        if removed {
+            emit(.personRemoved(session: session))
+        }
     }
 
     /// Changes a person and reports it, as the engine does.

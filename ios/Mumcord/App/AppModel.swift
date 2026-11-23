@@ -241,8 +241,7 @@ final class AppModel {
     /// Brings a tab in front of whatever is open: a sheet and the full voice view go away.
     func showTab(_ tab: ConnectedTab) {
         connectedLocal.voiceOpen = false
-        connectedLocal.personSession = nil
-        connectedLocal.volumeDraft = nil
+        closePerson()
         connectedLocal.menuChannelId = nil
         connectedLocal.tab = tab
         syncChat()

@@ -19,6 +19,14 @@ protocol EngineClient: AnyObject, Sendable {
     func joinChannel(channelId: UInt32, password: String?) async throws
     func setPersonVolume(session: UInt32, percent: UInt16) async throws
     func setPersonLocalMute(session: UInt32, muted: Bool) async throws
+    /// Moderation (FR-5.90 … FR-5.93). The three that change a person return true when the
+    /// server confirmed the change and false when it did not answer in time.
+    func movePerson(session: UInt32, channelId: UInt32) async throws -> Bool
+    func setServerMute(session: UInt32, muted: Bool) async throws -> Bool
+    func kickPerson(session: UInt32, reason: String?) async throws -> Bool
+    /// What the ban sheet needs about a person; asks the server (up to a few seconds).
+    func banTarget(session: UInt32) async throws -> BanTarget
+    func banPerson(session: UInt32, ban: BanInput) async throws -> BanResult
     func talkMode() async throws -> TalkMode
     func setTalkMode(mode: TalkMode) async throws
     func audioEndpoints() -> AudioEndpoints

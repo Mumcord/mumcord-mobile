@@ -181,6 +181,8 @@ struct ConnectedLocal: Equatable {
     var outputOpen = false
     /// The settings are open in the More tab.
     var settingsOpen = false
+    /// The moderation step that replaced the person sheet: move, kick or ban.
+    var moderation: ModerationLocal?
 }
 
 /// The sheet over the connected screens. At most one at a time.
@@ -195,8 +197,17 @@ enum ConnectedSheet: Equatable {
     /// The choice of the audio output, opened from the voice view.
     case audioOutput(rows: [OutputRow])
     case person(PersonSheetState)
+    /// Moving, kicking or banning the person of the person sheet.
+    case moderation(ModerationSheet)
     /// `expanded` as in `ChannelItem`; `canJoin` is false for the own channel.
     case channelMenu(id: UInt32, name: String, expanded: Bool?, canJoin: Bool)
+}
+
+extension ConnectedSheet {
+    var isModeration: Bool {
+        if case .moderation = self { return true }
+        return false
+    }
 }
 
 struct PersonSheetState: Equatable {
@@ -206,6 +217,7 @@ struct PersonSheetState: Equatable {
     let volumePercent: Int
     let locallyMuted: Bool
     let state: PersonFlags
+    var moderation = ModerationRows()
 }
 
 /// A refusal by the server; `channelName` and `detail` are untrusted text.
@@ -272,14 +284,19 @@ func connectedUiState(
     } else if local.outputOpen, let outputUi = outputUiState(output) {
         sheet = .audioOutput(rows: outputUi.rows)
     } else if let person = local.personSession.flatMap({ server.people[$0] }) {
-        sheet = .person(PersonSheetState(
-            session: person.session,
-            name: person.name,
-            channelName: server.channels[person.channelId]?.name ?? "",
-            volumePercent: local.volumeDraft ?? Int(person.localVolume),
-            locallyMuted: person.locallyMuted,
-            state: person.flags
-        ))
+        if let moderation = local.moderation, moderation.session == person.session {
+            sheet = .moderation(moderationSheet(server: server, person: person, local: moderation))
+        } else {
+            sheet = .person(PersonSheetState(
+                session: person.session,
+                name: person.name,
+                channelName: server.channels[person.channelId]?.name ?? "",
+                volumePercent: local.volumeDraft ?? Int(person.localVolume),
+                locallyMuted: person.locallyMuted,
+                state: person.flags,
+                moderation: server.moderationRows(person)
+            ))
+        }
     } else if let menuChannel = local.menuChannelId.flatMap({ server.channels[$0] }) {
         var expanded: Bool?
         for case .channel(let item) in rows where item.id == menuChannel.id {

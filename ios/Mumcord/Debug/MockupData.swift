@@ -84,6 +84,9 @@ enum Mockup {
     static let previousFingerprint =
         "2C:F2:4D:BA:5F:B0:A3:0E:26:E8:3B:2A:C5:B9:E2:9E:1B:16:1E:5C:1F:A7:42:5E:73:04:33:62:93:8B:98:24"
 
+    /// What the server says when it refuses a moderation command.
+    static let refusal = "Moderation is off tonight"
+
     /// The server list of mockup `01-server-list`.
     static let servers = [
         savedServer(1, "Nordlicht"),
@@ -133,6 +136,29 @@ func mockupServer() -> ServerState {
             jonas,
         ]
     )
+}
+
+extension ServerState {
+    /// The server with the rights `change` gives each channel.
+    func granting(_ change: (inout Channel) -> Void) -> ServerState {
+        var server = self
+        server.channels = channels.map { channel in
+            var changed = channel
+            change(&changed)
+            return changed
+        }
+        return server
+    }
+}
+
+extension Channel {
+    /// Every moderation right, as a server admin has it.
+    mutating func grantAllRights() {
+        permissions.movePeople = true
+        permissions.muteDeafen = true
+        permissions.kick = true
+        permissions.ban = true
+    }
 }
 
 /// The server of mockup `03-voice-expanded`: everybody is in the Lobby. Anna, Ben talking, Mira,
