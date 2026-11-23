@@ -106,8 +106,8 @@ private const val SHEET_MAX_SHARE = 0.95f
 
 /**
  * A finding on the screen behind an open sheet: dimmed by the backdrop and partly covered, so its
- * contrast and visible size are not what the user meets. These are counted on their own; that the
- * screen behind a sheet is still reachable with TalkBack is a separate, known finding.
+ * contrast and visible size are not what the user meets. These are counted on their own. A sheet
+ * leaves the screen behind it out of the accessibility tree, so there should be none.
  */
 private fun isBehindSheet(result: AccessibilityViewCheckResult, sheets: List<Rect>): Boolean {
     if (sheets.isEmpty()) return false
