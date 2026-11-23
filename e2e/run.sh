@@ -29,7 +29,10 @@
 #      as an argument and are written to no file and no log. In the stream scenario
 #      e2e/stream-peer (the engine on this machine, built with libvpx) shares its moving test
 #      pattern; it writes down how many people watch whenever the test asks, which shows that
-#      nothing was fetched before the tap. The public server scenario
+#      nothing was fetched before the tap. The tablet scenario watches the same share with the
+#      emulator's screen made the size of a tablet (`wm size`, `wm density`); the test puts the
+#      phone's screen back, and so does this script whenever a scenario ends, also after a
+#      crash. The public server scenario
 #      serves its own list inside the emulator (android/e2e LocalPublicList) and never
 #      contacts the real list service. In the moderation scenarios the phone connects as the
 #      test server's SuperUser (its password reaches the test as an argument, never a file or
@@ -160,6 +163,7 @@ SCENARIOS=(
   "granted granted identity ${TEST_PACKAGE}.IdentityFlowTest"
   "granted granted transfer ${TEST_PACKAGE}.TransferFlowTest"
   "granted granted stream ${TEST_PACKAGE}.StreamFlowTest"
+  "granted granted tablet ${TEST_PACKAGE}.TabletFlowTest"
   "granted granted camera ${TEST_PACKAGE}.CameraFlowTest"
   "granted granted activity ${TEST_PACKAGE}.ActivityFlowTest"
   "granted granted profile ${TEST_PACKAGE}.ProfileThemeFlowTest"
@@ -413,7 +417,7 @@ check_peers() {
   if [[ "${kind}" != "chat" && "${kind}" != "pm" && "${kind}" != "gap" && "${kind}" != "idle" \
     && "${kind}" != "identity" && "${kind}" != "activity" && "${kind}" != "moderation" \
     && "${kind}" != "ban" && "${kind}" != "profile" && "${kind}" != "stream" && "${kind}" != "certificate" \
-    && "${kind}" != "camera" ]]; then
+    && "${kind}" != "camera" && "${kind}" != "tablet" ]]; then
     spans="$(voice_spans "${PEER_LOG}")"
     count="$(grep -c . <<<"${spans}" || true)"
   fi
@@ -593,6 +597,11 @@ check_peers() {
       first_frame="$(sed -n 's/^stream: first_frame_ms=\([0-9]*\).*/\1/p' "${report}" | tr -d '\r')"
       printf 'e2e: stream: nothing fetched before the tap; first picture %s ms after the tap\n' "${first_frame:-?}"
       ;;
+    tablet)
+      grep -q '^VIEWERS 1$' "${STREAM_PEER_LOG}" \
+        || die "the sharer never had the tablet as viewer, see e2e/build/stream-peer.log"
+      printf 'e2e: tablet: the share played in the right column\n'
+      ;;
     camera)
       # The viewer's notes at the test's marks: "MARK <word> frames=<n> pattern=<p>".
       local log="${CAMERA_VIEWER_LOG#"${REPO_ROOT}/"}" first
@@ -619,12 +628,20 @@ check_peers() {
   esac
 }
 
+# The tablet scenario makes the emulator's screen a tablet's; the phone's screen comes back
+# here too, so that a test that crashed never leaves the shared emulator tablet-sized.
+reset_screen() {
+  [[ -n "${serial}" ]] || return 0
+  timeout 20 "${ADB}" -s "${serial}" shell 'wm size reset; wm density reset' >/dev/null 2>&1 || true
+}
+
 cleanup() {
   local status=$?
   trap - EXIT
   set +e
   step "cleaning up"
   stop_peers
+  reset_screen
   if ((status != 0)); then
     # What the other people reported belongs next to the failure, not only into a file.
     local log
@@ -725,7 +742,7 @@ step "building the app and the tests"
 # The sharer encodes VP9 on this machine, so it is built on its own with libvpx (a build
 # together with the others would give them its codec and test features too).
 if [[ "${E2E_SCENARIO:-}" == "" || "${TEST_PACKAGE}.StreamFlowTest" == *"${E2E_SCENARIO}"* \
-  || "${TEST_PACKAGE}.CameraFlowTest" == *"${E2E_SCENARIO}"* ]]; then
+  || "${TEST_PACKAGE}.CameraFlowTest" == *"${E2E_SCENARIO}"* || "${TEST_PACKAGE}.TabletFlowTest" == *"${E2E_SCENARIO}"* ]]; then
   pkg-config --exists vpx 2>/dev/null || die "libvpx is missing for the stream and camera scenarios (Debian: libvpx-dev, Arch: libvpx)"
   (cd "${REPO_ROOT}" && cargo build --locked --quiet --package mumcord-stream-peer --features sharer)
   [[ -x "${STREAM_PEER_BINARY}" ]] || die "the sharer was not built at ${STREAM_PEER_BINARY}"
@@ -826,7 +843,7 @@ run_scenario() {
       start_messenger
       PERSON_INPUT="${PM_FIFO}" start_person "${CHAT_PEER_LOG}" "${CHAT_PEER_BINARY}" --phone "${PHONE_NAME}" --visitor
       ;;
-    stream)
+    stream | tablet)
       start_messenger
       PERSON_INPUT="${PM_FIFO}" start_person "${STREAM_PEER_LOG}" "${STREAM_PEER_BINARY}" 127.0.0.1 "${MUMCORD_PORT_BASE}"
       ;;
@@ -880,7 +897,7 @@ run_scenario() {
 attempt_scenario() {
   (
     set -e
-    trap 'stop_peers; stop_phone_network; stop_messenger; stop_evidence; stop_cert_switcher' EXIT
+    trap 'stop_peers; stop_phone_network; stop_messenger; stop_evidence; stop_cert_switcher; reset_screen' EXIT
     run_scenario "$@"
   )
 }

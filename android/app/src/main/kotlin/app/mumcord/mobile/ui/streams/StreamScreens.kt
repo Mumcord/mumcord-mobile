@@ -72,6 +72,7 @@ const val STREAM_COLLAPSE_TEST_TAG = "stream-collapse"
 const val STREAM_EXPAND_TEST_TAG = "stream-expand"
 const val STREAM_STOP_TEST_TAG = "stream-stop"
 const val STREAM_ROTATE_TEST_TAG = "stream-rotate"
+const val STREAM_LEAVE_FULL_SCREEN_TEST_TAG = "stream-leave-full-screen"
 const val STREAM_RETRY_TEST_TAG = "stream-retry"
 const val STREAM_VOLUME_TEST_TAG = "stream-volume"
 const val DIRECT_CONNECTIONS_YES_TEST_TAG = "direct-connections-yes"
@@ -103,7 +104,7 @@ private fun StreamUi.status(): String? = when (val look = tile) {
 
 /** The status of an opened stream: its tile's, except that it plays here rather than elsewhere. */
 @Composable
-private fun StreamUi.openStatus(): String? = when {
+internal fun StreamUi.openStatus(): String? = when {
     tile == TileLook.OpenElsewhere -> null
     tile is TileLook.Playing -> null
     else -> status()
@@ -159,6 +160,9 @@ private fun StreamUi.icon() = if (key.kind == StreamKind.SCREEN) MumcordIcons.Mo
  * Back shrinks it to the mini window.
  *
  * @param mute the user's own microphone for its button; null hides the button.
+ * @param onLeave set where the whole screen was opened from the right column (two columns):
+ *   back and the collapse arrow return there, and the rotate button becomes "Leave full screen",
+ *   because a tablet turns by itself.
  */
 @Composable
 fun StreamFullScreen(
@@ -170,10 +174,12 @@ fun StreamFullScreen(
     actions: StreamsController,
     topInsets: WindowInsets,
     bottomInsets: WindowInsets,
+    onLeave: (() -> Unit)? = null,
 ) {
-    BackHandler(onBack = actions::collapse)
+    val back = onLeave ?: actions::collapse
+    BackHandler(onBack = back)
     val colors = MumcordTheme.colors
-    val portrait = LocalConfiguration.current.orientation != Configuration.ORIENTATION_LANDSCAPE
+    val portrait = onLeave == null && LocalConfiguration.current.orientation != Configuration.ORIENTATION_LANDSCAPE
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
@@ -196,7 +202,7 @@ fun StreamFullScreen(
                     .offset(y = maxWidth * 9f / 32f + 48.dp),
             )
         }
-        StageTop(stream, actions, Modifier.align(Alignment.TopCenter).windowInsetsPadding(topInsets))
+        StageTop(stream, back, Modifier.align(Alignment.TopCenter).windowInsetsPadding(topInsets))
         StageBottom(
             stream = stream,
             landscape = landscape,
@@ -204,13 +210,14 @@ fun StreamFullScreen(
             onToggleMute = onToggleMute,
             onMicrophone = onMicrophone,
             actions = actions,
+            onLeave = onLeave,
             modifier = Modifier.align(Alignment.BottomCenter).windowInsetsPadding(bottomInsets),
         )
     }
 }
 
 @Composable
-private fun StageTop(stream: StreamUi, actions: StreamsController, modifier: Modifier) {
+private fun StageTop(stream: StreamUi, onCollapse: () -> Unit, modifier: Modifier) {
     val colors = MumcordTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -223,7 +230,7 @@ private fun StageTop(stream: StreamUi, actions: StreamsController, modifier: Mod
         MumcordStageButton(
             icon = MumcordIcons.ChevronDown,
             contentDescription = stringResource(R.string.stream_collapse),
-            onClick = actions::collapse,
+            onClick = onCollapse,
             modifier = Modifier.testTag(STREAM_COLLAPSE_TEST_TAG),
         )
         Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
@@ -255,6 +262,7 @@ private fun StageBottom(
     onToggleMute: () -> Unit,
     onMicrophone: () -> Unit,
     actions: StreamsController,
+    onLeave: (() -> Unit)?,
     modifier: Modifier,
 ) {
     val colors = MumcordTheme.colors
@@ -299,14 +307,23 @@ private fun StageBottom(
                 // The user cannot change the server's mute, so there is no button for it here.
                 MuteControl.ServerMuted, null -> Unit
             }
-            MumcordStageButton(
-                icon = MumcordIcons.Maximize,
-                contentDescription = stringResource(
-                    if (landscape) R.string.stream_rotate_portrait else R.string.stream_rotate_landscape,
-                ),
-                onClick = actions::toggleLandscape,
-                modifier = Modifier.testTag(STREAM_ROTATE_TEST_TAG),
-            )
+            if (onLeave != null) {
+                MumcordStageButton(
+                    icon = MumcordIcons.Maximize,
+                    contentDescription = stringResource(R.string.stream_leave_full_screen),
+                    onClick = onLeave,
+                    modifier = Modifier.testTag(STREAM_LEAVE_FULL_SCREEN_TEST_TAG),
+                )
+            } else {
+                MumcordStageButton(
+                    icon = MumcordIcons.Maximize,
+                    contentDescription = stringResource(
+                        if (landscape) R.string.stream_rotate_portrait else R.string.stream_rotate_landscape,
+                    ),
+                    onClick = actions::toggleLandscape,
+                    modifier = Modifier.testTag(STREAM_ROTATE_TEST_TAG),
+                )
+            }
             MumcordStageButton(
                 icon = MumcordIcons.Monitor,
                 contentDescription = stringResource(R.string.stream_collapse),
@@ -325,7 +342,7 @@ private fun StageBottom(
 
 /** What an opened stream shows where it has no picture, with "Try again" where it could not be reached. */
 @Composable
-private fun StageStatus(text: String, retry: (() -> Unit)?, small: Boolean = false) {
+internal fun StageStatus(text: String, retry: (() -> Unit)?, small: Boolean = false) {
     val colors = MumcordTheme.colors
     Box(Modifier.fillMaxSize().padding(MumcordSpace.s4), contentAlignment = Alignment.Center) {
         Column(
@@ -361,7 +378,12 @@ private fun StageStatus(text: String, retry: (() -> Unit)?, small: Boolean = fal
  * channels. A tap or the expand button opens it full screen; the cross stops watching.
  */
 @Composable
-fun StreamMiniWindow(stream: StreamUi, actions: StreamsController, modifier: Modifier = Modifier) {
+fun StreamMiniWindow(
+    stream: StreamUi,
+    actions: StreamsController,
+    modifier: Modifier = Modifier,
+    onExpand: () -> Unit = actions::expand,
+) {
     val colors = MumcordTheme.colors
     val shape = RoundedCornerShape(MumcordRadius.lg)
     val title = stream.title()
@@ -374,7 +396,7 @@ fun StreamMiniWindow(stream: StreamUi, actions: StreamsController, modifier: Mod
             .background(colors.stageBg)
             .border(1.dp, colors.borderStrong, shape)
             .reportStreamBounds(LocalStreamBounds.current)
-            .clickable(onClickLabel = stringResource(R.string.stream_expand), onClick = actions::expand)
+            .clickable(onClickLabel = stringResource(R.string.stream_expand), onClick = onExpand)
             .semantics { contentDescription = title }
             .testTag(STREAM_MINI_WINDOW_TEST_TAG),
     ) {
@@ -394,7 +416,7 @@ fun StreamMiniWindow(stream: StreamUi, actions: StreamsController, modifier: Mod
             MumcordStageButton(
                 icon = MumcordIcons.Maximize,
                 contentDescription = stringResource(R.string.stream_expand),
-                onClick = actions::expand,
+                onClick = onExpand,
                 size = 30.dp,
                 iconSize = 16.dp,
                 modifier = Modifier.testTag(STREAM_EXPAND_TEST_TAG),

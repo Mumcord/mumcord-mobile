@@ -26,6 +26,9 @@
     <string name="stream_rotate_portrait">Back to portrait</string>
     <string name="stream_stop">Stop watching</string>
     <string name="stream_expand">Open full screen</string>
+    <string name="stream_leave_full_screen">Leave full screen</string>
+    <string name="stream_chat_strip">%1$s chat</string>
+    <string name="stream_chat_strip_open">Show the whole chat</string>
     <string name="stream_volume">Stream volume</string>
     <string name="stream_try_again">Try again</string>
 

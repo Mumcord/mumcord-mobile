@@ -122,6 +122,22 @@ class StreamsControllerTest {
     }
 
     @Test
+    fun inTwoColumnsTheFullScreenButtonOpensTheWholeScreenAndLeavingItReturnsToTheColumn() = runTest(dispatcher) {
+        val viewModel = connected()
+        viewModel.streams.open(key)
+        runCurrent()
+        assertEquals("the header names the sharer's channel", "Gaming", viewModel.stream.channel)
+        viewModel.streams.fillScreen()
+        runCurrent()
+        assertEquals(StreamView.Whole, viewModel.streams.state.value.open?.view)
+        assertEquals("still watched", 1, engine.watchCalls.size)
+        viewModel.streams.expand()
+        runCurrent()
+        assertEquals(StreamView.Full, viewModel.streams.state.value.open?.view)
+        assertTrue("nothing was stopped on the way", engine.stopCalls.isEmpty())
+    }
+
+    @Test
     fun backShrinksToTheMiniWindowAndCloseStopsForGood() = runTest(dispatcher) {
         autoplay.value = true
         val viewModel = connected()

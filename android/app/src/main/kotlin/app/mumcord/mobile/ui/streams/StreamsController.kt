@@ -38,6 +38,7 @@ class StreamsController(
         streamsUiState(
             streams = session.streams,
             names = { session.server?.people?.get(it)?.name },
+            channels = { session.server?.let { server -> server.people[it]?.channelId?.let(server.channels::get)?.name } },
             local = local,
             autoplay = autoplay,
             directConnectionsQuestion = session.directConnectionsQuestion,
@@ -76,6 +77,9 @@ class StreamsController(
 
     /** The mini window's expand button: full screen again. */
     fun expand() = local.update { current -> current.copy(open = current.open?.copy(view = StreamView.Full)) }
+
+    /** The full screen button of the stream in the right column (two columns): the whole screen. */
+    fun fillScreen() = local.update { current -> current.copy(open = current.open?.copy(view = StreamView.Whole)) }
 
     /** Stop watching the opened stream: it closes and does not start by itself again. */
     fun close() = local.update { current ->

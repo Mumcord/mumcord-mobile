@@ -4,6 +4,7 @@
 
 ### Added
 
+- Android: two-column layout on tablets and other wide windows – a navigation rail, the channels with the voice bar on the left and the chat on the right; a stream you watch fills the right column with the chat below, and the layout follows rotation and split-screen resizing without losing what you were doing
 - Android: the 24 languages of the desktop app, following the phone's language, with "Language" in Settings to pick another one (Android 13 and later); texts that only the phone app has are in English and German so far
 - Android: opt-in crash reports as on the desktop – after a crash the server list says so and offers to report it; the report shows exactly what will be sent, takes an optional comment and is sent only with "Send report"; saved reports can be reported or deleted under More → About → Crash reports
 - Android: About Mumcord with the app and engine versions, the third-party licences and a link to the source code, and a daily check for a new version on GitHub that offers the download (can be switched off in Settings)

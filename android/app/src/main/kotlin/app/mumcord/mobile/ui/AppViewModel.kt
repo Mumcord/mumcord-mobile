@@ -232,13 +232,16 @@ class AppViewModel(
         )
     }
 
-    /** The Chat tab: the chat of the channel the user is in, while that tab is the one on screen. */
+    /**
+     * The Chat tab: the chat of the channel the user is in, while it is on screen (its tab, or
+     * the right column of Channels in two columns).
+     */
     val chat = ChatController(
         chats = repository.chat,
         openChat = repository.state.map { session ->
             session.server?.takeIf { session.showsServer }?.selfChannelId?.let { ChatId.Channel(it) }
         },
-        shown = connected.local.map { it.tab == ConnectedTab.Chat && !it.voiceOpen },
+        shown = connected.local.map { it.showsChannelChat && !it.voiceOpen },
         scope = viewModelScope,
     )
 
@@ -252,7 +255,7 @@ class AppViewModel(
     /** The number on the Chat tab. */
     val chatBadge: StateFlow<Int> =
         combine(repository.chat.unread, repository.state, connected.local) { unread, session, connectedLocal ->
-            chatTabBadge(unread, session, chatTabOpen = connectedLocal.tab == ConnectedTab.Chat)
+            chatTabBadge(unread, session, chatTabOpen = connectedLocal.showsChannelChat)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), 0)
 
     /** The Messages tab, message requests, chat requests and blocking. */

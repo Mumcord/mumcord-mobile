@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,7 +46,8 @@ import app.mumcord.mobile.design.tokens.MumcordSpace
 /**
  * The frame of a bottom sheet (`.sheet`): rounded top, grip, optional [title], and the content
  * in a column. Showing and hiding it, and the dimmed backdrop behind it
- * (`MumcordTheme.colors.backdrop`), belong to the screen that uses it.
+ * (`MumcordTheme.colors.backdrop`), belong to the screen that uses it. On a wide screen (a
+ * tablet) it is at most [SHEET_MAX_WIDTH] wide, as in the tablet mockups; the screen centres it.
  */
 @Composable
 fun MumcordSheetFrame(
@@ -59,6 +61,7 @@ fun MumcordSheetFrame(
     Column(
         verticalArrangement = Arrangement.spacedBy(MumcordSpace.s3),
         modifier = modifier
+            .widthIn(max = SHEET_MAX_WIDTH)
             .fillMaxWidth()
             .tokenShadow(MumcordTheme.shadows.raised, shape)
             .clip(shape)
@@ -88,6 +91,9 @@ fun MumcordSheetFrame(
         content()
     }
 }
+
+/** The width of a sheet on a tablet (`.tablet .sheet`); on a phone it is the full width. */
+val SHEET_MAX_WIDTH = 480.dp
 
 enum class MumcordBannerTone { Info, Warning, Danger }
 

@@ -32,6 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -199,7 +205,7 @@ fun ChatScreen(
             }
             NewMessageAnnouncement(state)
         }
-        Composer(state, actions)
+        ChatComposer(state, actions)
     }
 }
 
@@ -297,9 +303,12 @@ private fun HistoryNote(text: String) {
     )
 }
 
-/** The reply bar, the `@` suggestions, the counter and the input bar. */
+/**
+ * The reply bar, the `@` suggestions, the counter and the input bar; also under a stream in the
+ * right column of two columns.
+ */
 @Composable
-private fun Composer(state: ChatUiState, actions: ChatController) {
+internal fun ChatComposer(state: ChatUiState, actions: ChatController) {
     val colors = MumcordTheme.colors
     state.reply?.let { reply ->
         MumcordReplyBar(
@@ -342,7 +351,7 @@ private fun Composer(state: ChatUiState, actions: ChatController) {
             if (changed) actions.changeDraft(it.text, it.selection.end)
         },
         placeholder = stringResource(R.string.chat_placeholder, state.title),
-        modifier = Modifier.testTag(CHAT_INPUT_TEST_TAG),
+        modifier = Modifier.testTag(CHAT_INPUT_TEST_TAG).sendOnHardwareEnter(actions::send),
         leading = {
             MumcordIconButton(
                 MumcordIcons.Image,
@@ -401,7 +410,7 @@ private fun MentionList(mentions: List<MentionCandidate>, onPick: (MentionCandid
  * part of the keyboard's height, so only what is left of it is padded.
  */
 @Composable
-private fun Modifier.keyboardPadding(): Modifier {
+internal fun Modifier.keyboardPadding(): Modifier {
     val density = LocalDensity.current
     val keyboard = WindowInsets.ime.getBottom(density)
     var below by remember { mutableIntStateOf(0) }
@@ -409,4 +418,16 @@ private fun Modifier.keyboardPadding(): Modifier {
         val root = coordinates.findRootCoordinates()
         below = (root.size.height - (coordinates.positionInRoot().y + coordinates.size.height)).roundToInt()
     }.padding(bottom = with(density) { (keyboard - below).coerceAtLeast(0).toDp() })
+}
+
+/**
+ * Enter on a hardware keyboard (a tablet's keyboard cover) sends; Shift+Enter still starts a new
+ * line. The on-screen keyboard is left alone: its Enter key always starts a new line.
+ */
+private fun Modifier.sendOnHardwareEnter(send: () -> Unit): Modifier = onPreviewKeyEvent { event ->
+    val hardware = event.nativeKeyEvent.device?.isVirtual == false
+    val enter = event.key == Key.Enter || event.key == Key.NumPadEnter
+    if (!hardware || !enter || event.isShiftPressed) return@onPreviewKeyEvent false
+    if (event.type == KeyEventType.KeyDown) send()
+    true
 }

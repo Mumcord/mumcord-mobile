@@ -249,7 +249,7 @@ class StreamsScreenshotTest {
  * on black as the real picture is.
  */
 @androidx.compose.runtime.Composable
-private fun MockupPicture(modifier: Modifier) {
+internal fun MockupPicture(modifier: Modifier) {
     Canvas(modifier) {
         drawRect(Color.Black)
         val width = minOf(size.width, size.height * 16f / 9f)

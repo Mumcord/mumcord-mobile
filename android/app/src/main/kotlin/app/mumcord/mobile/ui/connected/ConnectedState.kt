@@ -169,7 +169,13 @@ data class ConnectedLocal(
     val outputOpen: Boolean = false,
     /** The moderation step that replaced the person sheet: move, kick or ban. */
     val moderation: ModerationLocal? = null,
-)
+    /** The screen is laid out in two columns, as the shell last measured it. */
+    val twoColumns: Boolean = false,
+) {
+    /** The channel chat is on screen: its own tab, or beside the channels in two columns. */
+    val showsChannelChat: Boolean
+        get() = tab == ConnectedTab.Chat || twoColumns && tab == ConnectedTab.Channels
+}
 
 /** The sheet over the connected screens. At most one at a time. */
 sealed interface ConnectedSheet {
@@ -222,6 +228,8 @@ data class ConnectedUiState(
     /** The voice bar and the full voice view; null while the user's own entry is unknown. */
     val voice: VoiceUiState?,
     val sheet: ConnectedSheet?,
+    /** See [ConnectedLocal.showsChannelChat]. */
+    val showsChannelChat: Boolean = tab == ConnectedTab.Chat,
 )
 
 /** The connected screens as a value, or null while no server is shown. */
@@ -298,5 +306,6 @@ fun connectedUiState(
             ?: MicrophoneNotice.None,
         voice = voiceUiState(session, server, local, serverName, microphone, output.current),
         sheet = sheet,
+        showsChannelChat = local.showsChannelChat,
     )
 }

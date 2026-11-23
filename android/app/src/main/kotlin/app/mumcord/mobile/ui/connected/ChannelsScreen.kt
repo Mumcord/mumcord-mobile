@@ -2,6 +2,7 @@
 package app.mumcord.mobile.ui.connected
 
 import app.mumcord.mobile.ui.streams.StreamTileLine
+import app.mumcord.mobile.ui.streams.StreamKey
 import app.mumcord.mobile.ui.streams.StreamsController
 import app.mumcord.mobile.ui.streams.StreamsUiState
 import androidx.compose.foundation.layout.Box
@@ -64,6 +65,7 @@ fun ChannelsScreen(
     topInsets: WindowInsets,
     streams: StreamsUiState = StreamsUiState(),
     streamActions: StreamsController? = null,
+    hiddenStream: StreamKey? = null,
 ) {
     Column(Modifier.fillMaxSize()) {
         MumcordAppBar(
@@ -89,7 +91,7 @@ fun ChannelsScreen(
                 Paragraph(stringResource(R.string.channels_search_empty))
             }
         } else {
-            ChannelList(state.rows, state.hints, actions, streams, streamActions)
+            ChannelList(state.rows, state.hints, actions, streams, streamActions, hiddenStream)
         }
     }
 }
@@ -118,6 +120,7 @@ private fun ChannelList(
     actions: ConnectedController,
     streams: StreamsUiState,
     streamActions: StreamsController?,
+    hiddenStream: StreamKey?,
 ) {
     // Rows are immutable values with stable keys: when one person starts or stops talking,
     // only that person's row is drawn again.
@@ -147,7 +150,8 @@ private fun ChannelList(
                 is ChannelListRow.PersonItem -> PersonLine(row, actions::openPerson, indent)
                 is ChannelListRow.StreamItem -> {
                     val stream = streams.streams[row.key]
-                    if (stream != null && streamActions != null) {
+                    // The stream shown in the right column of two columns has no tile as well.
+                    if (stream != null && streamActions != null && row.key != hiddenStream) {
                         StreamTileLine(stream, streamActions::open, streamActions::tileShown, indent)
                     }
                 }

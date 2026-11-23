@@ -230,7 +230,12 @@ lists every scenario with its result, duration and attempts, and what the failed
   moving test pattern with VP9): on the emulator's mobile data the tile waits for a tap and the
   sharer reports nobody watching before it, then the picture must show the pattern (dark top
   left, bright bottom right, moving) full screen, in landscape and in the mini window above the
-  chat, and the run prints the time from the tap to the first picture; the phone's own camera,
+  chat, and the run prints the time from the tap to the first picture; the same share on a
+  tablet: the test makes the emulator's screen 800 x 1280 dp (`wm size 1600x2560`,
+  `wm density 320`) before the app starts and puts it back afterwards, and the script puts it
+  back again whenever a scenario ends, so a crash never leaves the shared emulator
+  tablet-sized; channels and chat must be side by side and the share must play in the right
+  column with the chat strip below; the phone's own camera,
   watched by `e2e/stream-peer --viewer` (the engine on the host, decoding it as the desktop app
   does): the emulator's camera films nothing that can be checked, so the debug build's
   `TestSettings.cameraSource` puts a test pattern camera (`TestPatternCamera`, dark at the top

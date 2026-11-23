@@ -25,6 +25,9 @@
     <string name="stream_rotate_portrait">Zurück ins Hochformat</string>
     <string name="stream_stop">Zuschauen beenden</string>
     <string name="stream_expand">Vollbild öffnen</string>
+    <string name="stream_leave_full_screen">Vollbild verlassen</string>
+    <string name="stream_chat_strip">Chat in %1$s</string>
+    <string name="stream_chat_strip_open">Ganzen Chat zeigen</string>
     <string name="stream_volume">Stream-Lautstärke</string>
     <string name="stream_try_again">Erneut versuchen</string>
     <string name="stream_unreachable_no_path">Stream aus diesem Netzwerk nicht erreichbar</string>

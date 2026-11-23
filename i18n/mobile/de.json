@@ -405,6 +405,8 @@
   "stream_rotate_landscape": "Ins Querformat drehen",
   "stream_rotate_portrait": "Zurück ins Hochformat",
   "stream_expand": "Vollbild öffnen",
+  "stream_chat_strip": "Chat in {{arg1}}",
+  "stream_chat_strip_open": "Ganzen Chat zeigen",
   "stream_volume": "Stream-Lautstärke",
   "stream_unreachable_no_path": "Stream aus diesem Netzwerk nicht erreichbar",
   "stream_unreachable_peer_to_peer_off": "Peer-to-Peer ist für diesen Server aus.",

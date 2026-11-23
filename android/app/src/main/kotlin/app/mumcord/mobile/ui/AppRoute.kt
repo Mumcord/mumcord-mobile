@@ -267,9 +267,9 @@ fun AppContent(
     val profileSheet = more?.profileEdit?.takeIf { it.edit.sheet != null && onMoreTab }
     val themesSheet = more?.themes?.takeIf { it.sheet != null && onMoreTab }
     // A chat's sheets and its full-screen picture belong to the tab that shows the chat.
-    val shownChat = when (uiState.connected?.tab) {
-        ConnectedTab.Chat -> chat
-        ConnectedTab.Messages -> conversation.takeIf { messages?.open != null }
+    val shownChat = when {
+        uiState.connected?.showsChannelChat == true -> chat
+        uiState.connected?.tab == ConnectedTab.Messages -> conversation.takeIf { messages?.open != null }
         else -> null
     }.takeIf { !covered }
     val chatOverlay = shownChat?.takeIf { it.sheet != null || it.viewer != null || it.urlToOpen != null }

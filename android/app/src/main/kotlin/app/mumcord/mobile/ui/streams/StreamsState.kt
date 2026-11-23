@@ -14,8 +14,12 @@ data class StreamKey(val session: UInt, val kind: StreamKind)
 val Stream.key: StreamKey
     get() = StreamKey(session, kind)
 
-/** How an opened stream is shown: full screen, or the floating mini window above the other screens. */
-enum class StreamView { Full, Mini }
+/**
+ * How an opened stream is shown: [Full] is the whole screen on a phone and the right column in
+ * two columns, [Mini] the floating mini window above the other screens, and [Whole] the whole
+ * screen that the right column's full screen button opens.
+ */
+enum class StreamView { Full, Mini, Whole }
 
 data class OpenStream(val key: StreamKey, val view: StreamView)
 
@@ -106,6 +110,8 @@ data class StreamUi(
     val volume: Int,
     val viewers: Int?,
     val tile: TileLook,
+    /** The channel the sharer is in, for the stream's header in two columns; untrusted text. */
+    val channel: String? = null,
 )
 
 data class StreamsUiState(
@@ -125,6 +131,7 @@ fun streamsUiState(
     local: StreamsLocal,
     autoplay: Boolean,
     directConnectionsQuestion: Boolean,
+    channels: (UInt) -> String? = { null },
 ): StreamsUiState {
     val shown = streams.mapNotNull { stream ->
         // A stream of someone the tree does not know (yet) cannot be named, so it waits.
@@ -140,6 +147,7 @@ fun streamsUiState(
             volume = local.volumeDrafts[key] ?: stream.volume.toInt(),
             viewers = stream.viewers?.toInt(),
             tile = tileLook(stream, local, autoplay),
+            channel = channels(stream.session),
         )
     }
     return StreamsUiState(

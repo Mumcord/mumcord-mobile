@@ -9,11 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -35,6 +39,7 @@ import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import app.mumcord.mobile.design.icons.MumcordIcons
 import app.mumcord.mobile.design.theme.MumcordTheme
+import app.mumcord.mobile.design.tokens.MumcordSpace
 
 /**
  * One tab. [badge] is the unread count shown on the icon; [contentDescription] replaces the
@@ -86,6 +91,48 @@ fun MumcordTabBar(
     }
 }
 
+/**
+ * The same tabs as a navigation rail at the left edge (`.tabbar--rail`), for two columns on
+ * tablets. It reaches up into the status bar area with its own background and starts its tabs
+ * below it ([windowInsets]).
+ */
+@Composable
+fun MumcordNavigationRail(
+    tabs: List<MumcordTab>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    windowInsets: WindowInsets = WindowInsets.statusBars,
+) {
+    val colors = MumcordTheme.colors
+    Column(
+        verticalArrangement = Arrangement.spacedBy(MumcordSpace.s2),
+        modifier = modifier
+            .width(RAIL_WIDTH)
+            .fillMaxHeight()
+            .background(colors.bgServers)
+            .drawBehind {
+                val x = size.width - 0.5.dp.toPx()
+                drawLine(colors.border, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1.dp.toPx())
+            }
+            .windowInsetsPadding(windowInsets)
+            .padding(vertical = MumcordSpace.s3)
+            .selectableGroup(),
+    ) {
+        tabs.forEachIndexed { index, tab ->
+            TabItem(
+                tab = tab,
+                selected = index == selectedIndex,
+                onClick = { onSelect(index) },
+                modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 60.dp),
+            )
+        }
+    }
+}
+
+/** Width of the navigation rail (`.tabbar--rail`). */
+val RAIL_WIDTH = 88.dp
+
 @Composable
 private fun TabItem(tab: MumcordTab, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MumcordTheme.colors
@@ -133,6 +180,26 @@ private fun TabBarDarkPreview() {
 @Composable
 private fun TabBarLightPreview() {
     PreviewFrame(darkTheme = false) { TabBarSample() }
+}
+
+@Preview(name = "Navigation rail dark", heightDp = 320)
+@Composable
+private fun NavigationRailDarkPreview() {
+    PreviewFrame(darkTheme = true) { NavigationRailSample() }
+}
+
+@Composable
+internal fun NavigationRailSample() {
+    MumcordNavigationRail(
+        tabs = listOf(
+            MumcordTab(MumcordIcons.List, "Channels"),
+            MumcordTab(MumcordIcons.Messages, "Messages", badge = "2", contentDescription = "Messages, 2 unread"),
+            MumcordTab(MumcordIcons.More, "More"),
+        ),
+        selectedIndex = 0,
+        onSelect = {},
+        windowInsets = WindowInsets(),
+    )
 }
 
 @Composable

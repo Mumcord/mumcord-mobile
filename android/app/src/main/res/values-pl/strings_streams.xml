@@ -29,6 +29,9 @@
     <string name="stream_rotate_portrait">Back to portrait</string>
     <string name="stream_stop">Przestań oglądać</string>
     <string name="stream_expand">Open full screen</string>
+    <string name="stream_leave_full_screen">Zamknij pełny ekran</string>
+    <string name="stream_chat_strip">%1$s chat</string>
+    <string name="stream_chat_strip_open">Show the whole chat</string>
     <string name="stream_volume">Stream volume</string>
     <string name="stream_try_again">Spróbuj ponownie</string>
     <string name="stream_unreachable_no_path">Stream not reachable from this network</string>

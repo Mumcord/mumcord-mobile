@@ -72,5 +72,6 @@
   "stream_try_again": "screenviewer:retry",
   "camera_share_cancel": "camera:preview.cancel",
   "camera_stop": "screenshare:liveBar.stop",
-  "camera_notice_dismiss": "camera:errors.dismissStopped"
+  "camera_notice_dismiss": "camera:errors.dismissStopped",
+  "stream_leave_full_screen": "screenviewer:exitFullscreen"
 }

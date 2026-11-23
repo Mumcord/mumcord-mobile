@@ -25,11 +25,10 @@ All end-to-end scenarios and instrumented tests run in CI on every push to a pul
 
 | Kind | Criteria |
 |---|---|
-| End-to-end, some with instrumented tests for a part (AC-5.4's password channel is instrumented only) | 26 |
+| End-to-end, some with instrumented tests for a part (AC-5.4's password channel is instrumented only) | 27 |
 | Instrumented or unit tests only | 2 (AC-5.20, AC-5.32) |
 | Automated as far as the emulator allows, the rest manual | 6 (AC-5.8, AC-5.10, AC-5.11, AC-5.12, AC-5.24, AC-5.33) |
 | Checked elsewhere (release check V10, desktop CI) | 3 (AC-5.34, AC-5.35, AC-5.36) |
-| Missing: the feature is not built yet | 1 (AC-5.31 tablet) |
 
 ## Criteria
 
@@ -65,7 +64,7 @@ All end-to-end scenarios and instrumented tests run in CI on every push to a pul
 | AC-5.28 | Activity log with join, leave, move, kick and filters | End-to-end `ActivityFlowTest` (join, move, leave and filters); kicks: instrumented `ActivityUiFlowTest`, because the bridge reports a kick of somebody else as leaving |
 | AC-5.29 | `mumble://` link shows the target and connects after confirmation | End-to-end `LinkFlowTest` (the system opens the link in the running app); instrumented `AppFlowTest.aLinkShowsItsTargetAndConnectsOnlyAfterConfirmationAlsoWhenConnectedElsewhere` |
 | AC-5.30 | Disconnect when alone: warning, "Stay connected", disconnect | End-to-end `IdleDisconnectFlowTest` (shortened times, also in Doze); instrumented `SettingsUiFlowTest`, `IdleNotifierTest` |
-| AC-5.31 | Tablet: two columns | Missing: the tablet layout is not built yet (task 9.1) |
+| AC-5.31 | Tablet: two columns in portrait and landscape; a stream fills the right column with the chat strip below | End-to-end `TabletFlowTest` (the emulator's screen is made a tablet's, 800 x 1280 dp, with `wm size` and `wm density` and put back afterwards: channels and chat side by side, a message sent, the share of `e2e/stream-peer` playing in the right column with the chat strip below and the channels still visible); instrumented `TabletUiFlowTest` (landscape and portrait at forced tablet sizes, the full screen button and back, the mini window, Messages in the right column, and resizing between phone and tablet keeping the tab, the draft and the stream); unit `ConnectedLayoutTest`; screenshots `android-tablet-*` in landscape and portrait |
 | AC-5.32 | A desktop file transfer is only a hint line | Unit tests of the session and chat state (`SessionReducerTest`, `ChatStateTest`, `ConnectedStateTest`). An end-to-end scenario is missing: the helpers on the host cannot start a desktop file transfer yet |
 | AC-5.33 | 200 % font size and TalkBack | Instrumented checks at twice the font size (`IdentitiesUiFlowTest`, `PublicServersUiFlowTest`) and screen-reader labels in the instrumented tests. Manual: a TalkBack pass on the device checklist |
 | AC-5.34 | Update over the old app keeps data; update notice | Update notice: instrumented `AboutUiFlowTest`. Installing a newer signed APK over the app: release check V10 and the device checklist, because it needs two signed release builds |

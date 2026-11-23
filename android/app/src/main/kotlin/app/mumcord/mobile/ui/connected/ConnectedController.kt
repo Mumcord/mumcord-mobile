@@ -64,6 +64,9 @@ class ConnectedController(
 
     fun selectTab(tab: ConnectedTab) = mutableLocal.update { it.copy(tab = tab) }
 
+    /** The shell measured its space again (rotation, resize, split screen). */
+    fun setTwoColumns(twoColumns: Boolean) = mutableLocal.update { it.copy(twoColumns = twoColumns) }
+
     /** Brings a tab in front of whatever is open: a sheet and the full voice view go away. */
     fun showTab(tab: ConnectedTab) {
         closeVoice()
