@@ -7,7 +7,6 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -113,7 +112,7 @@ class CameraShareUiFlowTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { exists("Nordlicht · Voice connected") }
         compose.onNodeWithText("Nordlicht · Voice connected").performClick()
         await { shown(VOICE_CAMERA_TEST_TAG) }

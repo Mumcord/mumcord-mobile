@@ -152,7 +152,7 @@ class MessagesUiFlowTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await("the connected screens") { shown(VOICE_BAR_TEST_TAG) }
         return viewModel
     }
@@ -184,7 +184,7 @@ class MessagesUiFlowTest {
         await("the messages to count as read") { engine.unread[annaChat] == null }
 
         compose.onNode(hasSetTextAction()).performTextInput("On my way")
-        compose.onNodeWithTag(CHAT_SEND_TEST_TAG).performClick()
+        compose.onNodeWithTag(CHAT_SEND_TEST_TAG).press()
         await("the answer to be sent") { engine.messages[annaChat].orEmpty().any { it.own } }
 
         compose.onNodeWithContentDescription("Back to the conversations").performClick()
@@ -207,7 +207,7 @@ class MessagesUiFlowTest {
         await("the search to leave one person") {
             compose.onAllNodesWithTag(PICKER_PERSON_TEST_TAG).fetchSemanticsNodes().size == 1
         }
-        compose.onNodeWithTag(PICKER_PERSON_TEST_TAG).performClick()
+        compose.onNodeWithTag(PICKER_PERSON_TEST_TAG).press()
 
         await("the conversation with Mira") { shown(CHAT_SCREEN_TEST_TAG) && exists("Mira") }
         assertEquals(ChatId.Session(MOCKUP_MIRA), engine.openChat)
@@ -279,7 +279,7 @@ class MessagesUiFlowTest {
         await("the chat request") { shown(CHAT_REQUEST_SEND_TEST_TAG) }
 
         compose.onNode(hasSetTextAction()).performTextInput("We met in Raid")
-        compose.onNodeWithTag(CHAT_REQUEST_SEND_TEST_TAG).performClick()
+        compose.onNodeWithTag(CHAT_REQUEST_SEND_TEST_TAG).press()
         await("the request to be sent") { engine.chatRequestCalls.toList() == listOf(MOCKUP_MIRA to "We met in Raid") }
         await("the sheet to close") { !shown(CHAT_REQUEST_SEND_TEST_TAG) }
 

@@ -119,7 +119,7 @@ class ModerationUiFlowTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await("the connected screens") { shown(VOICE_BAR_TEST_TAG) }
         compose.onNode(hasTestTag(PERSON_ROW_TEST_TAG) and hasText("Jonas")).performClick()
         await("Jonas's sheet") { shown(PERSON_SHEET_TEST_TAG) }
@@ -156,7 +156,7 @@ class ModerationUiFlowTest {
         compose.onNodeWithTag(MODERATION_KICK_TEST_TAG).performScrollTo().performClick()
         await("the kick question") { exists("Kick Jonas?") }
         compose.onNodeWithContentDescription("Reason").performTextInput("Cool down")
-        compose.onNodeWithTag(KICK_CONFIRM_TEST_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(KICK_CONFIRM_TEST_TAG).performScrollTo().press()
         await("the server's refusal in the sheet") { shown(MODERATION_ERROR_TEST_TAG) && exists("Kicking is off tonight", substring = true) }
 
         compose.onNodeWithTag(KICK_CONFIRM_TEST_TAG).performScrollTo().performClick()

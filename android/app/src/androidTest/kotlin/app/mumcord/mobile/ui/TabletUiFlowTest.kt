@@ -14,7 +14,6 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
@@ -114,7 +113,7 @@ class TabletUiFlowTest {
                 }
             }
         }
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { exists("Lobby") && shown(NAVIGATION_RAIL_TEST_TAG) }
         return viewModel
     }
@@ -129,7 +128,7 @@ class TabletUiFlowTest {
 
         engine.showStreams(listOf(mockupStream()))
         await { shown(STREAM_TILE_TEST_TAG) }
-        compose.onNodeWithTag(STREAM_TILE_TEST_TAG).performClick()
+        compose.onNodeWithTag(STREAM_TILE_TEST_TAG).press()
         await { shown(STREAM_COLUMN_TEST_TAG) && shown(STREAM_CHAT_STRIP_TEST_TAG) }
         assertFalse("the stream covers only the right column", shown(STREAM_FULL_SCREEN_TEST_TAG))
         assertFalse("its tile left the tree", shown(STREAM_TILE_TEST_TAG))
@@ -160,7 +159,7 @@ class TabletUiFlowTest {
         type("Kept across sizes")
         engine.showStreams(listOf(mockupStream()))
         await { shown(STREAM_TILE_TEST_TAG) }
-        compose.onNodeWithTag(STREAM_TILE_TEST_TAG).performClick()
+        compose.onNodeWithTag(STREAM_TILE_TEST_TAG).press()
         await { shown(STREAM_COLUMN_TEST_TAG) }
 
         // Narrow as half a split screen: the phone layout, where an open stream is full screen.

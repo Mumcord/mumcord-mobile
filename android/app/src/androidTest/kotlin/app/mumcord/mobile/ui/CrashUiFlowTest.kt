@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.ui
 
+import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -49,6 +50,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
@@ -59,7 +61,10 @@ import org.junit.Test
  */
 class CrashUiFlowTest {
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Before
+    fun resizeForTheKeyboard() = compose.resizeForTheKeyboardLikeTheApp()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val panic = crashReport("crash-1777900000.txt", createdMs = 1_777_900_000_000)
@@ -128,7 +133,7 @@ class CrashUiFlowTest {
         await { shownText("comment:\nI was talking") }
         assertTrue("nothing is sent before Send", source.uploads.isEmpty())
 
-        compose.onNodeWithTag(CRASH_UPLOAD_SEND_TEST_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(CRASH_UPLOAD_SEND_TEST_TAG).performScrollTo().press()
         await { source.uploads.isNotEmpty() }
         assertEquals(listOf(panic.id to "I was talking"), source.uploads.toList())
         await { shownText("Report sent. Thank you!") }
@@ -162,7 +167,7 @@ class CrashUiFlowTest {
     fun savedReportsAreListedUnderAboutAndDeleted() {
         val source = FakeCrashSource(listOf(panic, native, killed), unseen = emptyList())
         start(source)
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { shown(VOICE_BAR_TEST_TAG) }
         compose.onNodeWithText("More").performClick()
         await { shown(MORE_ABOUT_TEST_TAG) }

@@ -10,7 +10,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -208,7 +207,7 @@ class IdentitiesUiFlowTest {
     }
 
     private fun openIdentitiesFromMore() {
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { shown(VOICE_BAR_TEST_TAG) }
         compose.onNodeWithText("More").performClick()
         compose.onNodeWithTag(MORE_IDENTITIES_TEST_TAG).performClick()
@@ -248,7 +247,7 @@ class IdentitiesUiFlowTest {
         compose.onNodeWithTag(IDENTITY_CREATE_TEST_TAG).performClick()
         compose.onNodeWithTag(IDENTITY_CREATE_CONFIRM_TEST_TAG).assertIsNotEnabled()
         compose.onNodeWithContentDescription("Name on servers").performTextInput("Lea")
-        compose.onNodeWithTag(IDENTITY_CREATE_CONFIRM_TEST_TAG).performClick()
+        compose.onNodeWithTag(IDENTITY_CREATE_CONFIRM_TEST_TAG).press()
 
         await { shown(TALK_MODE_CONTINUE_TEST_TAG) }
         assertEquals(listOf("Lea"), labels())
@@ -290,7 +289,7 @@ class IdentitiesUiFlowTest {
         compose.onNodeWithText("Server passwords are not transferred.").assertIsDisplayed()
         assertEquals("nothing is imported before the user says so", emptyList<String>(), labels())
 
-        compose.onNodeWithTag(SCAN_IMPORT_TEST_TAG).performClick()
+        compose.onNodeWithTag(SCAN_IMPORT_TEST_TAG).press()
         await { shown(SCAN_DONE_TEST_TAG) }
         assertTrue(text("1 identity, 1 server"))
         assertTrue(text("Nordlicht · Already on this phone"))
@@ -316,7 +315,7 @@ class IdentitiesUiFlowTest {
         assertTrue("the scan starts over", described("Waiting for the first code"))
         assertTrue("the code field is gone", !shown(SCAN_CODE_TEST_TAG))
 
-        compose.onNodeWithContentDescription("Close").performClick()
+        compose.onNodeWithContentDescription("Close").press()
         await { shown(SERVER_SCAN_TEST_TAG) }
     }
 
@@ -396,7 +395,7 @@ class IdentitiesUiFlowTest {
         compose.onNodeWithContentDescription("Password").performTextInput(password)
         compose.onNodeWithTag(IDENTITY_EXPORT_CONFIRM_TEST_TAG).assertIsNotEnabled()
         compose.onNodeWithContentDescription("Repeat the password").performTextInput(password)
-        compose.onNodeWithTag(IDENTITY_EXPORT_CONFIRM_TEST_TAG).performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithTag(IDENTITY_EXPORT_CONFIRM_TEST_TAG).performScrollTo().press()
 
         await { shared.isNotEmpty() }
         assertEquals("mumcord-identity-Lea.p12", shared.single().fileName)
@@ -414,11 +413,11 @@ class IdentitiesUiFlowTest {
         compose.onNodeWithTag(IDENTITY_IMPORT_TEST_TAG).performScrollTo().performClick()
         await { shown(IDENTITY_IMPORT_CONFIRM_TEST_TAG) }
         compose.onNodeWithContentDescription("Password of the file").performTextInput("not it")
-        compose.onNodeWithTag(IDENTITY_IMPORT_CONFIRM_TEST_TAG).performClick()
+        compose.onNodeWithTag(IDENTITY_IMPORT_CONFIRM_TEST_TAG).press()
         await { fieldError("The password is wrong, or this file does not hold an identity.") }
 
         compose.onNodeWithContentDescription("Password of the file").performTextInput(engine.filePassword)
-        compose.onNodeWithTag(IDENTITY_IMPORT_CONFIRM_TEST_TAG).performClick()
+        compose.onNodeWithTag(IDENTITY_IMPORT_CONFIRM_TEST_TAG).press()
         await { labels() == listOf("Lea", IMPORTED_NAME) }
         await { compose.onAllNodesWithTag(IDENTITY_CARD_TEST_TAG).fetchSemanticsNodes().size == 2 }
 
@@ -441,7 +440,7 @@ class IdentitiesUiFlowTest {
         await { shown(IDENTITY_DELETE_CONFIRM_TEST_TAG) }
 
         compose.onNodeWithContentDescription("Type the identity label to confirm").performScrollTo().performTextInput("Lea")
-        compose.onNodeWithTag(IDENTITY_DELETE_CONFIRM_TEST_TAG).performScrollTo().assertIsEnabled().performClick()
+        compose.onNodeWithTag(IDENTITY_DELETE_CONFIRM_TEST_TAG).performScrollTo().press()
         await { labels() == listOf(IMPORTED_NAME) }
         await { compose.onAllNodesWithTag(IDENTITY_CARD_TEST_TAG).fetchSemanticsNodes().size == 1 }
     }

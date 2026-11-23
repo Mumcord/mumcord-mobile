@@ -101,7 +101,7 @@ class VoiceUiFlowTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { shown(VOICE_BAR_TEST_TAG) }
         return viewModel
     }

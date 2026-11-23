@@ -151,7 +151,7 @@ class PublicServersUiFlowTest {
         compose.onNodeWithContentDescription(SEARCH).performTextClearance()
         await { rows() == 4 }
 
-        compose.onNodeWithText("Germany").performClick()
+        compose.onNodeWithText("Germany").press()
         await { rows() == 2 && text("Berlin Gaming") && text("Lantern Guild") && !text("Nordic Friends") }
         compose.onNodeWithText("Any country").performClick()
         await { rows() == 4 }

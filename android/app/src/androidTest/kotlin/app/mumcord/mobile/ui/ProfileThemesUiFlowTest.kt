@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 package app.mumcord.mobile.ui
 
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -11,10 +12,9 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -58,13 +58,17 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 /** Edit profile and the themes screen (FR-5.80, FR-5.81) on a device against a fake engine. */
 class ProfileThemesUiFlowTest {
     @get:Rule
-    val compose = createComposeRule()
+    val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Before
+    fun resizeForTheKeyboard() = compose.resizeForTheKeyboardLikeTheApp()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private lateinit var engine: FakeEngine
@@ -106,7 +110,7 @@ class ProfileThemesUiFlowTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { shown(VOICE_BAR_TEST_TAG) }
         compose.onNodeWithText("More").performClick()
     }
@@ -132,7 +136,7 @@ class ProfileThemesUiFlowTest {
         compose.onNodeWithTag(PROFILE_SAVE_TEST_TAG).assertIsNotEnabled()
 
         compose.onNode(field(PROFILE_COMMENT_TEST_TAG)).performTextReplacement("Up for a chat")
-        compose.onNodeWithTag(PROFILE_PHOTO_TEST_TAG).performClick()
+        compose.onNodeWithTag(PROFILE_PHOTO_TEST_TAG).press()
         await { shown(AVATAR_REMOVE_TEST_TAG) }
         compose.onNodeWithTag(AVATAR_REMOVE_TEST_TAG).performClick()
         compose.onNodeWithTag(PROFILE_SAVE_TEST_TAG).assertIsEnabled().performClick()
@@ -163,7 +167,7 @@ class ProfileThemesUiFlowTest {
         await { compose.onAllNodes(invalid).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(field(THEMES_CODE_FIELD_TEST_TAG)).performTextReplacement("🎨 Mumcord theme \"Imported\" – $FAKE_THEME_CODE")
         await { shown(THEMES_PREVIEW_TEST_TAG) }
-        compose.onNodeWithTag(THEMES_APPLY_TEST_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(THEMES_APPLY_TEST_TAG).performScrollTo().press()
 
         await { engine.themeSettings.appThemeId == "custom:1" }
         await { shown(themeTileTestTag("custom:1")) }

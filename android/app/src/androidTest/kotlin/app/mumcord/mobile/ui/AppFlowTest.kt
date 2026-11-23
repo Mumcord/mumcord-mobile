@@ -170,7 +170,7 @@ class AppFlowTest {
         compose.onNodeWithContentDescription("Port").performTextReplacement("40000")
         compose.onNodeWithContentDescription("Name").performTextInput("Home")
         compose.onNodeWithContentDescription("User name").performTextInput("Tester")
-        compose.onNodeWithTag(FORM_SAVE_TEST_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(FORM_SAVE_TEST_TAG).performScrollTo().press()
 
         await { exists("Home") && exists("10.0.2.2:40000") }
         compose.onNodeWithContentDescription("Connect to Home").performClick()
@@ -193,7 +193,7 @@ class AppFlowTest {
     @Test
     fun connectedJoinAChannelOpenAPersonSearchSwitchTabsAndDisconnect() {
         val viewModel = start()
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { exists("Test Root") && exists("you are here") }
 
         // Tapping a channel joins it.
@@ -213,7 +213,7 @@ class AppFlowTest {
         compose.onNode(hasSetTextAction()).performTextInput("ali")
         // The voice bar keeps naming the user's channel; its row in the list is what goes.
         await { exists("Alice") && compose.onAllNodesWithText("<b>Games</b>").fetchSemanticsNodes().size == 1 }
-        compose.onNodeWithContentDescription("Close search").performClick()
+        compose.onNodeWithContentDescription("Close search").press()
         await { compose.onAllNodesWithText("<b>Games</b>").fetchSemanticsNodes().size == 2 }
 
         compose.onNodeWithText("Chat").performClick()
@@ -229,7 +229,7 @@ class AppFlowTest {
             it.channelPasswords[1u] = "secret"
             it.deniedChannels += 2u
         })
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { exists("Test Root") }
         // The user starts in Lobby; move to the root first so Lobby can be joined.
         compose.onNodeWithText("Test Root").performClick()
@@ -238,10 +238,10 @@ class AppFlowTest {
         compose.onNodeWithText("Lobby").performClick()
         await { exists("Channel password") }
         compose.onNode(hasSetTextAction()).performTextInput("wrong")
-        compose.onNodeWithTag(CHANNEL_PASSWORD_JOIN_TEST_TAG).performClick()
+        compose.onNodeWithTag(CHANNEL_PASSWORD_JOIN_TEST_TAG).press()
         await { hasFieldError("That password was not accepted. Try again.") }
         compose.onNode(hasSetTextAction()).performTextInput("secret")
-        compose.onNodeWithTag(CHANNEL_PASSWORD_JOIN_TEST_TAG).performClick()
+        compose.onNodeWithTag(CHANNEL_PASSWORD_JOIN_TEST_TAG).press()
         await { !exists("Channel password") }
 
         compose.onNodeWithText("<b>Games</b>").performClick()
@@ -259,7 +259,7 @@ class AppFlowTest {
     @Test
     fun aChangedCertificateWarnsStronglyAndNotTrustingItEndsInAnErrorWithRetry() {
         start(prompt = CertificatePrompt(fingerprint, previousFingerprint = "11:22:33"))
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
 
         await { exists("Server identity changed") }
         compose.onNodeWithText("11:22:33").assertIsDisplayed()
@@ -275,14 +275,14 @@ class AppFlowTest {
     @Test
     fun aWrongPasswordOffersToEnterItAndTryAgain() {
         start(configure = { it.requiredPassword = "open sesame" })
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
 
         await { exists("Enter password") }
         compose.onNodeWithTag(CONNECT_RETRY_TEST_TAG).performClick()
         await { exists("Server password") }
         compose.onNodeWithTag(PASSWORD_CONNECT_TEST_TAG).assertIsNotEnabled()
         compose.onNodeWithContentDescription("Password").performTextInput("open sesame")
-        compose.onNodeWithTag(PASSWORD_CONNECT_TEST_TAG).performClick()
+        compose.onNodeWithTag(PASSWORD_CONNECT_TEST_TAG).press()
 
         await { exists("Channels") }
         assertEquals(ConnectCall(1, "open sesame", emptyList()), engine.connectCalls.last())
@@ -297,7 +297,7 @@ class AppFlowTest {
         compose.onNodeWithContentDescription("Edit Tidepool").performClick()
         await { exists("Edit server") }
         compose.onNodeWithContentDescription("Name").performTextReplacement("Tide")
-        compose.onNodeWithTag(FORM_SAVE_TEST_TAG).performScrollTo().performClick()
+        compose.onNodeWithTag(FORM_SAVE_TEST_TAG).performScrollTo().press()
         await { exists("Tide") && !exists("Edit server") }
 
         compose.onNodeWithContentDescription("Remove Nordlicht").performClick()
@@ -312,7 +312,7 @@ class AppFlowTest {
     @Test
     fun aLinkShowsItsTargetAndConnectsOnlyAfterConfirmationAlsoWhenConnectedElsewhere() {
         val viewModel = start()
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { exists("Channels") }
 
         viewModel.openLink(LINK)
@@ -341,7 +341,7 @@ class AppFlowTest {
     fun aServerOnTheLocalNetworkIsExplainedAndConnectsByItselfOnceAllowed() {
         nordlichtOnTheLocalNetwork()
         start()
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
 
         await { exists("Local network access") }
         assertTrue(engine.connectCalls.isEmpty())
@@ -355,7 +355,7 @@ class AppFlowTest {
     fun notNowClosesTheExplanationAndLeavesTheListWithoutAnError() {
         nordlichtOnTheLocalNetwork()
         start()
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { exists("Local network access") }
 
         compose.onNodeWithText("Not now").performClick()
@@ -371,7 +371,7 @@ class AppFlowTest {
         nordlichtOnTheLocalNetwork()
         promptAnswer = LocalNetworkAnswer(granted = false, refusedBefore = false, refusedAfter = true)
         start()
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { exists("Local network access") }
         compose.onNodeWithTag(LOCAL_NETWORK_CONTINUE_TEST_TAG).performClick()
 

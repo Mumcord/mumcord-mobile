@@ -135,7 +135,7 @@ class AboutUiFlowTest {
     @Test
     fun aboutShowsTheVersionsLicencesAndSourceAndTheSwitchIsSaved() {
         start()
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { shown(VOICE_BAR_TEST_TAG) }
         compose.onNodeWithText("More").performClick()
         await { shown(MORE_ABOUT_TEST_TAG) }

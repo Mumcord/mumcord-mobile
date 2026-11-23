@@ -145,7 +145,7 @@ class ChatUiFlowTest {
                 )
             }
         }
-        compose.onNodeWithContentDescription("Connect to Nordlicht").performClick()
+        compose.connectToNordlicht()
         await { shown(VOICE_BAR_TEST_TAG) }
         compose.onNodeWithText("Chat").performClick()
         await { shown(CHAT_SCREEN_TEST_TAG) }
@@ -176,7 +176,7 @@ class ChatUiFlowTest {
         openChat()
         compose.onNodeWithText("No messages here yet.").assertIsDisplayed()
         type("Hello Lobby")
-        compose.onNodeWithTag(CHAT_SEND_TEST_TAG).performClick()
+        compose.onNodeWithTag(CHAT_SEND_TEST_TAG).press()
         await { own().size == 1 && exists("Hello Lobby") }
         assertEquals("Hello Lobby", own().single().content.plainText())
         compose.onNodeWithText("Message Lobby…").assertIsDisplayed()
@@ -187,7 +187,7 @@ class ChatUiFlowTest {
         openChat()
         engine.sendFailure = BridgeException.NotConnected("gone")
         type("Do not lose me")
-        compose.onNodeWithTag(CHAT_SEND_TEST_TAG).performClick()
+        compose.onNodeWithTag(CHAT_SEND_TEST_TAG).press()
         await { shown(CHAT_RETRY_TEST_TAG) }
         awaitDisplayed("Do not lose me")
         awaitDisplayed("Not sent.")
@@ -215,7 +215,7 @@ class ChatUiFlowTest {
         compose.onNodeWithText("can you host the first round?").performTouchInput { longClick() }
         await { shown(CHAT_REPLY_BAR_TEST_TAG) }
         type("Sure")
-        compose.onNodeWithTag(CHAT_SEND_TEST_TAG).performClick()
+        compose.onNodeWithTag(CHAT_SEND_TEST_TAG).press()
         await { own().size == 1 }
         assertEquals(ReplyQuote("Anna", "can you host the first round?"), own().single().content.reply)
         await { !shown(CHAT_REPLY_BAR_TEST_TAG) }
@@ -226,7 +226,7 @@ class ChatUiFlowTest {
         openChat { it.mentionNames += listOf(MentionCandidate(MOCKUP_ANNA, "Anna"), MentionCandidate(2u, "Ben")) }
         type("Hi @")
         await { compose.onAllNodesWithTag(CHAT_MENTION_TEST_TAG).fetchSemanticsNodes().size == 2 }
-        compose.onNodeWithText("@Anna").performClick()
+        compose.onNodeWithText("@Anna").press()
         await { !shown(CHAT_MENTION_TEST_TAG) }
         compose.onNode(hasSetTextAction() and hasText("Hi @Anna ")).assertIsDisplayed()
     }
