@@ -45,33 +45,102 @@ final class AppThemeController {
 
 /// Draws the app in the shown theme: in the version the appearance mode and the phone's dark
 /// mode pick, or in the app's own colours while the engine has not answered yet. `phone` is the
-/// phone's appearance; a debug launch can force it, as a test changes the phone's setting.
+/// phone's appearance; a debug launch can force it.
 ///
-/// The status bar and the system's own controls follow the drawn colours when the mode is Dark
-/// or Light. With System they are left to the phone, so the app keeps hearing when the phone's
-/// dark mode changes.
+/// The status bar, the keyboard and the system's own sheets follow the brightness of the drawn
+/// colours in every mode, as on Android: the window's root view controller is set to it. The
+/// phone's own setting is read from the window itself, which that setting does not reach, so
+/// with System the app keeps following the phone, also right after Dark or Light.
 struct AppThemeHost: ViewModifier {
     let theme: AppTheme?
     let phone: MumcordThemeMode
-    @Environment(\.colorScheme) private var systemScheme
+    /// The phone's dark mode as the window reports it; nil until the window is there.
+    @State private var windowDark: Bool?
 
     func body(content: Content) -> some View {
-        let phoneDark = MumcordTheme.resolve(phone, system: systemScheme).isDark
-        let drawn = theme?.theme(systemDark: phoneDark) ?? MumcordTheme.resolve(phone, system: systemScheme)
+        let phoneDark: Bool? = switch phone {
+        case .system: windowDark
+        case .dark: true
+        case .light: false
+        }
+        // Until the window has answered, nothing is overridden, so the environment's scheme
+        // is still the phone's own.
         content
-            .environment(\.mumcordTheme, drawn)
-            .preferredColorScheme(preferredScheme(drawn))
+            .modifier(DrawnTheme(theme: theme, phoneDark: phoneDark))
+            .background {
+                WindowStyle(dark: phoneDark.map { drawnTheme(theme, phoneDark: $0).isDark }) { dark in
+                    if windowDark != dark { windowDark = dark }
+                }
+            }
+    }
+}
+
+/// The colours drawn for the phone's dark mode: the theme's version, or the app's own colours.
+private func drawnTheme(_ theme: AppTheme?, phoneDark: Bool) -> MumcordTheme {
+    theme?.theme(systemDark: phoneDark) ?? (phoneDark ? .dark : .light)
+}
+
+/// Puts the drawn theme into the environment; before the phone's setting is known, the one the
+/// environment reports.
+private struct DrawnTheme: ViewModifier {
+    let theme: AppTheme?
+    let phoneDark: Bool?
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        content.environment(\.mumcordTheme, drawnTheme(theme, phoneDark: phoneDark ?? (scheme == .dark)))
+    }
+}
+
+/// Sets the app to the drawn brightness (nil: leaves it) and reports the phone's own dark mode,
+/// at once and whenever it changes, from the window.
+private struct WindowStyle: UIViewRepresentable {
+    let dark: Bool?
+    let onPhoneDark: (Bool) -> Void
+
+    func makeUIView(context: Context) -> WindowStyleView {
+        WindowStyleView()
     }
 
-    private func preferredScheme(_ drawn: MumcordTheme) -> ColorScheme? {
-        switch theme?.mode {
-        case .dark, .light: drawn.isDark ? .dark : .light
-        case .system, nil:
-            switch phone {
-            case .system: nil
-            case .dark: .dark
-            case .light: .light
-            }
+    func updateUIView(_ view: WindowStyleView, context: Context) {
+        view.onPhoneDark = onPhoneDark
+        view.dark = dark
+    }
+}
+
+final class WindowStyleView: UIView {
+    var dark: Bool? {
+        didSet { apply() }
+    }
+    var onPhoneDark: (Bool) -> Void = { _ in }
+    private weak var observed: UIWindow?
+    private var registration: (any UITraitChangeRegistration)?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard let window, window !== observed else {
+            apply()
+            return
         }
+        if let registration { observed?.unregisterForTraitChanges(registration) }
+        observed = window
+        registration = window.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { [weak self] (window: UIWindow, _) in
+            self?.report(window)
+        }
+        apply()
+        // Not while SwiftUI is placing this view: the answer changes what it draws.
+        DispatchQueue.main.async { [weak self] in self?.report(window) }
+    }
+
+    private func report(_ window: UIWindow) {
+        onPhoneDark(window.traitCollection.userInterfaceStyle == .dark)
+    }
+
+    /// The window's root view controller takes the style, not the window: the window keeps the
+    /// phone's own, and what it presents (sheets, the keyboard, the status bar) follows the root.
+    private func apply() {
+        guard let root = window?.rootViewController, let dark else { return }
+        let style: UIUserInterfaceStyle = dark ? .dark : .light
+        if root.overrideUserInterfaceStyle != style { root.overrideUserInterfaceStyle = style }
     }
 }

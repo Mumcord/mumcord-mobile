@@ -62,10 +62,11 @@ server's theme. The app's colours come from one place (`AppThemeHost` on the app
 shown; the built-in Mumcord theme gives exactly the design tokens' colours, so the app looks as
 before in it. Unit tests `AppThemeTests`, `ProfileStateTests`, `ProfileThemesTests` and
 `AvatarImageTests`, UI tests `ProfileThemesFlowUITests` (which also check the drawn colours on
-screen), screenshots `ios-profile-*`, `ios-themes-*` and `ios-server-theme-*`. Differences from
-Android: with System the status bar and the system's own controls follow the phone, not the
-theme (they follow the theme with Dark and Light), because iOS would otherwise no longer report
-the phone's own setting; a colour value from the engine that is not `#rrggbb` keeps the app's own
+screen), screenshots `ios-profile-*`, `ios-themes-*` and `ios-server-theme-*`. As on Android, the
+status bar, the keyboard and the system's own sheets follow the brightness of the drawn colours
+in all three modes; the phone's own setting is read from the window, which the app's setting does
+not reach, so System follows the phone live (`ProfileThemesFlowUITests` switches the simulator
+between light and dark). Differences from Android: a colour value from the engine that is not `#rrggbb` keeps the app's own
 colour instead of stopping the app; the screenshots also show the long-press sheet and the delete
 question, and the paste sheet with its keyboard. The camera for the profile picture is the
 system's camera, as for the chat, and is a device check.

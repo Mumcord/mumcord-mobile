@@ -8,13 +8,28 @@ final class ProfileThemesFlowUITests: XCTestCase {
     /// Left of the content, where only the screen's background is drawn.
     private let background = CGPoint(x: 0.01, y: 0.5)
 
+    /// The simulator's own appearance before a test changed it; given back afterwards.
+    private var phoneBefore: XCUIDevice.Appearance?
+
     override func setUp() {
         continueAfterFailure = false
     }
 
-    /// The app in the dark phone appearance, connected to Nordlicht, on the More tab.
-    private func openMore(_ options: String = "") -> XCUIApplication {
-        let app = launchApp("servers,voice-server" + options, theme: "dark")
+    override func tearDown() {
+        if let phoneBefore { XCUIDevice.shared.appearance = phoneBefore }
+        super.tearDown()
+    }
+
+    /// Switches the simulator's own dark mode, as the user does in the phone's settings.
+    private func setPhone(_ appearance: XCUIDevice.Appearance) {
+        if phoneBefore == nil { phoneBefore = XCUIDevice.shared.appearance }
+        XCUIDevice.shared.appearance = appearance
+    }
+
+    /// The app connected to Nordlicht, on the More tab; the phone's appearance forced to dark,
+    /// or with `phone` "system" the simulator's own.
+    private func openMore(_ options: String = "", phone: String = "dark") -> XCUIApplication {
+        let app = launchApp("servers,voice-server" + options, theme: phone)
         expectAppears(app.element(containing: "5 online · 24 ms"))
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.row("person-row", containing: "Jonas"))
@@ -23,8 +38,8 @@ final class ProfileThemesFlowUITests: XCTestCase {
         return app
     }
 
-    private func openThemes(_ options: String = "") -> XCUIApplication {
-        let app = openMore(options)
+    private func openThemes(_ options: String = "", phone: String = "dark") -> XCUIApplication {
+        let app = openMore(options, phone: phone)
         tapWhenReady(app.element("more-themes"))
         expectAppears(app.element("themes-mode-dark"))
         return app
@@ -90,6 +105,35 @@ final class ProfileThemesFlowUITests: XCTestCase {
     }
 
     // MARK: Themes
+
+    /// With System the app follows the phone's own dark mode, live, also after Dark or Light was
+    /// chosen and System chosen again.
+    func testSystemFollowsALightAndADarkPhoneAndComesBackToItAfterDark() {
+        setPhone(.light)
+        let app = openThemes(phone: "system")
+        expectSelected(app.element("themes-mode-system"))
+        awaitScreenColour(atNormalized: background) { !self.isDark($0) }
+
+        setPhone(.dark)
+        awaitScreenColour(atNormalized: background, isDark)
+
+        tapWhenReady(app.element("themes-mode-light"))
+        expectSelected(app.element("themes-mode-light"))
+        awaitScreenColour(atNormalized: background) { !self.isDark($0) }
+
+        tapWhenReady(app.element("themes-mode-dark"))
+        expectSelected(app.element("themes-mode-dark"))
+        setPhone(.light)
+        // Dark stays dark whatever the phone says; a moment for a wrong change to show.
+        Thread.sleep(forTimeInterval: 1)
+        awaitScreenColour(atNormalized: background, isDark)
+
+        tapWhenReady(app.element("themes-mode-system"))
+        expectSelected(app.element("themes-mode-system"))
+        awaitScreenColour(atNormalized: background) { !self.isDark($0) }
+        setPhone(.dark)
+        awaitScreenColour(atNormalized: background, isDark)
+    }
 
     func testTheAppearanceIsChosenAndAPastedThemeApplied() {
         let app = openThemes()
