@@ -15,11 +15,14 @@ enum ConnectedTab: Int, CaseIterable {
 enum ChannelListRow: Equatable, Identifiable {
     case channel(ChannelItem)
     case person(PersonItem)
+    /// The tile of a person's screen share or camera, under that person (FR-5.70).
+    case stream(StreamKey, depth: Int)
 
     var id: String {
         switch self {
         case .channel(let item): "channel-\(item.id)"
         case .person(let item): "person-\(item.session)"
+        case .stream(let key, _): "stream-\(key.session)-\(key.kind)"
         }
     }
 
@@ -27,6 +30,7 @@ enum ChannelListRow: Equatable, Identifiable {
         switch self {
         case .channel(let item): item.depth
         case .person(let item): item.depth
+        case .stream(_, let depth): depth
         }
     }
 }
@@ -83,11 +87,14 @@ private extension Person {
 /// A non-blank `query` filters by name, ignoring case: a person shows when the name matches, a
 /// channel when its name matches or something inside it shows. Collapsing is ignored meanwhile,
 /// so a match is never hidden.
+///
+/// The tiles of `streams` follow the person who shares them.
 func channelRows(
     root: ChannelNode?,
     selfChannelId: UInt32?,
     collapsed: Set<UInt32>,
-    query: String = ""
+    query: String = "",
+    streams: [StreamKey] = []
 ) -> [ChannelListRow] {
     guard let root else { return [] }
     let needle = query.trimmed
@@ -129,6 +136,9 @@ func channelRows(
                 locallyMuted: person.locallyMuted,
                 state: person.flags
             )))
+            for stream in streams where stream.session == person.session {
+                rows.append(.stream(stream, depth: depth + 1))
+            }
         }
         for child in node.children {
             add(child, level: level + 1)
@@ -257,7 +267,8 @@ func connectedUiState(
         root: server.root,
         selfChannelId: server.selfChannelId,
         collapsed: local.collapsed,
-        query: local.searching ? local.query : ""
+        query: local.searching ? local.query : "",
+        streams: session.streams.map(\.key)
     )
     let sheet: ConnectedSheet?
     // The server waits for the password, so this question comes first.

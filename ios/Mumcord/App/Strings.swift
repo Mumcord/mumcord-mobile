@@ -566,6 +566,45 @@ enum Strings {
     static var scanSkippedInvalid: String { text("scan_skipped_invalid") }
     static var scanDone: String { text("scan_done") }
 
+    // MARK: Streams
+
+    static func streamTitleScreen(_ p1: String) -> String { format("stream_title_screen", p1) }
+    static func streamTitleCamera(_ p1: String) -> String { format("stream_title_camera", p1) }
+    static var streamLive: String { text("stream_live") }
+    static func streamWatching(_ p1: Int) -> String {
+        format(p1 == 1 ? "stream_watching.one" : "stream_watching.other", p1)
+    }
+    static func streamViewers(_ p1: Int) -> String {
+        format(p1 == 1 ? "stream_viewers.one" : "stream_viewers.other", p1)
+    }
+    static func streamTileDescription(_ p1: String) -> String { format("stream_tile_description", p1) }
+    static func streamDescriptionPart(_ p1: String, _ p2: String) -> String { format("stream_description_part", p1, p2) }
+    static var streamTapToWatch: String { text("stream_tap_to_watch") }
+    static var streamConnecting: String { text("stream_connecting") }
+    static var streamPaused: String { text("stream_paused") }
+    static var streamOpenElsewhere: String { text("stream_open_elsewhere") }
+    static var streamRotateHint: String { text("stream_rotate_hint") }
+    static var streamCollapse: String { text("stream_collapse") }
+    static var streamRotateLandscape: String { text("stream_rotate_landscape") }
+    static var streamRotatePortrait: String { text("stream_rotate_portrait") }
+    static var streamStop: String { text("stream_stop") }
+    static var streamExpand: String { text("stream_expand") }
+    static var streamVolume: String { text("stream_volume") }
+    static var streamTryAgain: String { text("stream_try_again") }
+    static var streamUnreachableNoPath: String { text("stream_unreachable_no_path") }
+    static var streamUnreachablePeerToPeerOff: String { text("stream_unreachable_peer_to_peer_off") }
+    static var streamUnreachableDirectDeclined: String { text("stream_unreachable_direct_declined") }
+    static var streamUnreachableRelayUnavailable: String { text("stream_unreachable_relay_unavailable") }
+    static func streamUnreachableSharerUnsupported(_ p1: String) -> String { format("stream_unreachable_sharer_unsupported", p1) }
+    static func streamUnreachableNoAnswer(_ p1: String) -> String { format("stream_unreachable_no_answer", p1) }
+    static func streamUnreachableFull(_ p1: String) -> String { format("stream_unreachable_full", p1) }
+    static func streamUnreachableNeedsUpdate(_ p1: String) -> String { format("stream_unreachable_needs_update", p1) }
+    static func streamUnreachableJoinFailed(_ p1: String) -> String { format("stream_unreachable_join_failed", p1) }
+    static var directConnectionsTitle: String { text("direct_connections_title") }
+    static var directConnectionsBody: String { text("direct_connections_body") }
+    static var directConnectionsNo: String { text("direct_connections_no") }
+    static var directConnectionsYes: String { text("direct_connections_yes") }
+
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }

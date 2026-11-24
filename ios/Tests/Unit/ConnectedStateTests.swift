@@ -22,6 +22,7 @@ final class ConnectedStateTests: XCTestCase {
             switch row {
             case .channel(let item): "#\(item.name)"
             case .person(let item): item.name
+            case .stream(let key, _): "stream of \(key.session)"
             }
         }
     }
@@ -44,6 +45,21 @@ final class ConnectedStateTests: XCTestCase {
 
     private func connectedState(_ session: SessionState, _ local: ConnectedLocal = ConnectedLocal()) throws -> ConnectedUiState {
         try XCTUnwrap(connectedUiState(session: session, local: local, serverName: "Nordlicht"))
+    }
+
+    func testAStreamTileSitsRightUnderItsSharerAtItsIndent() throws {
+        let mira = StreamKey(session: Mockup.mira, kind: .screen)
+        let rows = channelRows(root: root, selfChannelId: Mockup.lobby, collapsed: [], streams: [mira])
+        let shown = names(rows)
+        let index = try XCTUnwrap(shown.firstIndex(of: "Mira"))
+        XCTAssertEqual(shown[index + 1], "stream of \(Mockup.mira)")
+        let tiles = rows.compactMap { row -> Int? in
+            if case .stream(_, let depth) = row { return depth }
+            return nil
+        }
+        XCTAssertEqual(tiles, [try personItem(rows, "Mira").depth])
+        let folded = channelRows(root: root, selfChannelId: Mockup.lobby, collapsed: [Mockup.gaming], streams: [mira])
+        XCTAssertFalse(folded.contains { if case .stream = $0 { true } else { false } }, "a folded channel hides it")
     }
 
     func testTheRootComesFirstThenChannelsByPositionWithTheirPeopleByName() {

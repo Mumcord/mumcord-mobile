@@ -5,10 +5,13 @@ import SwiftUI
 /// One step of nesting: the indent of a channel's people and sub-channels (`.channel-body`).
 private let indent: CGFloat = 28
 
-/// The Channels tab: server header, optional search field, the channel tree and the hints.
+/// The Channels tab: server header, optional search field, the channel tree with the tiles of
+/// the streams in the user's channel, and the hints.
 struct ChannelsScreen: View {
     let state: ConnectedUiState
     let actions: ConnectedActions
+    let streams: StreamsUiState
+    let streamActions: StreamActions
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,7 +47,13 @@ struct ChannelsScreen: View {
                     .padding(MumcordSpace.s6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ChannelList(rows: state.rows, hints: state.hints, actions: actions)
+                ChannelList(
+                    rows: state.rows,
+                    hints: state.hints,
+                    actions: actions,
+                    streams: streams,
+                    streamActions: streamActions
+                )
             }
         }
     }
@@ -54,6 +63,8 @@ private struct ChannelList: View {
     let rows: [ChannelListRow]
     let hints: [UnsupportedHint]
     let actions: ConnectedActions
+    let streams: StreamsUiState
+    let streamActions: StreamActions
 
     var body: some View {
         ScrollView {
@@ -68,6 +79,11 @@ private struct ChannelList: View {
                     case .person(let item):
                         PersonLine(item: item, onOpen: actions.openPerson)
                             .padding(.leading, indent * CGFloat(item.depth))
+                    case .stream(let key, let depth):
+                        if let stream = streams.streams[key] {
+                            StreamTileLine(stream: stream, actions: streamActions)
+                                .padding(.leading, indent * CGFloat(depth))
+                        }
                     }
                 }
                 ForEach(hints) { hint in

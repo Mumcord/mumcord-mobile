@@ -11,6 +11,7 @@ struct AppRoot: View {
     var body: some View {
         AppContent(uiState: model.uiState, model: model)
             .environment(\.cameraGateway, model.camera)
+            .environment(\.streamVideo, model.streams.video)
             .mumcordTheme(theme)
             .onOpenURL { model.openLink($0.absoluteString) }
             .onChange(of: scenePhase) { _, phase in
@@ -30,6 +31,8 @@ struct AppRoot: View {
             .onChange(of: scenePhase, initial: true) { _, phase in
                 model.chat.setResumed(phase == .active)
                 model.conversation.setResumed(phase == .active)
+                // Nothing is fetched or decoded for a stream nobody can see (FR-5.43).
+                model.streams.setOnScreen(phase != .background)
             }
     }
 }
@@ -51,8 +54,11 @@ struct AppContent: View {
         let identitySheet = uiState.screen == .identities || uiState.screen == .identitySetup ? uiState.identities.sheet : nil
         let cameraQuestion = uiState.screen == .scan && uiState.identities.scan?.camera == .explain
         let settingsSheet = model.more.local.sheet != nil
+        let streams = model.streams.uiState
+        // The engine waits for this answer before a stream can use a direct connection.
+        let directQuestion = uiState.screen == .channels && uiState.connected != nil && streams.directConnectionsQuestion
         let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
-            || settingsSheet || identitySheet != nil || cameraQuestion
+            || settingsSheet || identitySheet != nil || cameraQuestion || directQuestion
         ZStack {
             screen
                 // While a sheet is open, the screen behind it is not offered to screen readers.
@@ -75,6 +81,8 @@ struct AppContent: View {
                     onOpenSettings: model.openSettings,
                     onDismiss: model.identities.cameraNotNow
                 )
+            } else if directQuestion {
+                DirectConnectionsSheet(onAnswer: model.streams.answerDirectConnections)
             } else if let connectedSheet {
                 ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model), model: model)
             } else if uiState.connected != nil {
@@ -161,6 +169,8 @@ struct AppContent: View {
                 ConnectedShell(
                     state: connected,
                     actions: ConnectedActions(model: model),
+                    streams: model.streams.uiState,
+                    streamActions: StreamActions(controller: model.streams),
                     onDisconnect: model.disconnect,
                     chatBadge: model.chatBadge,
                     model: model

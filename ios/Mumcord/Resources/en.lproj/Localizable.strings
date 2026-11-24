@@ -534,3 +534,44 @@
 "scan_skipped_duplicate" = "Already on this phone";
 "scan_skipped_invalid" = "Cannot be used";
 "scan_done" = "Done";
+
+/* Watching screen shares and cameras (FR-5.70 … FR-5.76). */
+"stream_title_screen" = "%1$@'s screen";
+"stream_title_camera" = "%1$@'s camera";
+"stream_live" = "LIVE";
+"stream_watching.one" = "%d watching";
+"stream_watching.other" = "%d watching";
+"stream_viewers.one" = "%d viewer";
+"stream_viewers.other" = "%d viewers";
+/* VoiceOver text of a tile: the title, "live", then the viewers and what the tile says, where known. */
+"stream_tile_description" = "%1$@, live";
+"stream_description_part" = "%1$@, %2$@";
+"stream_tap_to_watch" = "Tap to watch";
+"stream_connecting" = "Connecting …";
+"stream_paused" = "Paused";
+"stream_open_elsewhere" = "Playing in the mini window";
+"stream_rotate_hint" = "Rotate for landscape";
+"stream_collapse" = "Collapse to mini window";
+"stream_rotate_landscape" = "Turn to landscape";
+"stream_rotate_portrait" = "Back to portrait";
+"stream_stop" = "Stop watching";
+"stream_expand" = "Open full screen";
+"stream_volume" = "Stream volume";
+"stream_try_again" = "Try again";
+
+/* Why a stream cannot be watched. */
+"stream_unreachable_no_path" = "Stream not reachable from this network";
+"stream_unreachable_peer_to_peer_off" = "Peer-to-peer is off for this server.";
+"stream_unreachable_direct_declined" = "You said no to direct connections and this server has no relay.";
+"stream_unreachable_relay_unavailable" = "The relay can't be used right now.";
+"stream_unreachable_sharer_unsupported" = "%1$@'s app doesn't take direct connections.";
+"stream_unreachable_no_answer" = "%1$@ did not answer.";
+"stream_unreachable_full" = "Too many people are watching %1$@.";
+"stream_unreachable_needs_update" = "%1$@ needs a newer Mumcord for this.";
+"stream_unreachable_join_failed" = "Couldn't join %1$@'s camera. Trying again …";
+
+/* The engine's question before the first direct connection. From the desktop app, shortened to what applies on the phone. */
+"direct_connections_title" = "Allow direct connections?";
+"direct_connections_body" = "Direct connections are faster, but the other person can see your IP address. Mumcord uses them for streams with other Mumcord users. If you say no, streams come through the server's relay where the server has one; then the other person doesn't see your IP address.";
+"direct_connections_no" = "No";
+"direct_connections_yes" = "Yes";

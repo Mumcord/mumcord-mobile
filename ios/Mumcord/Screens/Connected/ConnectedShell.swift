@@ -5,9 +5,14 @@ import SwiftUI
 /// The frame of the app while connected: the selected tab's screen, the banners, the whisper
 /// bar, the voice bar and the bottom tab bar, or the full voice view over all of it. `chat` is
 /// the Chat tab, which reads its own state, as the Messages tab does through `model`.
+///
+/// An opened stream covers all of it full screen, or floats above the tab's screen as the mini
+/// window, where the chat below stays usable.
 struct ConnectedShell<Chat: View>: View {
     let state: ConnectedUiState
     let actions: ConnectedActions
+    let streams: StreamsUiState
+    let streamActions: StreamActions
     let onDisconnect: () -> Void
     /// Unread messages of the current channel's chat, shown on the Chat tab.
     let chatBadge: Int
@@ -16,7 +21,16 @@ struct ConnectedShell<Chat: View>: View {
     @ViewBuilder let chat: () -> Chat
 
     var body: some View {
-        if let voice = state.voice, voice.open {
+        if let opened = streams.opened, streams.open?.view == .full {
+            StreamFullScreen(
+                stream: opened,
+                landscape: streams.landscape,
+                mute: state.voice?.mute,
+                onToggleMute: actions.toggleMute,
+                onMicrophone: actions.requestMicrophone,
+                actions: streamActions
+            )
+        } else if let voice = state.voice, voice.open {
             VoiceScreen(voice: voice, state: state, actions: actions, onLeave: onDisconnect)
         } else {
             tabs
@@ -35,6 +49,14 @@ struct ConnectedShell<Chat: View>: View {
         MumcordScreen {
             tabScreen
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .overlay(alignment: .bottomTrailing) {
+                    if let opened = streams.opened {
+                        // Above the chat's input bar, which stays usable.
+                        StreamMiniWindow(stream: opened, actions: streamActions)
+                            .padding(.trailing, miniWindowMargin)
+                            .padding(.bottom, miniWindowBottom)
+                    }
+                }
             ConnectedBanners(state: state, actions: actions)
             if let voice = state.voice {
                 if let whisper = voice.whisper {
@@ -69,7 +91,7 @@ struct ConnectedShell<Chat: View>: View {
     @ViewBuilder private var tabScreen: some View {
         switch state.tab {
         case .channels:
-            ChannelsScreen(state: state, actions: actions)
+            ChannelsScreen(state: state, actions: actions, streams: streams, streamActions: streamActions)
         case .chat:
             chat()
         case .messages:

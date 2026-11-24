@@ -58,6 +58,13 @@ import MumcordBridge
 ///         moderation-refused the server refuses the next moderation command
 ///         ban-quick        the server's ban list cannot be read: only its default ban
 ///         ban-conflict     the first ban finds the server's entry changed meanwhile
+///         streams          Mira shares her screen (with sound, one viewer) once connected
+///         stream-camera    Mira shares her camera instead of her screen
+///         stream-crowd     three people watch Mira's screen
+///         stream-question  the first watch asks whether direct connections are allowed
+///         stream-unreachable a watch ends with "Stream not reachable from this network"
+///         stream-colours   the stream's picture is red on the left half and blue on the right,
+///                          instead of the picture of the mockups
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
@@ -116,6 +123,16 @@ struct AppDebugLaunch {
             }
             if options.contains("admin") {
                 server = server.granting { $0.grantAllRights() }
+            }
+            if options.contains("stream-camera") {
+                server.people = server.people.map { person in
+                    var changed = person
+                    if person.session == Mockup.mira {
+                        changed.streaming = false
+                        changed.camera = true
+                    }
+                    return changed
+                }
             }
             let engine = FakeEngine(
                 listener: listener,
@@ -196,12 +213,34 @@ struct AppDebugLaunch {
                 engine.channelPasswords = [Mockup.music: "secret"]
                 engine.deniedChannels = [Mockup.afk]
             }
+            if options.contains("streams") {
+                engine.streamsOnConnect = [Self.stream(options)]
+            }
+            if options.contains("stream-question") {
+                engine.asksDirectConnections = true
+            }
+            if options.contains("stream-unreachable") {
+                engine.watchOutcome = .unreachable(reason: .noPath)
+            }
             return engine
         }
     }
 }
 
 extension AppDebugLaunch {
+    /// Mira's stream as the options describe it.
+    static func stream(_ options: Set<String>) -> MumcordBridge.Stream {
+        if options.contains("stream-camera") {
+            return mockupStream(viewers: nil, hasSound: false, kind: .camera)
+        }
+        return mockupStream(viewers: options.contains("stream-crowd") ? 3 : 1)
+    }
+
+    /// The pictures of watched streams, made here (`FakeVideoFrames`).
+    var streamVideo: StreamVideo {
+        StreamVideo(frames: FakeVideoFrames(options.contains("stream-colours") ? .colours : .mockup))
+    }
+
     /// The microphone as the options describe it; allowed when they say nothing.
     var microphoneGateway: FakeMicrophoneGateway {
         if options.contains("mic-declined") {
@@ -326,7 +365,9 @@ extension AppDebugLaunch {
             ),
             mediaPolicy: { loadMedia(monitor.status, store.state.mobileSettings) },
             camera: cameraGateway,
-            qrSource: qrSource
+            qrSource: qrSource,
+            network: monitor,
+            streamVideo: streamVideo
         )
         if let identitiesPreset {
             IdentitiesPreset.apply(identitiesPreset, to: model.identities)

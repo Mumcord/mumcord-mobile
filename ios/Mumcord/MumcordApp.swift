@@ -6,6 +6,8 @@ import UIKit
 
 @main
 struct MumcordApp: App {
+    // Says which screen orientations are allowed (the stream's landscape button).
+    @UIApplicationDelegateAdaptor(MumcordAppDelegate.self) private var appDelegate
     // Decided once at start: the engine must exist only once per process.
     private let model: AppModel?
     private let theme: MumcordThemeMode
@@ -113,7 +115,9 @@ extension AppModel {
             idle: idle,
             mediaPolicy: { loadMedia(network.status, store.state.mobileSettings) },
             camera: SystemCameraGateway(),
-            qrSource: CameraQrSource()
+            qrSource: CameraQrSource(),
+            network: network,
+            streamVideo: StreamVideo(frames: EngineVideoFrames(handle: { store.videoHandle() }))
         )
         notifier.onOpen { [weak model] key in
             if let chat = chatFromNotificationKey(key) { model?.openChat(chat) }

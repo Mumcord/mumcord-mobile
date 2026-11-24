@@ -6,20 +6,28 @@ import SwiftUI
 private let overlayInset: CGFloat = 9
 
 /// Tile of a running stream (`.stream`) in 16:9 with a LIVE badge, a label and the number of
-/// viewers. It shows a placeholder that stays dark in both themes, like real video; the video
-/// itself is drawn by a later task. The tile is as wide as its container; set a width for the
-/// compact form in the channel tree (232 pt in the mockups).
+/// viewers. Under the `picture` it shows a placeholder that stays dark in both themes, like real
+/// video, so the tile looks the same before the first picture arrives. The tile is as wide as
+/// its container; set a width for the compact form in the channel tree (232 pt in the mockups).
 ///
-/// `accessibilityLabel` is the whole tile in words for VoiceOver, such as
-/// "Mira's screen, live, 1 viewer".
+/// - `viewerCount`: nil hides the count (where it is not known).
+/// - `accessibilityLabel`: the whole tile in words for VoiceOver, such as
+///   "Mira's screen, live, 1 viewer".
+/// - `icon`: the placeholder's icon, the monitor for a screen share, the camera for a camera.
+/// - `status`: a short line under the icon, such as "Tap to watch"; nil for none.
+/// - `picture`: the stream's live picture, drawn over the placeholder; nil for none.
 struct MumcordStreamTile: View {
     let label: String
     let liveLabel: String
-    let viewerCount: Int
+    let viewerCount: Int?
     let accessibilityLabel: String
     var selected = false
+    var icon = MumcordIcons.monitor
+    var status: String?
+    var picture: AnyView?
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
+    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
 
     var body: some View {
         let colors = theme.colors
@@ -46,18 +54,25 @@ struct MumcordStreamTile: View {
                     }
                 }
                 .overlay {
-                    MumcordIcon(icon: MumcordIcons.monitor, label: nil, tint: colors.mediaText, size: MumcordSize.iconLg)
-                        .opacity(0.7)
+                    VStack(spacing: MumcordSpace.s1) {
+                        MumcordIcon(icon: icon, label: nil, tint: colors.mediaText, size: MumcordSize.iconLg)
+                            .opacity(0.7)
+                        if let status {
+                            Text(status)
+                                .font(Font(MumcordFonts.font(.captionStrong, scale: scale)))
+                                .foregroundStyle(colors.mediaText)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                        }
+                    }
+                    .padding(.horizontal, MumcordSpace.s4)
+                }
+                .overlay {
+                    if let picture { picture }
                 }
                 .overlay(alignment: .topLeading) {
-                    HStack(spacing: 5) {
-                        Circle().fill(colors.onLive).frame(width: 6, height: 6)
-                        LineText(liveLabel, style: .live, color: colors.onLive)
-                    }
-                    .padding(.horizontal, MumcordSpace.s2)
-                    .frame(height: 22)
-                    .background(colors.live, in: chip)
-                    .padding(overlayInset)
+                    MumcordLiveBadge(liveLabel: liveLabel)
+                        .padding(overlayInset)
                 }
                 .overlay(alignment: .bottomLeading) {
                     LineText(label, style: .captionStrong, color: colors.mediaText)
@@ -67,14 +82,16 @@ struct MumcordStreamTile: View {
                         .padding(overlayInset)
                 }
                 .overlay(alignment: .bottomTrailing) {
-                    HStack(spacing: 5) {
-                        MumcordIcon(icon: MumcordIcons.user, label: nil, tint: colors.mediaText, size: MumcordSize.iconSm)
-                        LineText(String(viewerCount), style: .captionStrong, color: colors.mediaText)
+                    if let viewerCount {
+                        HStack(spacing: 5) {
+                            MumcordIcon(icon: MumcordIcons.user, label: nil, tint: colors.mediaText, size: MumcordSize.iconSm)
+                            LineText(String(viewerCount), style: .captionStrong, color: colors.mediaText)
+                        }
+                        .padding(.horizontal, MumcordSpace.s2)
+                        .frame(height: 24)
+                        .background(colors.mediaScrim, in: chip)
+                        .padding(overlayInset)
                     }
-                    .padding(.horizontal, MumcordSpace.s2)
-                    .frame(height: 24)
-                    .background(colors.mediaScrim, in: chip)
-                    .padding(overlayInset)
                 }
                 .clipShape(shape)
                 .overlay { shape.strokeBorder(colors.border, lineWidth: 1) }
@@ -90,5 +107,22 @@ struct MumcordStreamTile: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+/// The red LIVE badge of streams (`.stream__live`), on the tile, the full screen and the mini window.
+struct MumcordLiveBadge: View {
+    let liveLabel: String
+    @Environment(\.mumcordTheme) private var theme
+
+    var body: some View {
+        let colors = theme.colors
+        HStack(spacing: 5) {
+            Circle().fill(colors.onLive).frame(width: 6, height: 6)
+            LineText(liveLabel, style: .live, color: colors.onLive)
+        }
+        .padding(.horizontal, MumcordSpace.s2)
+        .frame(height: 22)
+        .background(colors.live, in: RoundedRectangle(cornerRadius: MumcordRadius.sm))
     }
 }

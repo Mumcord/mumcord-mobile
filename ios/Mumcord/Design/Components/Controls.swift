@@ -36,31 +36,37 @@ struct MumcordToggle: View {
 }
 
 /// Slider (`.slider`) for a `value` from 0 to 1, such as a volume. `label` names what it
-/// changes. VoiceOver gets a standard slider and changes the value in steps.
+/// changes. VoiceOver gets a standard slider and changes the value in steps. `onMedia` draws it
+/// white on dark, for the stream's full screen, which is dark in both themes.
 struct MumcordSlider: View {
     let value: Double
     let label: String
+    var onMedia = false
     let onValueChange: (Double) -> Void
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
         let colors = theme.colors
+        let fill = onMedia ? colors.mediaText : colors.accent
+        let track = onMedia ? colors.stageTrack : colors.bgHover
+        let edge = onMedia ? Color.clear : colors.border
+        let thumb = onMedia ? colors.mediaText : colors.text
         let fraction = CGFloat(min(max(value, 0), 1))
         let thumbShadow = ShadowToken(y: 2, blur: 6, spread: 0, color: colors.sliderThumbShadow)
         GeometryReader { proxy in
             let width = proxy.size.width
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(colors.bgHover)
+                    .fill(track)
                     // The filled part ends square under the thumb, like the CSS gradient.
                     .overlay(alignment: .leading) {
-                        Rectangle().fill(colors.accent).frame(width: width * fraction)
+                        Rectangle().fill(fill).frame(width: width * fraction)
                     }
                     .clipShape(Capsule())
-                    .overlay { Capsule().strokeBorder(colors.border, lineWidth: 1) }
+                    .overlay { Capsule().strokeBorder(edge, lineWidth: 1) }
                     .frame(height: 6)
                 Circle()
-                    .fill(colors.text)
+                    .fill(thumb)
                     .frame(width: 26, height: 26)
                     .tokenShadow(thumbShadow, shape: Circle())
                     // Centred on the value, so it hangs over the ends of the track at 0 and 1.
