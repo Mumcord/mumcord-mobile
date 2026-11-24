@@ -65,10 +65,12 @@ def plain(root: dict, section: str) -> dict:
     return {k: v for k, v in root[section].items() if k != "comment"}
 
 
-def themed_struct(name: str, swift_type: str, dark: dict, light: dict, literal) -> str:
-    """A struct with one property per key, its dark and light value and a lookup by JSON key."""
+def themed_struct(name: str, swift_type: str, dark: dict, light: dict, literal, mutable: bool = False) -> str:
+    """A struct with one property per key, its dark and light value and a lookup by JSON key.
+    `mutable` properties can be changed on a copy, as a theme does with the colours it decides."""
+    keyword = "var" if mutable else "let"
     out = [f"struct {name} {{"]
-    out += [f"    let {camel(key)}: {swift_type}" for key in dark]
+    out += [f"    {keyword} {camel(key)}: {swift_type}" for key in dark]
     out.append("")
     for theme, values in (("dark", dark), ("light", light)):
         out.append(f"    static let {theme} = {name}(")
@@ -100,7 +102,7 @@ def font_file_name(font: dict) -> str:
 def tokens_swift(root: dict) -> str:
     out = [HEADER.format(source="tokens.json") + "import SwiftUI\n"]
 
-    out.append(themed_struct("MumcordColors", "Color", *themed(root, "color"), color))
+    out.append(themed_struct("MumcordColors", "Color", *themed(root, "color"), color, mutable=True))
     out.append(themed_struct("MumcordOpacities", "Double", *themed(root, "opacity"), number))
     out.append(themed_struct("MumcordShadows", "ShadowToken", *themed(root, "shadow"), shadow))
 

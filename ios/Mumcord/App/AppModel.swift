@@ -41,6 +41,8 @@ final class AppModel {
     @ObservationIgnored let identities: IdentitiesController
     /// The public server browser. Read only by its own screen.
     @ObservationIgnored let publicServers: PublicServersController
+    /// The colours of the shown theme. Read only where the app's theme is put on screen.
+    @ObservationIgnored let appTheme: AppThemeController
     /// Watching screen shares and cameras. Read only by the stream views.
     @ObservationIgnored let streams: StreamsController
     /// Sharing the own camera (FR-5.74); nil where it cannot be shared (no camera button).
@@ -111,6 +113,7 @@ final class AppModel {
         self.qrSource = qrSource
         identities = IdentitiesController(store: store, camera: camera)
         publicServers = PublicServersController(store: store)
+        appTheme = AppThemeController(store: store)
         streams = StreamsController(store: store, network: network, video: streamVideo)
         self.cameraShare = cameraShare.map { CameraShareController(store: store, camera: $0, permission: camera) }
         chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)

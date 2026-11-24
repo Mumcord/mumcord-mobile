@@ -5,6 +5,7 @@ import SwiftUI
 /// Connects the screens to the model; everything below it only gets values and closures.
 struct AppRoot: View {
     let model: AppModel
+    /// The phone's appearance; a debug launch can force it (`-mumcordTheme`).
     var theme: MumcordThemeMode = .system
     @Environment(\.scenePhase) private var scenePhase
 
@@ -12,7 +13,8 @@ struct AppRoot: View {
         AppContent(uiState: model.uiState, model: model)
             .environment(\.cameraGateway, model.camera)
             .environment(\.streamVideo, model.streams.video)
-            .mumcordTheme(theme)
+            // The colours switch at run time to the shown theme, on every screen (FR-5.81).
+            .modifier(AppThemeHost(theme: model.appTheme.shown, phone: theme))
             .onOpenURL { model.openLink($0.absoluteString) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
