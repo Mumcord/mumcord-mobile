@@ -98,7 +98,9 @@ final class StreamsControllerTests: XCTestCase {
 
         model.streams.close()
         XCTAssertNil(model.streams.uiState.open)
-        await assertEventually("the visible tile does not restart a closed stream") { self.engine.stopCalls.count == 1 }
+        await assertEventually { self.engine.stopCalls.count == 1 }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(engine.watchCalls.count, 1, "the visible tile does not restart a closed stream")
         XCTAssertEqual(stream(model)?.tile, .tapToWatch)
     }
 
@@ -125,6 +127,19 @@ final class StreamsControllerTests: XCTestCase {
         await assertEventually { self.engine.directAnswers == [false] }
         await assertEventually { !model.streams.uiState.directConnectionsQuestion }
         await assertEventually { self.stream(model)?.tile == .unreachable(.directConnectionsDeclined) }
+    }
+
+    func testAllowingDirectConnectionsLetsTheWaitingWatchGoOn() async {
+        let model = await connected()
+        engine.asksDirectConnections = true
+        model.streams.open(key)
+        await assertEventually { model.streams.uiState.directConnectionsQuestion }
+
+        model.streams.answerDirectConnections(true)
+        await assertEventually { self.engine.directAnswers == [true] }
+        await assertEventually { !model.streams.uiState.directConnectionsQuestion }
+        await assertEventually { model.streams.uiState.opened?.watch == .watching(path: .direct) }
+        XCTAssertEqual(engine.watchCalls, [key], "the answer is not a second watch")
     }
 
     func testAnUnreachableStreamIsTriedAgainOnRequest() async {
