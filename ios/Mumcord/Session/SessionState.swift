@@ -39,6 +39,8 @@ struct SessionState: Equatable {
     var streams: [Stream] = []
     /// The engine waits for the answer to "Allow direct connections?" (a stream needs it).
     var directConnectionsQuestion = false
+    /// The user's own camera as the engine last reported it (FR-5.74).
+    var ownCamera = cameraOff
 
     /// True once the server's channels are known and the connection is still alive.
     var showsServer: Bool {
@@ -161,3 +163,6 @@ extension SessionState {
         return next
     }
 }
+
+/// The own camera while it is off and nothing went wrong.
+let cameraOff = OwnCamera(state: .off, problem: nil, viewers: 0)

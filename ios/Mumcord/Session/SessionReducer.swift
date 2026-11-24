@@ -21,6 +21,7 @@ extension SessionState {
                 next.activity = []
                 next.streams = []
                 next.directConnectionsQuestion = false
+                next.ownCamera = cameraOff
             case .connecting:
                 next.phase = .connecting
             case .connected:
@@ -107,9 +108,8 @@ extension SessionState {
             next.streams = streams
         case .directConnectionsQuestion:
             next.directConnectionsQuestion = true
-        // Sharing the phone's own camera is a later step.
-        case .ownCameraChanged:
-            break
+        case .ownCameraChanged(let camera):
+            next.ownCamera = camera
         }
         return next
     }

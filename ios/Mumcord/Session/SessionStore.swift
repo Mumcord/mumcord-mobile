@@ -359,6 +359,7 @@ final class SessionStore: @unchecked Sendable {
                 next.server = nil
                 next.streams = []
                 next.directConnectionsQuestion = false
+                next.ownCamera = cameraOff
                 return next
             }
         }
@@ -485,6 +486,7 @@ final class SessionStore: @unchecked Sendable {
             next.server = nil
             next.streams = []
             next.directConnectionsQuestion = false
+            next.ownCamera = cameraOff
             setLocked(next)
         }
     }
@@ -592,6 +594,43 @@ final class SessionStore: @unchecked Sendable {
     /// The handle for the engine's picture functions, or 0 while no engine exists. Never waits.
     func videoHandle() -> UInt64 {
         engineNow()?.videoHandle() ?? 0
+    }
+
+    // MARK: Own camera (FR-5.74, FR-5.75)
+
+    // The state arrives as `ownCamera`; a failed command is logged, and the reason the engine
+    // knows shows in that state.
+
+    /// The app's camera, which the engine starts with the preview and stops when sharing ends.
+    /// Never waits.
+    func setCameraCapture(_ capture: MumcordBridge.CameraCapture?) {
+        engineNow()?.setCameraCapture(capture: capture)
+    }
+
+    /// The handle for the engine's camera input, or 0 while no engine exists. Never waits.
+    func cameraHandle() -> UInt64 {
+        engineNow()?.cameraHandle() ?? 0
+    }
+
+    /// Opens the preview: the camera starts on the phone, nothing is sent.
+    func openCameraPreview() async -> Outcome<Void> {
+        await call("open camera preview") { try await $0.openCameraPreview() }
+    }
+
+    /// "Start sharing": returns once the camera is shared or with the reason it is not.
+    func startCameraSharing() async -> Outcome<Void> {
+        await call("start camera sharing") { try await $0.startCameraSharing() }
+    }
+
+    /// Cancel in the preview or Stop while sharing.
+    func stopCamera() async -> Outcome<Void> {
+        await call("stop camera") { try await $0.stopCamera() }
+    }
+
+    /// The phone's camera stopped by itself; the engine turns sharing off and names the reason.
+    /// Never waits.
+    func cameraCaptureFailed(_ failure: CaptureFailure) {
+        engineNow()?.cameraCaptureFailed(failure: failure)
     }
 
     // MARK: Moderation (FR-5.90 … FR-5.93)

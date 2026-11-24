@@ -298,6 +298,8 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
             _streams = []
         }
         updateFrameTimer()
+        // As the engine: the own camera ends with the connection.
+        endCamera()
         emit(.audioWantedChanged(audio: AudioWanted(capture: false, playback: false)))
         emit(.connectionChanged(state: .disconnected(error: nil)))
     }
@@ -376,6 +378,8 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
                 emit(.channelPasswordChanged(channelId: channelId, state: .ended))
             }
             change(server.selfSession) { $0.channelId = channelId }
+            // As the engine: leaving the channel turns the own camera off (FR-8.21).
+            endCamera()
         }
     }
 
@@ -1130,6 +1134,83 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         for id in ids {
             sink?.onFrameReady(videoId: id, width: FakeVideoFrames.width, height: FakeVideoFrames.height)
         }
+    }
+
+    // MARK: Own camera
+
+    // Opening starts the app's camera and shows the preview; starting shares it, or fails with
+    // `cameraStartProblem`; stopping stops the app's camera. Leaving the channel and the end of
+    // the connection turn it off as the engine does.
+
+    private var _appCamera: CameraCapture?
+    private var _cameraStartProblem: CameraProblem?
+    private var _cameraViewers: UInt32 = 0
+    private var _captureFailures: [CaptureFailure] = []
+    private var _ownCameraState = OwnCameraState.off
+
+    /// The camera the app gave the engine; nil before it gave one.
+    var appCamera: CameraCapture? { locked { _appCamera } }
+    /// Why "Start sharing" fails; nil: it works.
+    var cameraStartProblem: CameraProblem? {
+        get { locked { _cameraStartProblem } }
+        set { locked { _cameraStartProblem = newValue } }
+    }
+    var captureFailures: [CaptureFailure] { locked { _captureFailures } }
+    /// The own camera's state as last reported.
+    var ownCameraState: OwnCameraState { locked { _ownCameraState } }
+
+    private func emitCamera(_ state: OwnCameraState, _ problem: CameraProblem? = nil) {
+        let viewers: UInt32 = locked {
+            _ownCameraState = state
+            return state == .sharing ? _cameraViewers : 0
+        }
+        emit(.ownCameraChanged(camera: OwnCamera(state: state, problem: problem, viewers: viewers)))
+    }
+
+    func setCameraCapture(capture: CameraCapture?) {
+        locked { _appCamera = capture }
+    }
+
+    func cameraHandle() -> UInt64 { 0 }
+
+    func openCameraPreview() async throws {
+        guard let capture = appCamera else { throw BridgeError.Internal(detail: "camera not shared: no-camera") }
+        guard case .connected = locked({ connection }) else { throw BridgeError.NotConnected(detail: "not connected") }
+        capture.start()
+        emitCamera(.preview)
+    }
+
+    func startCameraSharing() async throws {
+        emitCamera(.starting)
+        if let problem = cameraStartProblem {
+            emitCamera(.preview, problem)
+            throw BridgeError.Internal(detail: "camera not shared")
+        }
+        emitCamera(.sharing)
+    }
+
+    func stopCamera() async throws {
+        appCamera?.stop()
+        emitCamera(.off)
+    }
+
+    func cameraCaptureFailed(failure: CaptureFailure) {
+        locked { _captureFailures.append(failure) }
+        appCamera?.stop()
+        emitCamera(.off, .cameraFailed)
+    }
+
+    /// The engine reports a new number of people who get the camera.
+    func watchCamera(_ viewers: UInt32) {
+        locked { _cameraViewers = viewers }
+        emitCamera(.sharing)
+    }
+
+    /// Turns a running camera off without a reason, as the engine's stop rules do.
+    private func endCamera() {
+        guard ownCameraState != .off else { return }
+        appCamera?.stop()
+        emitCamera(.off)
     }
 
     // MARK: Identities

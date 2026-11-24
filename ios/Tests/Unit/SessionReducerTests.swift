@@ -141,6 +141,14 @@ final class SessionReducerTests: XCTestCase {
         XCTAssertFalse(ended.directConnectionsQuestion)
     }
 
+    func testTheOwnCameraIsFollowedUntilTheConnectionEnds() {
+        XCTAssertEqual(SessionState().ownCamera, cameraOff)
+        let sharing = OwnCamera(state: .sharing, problem: nil, viewers: 2)
+        let shown = fold(connected + [.ownCameraChanged(camera: sharing)])
+        XCTAssertEqual(shown.ownCamera, sharing)
+        XCTAssertEqual(shown.fold(.connectionChanged(state: .disconnected(error: nil))).ownCamera, cameraOff)
+    }
+
     func testANewSessionIsIdleAndShowsNoServer() {
         let state = SessionState()
         XCTAssertEqual(state.phase, .idle)

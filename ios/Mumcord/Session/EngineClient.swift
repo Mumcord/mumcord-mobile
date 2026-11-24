@@ -95,6 +95,19 @@ protocol EngineClient: AnyObject, Sendable {
     func setVideoSink(sink: VideoSink?)
     /// The handle for the engine's picture functions (`bridge/include/mumcord_video.h`).
     func videoHandle() -> UInt64
+
+    /// Sharing the own camera (FR-5.74, FR-5.75). The engine starts and stops the app's camera
+    /// through `capture`; the state arrives as `OwnCameraChanged`.
+    func setCameraCapture(capture: CameraCapture?)
+    /// The handle for the engine's camera input (`bridge/include/mumcord_camera.h`).
+    func cameraHandle() -> UInt64
+    /// Opens the preview: the camera runs on the phone, nothing is sent.
+    func openCameraPreview() async throws
+    func startCameraSharing() async throws
+    /// Cancel in the preview, or Stop while sharing.
+    func stopCamera() async throws
+    /// The app's camera stopped by itself; sharing ends with the reason.
+    func cameraCaptureFailed(failure: CaptureFailure)
 }
 
 /// The bridge's side of one "Send to your phone" scan (`TransferScan`), as the app uses it, so
