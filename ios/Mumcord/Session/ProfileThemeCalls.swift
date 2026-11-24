@@ -26,13 +26,6 @@ extension SessionStore {
         await call("chat limits") { try await $0.chatLimits() }.value?.text
     }
 
-    /// Both versions of the theme `themeId` (nil: the app theme), as the app draws them.
-    func themeTokens(_ themeId: String?) async -> Outcome<(dark: ThemeTokens, light: ThemeTokens)> {
-        await call("read theme colours") {
-            (dark: $0.themeTokens(themeId: themeId, variant: .dark), light: $0.themeTokens(themeId: themeId, variant: .light))
-        }
-    }
-
     func setThemeMode(_ mode: ThemeMode) async -> Outcome<Void> {
         await call("save appearance") { try await $0.setThemeMode(mode: mode) }
     }

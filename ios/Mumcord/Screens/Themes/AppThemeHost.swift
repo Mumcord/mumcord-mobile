@@ -13,7 +13,7 @@ final class AppThemeController {
     private(set) var shown: AppTheme?
 
     @ObservationIgnored private let store: SessionStore
-    @ObservationIgnored private var reading: Task<Void, Never>?
+    @ObservationIgnored private var last: Shown?
 
     /// What the shown colours follow. Any change of the themes reads the colours again: a theme
     /// of the same id may have been replaced. That is rare and cheap.
@@ -24,33 +24,22 @@ final class AppThemeController {
 
     init(store: SessionStore) {
         self.store = store
-        let states = store.states()
-        Task { [weak self] in
-            var last: Shown?
-            for await state in states {
-                guard let self else { return }
-                let key = state.themes.map { Shown(settings: $0, serverId: state.showsServer ? state.activeServerId : nil) }
-                if key == last { continue }
-                last = key
-                self.read(key)
-            }
-        }
     }
 
-    private func read(_ key: Shown?) {
-        reading?.cancel()
-        guard let key else {
+    /// Takes over a new state of the session. The model calls it with every state before the
+    /// screens get it, and the colours are read at once, so the first picture of a server with
+    /// a theme of its own, and the first screen after the start, are already drawn in them.
+    func follow(_ state: SessionState) {
+        let key = state.themes.map { Shown(settings: $0, serverId: state.showsServer ? state.activeServerId : nil) }
+        if key == last { return }
+        last = key
+        // Without colours (the store logs why) the app draws in its own Mumcord colours.
+        guard let key, let tokens = store.themeTokensNow(shownThemeId(key.settings, shownServerId: key.serverId)) else {
             shown = nil
             return
         }
-        reading = Task { [store] in
-            let tokens = await store.themeTokens(shownThemeId(key.settings, shownServerId: key.serverId))
-            if Task.isCancelled { return }
-            switch tokens {
-            case .ok(let tokens): shown = AppTheme(mode: key.settings.mode, dark: tokens.dark, light: tokens.light)
-            case .failed: shown = nil
-            }
-        }
+        let next = AppTheme(mode: key.settings.mode, dark: tokens.dark, light: tokens.light)
+        if next != shown { shown = next }
     }
 }
 

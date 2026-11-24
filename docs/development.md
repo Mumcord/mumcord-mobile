@@ -642,7 +642,9 @@ picture, its orientation, the camera indicator and a desktop watching it.
 The theme the app is drawn in comes from one place: `AppThemeController`
 (`ios/Mumcord/Screens/Themes/AppThemeHost.swift`) reads both versions of the shown theme from the
 engine whenever the themes or the shown server change (the server's own theme while connected to
-it, otherwise the app theme), and `AppThemeHost` on the app's root picks the version the
+it, otherwise the app theme). `AppModel` hands it every state before the screens get it and the
+engine answers at once from memory, so the first picture after the start and of a server with its
+own theme are already in its colours. `AppThemeHost` on the app's root picks the version the
 appearance mode and the phone's dark mode ask for and puts it into the environment as the
 `MumcordTheme` every view reads. The engine's tokens replace the design system's colours of the
 same name; everything a theme does not decide (avatar colours, the backdrop, the stream stage)

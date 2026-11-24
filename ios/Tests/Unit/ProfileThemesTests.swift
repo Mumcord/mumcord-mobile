@@ -300,6 +300,22 @@ final class ProfileThemesTests: XCTestCase {
         await assertEventually { model.appTheme.shown?.dark.themeId == MockupThemes.mumcordId }
     }
 
+    /// No picture in the default colours first: the colours come with the state that picks
+    /// them, at the start and on connecting to a server with a theme of its own.
+    func testTheColoursAreThereWithTheFirstPictureOfTheirScreen() async {
+        let store = makeStore(box, server: mockupVoiceServer(), servers: [savedServer(1, "Nordlicht")]) { engine in
+            engine.profileThemes.settings.appThemeId = MockupThemes.oceanId
+            engine.profileThemes.settings.serverThemes = [1: MockupThemes.mumcordId]
+        }
+        let model = PhoneFakes().makeModel(store: store, setupStore: InMemorySetupStore(firstStartDone: true))
+        await assertEventually { model.uiState.session.serversLoaded }
+        XCTAssertEqual(model.appTheme.shown?.dark.themeId, MockupThemes.oceanId, "the server list, at once in the app theme")
+
+        model.connect(1)
+        await assertEventually { model.uiState.session.showsServer }
+        XCTAssertEqual(model.appTheme.shown?.dark.themeId, MockupThemes.mumcordId, "Nordlicht, at once in its own theme")
+    }
+
     func testLeavingTheThemesScreenClosesItsSheet() async {
         let model = await connected()
         model.more.openThemes()

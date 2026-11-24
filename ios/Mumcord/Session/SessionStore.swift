@@ -359,6 +359,18 @@ final class SessionStore: @unchecked Sendable {
         engineNow()?.setOpenChat(chat: chat)
     }
 
+    /// Both versions of the theme `themeId` (nil: the app theme), as the app draws them. Read
+    /// at once, so the colours change together with the state that picks them: the engine only
+    /// looks them up in memory. Nil while there is no engine yet, which never happens once the
+    /// themes have been read.
+    func themeTokensNow(_ themeId: String?) -> (dark: ThemeTokens, light: ThemeTokens)? {
+        guard let engine = engineNow() else {
+            log("read theme colours failed: no engine yet")
+            return nil
+        }
+        return (engine.themeTokens(themeId: themeId, variant: .dark), engine.themeTokens(themeId: themeId, variant: .light))
+    }
+
     private func engineNow() -> EngineClient? {
         lock.lock()
         defer { lock.unlock() }

@@ -186,6 +186,8 @@ final class AppModel {
     }
 
     private func apply(_ state: SessionState) {
+        // Before the screens get the state, so they are drawn in its colours from the start.
+        appTheme.follow(state)
         let serversChanged = state.servers != session.servers
         let previousPhase = session.phase
         let whisperEnded = state.whispersEnded != session.whispersEnded
