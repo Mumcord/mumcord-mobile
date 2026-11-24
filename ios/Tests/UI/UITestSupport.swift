@@ -235,6 +235,31 @@ extension XCTestCase {
         return check(first, second)
     }
 
+    /// The colour of the screen at a point given as a fraction of its width and height.
+    func screenColour(atNormalized point: CGPoint) -> ScreenColour? {
+        let screenshot = XCUIScreen.main.screenshot().image
+        guard let image = screenshot.cgImage else { return nil }
+        return pixel(image, x: CGFloat(image.width) * point.x, y: CGFloat(image.height) * point.y)
+    }
+
+    /// Waits until the screen's colour at the point passes `check`; the colours of a theme are
+    /// drawn a moment after it was chosen.
+    func awaitScreenColour(
+        atNormalized point: CGPoint,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ check: (ScreenColour) -> Bool
+    ) {
+        let deadline = Date().addingTimeInterval(10)
+        var last: ScreenColour?
+        while Date() < deadline {
+            last = screenColour(atNormalized: point)
+            if let last, check(last) { return }
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        XCTFail("the screen colour is \(String(describing: last))", file: file, line: line)
+    }
+
     private func pixel(_ image: CGImage, x: CGFloat, y: CGFloat) -> ScreenColour? {
         var bytes = [UInt8](repeating: 0, count: 4)
         guard let context = CGContext(

@@ -61,7 +61,8 @@ group_tests() {
     app-screens)
       printf '%s\n' MumcordUITests/AppScreenshotUITests MumcordUITests/DesignReferenceUITests \
         MumcordUITests/LaunchUITests MumcordUITests/PublicServersFlowUITests \
-        MumcordUITests/PublicServersScreenshotUITests ;;
+        MumcordUITests/PublicServersScreenshotUITests \
+        MumcordUITests/ProfileThemesScreenshotUITests ;;
     core)
       printf '%s\n' MumcordTests MumcordUITests/AppFlowUITests MumcordUITests/VoiceFlowUITests ;;
     voice-chat-screens)
@@ -78,7 +79,8 @@ group_tests() {
       printf '%s\n' MumcordUITests/OutputFlowUITests MumcordUITests/PhoneScreenshotUITests \
         MumcordUITests/SettingsFlowUITests MumcordUITests/MoreScreenshotUITests ;;
     identities)
-      printf '%s\n' MumcordUITests/IdentitiesFlowUITests MumcordUITests/IdentitiesScreenshotUITests ;;
+      printf '%s\n' MumcordUITests/IdentitiesFlowUITests MumcordUITests/IdentitiesScreenshotUITests \
+        MumcordUITests/ProfileThemesFlowUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
   esac
 }

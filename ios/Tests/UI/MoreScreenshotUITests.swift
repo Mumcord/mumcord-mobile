@@ -40,10 +40,12 @@ final class MoreScreenshotUITests: XCTestCase {
 
     // MARK: States
 
-    /// Mockup `15-more`, as far as it exists; seven entries of the log are new.
+    /// Mockup `15-more`, as far as it exists, with the user's profile; seven entries of the log
+    /// are new.
     private func more(theme: String) {
-        let app = openMore(",activity", theme: theme)
+        let app = openMore(",activity,profile", theme: theme)
         expectAppears(app.element("Activity, 7 new entries"))
+        expectAppears(app.element("more-edit-profile"))
         capture(app, "more", theme: theme)
     }
 
