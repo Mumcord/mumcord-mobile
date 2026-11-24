@@ -97,6 +97,11 @@ extension AppModel {
         notifier.onResponse(category: SystemIdleNotifier.warningCategory) { action in
             if action == SystemIdleNotifier.stayAction { idle.stayConnected() }
         }
+        // The shared camera's pictures go to the engine's C function.
+        let cameraFrames = EngineCameraFrames(handle: { store.cameraHandle() })
+        let cameraShare = CameraShare(store: store) { onTrouble in
+            AVCameraSource(frames: cameraFrames, onTrouble: onTrouble, log: AppLog.write)
+        }
         let model = AppModel(
             store: store,
             setupStore: UserDefaultsSetupStore(),
@@ -117,7 +122,8 @@ extension AppModel {
             camera: SystemCameraGateway(),
             qrSource: CameraQrSource(),
             network: network,
-            streamVideo: StreamVideo(frames: EngineVideoFrames(handle: { store.videoHandle() }))
+            streamVideo: StreamVideo(frames: EngineVideoFrames(handle: { store.videoHandle() })),
+            cameraShare: cameraShare
         )
         notifier.onOpen { [weak model] key in
             if let chat = chatFromNotificationKey(key) { model?.openChat(chat) }

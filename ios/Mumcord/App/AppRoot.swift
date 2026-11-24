@@ -33,6 +33,8 @@ struct AppRoot: View {
                 model.conversation.setResumed(phase == .active)
                 // Nothing is fetched or decoded for a stream nobody can see (FR-5.43).
                 model.streams.setOnScreen(phase != .background)
+                // The shared camera pauses while the app is in the background (FR-5.75).
+                model.cameraShare?.camera.setOnScreen(phase != .background)
             }
     }
 }
@@ -57,8 +59,13 @@ struct AppContent: View {
         let streams = model.streams.uiState
         // The engine waits for this answer before a stream can use a direct connection.
         let directQuestion = uiState.screen == .channels && uiState.connected != nil && streams.directConnectionsQuestion
+        let connectedScreen = uiState.screen == .channels && uiState.connected != nil
+        let camera = connectedScreen ? model.cameraShare : nil
+        let cameraSheet = camera?.uiState.sheet
+        let cameraPermission = camera?.question
         let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
             || settingsSheet || identitySheet != nil || cameraQuestion || directQuestion
+            || cameraSheet != nil || cameraPermission != nil
         ZStack {
             screen
                 // While a sheet is open, the screen behind it is not offered to screen readers.
@@ -83,6 +90,19 @@ struct AppContent: View {
                 )
             } else if directQuestion {
                 DirectConnectionsSheet(onAnswer: model.streams.answerDirectConnections)
+            } else if let camera, let cameraPermission {
+                CameraSheet(
+                    reason: Strings.cameraReasonShare,
+                    blocked: cameraPermission == .denied,
+                    onContinue: camera.allowCamera,
+                    onOpenSettings: {
+                        camera.dismissQuestion()
+                        model.openSettings()
+                    },
+                    onDismiss: camera.dismissQuestion
+                )
+            } else if let camera, let cameraSheet {
+                CameraShareSheet(sheet: cameraSheet, controller: camera)
             } else if let connectedSheet {
                 ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model), model: model)
             } else if uiState.connected != nil {

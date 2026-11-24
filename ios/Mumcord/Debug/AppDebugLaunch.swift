@@ -67,6 +67,12 @@ import MumcordBridge
 ///         stream-colours   the stream's picture is red on the left half and blue on the right,
 ///                          instead of the picture of the mockups
 ///         stream-one-frame the stream sends a single picture and nothing new afterwards
+///         camera-refused   "Start sharing" of the own camera is refused: direct connections
+///                          are off
+///         camera-viewers   three seconds after the own camera is shared, two people
+///                          watch it
+///         camera-fails     three seconds after the own camera is shared, the camera
+///                          stops working
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
@@ -224,6 +230,9 @@ struct AppDebugLaunch {
             if options.contains("stream-unreachable") {
                 engine.firstWatchOutcome = .unreachable(reason: .noPath)
             }
+            if options.contains("camera-refused") {
+                engine.cameraStartProblem = .directConnectionsOff
+            }
             return engine
         }
     }
@@ -343,6 +352,13 @@ extension AppDebugLaunch {
         let monitor = FakeNetworkMonitor(network)
         Self.networkSession = NetworkSession(store: store, monitor: monitor)
         let idleTimes = idleTimes
+        // The simulator's camera films nothing a test can check: the shared camera is a drawn one.
+        var cameraSource: FakeCameraSource?
+        let cameraShare = CameraShare(store: store) { onTrouble in
+            let source = FakeCameraSource(onTrouble: onTrouble)
+            cameraSource = source
+            return source
+        }
         let model = AppModel(
             store: store,
             setupStore: InMemorySetupStore(firstStartDone: setupDone),
@@ -372,8 +388,16 @@ extension AppDebugLaunch {
             camera: cameraGateway,
             qrSource: qrSource,
             network: monitor,
-            streamVideo: streamVideo
+            streamVideo: streamVideo,
+            cameraShare: cameraShare
         )
+        if options.contains("camera-viewers") || options.contains("camera-fails") {
+            let options = options
+            whileSharing(model) {
+                if options.contains("camera-viewers") { engine.value?.watchCamera(2) }
+                if options.contains("camera-fails") { cameraSource?.trouble(.failed) }
+            }
+        }
         if let identitiesPreset {
             IdentitiesPreset.apply(identitiesPreset, to: model.identities)
         }
@@ -384,6 +408,19 @@ extension AppDebugLaunch {
             reportLiveActivity(model, engine)
         }
         return model
+    }
+
+    /// Runs `change` three seconds after the own camera is shared, so a test sees the state
+    /// before it, then waits for the change.
+    @MainActor
+    private func whileSharing(_ model: AppModel, _ change: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            while model.cameraShare?.uiState.sharing == nil {
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            change()
+        }
     }
 
     /// Lets the engine report activity at the moments a test waits for it: while the log is

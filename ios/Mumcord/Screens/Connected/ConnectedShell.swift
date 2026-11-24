@@ -31,7 +31,7 @@ struct ConnectedShell<Chat: View>: View {
                 actions: streamActions
             )
         } else if let voice = state.voice, voice.open {
-            VoiceScreen(voice: voice, state: state, actions: actions, onLeave: onDisconnect)
+            VoiceScreen(voice: voice, state: state, actions: actions, onLeave: onDisconnect, camera: model.cameraShare)
         } else {
             tabs
         }
@@ -61,6 +61,9 @@ struct ConnectedShell<Chat: View>: View {
             if let voice = state.voice {
                 if let whisper = voice.whisper {
                     WhisperBar(whisper: whisper, onHeldChange: actions.setWhisperHeld, onClose: actions.closeWhisper)
+                }
+                if let camera = model.cameraShare {
+                    CameraBar(state: camera.uiState, controller: camera)
                 }
                 VoiceBar(voice: voice, actions: actions, onLeave: onDisconnect)
             }

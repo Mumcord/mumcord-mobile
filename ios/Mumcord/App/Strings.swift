@@ -605,6 +605,36 @@ enum Strings {
     static var directConnectionsNo: String { text("direct_connections_no") }
     static var directConnectionsYes: String { text("direct_connections_yes") }
 
+    // MARK: Sharing the own camera
+
+    static var cameraReasonShare: String { text("camera_reason_share") }
+    static var cameraShareButton: String { text("camera_share_button") }
+    static var cameraShareTitle: String { text("camera_share_title") }
+    static var cameraSharePreview: String { text("camera_share_preview") }
+    static var cameraShareFront: String { text("camera_share_front") }
+    static var cameraShareBack: String { text("camera_share_back") }
+    static var cameraShareSwitch: String { text("camera_share_switch") }
+    static var cameraSharePauses: String { text("camera_share_pauses") }
+    static var cameraShareStart: String { text("camera_share_start") }
+    static var cameraShareStarting: String { text("camera_share_starting") }
+    static var cameraShareCancel: String { text("camera_share_cancel") }
+    static func cameraOnWatching(_ p1: Int) -> String {
+        format(p1 == 1 ? "camera_on_watching.one" : "camera_on_watching.other", p1)
+    }
+    static var cameraStop: String { text("camera_stop") }
+    static var cameraStopSharing: String { text("camera_stop_sharing") }
+    static var cameraStopped: String { text("camera_stopped") }
+    static var cameraNoticeDismiss: String { text("camera_notice_dismiss") }
+    static var cameraProblemNotConnected: String { text("camera_problem_not_connected") }
+    static var cameraProblemBusy: String { text("camera_problem_busy") }
+    static var cameraProblemPermission: String { text("camera_problem_permission") }
+    static var cameraProblemFailed: String { text("camera_problem_failed") }
+    static var cameraProblemDirectOff: String { text("camera_problem_direct_off") }
+    static var cameraProblemNoCertificate: String { text("camera_problem_no_certificate") }
+    static var cameraProblemFull: String { text("camera_problem_full") }
+    static var cameraProblemRelayLost: String { text("camera_problem_relay_lost") }
+    static var cameraProblemRefused: String { text("camera_problem_refused") }
+
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }

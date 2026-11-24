@@ -41,7 +41,10 @@ final class AppModel {
     @ObservationIgnored let identities: IdentitiesController
     /// Watching screen shares and cameras. Read only by the stream views.
     @ObservationIgnored let streams: StreamsController
-    /// The camera permission, for the scanner and the chat's "Take photo".
+    /// Sharing the own camera (FR-5.74); nil where it cannot be shared (no camera button).
+    /// Read only by the camera views.
+    @ObservationIgnored let cameraShare: CameraShareController?
+    /// The camera permission, for the scanner, the chat's "Take photo" and sharing the camera.
     @ObservationIgnored let camera: CameraGateway
     /// Where the scanner gets the texts of QR codes from.
     @ObservationIgnored let qrSource: QrSource
@@ -81,7 +84,8 @@ final class AppModel {
         camera: CameraGateway = NoCamera(),
         qrSource: QrSource = NoQrSource(),
         network: NetworkMonitor? = nil,
-        streamVideo: StreamVideo = .none
+        streamVideo: StreamVideo = .none,
+        cameraShare: CameraShare? = nil
     ) {
         self.store = store
         self.setupStore = setupStore
@@ -105,6 +109,7 @@ final class AppModel {
         self.qrSource = qrSource
         identities = IdentitiesController(store: store, camera: camera)
         streams = StreamsController(store: store, network: network, video: streamVideo)
+        self.cameraShare = cameraShare.map { CameraShareController(store: store, camera: $0, permission: camera) }
         chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
         local = AppUiState(setupDone: setupStore.firstStartDone)
         if let sessionEnded {

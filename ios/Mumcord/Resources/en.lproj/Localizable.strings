@@ -575,3 +575,33 @@
 "direct_connections_body" = "Direct connections are faster, but the other person can see your IP address. Mumcord uses them for streams with other Mumcord users. If you say no, streams come through the server's relay where the server has one; then the other person doesn't see your IP address.";
 "direct_connections_no" = "No";
 "direct_connections_yes" = "Yes";
+
+/* Sharing the own camera (FR-5.74, FR-5.75). */
+"camera_reason_share" = "Mumcord needs the camera to share it with the people in your channel. Nothing is sent before you start sharing.";
+"camera_share_button" = "Camera";
+"camera_share_title" = "Share your camera";
+"camera_share_preview" = "Camera preview";
+"camera_share_front" = "Front camera";
+"camera_share_back" = "Back camera";
+"camera_share_switch" = "Switch front or back camera";
+"camera_share_pauses" = "Your camera pauses when Mumcord is in the background";
+"camera_share_start" = "Start sharing";
+"camera_share_starting" = "Starting…";
+"camera_share_cancel" = "Cancel";
+"camera_on_watching.one" = "Camera on · %d watching";
+"camera_on_watching.other" = "Camera on · %d watching";
+"camera_stop" = "Stop";
+"camera_stop_sharing" = "Stop camera";
+"camera_stopped" = "Camera stopped.";
+"camera_notice_dismiss" = "Dismiss";
+
+/* Why the camera could not be shared, or why sharing ended by itself. */
+"camera_problem_not_connected" = "You are not connected to the server.";
+"camera_problem_busy" = "The camera is already in use.";
+"camera_problem_permission" = "Mumcord may not use the camera.";
+"camera_problem_failed" = "The camera could not be opened or stopped working.";
+"camera_problem_direct_off" = "Camera sharing needs direct connections between clients, which are turned off.";
+"camera_problem_no_certificate" = "Camera sharing needs an identity with a certificate.";
+"camera_problem_full" = "There is no room for another camera in this channel.";
+"camera_problem_relay_lost" = "The connection that carried your camera ended.";
+"camera_problem_refused" = "The server does not allow your camera.";
