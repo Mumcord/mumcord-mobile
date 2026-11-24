@@ -67,6 +67,9 @@ struct AppContent: View {
         let identitySheet = uiState.screen == .identities || uiState.screen == .identitySetup ? uiState.identities.sheet : nil
         let cameraQuestion = uiState.screen == .scan && uiState.identities.scan?.camera == .explain
         let settingsSheet = model.more.local.sheet != nil
+        let moreSheet = uiState.connected?.tab == .more && model.more.sheetOpen
+        let serverThemeSheet = uiState.screen == .serverForm ? uiState.form.flatMap { $0.themeSheet ? $0 : nil } : nil
+        let allThemes = uiState.session.builtInThemes + (uiState.session.themes?.customThemes ?? [])
         let streams = model.streams.uiState
         // The engine waits for this answer before a stream can use a direct connection.
         let directQuestion = uiState.screen == .channels && uiState.connected != nil && streams.directConnectionsQuestion
@@ -75,8 +78,8 @@ struct AppContent: View {
         let cameraSheet = camera?.uiState.sheet
         let cameraPermission = camera?.question
         let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
-            || settingsSheet || identitySheet != nil || cameraQuestion || directQuestion
-            || cameraSheet != nil || cameraPermission != nil
+            || settingsSheet || moreSheet || identitySheet != nil || cameraQuestion || directQuestion
+            || cameraSheet != nil || cameraPermission != nil || serverThemeSheet != nil
         // The camera runs only while the user sees it: its preview is the sheet shown below (the
         // sheets before it in the chain take its place), or the "Camera on" bar is on screen.
         let previewShown = cameraSheet != nil && prompt == nil && overlay == nil && identitySheet == nil
@@ -94,6 +97,8 @@ struct AppContent: View {
                 )
             } else if let overlay {
                 sheet(for: overlay)
+            } else if let serverThemeSheet {
+                ServerThemeSheet(form: serverThemeSheet, themes: allThemes, onChange: model.changeForm)
             } else if let identitySheet {
                 IdentitySheetHost(sheet: identitySheet, actions: model.identities)
             } else if cameraQuestion {
@@ -203,7 +208,8 @@ struct AppContent: View {
                     form: form,
                     onChange: model.changeForm,
                     onSave: model.saveForm,
-                    onBack: model.closeForm
+                    onBack: model.closeForm,
+                    themes: uiState.session.builtInThemes + (uiState.session.themes?.customThemes ?? [])
                 )
             }
         case .channels:

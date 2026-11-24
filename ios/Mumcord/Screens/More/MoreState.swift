@@ -7,6 +7,8 @@ enum MorePage: Equatable {
     case main
     case activity
     case settings
+    case editProfile
+    case themes
 }
 
 /// The choices of the settings that open a sheet.
@@ -53,6 +55,21 @@ struct MoreUiState: Equatable {
     let filter: ActivityFilter
     /// Nil while the settings are closed or not read yet.
     let settings: SettingsUiState?
+    /// The user's own profile for the card at the top; nil until it was read.
+    var profile: OwnProfile?
+    /// Nil while the editor is closed.
+    var profileEdit: ProfileEditUiState?
+    /// The name of the app theme for the Themes row; nil until the themes were read.
+    var themeName: String?
+    /// Nil while the themes screen is closed or the themes have not been read.
+    var themes: ThemesUiState?
+}
+
+/// What the profile and theme screens add to the More tab; kept apart from `MoreLocal`.
+struct MoreExtras: Equatable {
+    var profile: OwnProfile?
+    var profileEdit: ProfileEdit?
+    var themes = ThemesLocal()
 }
 
 /// The More tab as a value, or nil while no server is shown.
@@ -61,7 +78,8 @@ func moreUiState(
     local: MoreLocal,
     serverName: String,
     output: OutputState,
-    senderOnly: Bool
+    senderOnly: Bool,
+    extras: MoreExtras = MoreExtras()
 ) -> MoreUiState? {
     guard session.showsServer else { return nil }
     var settings: SettingsUiState?
@@ -82,6 +100,12 @@ func moreUiState(
         activityBadge: local.page == .activity ? 0 : unseenActivity(session.activity, seenId: local.seenActivityId),
         activity: session.activity,
         filter: local.filter,
-        settings: settings
+        settings: settings,
+        profile: extras.profile,
+        profileEdit: local.page == .editProfile
+            ? extras.profile.flatMap { own in extras.profileEdit.map { profileEditUiState(own: own, edit: $0) } }
+            : nil,
+        themeName: appThemeName(session),
+        themes: local.page == .themes ? themesUiState(session: session, local: extras.themes, serverName: serverName) : nil
     )
 }

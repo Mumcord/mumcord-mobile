@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import MumcordBridge
 import SwiftUI
 
-/// Adds a server to the list or changes one: address, port, name, user name, server password.
+/// Adds a server to the list or changes one: address, port, name, user name, server password,
+/// and for a saved server the theme it is shown in (no mockup; as in the desktop's edit-server
+/// dialog, Spec 02 FR-2.17).
 struct ServerFormScreen: View {
     let form: ServerFormState
     let onChange: ((inout ServerFormState) -> Void) -> Void
     let onSave: () -> Void
     let onBack: () -> Void
+    /// Every theme, built in and the user's own; empty until they were read.
+    var themes: [Theme] = []
+    @Environment(\.mumcordTheme) private var theme
     /// The field the keyboard writes into, so that its "Next" key can move on.
     @FocusState private var focus: FormField?
 
@@ -28,6 +34,9 @@ struct ServerFormScreen: View {
                             style: .ghost,
                             action: { onChange { $0.removeSavedPassword.toggle() } }
                         )
+                    }
+                    if form.isEdit && !themes.isEmpty {
+                        themeRow
                     }
                     if let saveError = form.saveError {
                         MumcordBanner(
@@ -101,6 +110,25 @@ struct ServerFormScreen: View {
         .focused($focus, equals: .password)
     }
 
+    private var themeRow: some View {
+        let name = form.themeId.flatMap { id in themes.first { $0.id == id }?.name } ?? Strings.serverThemeUseApp
+        return VStack(alignment: .leading, spacing: 6) {
+            MumcordList(horizontalMargin: 0) {
+                MumcordListRow(
+                    title: Strings.serverTheme,
+                    icon: MumcordIcons.moon,
+                    action: { onChange { $0.themeSheet = true } },
+                    trailing: {
+                        MumcordListRowValue(text: name)
+                        MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted)
+                    }
+                )
+                .accessibilityIdentifier("server-form-theme")
+            }
+            ParagraphText(Strings.serverThemeHint, style: .small, color: theme.colors.textMuted)
+        }
+    }
+
     private var passwordHint: String {
         if form.removeSavedPassword { return Strings.formPasswordWillBeRemoved }
         return form.hasSavedPassword ? Strings.formPasswordSaved : Strings.formPasswordHint
@@ -114,4 +142,48 @@ private enum FormField: Hashable {
     case name
     case username
     case password
+}
+
+/// The accessibility identifier of a choice in the server theme sheet; "app" for "Use app theme".
+func serverThemeOptionIdentifier(_ themeId: String?) -> String {
+    "server-theme-option-" + (themeId ?? "app")
+}
+
+/// The theme a server is shown in: "Use app theme" or one of all themes. Taken over on Save.
+struct ServerThemeSheet: View {
+    let form: ServerFormState
+    let themes: [Theme]
+    let onChange: ((inout ServerFormState) -> Void) -> Void
+    @Environment(\.mumcordTheme) private var theme
+
+    var body: some View {
+        let options: [(id: String?, name: String)] = [(nil, Strings.serverThemeUseApp)] + themes.map { ($0.id, $0.name) }
+        SheetOverlay(
+            title: Strings.serverThemeTitle(form.name.isBlank ? form.address : form.name),
+            onDismiss: { onChange { $0.themeSheet = false } }
+        ) {
+            MumcordList(horizontalMargin: 0, background: theme.colors.bgHover) {
+                ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+                    let selected = form.themeId == option.id
+                    MumcordListRow(
+                        title: option.name,
+                        divider: index > 0,
+                        selected: selected,
+                        action: {
+                            onChange {
+                                $0.themeId = option.id
+                                $0.themeSheet = false
+                            }
+                        },
+                        trailing: {
+                            if selected {
+                                MumcordIcon(icon: MumcordIcons.check, label: nil, tint: theme.colors.accentText)
+                            }
+                        }
+                    )
+                    .accessibilityIdentifier(serverThemeOptionIdentifier(option.id))
+                }
+            }
+        }
+    }
 }

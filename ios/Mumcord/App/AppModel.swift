@@ -390,7 +390,7 @@ final class AppModel {
 
     func openEditServer(_ serverId: Int64) {
         guard let server = server(serverId) else { return }
-        local.form = .edit(server)
+        local.form = .edit(server, themeId: store.state.themes?.serverThemes[serverId])
     }
 
     func changeForm(_ change: (inout ServerFormState) -> Void) {
@@ -421,7 +421,16 @@ final class AppModel {
             } else {
                 saved = await store.addServer(input)
             }
+            // The server's theme is its own setting, saved once the server itself is.
+            var themed: Outcome<Void>
             switch saved {
+            case .ok: themed = .ok(())
+            case .failed(let error): themed = .failed(error)
+            }
+            if case .ok = themed, let serverId = form.serverId, form.themeChanged {
+                themed = await store.setServerTheme(serverId, form.themeId)
+            }
+            switch themed {
             case .ok:
                 closeForm()
             case .failed(let error):

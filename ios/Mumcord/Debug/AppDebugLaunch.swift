@@ -3,6 +3,7 @@
 #if DEBUG
 import Foundation
 import MumcordBridge
+import UIKit
 
 /// Lets a debug build run against the fake engine with canned data, so UI tests and screenshot
 /// tests can walk through the app without a server:
@@ -84,6 +85,11 @@ import MumcordBridge
 ///         public-ping-slow a listed server takes ten seconds to answer a ping
 ///         public-probe     an invisible element "fake-public-list" says how often the list was
 ///                          downloaded and the listed servers pinged (`FakePublicListProbeView`)
+///         profile          the user's comment on Nordlicht is the one of the mockup
+///         profile-avatar   the user has a profile picture on Nordlicht
+///         profile-save-fails saving the comment fails once
+///         own-theme        the user has a theme of their own, "From the desktop"
+///         theme-ocean      the app theme is the built-in "Deep Ocean"
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
@@ -250,6 +256,7 @@ struct AppDebugLaunch {
             if options.contains("camera-slow-start") {
                 engine.cameraStartDelay = .seconds(30)
             }
+            Self.prepareProfileThemes(engine.profileThemes, options)
             return engine
         }
     }
@@ -282,6 +289,43 @@ extension AppDebugLaunch {
             failing.formUnion(downloads.filter { $0 > firstWorking })
         }
         engine.failingPublicDownloads = failing
+    }
+
+    /// The comment of the edit profile mockup.
+    static let mockupComment = "Playing late, always up for a chat. Ask me about the new map!"
+
+    /// The profile and the themes as the options describe them.
+    static func prepareProfileThemes(_ fake: FakeProfileThemes, _ options: Set<String>) {
+        if options.contains("profile") {
+            fake.profile.commentText = mockupComment
+        }
+        if options.contains("profile-avatar") {
+            let picture = mockupAvatar()
+            fake.profile.avatar = ImageData(bytes: picture, mime: "image/png", width: 96, height: 96, animated: false)
+        }
+        if options.contains("profile-save-fails") {
+            fake.saveFailure = .Io(detail: "the connection dropped")
+        }
+        if options.contains("own-theme") {
+            _ = fake.addCustom(MockupThemes.fromTheDesktop)
+        }
+        if options.contains("theme-ocean") {
+            fake.settings.appThemeId = MockupThemes.oceanId
+        }
+    }
+
+    /// A profile picture drawn here: a warm circle on a cool background.
+    static func mockupAvatar() -> Data {
+        let size = CGSize(width: 96, height: 96)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor(red: 0.16, green: 0.42, blue: 0.62, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            UIColor(red: 0.98, green: 0.69, blue: 0.47, alpha: 1).setFill()
+            context.cgContext.fillEllipse(in: CGRect(x: 24, y: 16, width: 48, height: 48))
+        }
+        return image.pngData() ?? Data()
     }
 
     /// Mira's stream as the options describe it.

@@ -21,6 +21,15 @@ struct MoreTab: View {
                     if let settings = state.settings {
                         SettingsScreen(state: settings, actions: model.more, inputLevel: model.inputLevel)
                     }
+                case .editProfile:
+                    // Nil for the moment the profile is being read.
+                    if let edit = state.profileEdit {
+                        EditProfileScreen(state: edit, actions: model.more.profile)
+                    }
+                case .themes:
+                    if let themes = state.themes {
+                        ThemesScreen(state: themes, actions: model.more.themes, onBack: model.more.back)
+                    }
                 case .main:
                     MoreBlockedHost(model: model) {
                         MoreScreen(
@@ -41,13 +50,19 @@ struct MoreTab: View {
     }
 }
 
-/// The sheet of a setting when one is open, else the sheets of messages and chat, over the
-/// whole screen. There is never more than one.
+/// The sheet of a setting, of the profile or of the themes when one is open, else the sheets of
+/// messages and chat, over the whole screen. There is never more than one.
 struct MoreOverlayHost: View {
     let model: AppModel
 
     var body: some View {
-        if let settings = model.moreUiState?.settings, settings.sheet != nil {
+        let more = model.connectedLocal.tab == .more ? model.moreUiState : nil
+        if let edit = more?.profileEdit {
+            // Also without an open sheet: it holds the photo library and the camera.
+            ProfileOverlays(state: edit, actions: model.more.profile)
+        } else if let themes = more?.themes, themes.sheet != nil {
+            ThemesSheetHost(state: themes, actions: model.more.themes)
+        } else if let settings = model.moreUiState?.settings, settings.sheet != nil {
             SettingsSheetHost(state: settings, actions: model.more)
         } else {
             MessagesOverlayHost(model: model)

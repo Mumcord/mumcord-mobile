@@ -3,8 +3,9 @@
 import MumcordBridge
 import Observation
 
-/// What the user does on the More tab: the activity log and the settings. Every setting is
-/// saved at once; a failure is shown like a refusal. The end of a connection starts it afresh.
+/// What the user does on the More tab: the profile, the themes, the activity log and the
+/// settings. Every setting is saved at once; a failure is shown like a refusal. The end of a
+/// connection starts it afresh.
 ///
 /// An object of its own, apart from `AppModel`, like the Messages tab: only the More tab's own
 /// views read it.
@@ -14,6 +15,10 @@ final class MoreController {
     private(set) var local = MoreLocal()
     /// Notifications name the sender and leave the message out.
     private(set) var senderOnly: Bool
+    /// The user's own profile and its editor (FR-5.80).
+    let profile: ProfileController
+    /// The themes screen (FR-5.81).
+    let themes: ThemesController
 
     /// Switches the talk mode as the voice view does, where a held talk button is let go. Set
     /// by the model that owns the voice view.
@@ -30,13 +35,19 @@ final class MoreController {
         self.store = store
         self.messageSettings = messageSettings
         senderOnly = messageSettings.senderOnly
+        profile = ProfileController(store: store)
+        themes = ThemesController(store: store)
         let states = store.states()
         Task { [weak self] in
             for await state in states {
                 guard let self else { return }
-                if !state.showsServer, self.local != MoreLocal() { self.local = MoreLocal() }
+                if !state.showsServer {
+                    if self.local != MoreLocal() { self.local = MoreLocal() }
+                    self.themes.reset()
+                }
             }
         }
+        profile.onClosed = { [weak self] in self?.back() }
         // The setting is read from the engine, which can take longer than drawing the switch.
         let senderOnlyStates = messageSettings.senderOnlyStates()
         Task { [weak self] in
@@ -48,7 +59,34 @@ final class MoreController {
 
     /// The More tab as a value, or nil while no server is shown.
     func uiState(session: SessionState, serverName: String, output: OutputState) -> MoreUiState? {
-        moreUiState(session: session, local: local, serverName: serverName, output: output, senderOnly: senderOnly)
+        moreUiState(
+            session: session,
+            local: local,
+            serverName: serverName,
+            output: output,
+            senderOnly: senderOnly,
+            extras: MoreExtras(profile: profile.own, profileEdit: profile.edit, themes: themes.local)
+        )
+    }
+
+    /// A sheet of the profile or the themes screen is open over the screen.
+    var sheetOpen: Bool {
+        switch local.page {
+        case .editProfile: profile.edit?.sheet != nil
+        case .themes: themes.local.sheet != nil
+        case .main, .activity, .settings: false
+        }
+    }
+
+    // MARK: Profile and themes
+
+    func openProfile() {
+        profile.open()
+        local.page = .editProfile
+    }
+
+    func openThemes() {
+        local.page = .themes
     }
 
     // MARK: Activity
@@ -64,6 +102,11 @@ final class MoreController {
 
     /// Back to the list of the More tab; what was in the log until now counts as seen.
     func back() {
+        switch local.page {
+        case .themes: themes.reset()
+        case .editProfile: profile.discard()
+        case .main, .activity, .settings: break
+        }
         if local.page == .activity { local.seenActivityId = newestActivity }
         local.page = .main
         local.sheet = nil

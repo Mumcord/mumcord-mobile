@@ -12,8 +12,9 @@ private let defaultOutputs: [DefaultOutput] = [.ask, .speaker, .earpiece]
 /// The settings (mockup `16-settings`, FR-5.100). Every switch is saved at once; the rows with a
 /// value open a sheet with the choices. Left out until their features exist: echo cancellation
 /// (the phone's own voice processing does it, there is nothing to switch), link previews (the
-/// chat shows none yet), appearance, language and about. The level meter, the "Chat" section
-/// and the note under "Notifications" have no mockup.
+/// chat shows none yet), language and about. Dark, light or system is chosen on the themes
+/// screen (mockup `19-themes`). The level meter, the "Chat" section and the note under
+/// "Notifications" have no mockup.
 struct SettingsScreen: View {
     let state: SettingsUiState
     let actions: MoreController

@@ -668,11 +668,69 @@ enum Strings {
     static var cameraProblemRelayLost: String { text("camera_problem_relay_lost") }
     static var cameraProblemRefused: String { text("camera_problem_refused") }
 
+    // MARK: Profile and themes
+
+    static var moreEditProfile: String { text("more_edit_profile") }
+    static var moreThemes: String { text("more_themes") }
+    static var profileTitle: String { text("profile_title") }
+    static var profileSave: String { text("profile_save") }
+    static var profileChangePhoto: String { text("profile_change_photo") }
+    static var profileName: String { text("profile_name") }
+    static var profileNameHint: String { text("profile_name_hint") }
+    static var profileComment: String { text("profile_comment") }
+    /// The counter's numbers are written without a thousands separator, as on Android.
+    static func profileCommentCount(_ p1: Int, _ p2: Int) -> String { ungrouped("profile_comment_count", p1, p2) }
+    /// The plural form follows the limit, as on Android.
+    static func profileCommentCountDescription(_ p1: Int, _ p2: Int) -> String {
+        ungrouped(p2 == 1 ? "profile_comment_count_description.one" : "profile_comment_count_description.other", p1, p2)
+    }
+    static var profileTooLong: String { text("profile_too_long") }
+    static var profilePreview: String { text("profile_preview") }
+    static var profileYou: String { text("profile_you") }
+    static var profileAvatarTitle: String { text("profile_avatar_title") }
+    static var profileAvatarRemove: String { text("profile_avatar_remove") }
+    static var profileAvatarUnreadable: String { text("profile_avatar_unreadable") }
+    static var profileSaveFailed: String { text("profile_save_failed") }
+    static var cameraReasonAvatar: String { text("camera_reason_avatar") }
+    static var themesTitle: String { text("themes_title") }
+    static var themesAppearance: String { text("themes_appearance") }
+    static var themesModeSystem: String { text("themes_mode_system") }
+    static var themesModeDark: String { text("themes_mode_dark") }
+    static var themesModeLight: String { text("themes_mode_light") }
+    static var themesTheme: String { text("themes_theme") }
+    static var themesYours: String { text("themes_yours") }
+    static func themesItem(_ p1: String) -> String { format("themes_item", p1) }
+    static func themesItemSelected(_ p1: String) -> String { format("themes_item_selected", p1) }
+    static func themesOptions(_ p1: String) -> String { format("themes_options", p1) }
+    static var themesShare: String { text("themes_share") }
+    static var themesDelete: String { text("themes_delete") }
+    static func themesDeleteTitle(_ p1: String) -> String { format("themes_delete_title", p1) }
+    static var themesDeleteMessage: String { text("themes_delete_message") }
+    static var themesDeleteConfirm: String { text("themes_delete_confirm") }
+    static func themesServerNote(_ p1: String, _ p2: String) -> String { format("themes_server_note", p1, p2) }
+    static var themesPaste: String { text("themes_paste") }
+    static var themesImportTitle: String { text("themes_import_title") }
+    static var themesImportLabel: String { text("themes_import_label") }
+    static var themesImportHint: String { text("themes_import_hint") }
+    static var themesImportInvalid: String { text("themes_import_invalid") }
+    static var themesImportUnreadable: String { text("themes_import_unreadable") }
+    static var themesImported: String { text("themes_imported") }
+    static func themesMadeWithNewer(_ p1: String) -> String { format("themes_made_with_newer", p1) }
+    static var themesApply: String { text("themes_apply") }
+    static var serverTheme: String { text("server_theme") }
+    static func serverThemeTitle(_ p1: String) -> String { format("server_theme_title", p1) }
+    static var serverThemeUseApp: String { text("server_theme_use_app") }
+    static var serverThemeHint: String { text("server_theme_hint") }
+
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }
 
     private static func format(_ key: String, _ arguments: CVarArg...) -> String {
         String(format: text(key), locale: Locale.current, arguments: arguments)
+    }
+
+    private static func ungrouped(_ key: String, _ arguments: CVarArg...) -> String {
+        String(format: text(key), arguments: arguments)
     }
 }

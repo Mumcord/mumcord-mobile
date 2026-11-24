@@ -3,11 +3,15 @@
 import SwiftUI
 import UIKit
 
+private let readOnlyOpacity = 0.75
+
 /// Single-line text field of a form (`.label` over `.field`): the `label` above, the field with
 /// a focus ring while it is being edited, and below it the `error` in the danger colour or else
 /// the `hint`. VoiceOver reads the label with the field and the error as the text after it.
 /// `password` hides the typed characters. The text is taken as typed: no autocorrection, and
-/// automatic capitals only with a `capitalization`.
+/// automatic capitals only with a `capitalization`. `minLines` above 1 makes it a text area that
+/// grows with its text; `readOnly` shows a value that cannot be changed here, dimmed, with
+/// `trailingIcon` saying why.
 struct MumcordTextField: View {
     private let value: String
     private let onValueChange: (String) -> Void
@@ -21,6 +25,9 @@ struct MumcordTextField: View {
     private let onSubmit: (() -> Void)?
     private let autoFocus: Bool
     private let capitalization: TextInputAutocapitalization
+    private let minLines: Int
+    private let readOnly: Bool
+    private let trailingIcon: MumcordIconData?
     @FocusState private var focused: Bool
     @Environment(\.mumcordTheme) private var theme
     @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
@@ -37,7 +44,10 @@ struct MumcordTextField: View {
         submitLabel: SubmitLabel = .done,
         onSubmit: (() -> Void)? = nil,
         autoFocus: Bool = false,
-        capitalization: TextInputAutocapitalization = .never
+        capitalization: TextInputAutocapitalization = .never,
+        minLines: Int = 1,
+        readOnly: Bool = false,
+        trailingIcon: MumcordIconData? = nil
     ) {
         self.value = value
         self.onValueChange = onValueChange
@@ -51,6 +61,9 @@ struct MumcordTextField: View {
         self.onSubmit = onSubmit
         self.autoFocus = autoFocus
         self.capitalization = capitalization
+        self.minLines = minLines
+        self.readOnly = readOnly
+        self.trailingIcon = trailingIcon
     }
 
     var body: some View {
@@ -60,21 +73,15 @@ struct MumcordTextField: View {
             // Read as part of the field below, not as a separate element.
             LineText(label, style: .smallStrong, color: colors.textSecondary)
                 .accessibilityHidden(true)
-            input
-                .font(Font(MumcordFonts.font(.body, scale: scale)))
-                .foregroundStyle(colors.text)
-                .tint(colors.accent)
-                .autocorrectionDisabled(true)
-                .textInputAutocapitalization(capitalization)
-                .keyboardType(keyboard)
-                .submitLabel(submitLabel)
-                .focused($focused)
-                .onSubmit { onSubmit?() }
-                .accessibilityLabel(label)
+            field
                 .padding(.horizontal, MumcordSpace.s4)
-                .frame(maxWidth: .infinity, minHeight: MumcordSize.touchVisual, alignment: .leading)
+                .padding(.vertical, minLines > 1 ? MumcordSpace.s3 : 0)
+                .frame(maxWidth: .infinity, minHeight: MumcordSize.touchVisual, alignment: minLines > 1 ? .topLeading : .leading)
                 .background(colors.bgElevated, in: shape)
                 .overlay { shape.strokeBorder(borderColor, lineWidth: 1) }
+                // The dimmed look of `.field` in the edit profile mockup for a value that cannot
+                // be changed.
+                .opacity(readOnly ? readOnlyOpacity : 1)
                 .overlay {
                     if focused {
                         // The 2 pt ring around the focused field, as the CSS box shadow of
@@ -106,11 +113,38 @@ struct MumcordTextField: View {
         }
     }
 
+    @ViewBuilder private var field: some View {
+        let colors = theme.colors
+        let configured = input
+            .font(Font(MumcordFonts.font(.body, scale: scale)))
+            .foregroundStyle(colors.text)
+            .tint(colors.accent)
+            .autocorrectionDisabled(true)
+            .textInputAutocapitalization(capitalization)
+            .keyboardType(keyboard)
+            .submitLabel(submitLabel)
+            .focused($focused)
+            .onSubmit { onSubmit?() }
+            .accessibilityLabel(label)
+            .disabled(readOnly)
+        if let trailingIcon {
+            HStack(spacing: MumcordSpace.s2) {
+                configured
+                MumcordIcon(icon: trailingIcon, label: nil, tint: colors.textSecondary, size: MumcordSize.iconSm)
+            }
+        } else {
+            configured
+        }
+    }
+
     @ViewBuilder private var input: some View {
         let text = Binding(get: { value }, set: onValueChange)
         let prompt = Text(verbatim: placeholder ?? "").foregroundColor(theme.colors.textMuted)
         if password {
             SecureField("", text: text, prompt: prompt)
+        } else if minLines > 1 {
+            TextField("", text: text, prompt: prompt, axis: .vertical)
+                .lineLimit(minLines...)
         } else {
             TextField("", text: text, prompt: prompt)
         }

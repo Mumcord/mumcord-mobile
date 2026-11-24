@@ -17,6 +17,12 @@ struct ServerFormState: Equatable {
     var removeSavedPassword = false
     /// Kept as it is: choosing the identity arrives with the identity screens.
     var identityId: Int64?
+    /// The theme picked for this server (Spec 02 FR-2.17); nil shows it in the app theme.
+    var themeId: String?
+    /// The theme the server had when the form was opened; a different `themeId` is saved.
+    var savedThemeId: String?
+    /// The choice of the server's theme is open.
+    var themeSheet = false
     /// Errors are shown once the user has tried to save.
     var showErrors = false
     var saving = false
@@ -33,6 +39,8 @@ struct ServerFormState: Equatable {
     var addressMissing: Bool { address.isBlank }
 
     var usernameMissing: Bool { username.isBlank }
+
+    var themeChanged: Bool { themeId != savedThemeId }
 
     var isValid: Bool { !addressMissing && !usernameMissing && portNumber != nil }
 
@@ -57,7 +65,7 @@ struct ServerFormState: Equatable {
         )
     }
 
-    static func edit(_ server: SavedServer) -> ServerFormState {
+    static func edit(_ server: SavedServer, themeId: String? = nil) -> ServerFormState {
         ServerFormState(
             serverId: server.id,
             name: server.name,
@@ -65,7 +73,9 @@ struct ServerFormState: Equatable {
             port: String(server.port),
             username: server.username,
             hasSavedPassword: server.hasPassword,
-            identityId: server.identityId
+            identityId: server.identityId,
+            themeId: themeId,
+            savedThemeId: themeId
         )
     }
 }
