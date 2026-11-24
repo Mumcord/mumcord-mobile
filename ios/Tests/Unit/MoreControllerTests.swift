@@ -125,10 +125,13 @@ final class MoreControllerTests: XCTestCase {
         model.more.changeMobile { $0.idleDisconnect = true }
         model.more.setSenderOnly(true)
 
-        await assertEventually { self.engine.storedMobileSettings.notifySenderOnly }
-        await assertEventually { self.engine.storedMobileSettings.idleDisconnect }
+        await assertEventually("both switches are stored") { self.engine.mobileSettingsSaves == 2 }
+        XCTAssertTrue(engine.storedMobileSettings.idleDisconnect, "both switches are stored")
         XCTAssertTrue(engine.storedMobileSettings.notifySenderOnly, "both switches are stored")
-        XCTAssertEqual(settings(model)?.mobile, engine.storedMobileSettings, "the screen shows what was saved")
+        // The screen follows a save once the engine has it, so it is waited for, not read at once.
+        await assertEventually("the screen shows what was saved") {
+            self.settings(model)?.mobile == self.engine.storedMobileSettings
+        }
     }
 
     func testShowSenderOnlyChangesItsValueBothWays() async {

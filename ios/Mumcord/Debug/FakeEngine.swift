@@ -113,6 +113,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _noiseSuppression = false
     private var _voiceSettingsFailure: BridgeError?
     private var _mobileSettingsSaveDelay: Duration?
+    private var _mobileSettingsSaves = 0
     private var _settingsSaveFailure: BridgeError?
     private var _activityOnConnect: [ActivityEntry] = []
     /// The user's own mute before a deafen, which comes back when the deafen ends.
@@ -802,6 +803,11 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         set { locked { _mobileSettingsSaveDelay = newValue } }
     }
 
+    /// How often `setMobileSettings` saved, so that a test knows every save is done.
+    var mobileSettingsSaves: Int {
+        locked { _mobileSettingsSaves }
+    }
+
     /// Whether the engine has noise suppression switched on.
     var noiseSuppression: Bool {
         get { locked { _noiseSuppression } }
@@ -951,6 +957,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
                 throw failure
             }
             _mobileSettings = settings
+            _mobileSettingsSaves += 1
         }
     }
 
