@@ -218,6 +218,10 @@ simulator app; linking for a real device is first proven here.
   commit before the More tab and moderation were built.
 - Seen once in a full local run and green on the next run:
   `IdentitiesScreenshotUITests.testImportWrongPasswordDark`.
+- `ProfileThemesFlowUITests.testSystemFollowsALightAndADarkPhoneAndComesBackToItAfterDark` switches
+  the simulator between light and dark. A simulator that has been running for a long time can
+  ignore that switch, and the test then fails with a light screen where it expects a dark one;
+  after shutting the simulator down and booting it again the test passes (three of three runs).
 - `DesignReferenceUITests.testComponentGalleryShowsEveryGroup` ("the gallery does not scroll to
   its last group") failed whenever its drag started on the slider, which happened every time once
   the profile picture's avatar size made the gallery taller. It now tries another starting point
