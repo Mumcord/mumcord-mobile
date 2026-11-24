@@ -6,12 +6,12 @@ counts as done. Task numbers refer to `specs/05-mobile-app-tasks.md` in the Mumc
 FR and AC numbers to `specs/05-mobile-app-specification.md` there. The specification stays the
 truth; this plan adds nothing to it.
 
-State on 2026-11-24: steps 1 (moderation), 2 (More tab, activity log, settings), 6 (watching
-streams, without the system's picture-in-picture window) and 7 (sharing the phone camera) are
-built on `feat/ios-backlog`, each read by a review round whose confirmed findings are fixed.
-Steps 3 (profile, appearance and themes) and 4 (public server browser) are built there too; step 3
-waits for its review round, step 4 for the product manager's look at the screenshots. The real
-camera and a real stream are device checks (step 12). Everything else is open.
+State on 2026-11-24: steps 1 (moderation), 2 (More tab, activity log, settings), 3 (profile,
+appearance and themes), 4 (public server browser), 6 (watching streams, without the system's
+picture-in-picture window) and 7 (sharing the phone camera) are built on `feat/ios-backlog`.
+Steps 1, 2, 3, 6 and 7 were each read by a review round whose confirmed findings are fixed; step
+4 waits for the product manager's look at the screenshots. The real camera and a real stream are
+device checks (step 12). Everything else is open.
 
 ## Starting point
 
