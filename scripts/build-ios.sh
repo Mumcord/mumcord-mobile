@@ -70,7 +70,8 @@ group_tests() {
         MumcordUITests/ModerationFlowUITests MumcordUITests/ModerationScreenshotUITests \
         MumcordUITests/ActivityFlowUITests ;;
     messages)
-      printf '%s\n' MumcordUITests/MessagesFlowUITests MumcordUITests/MessagesScreenshotUITests ;;
+      printf '%s\n' MumcordUITests/MessagesFlowUITests MumcordUITests/MessagesScreenshotUITests \
+        MumcordUITests/StreamsFlowUITests MumcordUITests/StreamsScreenshotUITests ;;
     output-settings)
       printf '%s\n' MumcordUITests/OutputFlowUITests MumcordUITests/PhoneScreenshotUITests \
         MumcordUITests/SettingsFlowUITests MumcordUITests/MoreScreenshotUITests ;;
