@@ -28,12 +28,17 @@ final class DesignReferenceUITests: XCTestCase {
         attachScreenshot(of: app, name: "ios-gallery-dark-1")
         let lastGroup = app.staticTexts["TAB BAR"]
         var page = 1
-        // Dragged along the left edge: the talk button and the slider keep a touch that starts
-        // on them for themselves.
-        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.8))
-        let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.3))
+        // Dragged along an edge: the talk button and the slider keep a touch that starts on them
+        // for themselves. Where a drag moved nothing, one of them was under it, and the next
+        // starting point is tried.
+        let starts = [CGVector(dx: 0.02, dy: 0.8), CGVector(dx: 0.98, dy: 0.8), CGVector(dx: 0.02, dy: 0.65)]
         while !lastGroup.isHittable && page < 12 {
-            from.press(forDuration: 0.1, thenDragTo: to)
+            let before = lastGroup.frame.minY
+            for start in starts where lastGroup.frame.minY == before {
+                let from = app.coordinate(withNormalizedOffset: start)
+                let to = app.coordinate(withNormalizedOffset: CGVector(dx: start.dx, dy: start.dy - 0.5))
+                from.press(forDuration: 0.1, thenDragTo: to)
+            }
             page += 1
             attachScreenshot(of: app, name: "ios-gallery-dark-\(page)")
         }
