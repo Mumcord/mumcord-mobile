@@ -483,6 +483,8 @@ final class SessionStore: @unchecked Sendable {
             next.phase = .failed(.serverUnreachable)
             next.certificatePrompt = nil
             next.server = nil
+            next.streams = []
+            next.directConnectionsQuestion = false
             setLocked(next)
         }
     }

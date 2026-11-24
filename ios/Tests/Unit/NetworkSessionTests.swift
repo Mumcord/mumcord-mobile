@@ -100,6 +100,20 @@ final class NetworkSessionTests: XCTestCase {
         XCTAssertNil(store.state.server)
     }
 
+    func testALostConnectionForgetsItsStreamsAndTheDirectConnectionQuestion() async {
+        let (store, _, _) = await connected()
+        box.engine.emit(.streamsChanged(streams: [mockupStream(watch: .connecting)]))
+        box.engine.emit(.directConnectionsQuestion)
+        await assertEventually { store.state.directConnectionsQuestion && !store.state.streams.isEmpty }
+        lose(3)
+        await assertEventually { isReconnecting(store) }
+        box.engine.connectFailure = .ServerUnreachable(detail: "gone")
+        await store.reconnectNow()
+        XCTAssertEqual(store.state.phase, .failed(.serverUnreachable))
+        XCTAssertTrue(store.state.streams.isEmpty)
+        XCTAssertFalse(store.state.directConnectionsQuestion, "the next connection must not ask unasked")
+    }
+
     func testReducedVoiceLimitsTheBitrateOnMobileDataAndIsSetAgainAfterEveryStart() async {
         let (store, monitor, session) = await connected(network: fakeMobileData)
         _ = await store.updateMobileSettings { $0.mobileDataReducedVoice = true }
