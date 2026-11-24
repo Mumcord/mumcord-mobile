@@ -28,34 +28,62 @@ final class AVCameraSource: CameraSource {
     /// Says how far to turn the frames to make them upright, as the phone is held.
     private var rotation: AVCaptureDevice.RotationCoordinator?
     private var rotationObservation: NSKeyValueObservation?
-    private var errorObserver: NSObjectProtocol?
+    private var observers: [NSObjectProtocol] = []
+    private lazy var watch = CameraSessionWatch(
+        resume: { [weak self] done in
+            self?.capture.resume { running in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { done(running) }
+                }
+            }
+        },
+        fail: { [weak self] in self?.onTrouble(.failed) },
+        log: self.log
+    )
 
     init(frames: CameraFrames, onTrouble: @escaping (CameraTrouble) -> Void, log: @escaping @Sendable (String) -> Void) {
         self.frames = frames
         self.onTrouble = onTrouble
         self.log = log
         facings = Set(CameraFacing.allCases.filter { Self.device(facing: $0) != nil })
-        errorObserver = NotificationCenter.default.addObserver(
-            forName: AVCaptureSession.runtimeErrorNotification,
-            object: capture.session,
-            queue: .main
-        ) { [weak self] notification in
-            let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError
-            MainActor.assumeIsolated { self?.failed(error) }
-        }
+        let center = NotificationCenter.default
+        let session = capture.session
+        observers = [
+            center.addObserver(forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: .main) {
+                [weak self] notification in
+                let code = (notification.userInfo?[AVCaptureSessionErrorKey] as? AVError)?.code
+                MainActor.assumeIsolated {
+                    self?.watch.failed(mediaServicesWereReset: code == .mediaServicesWereReset, code: code?.rawValue ?? 0)
+                }
+            },
+            center.addObserver(forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: .main) {
+                [weak self] notification in
+                let reason = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int
+                MainActor.assumeIsolated { self?.watch.interrupted(reason: reason) }
+            },
+            center.addObserver(forName: AVCaptureSession.interruptionEndedNotification, object: session, queue: .main) {
+                [weak self] _ in
+                MainActor.assumeIsolated { self?.watch.interruptionEnded() }
+            },
+        ]
     }
 
     deinit {
-        if let errorObserver { NotificationCenter.default.removeObserver(errorObserver) }
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
     }
 
     func start(_ facing: CameraFacing) {
         wanted = facing
+        watch.started()
         guard let next = Self.device(facing: facing) ?? CameraFacing.allCases.lazy.compactMap(Self.device(facing:)).first else {
             onTrouble(.noCamera)
             return
         }
-        guard next != device else { return }
+        guard next != device else {
+            // The same camera, which the system may have stopped meanwhile.
+            capture.resume()
+            return
+        }
         device = next
         followRotation(of: next)
         capture.run(next) { [weak self] opened in
@@ -71,6 +99,7 @@ final class AVCameraSource: CameraSource {
 
     func stop() {
         wanted = nil
+        watch.stopped()
         device = nil
         rotationObservation = nil
         rotation = nil
@@ -86,19 +115,6 @@ final class AVCameraSource: CameraSource {
         guard wanted != nil else { return }
         log("camera: the engine has not opened the camera")
         onTrouble(.notOpen)
-    }
-
-    /// A camera taken by another app or by the system (a call, multitasking) only interrupts the
-    /// session, which goes on by itself afterwards; meanwhile no frames come and sharing stays
-    /// on. A reset of the media services is recovered once; anything else ends sharing.
-    private func failed(_ error: AVError?) {
-        guard wanted != nil else { return }
-        if error?.code == .mediaServicesWereReset {
-            capture.resume()
-            return
-        }
-        log("camera: the capture session failed (\(error?.code.rawValue ?? 0))")
-        onTrouble(.failed)
     }
 
     private func followRotation(of device: AVCaptureDevice) {
@@ -170,10 +186,11 @@ private final class CameraRunner: NSObject, AVCaptureVideoDataOutputSampleBuffer
         }
     }
 
-    /// Runs the session again after the system stopped it.
-    func resume() {
+    /// Runs the session again if the system stopped it; `done` says whether it runs afterwards.
+    func resume(_ done: @escaping @Sendable (Bool) -> Void = { _ in }) {
         sessionQueue.async { [session] in
             if !session.isRunning && !session.inputs.isEmpty { session.startRunning() }
+            done(session.isRunning)
         }
     }
 
