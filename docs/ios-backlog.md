@@ -60,9 +60,12 @@ button explains the camera before iOS asks (or points to the system settings aft
 the sheet "Share your camera" shows the picture with the front camera and the switch to the back
 camera, nothing is sent before "Start sharing", the "Camera on · n watching" bar with the switch
 and Stop sits above the voice bar and the voice view's buttons, a refused start and a camera that
-stops by itself say why. The camera is released while the app is in the background and back on
-return; sharing and voice go on. Capture with AVFoundation (`ios/Platform/Camera`), frames handed
-to the bridge's C function in place. Unit tests `CameraShareControllerTests`, UI tests
+stops by itself say why. The camera is released while the app is in the background or another
+sheet takes the preview's place, and back on return; sharing and voice go on. Cancel and Stop
+close the camera at once, also while "Start sharing" still waits for the engine, and the camera
+closes whenever the app's state says off. Capture with AVFoundation (`ios/Platform/Camera`),
+frames handed to the bridge's C function in place, interruptions followed. Unit tests
+`CameraShareControllerTests`, `CameraFramesTests` and `CameraSessionWatchTests`, UI tests
 `CameraShareFlowUITests`, screenshots `ios-camera-*`. Differences from Android: the camera is
 asked for 1280 x 720 (the smallest 16:9 size every iPhone camera offers; the bridge scales it
 down to 640 x 360) instead of 640 x 360; "on screen" is every state but the background, as for
@@ -158,8 +161,9 @@ simulator app; linking for a real device is first proven here.
   in the iOS CI job) and the iOS column of [acceptance.md](acceptance.md) are open.
 
 - Camera sharing, still open on iOS: the real camera on a real iPhone (the picture, upright for
-  both cameras and as the phone turns, the switch while sharing, the camera indicator going off
-  after Stop and in the background, a phone call or another app taking the camera); an
+  both cameras, as the phone turns and right after a switch, unmirrored on the desktop, the
+  camera indicator going off after Stop and in the background, a phone call, another app or
+  Split View taking the camera and the picture coming back); an
   end-to-end scenario with `e2e/stream-peer --viewer` against the local test server. As on
   Android, viewers see the last picture instead of "paused" while the phone is in the background:
   the engine has no paused signal for cameras (see AC-5.24 in [acceptance.md](acceptance.md)).
