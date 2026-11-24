@@ -39,6 +39,8 @@ final class AppModel {
     @ObservationIgnored let more: MoreController
     /// The identity screens and "Scan from desktop app".
     @ObservationIgnored let identities: IdentitiesController
+    /// The public server browser. Read only by its own screen.
+    @ObservationIgnored let publicServers: PublicServersController
     /// Watching screen shares and cameras. Read only by the stream views.
     @ObservationIgnored let streams: StreamsController
     /// Sharing the own camera (FR-5.74); nil where it cannot be shared (no camera button).
@@ -108,6 +110,7 @@ final class AppModel {
         self.camera = camera
         self.qrSource = qrSource
         identities = IdentitiesController(store: store, camera: camera)
+        publicServers = PublicServersController(store: store)
         streams = StreamsController(store: store, network: network, video: streamVideo)
         self.cameraShare = cameraShare.map { CameraShareController(store: store, camera: $0, permission: camera) }
         chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
@@ -425,6 +428,27 @@ final class AppModel {
                 }
             }
         }
+    }
+
+    // MARK: Public servers
+
+    /// Opening the browser is what loads the public list: nothing is requested before (FR-5.9).
+    func openPublicServers() {
+        local.editing = false
+        local.browsingPublic = true
+        publicServers.open()
+    }
+
+    func closePublicServers() {
+        publicServers.close()
+        local.browsingPublic = false
+    }
+
+    /// "Connect" on a listed server that is in the server list: the normal flow takes over on
+    /// the server list, where its questions and errors are.
+    func connectFromPublicServers(_ serverId: Int64) {
+        closePublicServers()
+        connect(serverId)
     }
 
     func requestRemove(_ serverId: Int64) {

@@ -6,7 +6,8 @@ import SwiftUI
 private let fabClearance: CGFloat = 84
 
 /// The saved servers with people online and latency, and the way to add, edit, remove and
-/// connect. While `editing`, every row offers Edit and Remove instead of Connect.
+/// connect. While `editing`, every row offers Edit and Remove instead of Connect. "Find more"
+/// leads to the public server browser.
 struct ServerListScreen: View {
     let rows: [ServerRow]
     let loaded: Bool
@@ -22,6 +23,8 @@ struct ServerListScreen: View {
     let onDismissError: () -> Void
     let onOpenSettings: () -> Void
     var onScan: () -> Void = {}
+    var onBrowsePublic: () -> Void = {}
+    @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
         MumcordScreen {
@@ -32,7 +35,7 @@ struct ServerListScreen: View {
             // Nothing to show before the list is read; an empty state would flash by.
             if loaded {
                 if rows.isEmpty {
-                    EmptyState(onAdd: onAdd, onScan: onScan)
+                    EmptyState(onAdd: onAdd, onScan: onScan, onBrowsePublic: onBrowsePublic)
                 } else {
                     list
                 }
@@ -61,6 +64,13 @@ struct ServerListScreen: View {
                                 onRemove: onRemove
                             )
                         }
+                    }
+                    MumcordSectionHeader(title: Strings.serversFindMore)
+                    MumcordList {
+                        MumcordListRow(title: Strings.serversBrowsePublic, icon: MumcordIcons.globe, action: onBrowsePublic) {
+                            MumcordIcon(icon: MumcordIcons.chevronRight, label: nil, tint: theme.colors.textMuted, size: 18)
+                        }
+                        .accessibilityIdentifier("server-browse-public")
                     }
                     Color.clear.frame(height: fabClearance)
                 }
@@ -219,6 +229,7 @@ private struct FailureBanner: View {
 private struct EmptyState: View {
     let onAdd: () -> Void
     let onScan: () -> Void
+    let onBrowsePublic: () -> Void
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
@@ -233,6 +244,8 @@ private struct EmptyState: View {
             // The server list of the desktop app can come with a transfer (FR-5.66).
             MumcordButton(text: Strings.identitiesScan, style: .secondary, icon: MumcordIcons.qrCode, action: onScan)
                 .accessibilityIdentifier("server-scan")
+            MumcordButton(text: Strings.serversBrowsePublic, style: .secondary, icon: MumcordIcons.globe, action: onBrowsePublic)
+                .accessibilityIdentifier("server-browse-public")
         }
         .padding(MumcordSpace.s5)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -36,6 +36,15 @@ struct AppRoot: View {
                 // The shared camera pauses while the app is in the background (FR-5.75).
                 model.cameraShare?.camera.setOnScreen(phase != .background)
             }
+            // No pings of public servers while the app is not on screen (FR-5.43).
+            .onChange(of: scenePhase) { _, phase in
+                guard model.uiState.browsingPublic else { return }
+                if phase == .background {
+                    model.publicServers.pausePings()
+                } else {
+                    model.publicServers.resumePings()
+                }
+            }
     }
 }
 
@@ -181,8 +190,11 @@ struct AppContent: View {
                 onRetry: model.retry,
                 onDismissError: model.dismissError,
                 onOpenSettings: model.openSettings,
-                onScan: model.identities.openScan
+                onScan: model.identities.openScan,
+                onBrowsePublic: model.openPublicServers
             )
+        case .publicServers:
+            PublicServersHost(model: model)
         case .serverForm:
             if let form = uiState.form {
                 ServerFormScreen(
@@ -256,5 +268,26 @@ struct AppContent: View {
                 onDismiss: model.dismissOverlay
             )
         }
+    }
+}
+
+/// Reads the browser's state in a view of its own, so arriving pings redraw only the browser.
+private struct PublicServersHost: View {
+    let model: AppModel
+
+    var body: some View {
+        let controller = model.publicServers
+        PublicServersScreen(
+            state: controller.uiState,
+            actions: PublicServersActions(
+                back: model.closePublicServers,
+                refresh: controller.refresh,
+                search: controller.search,
+                selectCountry: controller.selectCountry,
+                showing: controller.showing,
+                add: controller.add,
+                connect: model.connectFromPublicServers
+            )
+        )
     }
 }

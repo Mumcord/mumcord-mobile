@@ -34,6 +34,37 @@
 "servers_add" = "Add server";
 "servers_empty_title" = "No servers yet";
 "servers_empty_text" = "Add a Mumble server to start talking.";
+"servers_find_more" = "Find more";
+"servers_browse_public" = "Browse public servers";
+"public_title" = "Public servers";
+"public_back" = "Back to the server list";
+"public_loading" = "Loading the list…";
+"public_load_failed_title" = "The list could not be loaded";
+"public_load_failed" = "Check your internet connection and try again.";
+"public_retry" = "Try again";
+"public_refresh" = "Refresh";
+"public_refreshing" = "Refreshing…";
+"public_refresh_failed" = "The list could not be refreshed. This is the list loaded before.";
+"public_search" = "Search by name, address or country";
+"public_any_country" = "Any country";
+"public_count_all.one" = "%1$ld server";
+"public_count_all.other" = "%1$ld servers";
+"public_count_shown.one" = "%1$ld of %2$ld server";
+"public_count_shown.other" = "%1$ld of %2$ld servers";
+"public_empty" = "The public server list is empty.";
+"public_no_match" = "No server matches your search and filter.";
+/* Address and country of a listed server, e.g. "voice.example.org · Germany". */
+"public_address_country" = "%1$@ · %2$@";
+/* People online, user limit and latency of a listed server, e.g. "12 / 50 · 34 ms". */
+"public_ping" = "%1$ld / %2$ld · %3$ld ms";
+/* Read by VoiceOver instead of "12 / 50 · 34 ms"; the plural follows the user limit. */
+"public_ping_description.one" = "%1$ld of %2$ld person online, %3$ld ms";
+"public_ping_description.other" = "%1$ld of %2$ld people online, %3$ld ms";
+"public_no_answer" = "No answer";
+"public_add" = "Add";
+"public_add_description" = "Add %1$@ to your servers";
+"public_add_failed" = "The server could not be added. Please try again.";
+"public_note" = "Loaded because you opened this page. Only the rows you can see are pinged, a few at a time. Nothing else is sent to a server until you connect.";
 "form_add_title" = "Add server";
 "form_edit_title" = "Edit server";
 "form_address_label" = "Address";

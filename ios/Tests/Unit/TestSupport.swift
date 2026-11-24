@@ -206,3 +206,14 @@ extension AppModel {
         )
     }
 }
+
+/// A server of the public list; in Germany unless said otherwise.
+func publicServer(
+    _ name: String,
+    _ host: String,
+    country: String = "Germany",
+    code: String = "DE",
+    port: UInt16 = 64738
+) -> PublicServer {
+    PublicServer(name: name, host: host, port: port, country: country, countryCode: code)
+}

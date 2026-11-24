@@ -40,6 +40,39 @@ enum Strings {
     static var serversAdd: String { text("servers_add") }
     static var serversEmptyTitle: String { text("servers_empty_title") }
     static var serversEmptyText: String { text("servers_empty_text") }
+    static var serversFindMore: String { text("servers_find_more") }
+    static var serversBrowsePublic: String { text("servers_browse_public") }
+    static var publicTitle: String { text("public_title") }
+    static var publicBack: String { text("public_back") }
+    static var publicLoading: String { text("public_loading") }
+    static var publicLoadFailedTitle: String { text("public_load_failed_title") }
+    static var publicLoadFailed: String { text("public_load_failed") }
+    static var publicRetry: String { text("public_retry") }
+    static var publicRefresh: String { text("public_refresh") }
+    static var publicRefreshing: String { text("public_refreshing") }
+    static var publicRefreshFailed: String { text("public_refresh_failed") }
+    static var publicSearch: String { text("public_search") }
+    static var publicAnyCountry: String { text("public_any_country") }
+    static func publicCountAll(_ p1: Int) -> String {
+        format(p1 == 1 ? "public_count_all.one" : "public_count_all.other", p1)
+    }
+    /// The plural follows the total, as on Android.
+    static func publicCountShown(_ p1: Int, _ p2: Int) -> String {
+        format(p2 == 1 ? "public_count_shown.one" : "public_count_shown.other", p1, p2)
+    }
+    static var publicEmpty: String { text("public_empty") }
+    static var publicNoMatch: String { text("public_no_match") }
+    static func publicAddressCountry(_ p1: String, _ p2: String) -> String { format("public_address_country", p1, p2) }
+    static func publicPing(_ p1: Int, _ p2: Int, _ p3: Int) -> String { format("public_ping", p1, p2, p3) }
+    /// The plural follows the user limit, as on Android.
+    static func publicPingDescription(_ p1: Int, _ p2: Int, _ p3: Int) -> String {
+        format(p2 == 1 ? "public_ping_description.one" : "public_ping_description.other", p1, p2, p3)
+    }
+    static var publicNoAnswer: String { text("public_no_answer") }
+    static var publicAdd: String { text("public_add") }
+    static func publicAddDescription(_ p1: String) -> String { format("public_add_description", p1) }
+    static var publicAddFailed: String { text("public_add_failed") }
+    static var publicNote: String { text("public_note") }
     static var formAddTitle: String { text("form_add_title") }
     static var formEditTitle: String { text("form_edit_title") }
     static var formAddressLabel: String { text("form_address_label") }
