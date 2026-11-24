@@ -44,9 +44,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile.bridge
         # The four audio functions of bridge/include/mumcord_audio.h are called by the app's C
-        # code and the two picture functions of bridge/include/mumcord_video.h by its video
-        # views, not by the Swift bindings. Nothing in this framework refers to them, so the
-        # linker would leave them out of it without being told to keep them.
+        # code, the two picture functions of bridge/include/mumcord_video.h by its video views
+        # and the camera function of bridge/include/mumcord_camera.h by its camera, not by the
+        # Swift bindings. Nothing in this framework refers to them, so the linker would leave
+        # them out of it without being told to keep them.
         OTHER_LDFLAGS:
           - "-Wl,-u,_mumcord_audio_capture_push_i16"
           - "-Wl,-u,_mumcord_audio_capture_push_f32"
@@ -54,6 +55,7 @@ targets:
           - "-Wl,-u,_mumcord_audio_playback_pull_f32"
           - "-Wl,-u,_mumcord_video_frame_acquire"
           - "-Wl,-u,_mumcord_video_frame_release"
+          - "-Wl,-u,_mumcord_camera_push_frame"
 
   Mumcord:
     type: application
@@ -85,6 +87,9 @@ targets:
       # Draws the pictures of streams (Platform/Video).
       - sdk: Metal.framework
       - sdk: QuartzCore.framework
+      # Captures the shared camera (Platform/Camera).
+      - sdk: AVFoundation.framework
+      - sdk: CoreVideo.framework
     # Keys that have no INFOPLIST_KEY_ build setting. The file is written by XcodeGen into the
     # git-ignored build folder and merged with the generated keys below.
     info:
