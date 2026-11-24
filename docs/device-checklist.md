@@ -124,6 +124,7 @@ on Mumcord for desktop in the same channel.
 - [ ] Import a `.p12` file from the phone's file picker and enter its password. Pass: the test server knows you as the same registered user. [AC-5.20, FR-5.62]
 - [ ] Export an identity with the share sheet and send it to a real app (mail, notes, cloud drive). Pass: the file arrives and opens on desktop with its password. [FR-5.63]
 - [ ] Share an image from the photo library and take one with the camera into the chat. Pass: both arrive correctly on desktop. [FR-5.51]
+- [ ] (iPhone) More → Edit profile → Change photo: take a picture with the real camera, holding the phone upright, then one held sideways, then choose a photo with a location from the photo library; save each time. Pass: the desktop shows each picture upright, and the saved avatar carries no location or camera data. [AC-5.25, FR-5.80]
 - [ ] Open a `mumble://` link to your own test server from another app (notes or browser). Pass: the app shows the target and connects only after you confirm. [AC-5.29]
 
 ## 8. Public servers
@@ -160,6 +161,7 @@ on Mumcord for desktop in the same channel.
 - [ ] (Android) With TalkBack on, open a bottom sheet (for example the person sheet or "Leave server?") and swipe through it. Pass: the sheet's title is read first and you stay in the sheet; note it as a problem if swiping reaches the dimmed screen behind it. [AC-5.33]
 - [ ] (Android) Turn on Settings, Accessibility, "Remove animations". Open and close sheets and the voice view. Pass: they appear without motion and nothing is shown only through movement. [AC-5.33]
 - [ ] Switch the phone between dark and light and set a desktop theme code. Pass: colours match the desktop theme in both modes. [AC-5.26]
+- [ ] (iPhone) With a theme other than Mumcord, switch Themes between System, Dark and Light while the phone is in dark mode, then in light mode, and open the keyboard, the share sheet and the photo library each time. Pass: the status bar stays readable on the app's colours, and with System everything follows the phone when its dark mode changes while the app is open. [AC-5.26, FR-5.81]
 - [ ] (Android) Install the new APK over the old one. Pass: all data stays. With an older version installed and a newer release published, the update notice appears and opens the download. [AC-5.34]
 
 ## 11. Battery and data measurements

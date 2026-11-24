@@ -46,6 +46,30 @@ Notifications (with "Show sender only", which left More) and Chat. Differences f
 offer the earpiece; the whole settings do not fit one picture, so the screenshots show them in
 two parts.
 
+Profile, appearance and themes (the profile and theme part of 8.6, mirroring Android commit
+`4d3e6d3`): built and checked in the simulator against the fake engine. More shows the own
+profile with "Edit profile" and a Themes row with the app theme's name; Edit profile has the
+picture (choose, take, remove), the name that is set per server, the comment with the server's
+limit and its counter, "How others see you", and Save, which sends only what changed (the picture
+first; a saved picture is not sent again after a failed comment). Every chosen or taken picture
+is decoded upright and written again as a PNG with nothing but its pixels, at most 512 pixels on
+its longest edge (`avatarImage`), so no location or camera data leaves the phone. Themes has
+System, Dark and Light, the built-in themes and the user's own, "Paste theme code" with the
+engine's preview in both versions and "Apply theme", and on a long press (or VoiceOver's actions)
+Share through the system's share sheet and Delete for an own theme. The edit-server form picks the
+server's theme. The app's colours come from one place (`AppThemeHost` on the app's root, fed by
+`AppThemeController`), so every screen switches at once, to the server's own theme while it is
+shown; the built-in Mumcord theme gives exactly the design tokens' colours, so the app looks as
+before in it. Unit tests `AppThemeTests`, `ProfileStateTests`, `ProfileThemesTests` and
+`AvatarImageTests`, UI tests `ProfileThemesFlowUITests` (which also check the drawn colours on
+screen), screenshots `ios-profile-*`, `ios-themes-*` and `ios-server-theme-*`. Differences from
+Android: with System the status bar and the system's own controls follow the phone, not the
+theme (they follow the theme with Dark and Light), because iOS would otherwise no longer report
+the phone's own setting; a colour value from the engine that is not `#rrggbb` keeps the app's own
+colour instead of stopping the app; the screenshots also show the long-press sheet and the delete
+question, and the paste sheet with its keyboard. The camera for the profile picture is the
+system's camera, as for the chat, and is a device check.
+
 Watching screen shares and cameras (the watching half of 7.5, mirroring Android commit
 `6b3821d`): built and checked in the simulator against the fake engine, whose pictures are made in
 the app and drawn through the real Metal path. Live tile under the sharer, "Tap to watch" on mobile
@@ -99,24 +123,11 @@ the local test server) waits for the iOS end-to-end tests (task 10.4).
 
 ## Open tasks
 
-### 8.6 Profile and themes (FR-5.80 … FR-5.100)
+### 8.6 Translations and the language override (FR-5.82)
 
-Task 8.6 is the iOS scope of the Android tasks 8.3, 8.4 and 8.5. Moderation (8.4) and the More
-tab, the activity log and the settings (8.5) are built, see "State when paused".
-
-Profile, appearance and themes, mirroring the Android task 8.3 commit (in progress on Android
-when iOS was paused):
-
-- Profile card at the top of More with "Edit profile"; Edit profile with photo (choose, take,
-  remove), read-only name, comment with the server's length limit. Profile photos must not
-  carry location or other metadata to the server (re-encode before sending).
-- Themes screen with System / Dark / Light, the built-in themes, own themes, "Paste theme
-  code" with preview, share and delete. There is no server-offered theme ("Use server theme
-  when offered" does not exist); the only per-server theme is the one the user picks in the
-  edit-server form.
-- The app's colours switch at runtime to the chosen theme, including the per-server theme
-  while connected to that server.
-- `SessionReducer.swift` ignores `ProfileChanged` and `ThemesChanged` today.
+Task 8.6 is the iOS scope of the Android tasks 8.3, 8.4 and 8.5. Moderation (8.4), the More
+tab, the activity log and the settings (8.5), and the profile and themes of 8.3 are built, see
+"State when paused". What is left of 8.3 is the language.
 
 Translations (task 8.1) and the language override of task 8.3 are done on Android only. For iOS:
 
@@ -193,9 +204,12 @@ simulator app; linking for a real device is first proven here.
   `ChatFlowUITests.testAddingAnImageOffersThePhotoLibraryAndTheCamera` fails: it expects the
   simulator to have no camera, and there the camera screen opens. It fails the same way on the
   commit before the More tab and moderation were built.
-- Seen once each in a full local run and green on the next run:
-  `DesignReferenceUITests.testComponentGalleryShowsEveryGroup` ("the gallery does not scroll to
-  its last group") and `IdentitiesScreenshotUITests.testImportWrongPasswordDark`.
+- Seen once in a full local run and green on the next run:
+  `IdentitiesScreenshotUITests.testImportWrongPasswordDark`.
+- `DesignReferenceUITests.testComponentGalleryShowsEveryGroup` ("the gallery does not scroll to
+  its last group") failed whenever its drag started on the slider, which happened every time once
+  the profile picture's avatar size made the gallery taller. It now tries another starting point
+  where a drag moved nothing.
 - Every pushed commit gets its own complete CI run. When the macOS queue is long, cancel the
   queued iOS runs of superseded commits that do not change `ios/**`.
 - SwiftUI section headers are drawn in capitals; UI tests must look for "MOBILE DATA", not

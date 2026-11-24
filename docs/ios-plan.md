@@ -8,10 +8,10 @@ truth; this plan adds nothing to it.
 
 State on 2026-11-24: steps 1 (moderation), 2 (More tab, activity log, settings), 6 (watching
 streams, without the system's picture-in-picture window) and 7 (sharing the phone camera) are
-built on `feat/ios-backlog`, each read by a review round whose confirmed findings are fixed. Step
-4 (public server browser) is built on its own branch `ios/public-servers` and waits for its review
-round and the product manager's look at the screenshots. The real camera and a real stream are
-device checks (step 12). Everything else is open.
+built on `feat/ios-backlog`, each read by a review round whose confirmed findings are fixed.
+Steps 3 (profile, appearance and themes) and 4 (public server browser) are built there too; step 3
+waits for its review round, step 4 for the product manager's look at the screenshots. The real
+camera and a real stream are device checks (step 12). Everything else is open.
 
 ## Starting point
 

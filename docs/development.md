@@ -636,3 +636,26 @@ options `camera-refused`, `camera-slow-start`, `camera-viewers` and `camera-fail
 camera that stops working; with `camera-probe` an invisible element `fake-camera` tells UI tests
 every start and stop of the drawn camera. Only a real iPhone shows the real
 picture, its orientation, the camera indicator and a desktop watching it.
+
+### Profile and themes (iOS)
+
+The theme the app is drawn in comes from one place: `AppThemeController`
+(`ios/Mumcord/Screens/Themes/AppThemeHost.swift`) reads both versions of the shown theme from the
+engine whenever the themes or the shown server change (the server's own theme while connected to
+it, otherwise the app theme), and `AppThemeHost` on the app's root picks the version the
+appearance mode and the phone's dark mode ask for and puts it into the environment as the
+`MumcordTheme` every view reads. The engine's tokens replace the design system's colours of the
+same name; everything a theme does not decide (avatar colours, the backdrop, the stream stage)
+comes from the app's own dark or light set that matches the theme's brightness
+(`ThemeTokens.toColors`). Before the engine answers, and in the built-in Mumcord theme, the app
+has exactly the colours of `design/tokens.json`. With Dark or Light the status bar and the
+system's controls follow the drawn colours; with System they are left to the phone, so the app
+keeps hearing when the phone's dark mode changes.
+
+A chosen or taken profile picture is decoded upright and written again as a PNG of its pixels
+only, at most 512 pixels on its longest edge (`ios/Mumcord/Screens/Profile/AvatarImage.swift`),
+before it goes to the engine, which scales it to the server's limit. The fake engine knows the
+four built-in themes; it reads only its own code `mct1.fake` and the Deep Ocean code of the
+screenshots as theme codes. The launch options `profile`, `profile-avatar`, `profile-save-fails`,
+`own-theme` and `theme-ocean` (`AppDebugLaunch.swift`) put the screens into the states of the
+tests. Only a real iPhone shows the camera taking the profile picture.
