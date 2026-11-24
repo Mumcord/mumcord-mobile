@@ -66,6 +66,7 @@ import MumcordBridge
 ///                          trying again gets through
 ///         stream-colours   the stream's picture is red on the left half and blue on the right,
 ///                          instead of the picture of the mockups
+///         stream-one-frame the stream sends a single picture and nothing new afterwards
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
@@ -239,7 +240,10 @@ extension AppDebugLaunch {
 
     /// The pictures of watched streams, made here (`FakeVideoFrames`).
     var streamVideo: StreamVideo {
-        StreamVideo(frames: FakeVideoFrames(options.contains("stream-colours") ? .colours : .mockup))
+        StreamVideo(frames: FakeVideoFrames(
+            options.contains("stream-colours") ? .colours : .mockup,
+            once: options.contains("stream-one-frame")
+        ))
     }
 
     /// The microphone as the options describe it; allowed when they say nothing.

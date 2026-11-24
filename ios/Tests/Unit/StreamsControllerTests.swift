@@ -95,9 +95,14 @@ final class StreamsControllerTests: XCTestCase {
         XCTAssertFalse(model.streams.uiState.landscape, "the mini window is never landscape")
         model.streams.expand()
         XCTAssertEqual(model.streams.uiState.open?.view, .full)
+        let pictures = model.streams.video.router.pictures
+        let videoId = mockupStream().videoId
+        let shown = pictures.picture(for: videoId, held: nil)
+        XCTAssertTrue(pictures.picture(for: videoId, held: nil) === shown, "each view of the stream starts with its last picture")
 
         model.streams.close()
         XCTAssertNil(model.streams.uiState.open)
+        XCTAssertFalse(pictures.picture(for: videoId, held: nil) === shown, "a closed stream keeps no picture")
         await assertEventually { self.engine.stopCalls.count == 1 }
         try? await Task.sleep(nanoseconds: 300_000_000)
         XCTAssertEqual(engine.watchCalls.count, 1, "the visible tile does not restart a closed stream")

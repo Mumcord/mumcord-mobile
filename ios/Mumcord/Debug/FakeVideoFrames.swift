@@ -5,7 +5,9 @@ import Foundation
 
 /// Stream pictures made here instead of by the engine's decoders, so the real render path
 /// (Metal, the I420 shader) draws something known in tests and screenshots. Every stream shows
-/// the same picture; it is made once and lent out like the engine's.
+/// the same picture; it is made once and lent out like the engine's. With `once`, each stream
+/// sends that picture a single time and nothing new afterwards, like a screen share of a screen
+/// that does not change.
 final class FakeVideoFrames: VideoFrames, @unchecked Sendable {
     static let width: UInt32 = 640
     static let height: UInt32 = 360
@@ -23,8 +25,11 @@ final class FakeVideoFrames: VideoFrames, @unchecked Sendable {
     private let v: UnsafeMutableBufferPointer<UInt8>
     private let lock = NSLock()
     private var nextToken: UInt64 = 1
+    private let once: Bool
+    private var sent: Set<UInt64> = []
 
-    init(_ pattern: Pattern) {
+    init(_ pattern: Pattern, once: Bool = false) {
+        self.once = once
         let width = Int(Self.width)
         let height = Int(Self.height)
         let colour: (Int, Int) -> (Double, Double, Double) = switch pattern {
@@ -88,11 +93,12 @@ final class FakeVideoFrames: VideoFrames, @unchecked Sendable {
     }
 
     func acquire(videoId: UInt64) -> VideoFrame? {
-        let token = lock.withLock {
+        let token: UInt64? = lock.withLock {
+            if once && !sent.insert(videoId).inserted { return nil }
             defer { nextToken += 1 }
             return nextToken
         }
-        guard let y = y.baseAddress, let u = u.baseAddress, let v = v.baseAddress else { return nil }
+        guard let token, let y = y.baseAddress, let u = u.baseAddress, let v = v.baseAddress else { return nil }
         return VideoFrame(
             token: token,
             width: Int(Self.width),

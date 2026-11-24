@@ -17,6 +17,11 @@ final class StreamVideo: Sendable {
         sink = RouterSink(router: router)
     }
 
+    /// Keeps the last picture of exactly these streams for the next view of them.
+    func keepPictures(of videoIds: Set<UInt64>) {
+        router.pictures.keep(videoIds)
+    }
+
     /// No pictures at all (tests that do not look at them).
     static let none = StreamVideo(frames: NoVideoFrames())
 }

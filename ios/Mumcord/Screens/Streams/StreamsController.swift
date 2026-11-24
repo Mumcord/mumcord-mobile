@@ -26,6 +26,8 @@ final class StreamsController {
     /// The last commands sent to the engine; the next ones wait for them, so a stop never
     /// overtakes the watch it ends.
     @ObservationIgnored private var commands: Task<Void, Never>?
+    /// The streams whose last picture is kept for the next view of them: the watched ones.
+    @ObservationIgnored private var keptPictures: Set<UInt64> = []
 
     /// - Parameter network: decides with the mobile data settings whether streams start by
     ///   themselves (FR-5.41); nil counts as Wi-Fi.
@@ -90,6 +92,11 @@ final class StreamsController {
         )
         next.requested = next.requested.union(changes.start).subtracting(changes.stop)
         if next != local { local = next }
+        let watched = Set(streams.filter { next.requested.contains($0.key) }.map(\.videoId))
+        if watched != keptPictures {
+            keptPictures = watched
+            video.keepPictures(of: watched)
+        }
         guard !changes.isEmpty else { return }
         // The sink first, so the news of the first picture is not lost.
         if !changes.start.isEmpty { store.setVideoSink(video.sink) }

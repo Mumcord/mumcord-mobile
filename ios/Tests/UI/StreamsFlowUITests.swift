@@ -5,7 +5,8 @@ import XCTest
 /// Watching Mira's screen share against the fake engine, whose pictures are made in the app
 /// (`FakeVideoFrames`): with `stream-colours` they are red on the left half and blue on the
 /// right, and they go through the real render path (Metal, the I420 shader), so the colours on
-/// screen prove that the picture is drawn.
+/// screen prove that the picture is drawn. With `stream-one-frame` the stream sends a single
+/// picture, like a screen share of a screen that does not change.
 final class StreamsFlowUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
@@ -20,7 +21,7 @@ final class StreamsFlowUITests: XCTestCase {
     }
 
     func testOnMobileDataATappedStreamPlaysFullScreenThenInTheMiniWindowAndStops() {
-        let app = connect("metered,stream-question,stream-colours")
+        let app = connect("metered,stream-question,stream-colours,stream-one-frame")
         let tile = app.element("stream-tile")
         expectAppears(app.row("stream-tile", containing: "Tap to watch"))
         // AC-5.23: nothing is fetched before the tap, so the tile keeps its placeholder.
@@ -42,10 +43,11 @@ final class StreamsFlowUITests: XCTestCase {
         awaitColours(in: mini)
         expectAppears(app.row("stream-tile", containing: "Playing in the mini window"))
 
+        // The one picture moves along without waiting for the sender's next one.
         mini.tapCenter()
-        expectAppears(app.element("stream-full-screen"))
+        awaitColours(in: app.element("stream-full-screen"))
         tapWhenReady(app.element("stream-collapse"))
-        expectAppears(mini)
+        awaitColours(in: mini)
 
         tapWhenReady(app.element("stream-stop"))
         expectGone(mini)

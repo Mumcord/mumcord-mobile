@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import Foundation
+import Metal
 
 /// One decoded I420 picture (YUV 4:2:0, 8 bit, BT.601 limited range), lent by its source until
 /// `VideoFrames.release(token:)`. The planes are read-only memory of the source: row `r` of the
@@ -73,8 +74,10 @@ final class EngineVideoFrames: VideoFrames, @unchecked Sendable {
 
 /// Passes "a stream has a new picture" on to the one view that shows that stream. The engine
 /// says so again only after the picture was taken, so a view that starts showing a stream takes
-/// the waiting picture itself (see `VideoLayerView`).
+/// the waiting picture itself (see `VideoLayerView`). Also keeps the last picture of each
+/// watched stream for the next view of it (`pictures`).
 final class VideoRouter: @unchecked Sendable {
+    let pictures = VideoPictures()
     private let lock = NSLock()
     private var views: [UInt64: (id: ObjectIdentifier, ready: @Sendable () -> Void)] = [:]
 
@@ -93,6 +96,43 @@ final class VideoRouter: @unchecked Sendable {
     func stop(videoId: UInt64, owner: AnyObject) {
         lock.withLock {
             if views[videoId]?.id == ObjectIdentifier(owner) { views[videoId] = nil }
+        }
+    }
+}
+
+/// The last picture of one stream as it was uploaded: its three planes. Read and written on
+/// the render queue only.
+final class VideoPicture: @unchecked Sendable {
+    var planes: [MTLTexture] = []
+    var size = CGSize.zero
+}
+
+/// The last picture of each watched stream, shared by the views of that stream. A view that
+/// takes a stream over (tile, full screen, mini window) draws it at once: the view before it has
+/// usually taken the waiting picture already, and a still screen share may not send the next one
+/// for a long time. Only watched streams are kept (`keep`); a view of any other stream holds its
+/// own picture, which goes with the view.
+final class VideoPictures: @unchecked Sendable {
+    private let lock = NSLock()
+    private var kept: Set<UInt64> = []
+    private var pictures: [UInt64: VideoPicture] = [:]
+
+    /// The streams that are watched now; the pictures of all others are dropped.
+    func keep(_ videoIds: Set<UInt64>) {
+        lock.withLock {
+            kept = videoIds
+            pictures = pictures.filter { videoIds.contains($0.key) }
+        }
+    }
+
+    /// The picture a view of `videoId` draws: the shared one while the stream is watched,
+    /// otherwise `held` (the view's own picture of this stream) or a new, empty one.
+    func picture(for videoId: UInt64, held: VideoPicture?) -> VideoPicture {
+        lock.withLock {
+            if let shared = pictures[videoId] { return shared }
+            let picture = held ?? VideoPicture()
+            if kept.contains(videoId) { pictures[videoId] = picture }
+            return picture
         }
     }
 }

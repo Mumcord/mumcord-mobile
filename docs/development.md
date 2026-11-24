@@ -566,14 +566,17 @@ engine's `VideoSink` only schedules a redraw; a serial render queue takes the ne
 picture with `mumcord_video_frame_acquire` (`bridge/include/mumcord_video.h`, reached through
 the bridging header), copies the three planes straight from the engine's memory into three
 single-channel textures, gives the picture back at once and lets a BT.601 shader draw it,
-letterboxed on black. Nothing is queued and nothing is drawn on the main thread or while the view
-is off screen. The shader is compiled from source when the first picture is drawn, because
-building `.metal` files needs Xcode's separate Metal toolchain (`xcodebuild -downloadComponent
-MetalToolchain`), which CI and a fresh Mac do not have.
+letterboxed on black. The textures belong to the stream, not to the view: the last picture of
+each watched stream is kept (`VideoPictures`), so a view that takes the stream over (tile, full
+screen, mini window) shows it at once instead of waiting for the sender's next picture, which a
+still screen share may not send for a long time. Nothing is queued and nothing is drawn on the
+main thread or while the view is off screen. The shader is compiled from source when the first
+picture is drawn, because building `.metal` files needs Xcode's separate Metal toolchain
+(`xcodebuild -downloadComponent MetalToolchain`), which CI and a fresh Mac do not have.
 
 The fake engine plays the bridge for the tests: the debug launch options `streams`,
-`stream-camera`, `stream-crowd`, `stream-question`, `stream-unreachable` and `stream-colours`
-(`ios/Mumcord/Debug/AppDebugLaunch.swift`) give Mira a stream, and `FakeVideoFrames` makes its
-pictures in the app, so the real render path draws them; `StreamsFlowUITests` checks the colours
-on screen. Only a real iPhone against the desktop app can show real streams, decoding load and
-the system's rotation.
+`stream-camera`, `stream-crowd`, `stream-question`, `stream-unreachable`, `stream-colours` and
+`stream-one-frame` (`ios/Mumcord/Debug/AppDebugLaunch.swift`) give Mira a stream, and
+`FakeVideoFrames` makes its pictures in the app, so the real render path draws them;
+`StreamsFlowUITests` checks the colours on screen. Only a real iPhone against the desktop app
+can show real streams, decoding load and the system's rotation.

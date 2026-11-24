@@ -96,7 +96,9 @@ final class VideoRenderer: @unchecked Sendable {
 /// queued. The render queue takes the picture, copies its three planes straight from the
 /// engine's memory into three single-channel textures, gives the picture back at once and lets
 /// the BT.601 shader turn it into RGB, letterboxed on black. The textures are made again only
-/// when the picture's size changes; nothing else is allocated per picture.
+/// when the picture's size changes; nothing else is allocated per picture. They belong to the
+/// stream, not the view (`VideoPictures`), so the next view of a watched stream starts with its
+/// last picture, and a view switched to another stream never shows the one before.
 ///
 /// Nothing is drawn while the view is not in a window or the app is in the background: the view
 /// stops listening then, and takes the waiting picture itself when it is shown again.
@@ -177,7 +179,7 @@ final class VideoLayerView: UIView {
             listening.router.stop(videoId: listening.videoId, owner: self)
             self.listening = nil
         }
-        painter.setSource(wanted.map { ($0.videoId, $0.frames) })
+        painter.setSource(wanted.map { VideoSource(videoId: $0.videoId, frames: $0.frames, pictures: $0.router.pictures) })
         guard let wanted, listening == nil else { return }
         listening = (wanted.videoId, wanted.router)
         wanted.router.listen(videoId: wanted.videoId, owner: self) { [weak painter] in
@@ -185,6 +187,17 @@ final class VideoLayerView: UIView {
         }
         // The engine tells of a picture only once it was taken; one may be waiting already.
         painter.schedule(take: true)
+    }
+}
+
+/// What a view draws: the pictures of `videoId` from `frames`, kept in `pictures`.
+private struct VideoSource {
+    let videoId: UInt64
+    let frames: VideoFrames
+    let pictures: VideoPictures
+
+    func isSame(as other: VideoSource?) -> Bool {
+        other?.videoId == videoId && other?.frames === frames && other?.pictures === pictures
     }
 }
 
@@ -196,21 +209,23 @@ private final class VideoPainter: @unchecked Sendable {
 
     private let lock = NSLock()
     /// The picture source; nil while nothing may be drawn.
-    private var source: (videoId: UInt64, frames: VideoFrames)?
+    private var source: VideoSource?
     /// A redraw is on its way to the render queue.
     private var pending = false
     /// The pending redraw takes a new picture first.
     private var take = false
 
     // Render queue only.
-    private var planes: [MTLTexture] = []
-    private var pictureSize = CGSize.zero
+    /// The picture drawn last and the source it belongs to.
+    private var held: (source: VideoSource, picture: VideoPicture)?
+    /// The layer shows a picture, which an empty one must clear.
+    private var showsPicture = false
 
     init(renderer: VideoRenderer) {
         self.renderer = renderer
     }
 
-    func setSource(_ source: (videoId: UInt64, frames: VideoFrames)?) {
+    func setSource(_ source: VideoSource?) {
         lock.withLock { self.source = source }
     }
 
@@ -226,33 +241,35 @@ private final class VideoPainter: @unchecked Sendable {
     }
 
     private func draw() {
-        let (source, take): ((videoId: UInt64, frames: VideoFrames)?, Bool) = lock.withLock {
+        let (source, take): (VideoSource?, Bool) = lock.withLock {
             pending = false
             defer { self.take = false }
             return (self.source, self.take)
         }
         guard let source, let layer else { return }
+        let own = held.flatMap { source.isSame(as: $0.source) ? $0.picture : nil }
+        let picture = source.pictures.picture(for: source.videoId, held: own)
+        held = (source, picture)
         if take, let frame = source.frames.acquire(videoId: source.videoId) {
-            upload(frame)
+            upload(frame, into: picture)
             source.frames.release(token: frame.token)
         }
-        guard planes.count == 3 else { return }
-        render(into: layer)
+        render(picture, into: layer)
     }
 
-    private func upload(_ frame: VideoFrame) {
+    private func upload(_ frame: VideoFrame, into picture: VideoPicture) {
         let size = CGSize(width: frame.width, height: frame.height)
-        if size != pictureSize || planes.count != 3 {
-            planes = [
+        if size != picture.size || picture.planes.count != 3 {
+            picture.planes = [
                 makePlane(width: frame.width, height: frame.height),
                 makePlane(width: frame.chromaWidth, height: frame.chromaHeight),
                 makePlane(width: frame.chromaWidth, height: frame.chromaHeight),
             ].compactMap { $0 }
-            pictureSize = size
-            guard planes.count == 3 else { return }
+            picture.size = size
+            guard picture.planes.count == 3 else { return }
         }
         let sources = [(frame.y, frame.strideY), (frame.u, frame.strideU), (frame.v, frame.strideV)]
-        for (plane, (bytes, stride)) in zip(planes, sources) {
+        for (plane, (bytes, stride)) in zip(picture.planes, sources) {
             plane.replace(
                 region: MTLRegionMake2D(0, 0, plane.width, plane.height),
                 mipmapLevel: 0,
@@ -274,7 +291,11 @@ private final class VideoPainter: @unchecked Sendable {
         return renderer.device.makeTexture(descriptor: description)
     }
 
-    private func render(into layer: CAMetalLayer) {
+    /// Draws the picture letterboxed on black; a picture without planes yet clears what the
+    /// layer showed before (another stream's picture), so the stage shows through.
+    private func render(_ picture: VideoPicture, into layer: CAMetalLayer) {
+        let empty = picture.planes.count != 3
+        if empty && !showsPicture { return }
         let area = layer.drawableSize
         guard area.width >= 1, area.height >= 1,
               let drawable = layer.nextDrawable(),
@@ -283,27 +304,30 @@ private final class VideoPainter: @unchecked Sendable {
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = drawable.texture
         pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: empty ? 0 : 1)
         pass.colorAttachments[0].storeAction = .store
         guard let encoder = buffer.makeRenderCommandEncoder(descriptor: pass) else { return }
-        let fit = fitPicture(area: area, picture: pictureSize)
-        encoder.setViewport(MTLViewport(
-            originX: fit.minX,
-            originY: fit.minY,
-            width: fit.width,
-            height: fit.height,
-            znear: 0,
-            zfar: 1
-        ))
-        encoder.setRenderPipelineState(renderer.pipeline)
-        for (index, plane) in planes.enumerated() {
-            encoder.setFragmentTexture(plane, index: index)
+        if !empty {
+            let fit = fitPicture(area: area, picture: picture.size)
+            encoder.setViewport(MTLViewport(
+                originX: fit.minX,
+                originY: fit.minY,
+                width: fit.width,
+                height: fit.height,
+                znear: 0,
+                zfar: 1
+            ))
+            encoder.setRenderPipelineState(renderer.pipeline)
+            for (index, plane) in picture.planes.enumerated() {
+                encoder.setFragmentTexture(plane, index: index)
+            }
+            encoder.setFragmentSamplerState(renderer.sampler, index: 0)
+            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
-        encoder.setFragmentSamplerState(renderer.sampler, index: 0)
-        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.endEncoding()
         buffer.present(drawable)
         buffer.commit()
+        showsPicture = !empty
         // The next picture is copied into the same textures; it must not change this one
         // while the GPU still reads it.
         buffer.waitUntilCompleted()
