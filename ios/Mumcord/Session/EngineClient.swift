@@ -82,6 +82,19 @@ protocol EngineClient: AnyObject, Sendable {
     func deleteIdentity(identityId: Int64) async throws
     /// A new "Send to your phone" scan of the desktop app's QR codes.
     func startTransfer() throws -> TransferSession
+
+    /// Streams (FR-5.70 … FR-5.73). How a watch goes shows in the stream's state; nothing is
+    /// fetched before `watchStream`.
+    func watchStream(session: UInt32, kind: StreamKind) async throws
+    func stopWatchingStream(session: UInt32, kind: StreamKind) async throws
+    /// How loud a person's screen share sound plays, 0 to 200 percent.
+    func setStreamVolume(session: UInt32, percent: UInt16) async throws
+    /// Answers "Allow direct connections?"; the waiting watch goes on with the answer.
+    func answerDirectConnections(allow: Bool) async throws
+    /// Where the news of new stream pictures goes; nil stops it.
+    func setVideoSink(sink: VideoSink?)
+    /// The handle for the engine's picture functions (`bridge/include/mumcord_video.h`).
+    func videoHandle() -> UInt64
 }
 
 /// The bridge's side of one "Send to your phone" scan (`TransferScan`), as the app uses it, so

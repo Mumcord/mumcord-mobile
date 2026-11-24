@@ -292,7 +292,12 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     }
 
     func disconnect() async throws {
-        locked { _disconnects += 1 }
+        locked {
+            _disconnects += 1
+            // The bridge's list of a connection ends with it.
+            _streams = []
+        }
+        updateFrameTimer()
         emit(.audioWantedChanged(audio: AudioWanted(capture: false, playback: false)))
         emit(.connectionChanged(state: .disconnected(error: nil)))
     }
@@ -985,6 +990,142 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         locked { _bitrateLimits.append(kbps) }
     }
 
+    // MARK: Streams
+
+    // The tests set the streams with `showStreams` (or `streamsOnConnect`); a watch goes to
+    // Connecting and then to `watchOutcome`, after the direct connection question when
+    // `asksDirectConnections`. While a stream is watched and a sink is set, the fake plays the
+    // bridge's video thread and says 15 times a second that a picture is ready; the pictures
+    // themselves come from `FakeVideoFrames`.
+
+    private var _streams: [MumcordBridge.Stream] = []
+    private var _streamsOnConnect: [MumcordBridge.Stream] = []
+    private var _watchCalls: [StreamKey] = []
+    private var _stopCalls: [StreamKey] = []
+    private var _directAnswers: [Bool] = []
+    private var _watchOutcome = StreamWatch.watching(path: .direct)
+    private var _asksDirectConnections = false
+    private var _videoSink: VideoSink?
+    private var _videoSinkCalls = 0
+    private var frameTimer: DispatchSourceTimer?
+
+    /// The streams shown once connected, as the bridge reports them.
+    var streamsOnConnect: [MumcordBridge.Stream] {
+        get { locked { _streamsOnConnect } }
+        set { locked { _streamsOnConnect = newValue } }
+    }
+    var watchCalls: [StreamKey] { locked { _watchCalls } }
+    var stopCalls: [StreamKey] { locked { _stopCalls } }
+    var directAnswers: [Bool] { locked { _directAnswers } }
+    var currentStreams: [MumcordBridge.Stream] { locked { _streams } }
+    /// The sink the app set last; nil before it set one.
+    var videoSink: VideoSink? { locked { _videoSink } }
+    /// What a watch turns into once it has connected.
+    var watchOutcome: StreamWatch {
+        get { locked { _watchOutcome } }
+        set { locked { _watchOutcome = newValue } }
+    }
+    /// The first watch asks "Allow direct connections?" and waits for the answer.
+    var asksDirectConnections: Bool {
+        get { locked { _asksDirectConnections } }
+        set { locked { _asksDirectConnections = newValue } }
+    }
+
+    /// Replaces the streams of the user's channel, as the bridge reports them.
+    func showStreams(_ streams: [MumcordBridge.Stream]) {
+        locked { _streams = streams }
+        streamsChanged()
+    }
+
+    private func streamsChanged() {
+        let streams = locked { _streams }
+        emit(.streamsChanged(streams: streams))
+        updateFrameTimer()
+    }
+
+    private func changeStream(_ key: StreamKey, _ change: (inout MumcordBridge.Stream) -> Void) throws {
+        try locked {
+            guard let index = _streams.firstIndex(where: { $0.key == key }) else {
+                throw BridgeError.NotFound(detail: "no such stream")
+            }
+            change(&_streams[index])
+        }
+        streamsChanged()
+    }
+
+    func watchStream(session: UInt32, kind: StreamKind) async throws {
+        let key = StreamKey(session: session, kind: kind)
+        let ask = locked {
+            _watchCalls.append(key)
+            return _asksDirectConnections && _directAnswers.isEmpty
+        }
+        try changeStream(key) { $0.watch = .connecting }
+        if ask {
+            emit(.directConnectionsQuestion)
+            return
+        }
+        let outcome = watchOutcome
+        try changeStream(key) { $0.watch = outcome }
+    }
+
+    func stopWatchingStream(session: UInt32, kind: StreamKind) async throws {
+        let key = StreamKey(session: session, kind: kind)
+        locked { _stopCalls.append(key) }
+        try changeStream(key) { $0.watch = .idle }
+    }
+
+    func setStreamVolume(session: UInt32, percent: UInt16) async throws {
+        let keys = locked { _streams.filter { $0.session == session }.map(\.key) }
+        for key in keys {
+            try changeStream(key) { $0.volume = percent }
+        }
+    }
+
+    /// The answer also lets the watches that waited for it go on.
+    func answerDirectConnections(allow: Bool) async throws {
+        let (waiting, outcome): ([StreamKey], StreamWatch) = locked {
+            _directAnswers.append(allow)
+            return (_streams.filter { $0.watch == .connecting }.map(\.key), _watchOutcome)
+        }
+        for key in waiting {
+            try changeStream(key) { $0.watch = allow ? outcome : .unreachable(reason: .directConnectionsDeclined) }
+        }
+    }
+
+    func setVideoSink(sink: VideoSink?) {
+        locked { _videoSink = sink }
+        updateFrameTimer()
+    }
+
+    func videoHandle() -> UInt64 { 0 }
+
+    /// Runs the picture news while something is watched and a sink is set, and only then.
+    private func updateFrameTimer() {
+        locked {
+            let watched = _streams.contains { if case .watching = $0.watch { true } else { false } }
+            if watched && _videoSink != nil {
+                guard frameTimer == nil else { return }
+                let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "app.mumcord.mobile.fake-video"))
+                timer.schedule(deadline: .now(), repeating: .milliseconds(66))
+                timer.setEventHandler { [weak self] in self?.framesReady() }
+                timer.resume()
+                frameTimer = timer
+            } else {
+                frameTimer?.cancel()
+                frameTimer = nil
+            }
+        }
+    }
+
+    private func framesReady() {
+        let (sink, ids): (VideoSink?, [UInt64]) = locked {
+            (_videoSink, _streams.filter { if case .watching = $0.watch { true } else { false } }.map(\.videoId))
+        }
+        for id in ids {
+            sink?.onFrameReady(videoId: id, width: FakeVideoFrames.width, height: FakeVideoFrames.height)
+        }
+    }
+
     // MARK: Identities
 
     /// The identities as they are; set before the engine is used, without an event.
@@ -1141,6 +1282,10 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         emit(.audioWantedChanged(audio: audioOnConnect))
         if let level = levelOnConnect {
             emit(.inputLevelChanged(percent: level))
+        }
+        let streams = streamsOnConnect
+        if !streams.isEmpty {
+            showStreams(streams)
         }
     }
 }

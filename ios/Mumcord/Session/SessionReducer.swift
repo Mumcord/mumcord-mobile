@@ -19,6 +19,8 @@ extension SessionState {
                 next.denied = nil
                 next.hints = []
                 next.activity = []
+                next.streams = []
+                next.directConnectionsQuestion = false
             case .connecting:
                 next.phase = .connecting
             case .connected:
@@ -101,8 +103,12 @@ extension SessionState {
         case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,
              .blockedPeopleChanged:
             break
-        // Streams phase (task 7.5): the state does not follow streams yet.
-        case .streamsChanged, .directConnectionsQuestion, .ownCameraChanged:
+        case .streamsChanged(let streams):
+            next.streams = streams
+        case .directConnectionsQuestion:
+            next.directConnectionsQuestion = true
+        // Sharing the phone's own camera is a later step.
+        case .ownCameraChanged:
             break
         }
         return next

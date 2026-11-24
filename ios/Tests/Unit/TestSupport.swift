@@ -178,8 +178,8 @@ final class PhoneFakes {
 
 extension AppModel {
     /// A model for tests that do not look at voice or the local network: the microphone is
-    /// allowed and every server is on the internet.
-    convenience init(store: SessionStore, setupStore: SetupStore) {
+    /// allowed and every server is on the internet. Without a `network` streams start as on Wi-Fi.
+    convenience init(store: SessionStore, setupStore: SetupStore, network: NetworkMonitor? = nil) {
         let fakes = PhoneFakes()
         self.init(
             store: store,
@@ -193,7 +193,8 @@ extension AppModel {
                 log: { _ in }
             ),
             localNetwork: fakes.localNetwork,
-            openSettings: {}
+            openSettings: {},
+            network: network
         )
     }
 }

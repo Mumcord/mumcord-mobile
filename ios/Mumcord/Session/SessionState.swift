@@ -34,6 +34,11 @@ struct SessionState: Equatable {
     var activity: [ActivityEntry] = []
     /// Which of the phone's speaker and microphone the engine needs right now.
     var audio = AudioWanted(capture: false, playback: false)
+    /// The screen shares and cameras of the people in the user's channel, as the bridge last
+    /// sent them.
+    var streams: [Stream] = []
+    /// The engine waits for the answer to "Allow direct connections?" (a stream needs it).
+    var directConnectionsQuestion = false
 
     /// True once the server's channels are known and the connection is still alive.
     var showsServer: Bool {

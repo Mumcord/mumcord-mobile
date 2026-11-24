@@ -39,6 +39,8 @@ final class AppModel {
     @ObservationIgnored let more: MoreController
     /// The identity screens and "Scan from desktop app".
     @ObservationIgnored let identities: IdentitiesController
+    /// Watching screen shares and cameras. Read only by the stream views.
+    @ObservationIgnored let streams: StreamsController
     /// The camera permission, for the scanner and the chat's "Take photo".
     @ObservationIgnored let camera: CameraGateway
     /// Where the scanner gets the texts of QR codes from.
@@ -77,7 +79,9 @@ final class AppModel {
         idle: IdleAccess? = nil,
         mediaPolicy: @escaping MediaPolicy = { true },
         camera: CameraGateway = NoCamera(),
-        qrSource: QrSource = NoQrSource()
+        qrSource: QrSource = NoQrSource(),
+        network: NetworkMonitor? = nil,
+        streamVideo: StreamVideo = .none
     ) {
         self.store = store
         self.setupStore = setupStore
@@ -100,6 +104,7 @@ final class AppModel {
         self.camera = camera
         self.qrSource = qrSource
         identities = IdentitiesController(store: store, camera: camera)
+        streams = StreamsController(store: store, network: network, video: streamVideo)
         chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
         local = AppUiState(setupDone: setupStore.firstStartDone)
         if let sessionEnded {

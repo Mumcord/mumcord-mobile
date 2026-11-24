@@ -77,6 +77,7 @@ enum Mockup {
     static let afk: UInt32 = 4
     static let ben: UInt32 = 2
     static let lea: UInt32 = 3
+    static let mira: UInt32 = 4
     static let jonas: UInt32 = 5
 
     static let fingerprint =
@@ -114,7 +115,7 @@ func mockupServer() -> ServerState {
     music.canEnter = false
     var ben = person(Mockup.ben, "Ben", channelId: Mockup.lobby)
     ben.talking = true
-    var mira = person(4, "Mira", channelId: Mockup.gaming)
+    var mira = person(Mockup.mira, "Mira", channelId: Mockup.gaming)
     mira.streaming = true
     var jonas = person(Mockup.jonas, "Jonas", channelId: Mockup.gaming)
     jonas.selfMuted = true
@@ -159,6 +160,26 @@ extension Channel {
         permissions.kick = true
         permissions.ban = true
     }
+}
+
+/// Mira's screen share as the bridge reports it, with the picture id the bridge gives it.
+func mockupStream(
+    watch: StreamWatch = .idle,
+    viewers: UInt32? = 1,
+    hasSound: Bool = true,
+    paused: Bool = false,
+    kind: StreamKind = .screen
+) -> Stream {
+    Stream(
+        session: Mockup.mira,
+        kind: kind,
+        videoId: (kind == .screen ? 1 << 32 : 2 << 32) | UInt64(Mockup.mira),
+        watch: watch,
+        paused: paused,
+        hasSound: hasSound,
+        volume: 136,
+        viewers: viewers
+    )
 }
 
 /// The server of mockup `03-voice-expanded`: everybody is in the Lobby. Anna, Ben talking, Mira,

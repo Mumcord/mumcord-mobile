@@ -357,6 +357,8 @@ final class SessionStore: @unchecked Sendable {
                 next.phase = .failed(error)
                 next.certificatePrompt = nil
                 next.server = nil
+                next.streams = []
+                next.directConnectionsQuestion = false
                 return next
             }
         }
@@ -549,6 +551,45 @@ final class SessionStore: @unchecked Sendable {
 
     func setPersonLocalMute(_ session: UInt32, muted: Bool) async {
         report(await call("set person mute") { try await $0.setPersonLocalMute(session: session, muted: muted) })
+    }
+
+    // MARK: Streams (FR-5.70 … FR-5.73)
+
+    // How a watch goes shows in the stream's state; a failed command only means that the
+    // stream or the connection went away meanwhile, so it is logged and not shown.
+
+    func watchStream(_ session: UInt32, kind: StreamKind) async {
+        _ = await call("watch stream") { try await $0.watchStream(session: session, kind: kind) }
+    }
+
+    func stopWatchingStream(_ session: UInt32, kind: StreamKind) async {
+        _ = await call("stop watching stream") { try await $0.stopWatchingStream(session: session, kind: kind) }
+    }
+
+    /// How loud a person's screen share sound plays, 0 to 200 percent.
+    func setStreamVolume(_ session: UInt32, percent: Int) async {
+        let clamped = UInt16(min(max(percent, 0), 200))
+        _ = await call("set stream volume") { try await $0.setStreamVolume(session: session, percent: clamped) }
+    }
+
+    /// Answers "Allow direct connections?"; the question goes away either way.
+    func answerDirectConnections(_ allow: Bool) async {
+        update { state in
+            var next = state
+            next.directConnectionsQuestion = false
+            return next
+        }
+        _ = await call("answer direct connections") { try await $0.answerDirectConnections(allow: allow) }
+    }
+
+    /// Where the news of new stream pictures goes, once an engine exists. Never waits.
+    func setVideoSink(_ sink: VideoSink?) {
+        engineNow()?.setVideoSink(sink: sink)
+    }
+
+    /// The handle for the engine's picture functions, or 0 while no engine exists. Never waits.
+    func videoHandle() -> UInt64 {
+        engineNow()?.videoHandle() ?? 0
     }
 
     // MARK: Moderation (FR-5.90 … FR-5.93)

@@ -130,6 +130,17 @@ final class SessionReducerTests: XCTestCase {
         XCTAssertEqual(SessionState().fold(.appSettingsChanged(settings: settings)).appSettings, settings)
     }
 
+    func testTheStreamsAndTheDirectConnectionQuestionAreFollowedUntilTheConnectionEnds() {
+        let stream = mockupStream(watch: .watching(path: .relay))
+        let shown = fold(connected + [.streamsChanged(streams: [stream]), .directConnectionsQuestion])
+        XCTAssertEqual(shown.streams, [stream])
+        XCTAssertTrue(shown.directConnectionsQuestion)
+        XCTAssertEqual(shown.fold(.streamsChanged(streams: [])).streams, [])
+        let ended = shown.fold(.connectionChanged(state: .disconnected(error: nil)))
+        XCTAssertEqual(ended.streams, [])
+        XCTAssertFalse(ended.directConnectionsQuestion)
+    }
+
     func testANewSessionIsIdleAndShowsNoServer() {
         let state = SessionState()
         XCTAssertEqual(state.phase, .idle)
