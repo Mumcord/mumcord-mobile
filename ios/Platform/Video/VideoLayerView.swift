@@ -123,15 +123,17 @@ final class VideoRenderer: @unchecked Sendable {
 /// stream, not the view (`VideoPictures`), so the next view of a watched stream starts with its
 /// last picture, and a view switched to another stream never shows the one before.
 ///
-/// Nothing is drawn while the view is not in a window or the app is in the background: the view
-/// stops listening then, and takes the waiting picture itself when it is shown again.
+/// Nothing is drawn while the view is not in a window or the app is not active (in the
+/// background, or on its way there): the view stops listening then, a draw already under way
+/// submits nothing to the GPU, and the view takes the waiting picture itself when it is shown
+/// again. iOS ends an app that submits GPU work in the background.
 final class VideoLayerView: UIView {
     override class var layerClass: AnyClass { CAMetalLayer.self }
 
     private let painter: VideoPainter?
     private var shown: (videoId: UInt64, frames: VideoFrames, router: VideoRouter)?
     private var listening: (videoId: UInt64, router: VideoRouter)?
-    private var inBackground = UIApplication.shared.applicationState == .background
+    private var active = UIApplication.shared.applicationState == .active
     private var observers: [NSObjectProtocol] = []
 
     override init(frame: CGRect) {
@@ -149,11 +151,12 @@ final class VideoLayerView: UIView {
         }
         let center = NotificationCenter.default
         observers = [
-            center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.setBackground(true) }
+            // Resigning comes before the background, early enough to stop before it.
+            center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setActive(false) }
             },
-            center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.setBackground(false) }
+            center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.setActive(true) }
             },
         ]
     }
@@ -185,19 +188,20 @@ final class VideoLayerView: UIView {
         let scale = window?.screen.scale ?? traitCollection.displayScale
         let size = CGSize(width: bounds.width * scale, height: bounds.height * scale)
         guard let painter, size.width >= 1, size.height >= 1 else { return }
-        (layer as? CAMetalLayer)?.drawableSize = size
+        // The render queue may be using the layer right now; it takes the new size itself.
+        painter.resize(to: size)
         // The last picture again in the new size, without waiting for the next one.
         painter.schedule(take: false)
     }
 
-    private func setBackground(_ background: Bool) {
-        inBackground = background
+    private func setActive(_ active: Bool) {
+        self.active = active
         updateListening()
     }
 
     private func updateListening() {
         guard let painter else { return }
-        let wanted = shown.flatMap { shown in window != nil && !inBackground ? shown : nil }
+        let wanted = shown.flatMap { shown in window != nil && active ? shown : nil }
         if let listening, listening.videoId != wanted?.videoId || listening.router !== wanted?.router {
             listening.router.stop(videoId: listening.videoId, owner: self)
             self.listening = nil
@@ -233,6 +237,8 @@ private final class VideoPainter: @unchecked Sendable {
     private let lock = NSLock()
     /// The picture source; nil while nothing may be drawn.
     private var source: VideoSource?
+    /// The size of the layer's drawables in pixels, set by the view.
+    private var size = CGSize.zero
     /// A redraw is on its way to the render queue.
     private var pending = false
     /// The pending redraw takes a new picture first.
@@ -248,8 +254,13 @@ private final class VideoPainter: @unchecked Sendable {
         self.renderer = renderer
     }
 
+    /// Once this returns with nil, nothing more is submitted to the GPU.
     func setSource(_ source: VideoSource?) {
         lock.withLock { self.source = source }
+    }
+
+    func resize(to size: CGSize) {
+        lock.withLock { self.size = size }
     }
 
     /// Called on any thread; returns at once.
@@ -264,12 +275,15 @@ private final class VideoPainter: @unchecked Sendable {
     }
 
     private func draw() {
-        let (source, take): (VideoSource?, Bool) = lock.withLock {
+        let (source, take, size): (VideoSource?, Bool, CGSize) = lock.withLock {
             pending = false
             defer { self.take = false }
-            return (self.source, self.take)
+            return (self.source, self.take, self.size)
         }
         guard let source, let layer else { return }
+        if size.width >= 1, size.height >= 1, layer.drawableSize != size {
+            layer.drawableSize = size
+        }
         let own = held.flatMap { source.isSame(as: $0.source) ? $0.picture : nil }
         let picture = source.pictures.picture(for: source.videoId, held: own)
         held = (source, picture)
@@ -277,7 +291,7 @@ private final class VideoPainter: @unchecked Sendable {
             upload(frame, into: picture)
             source.frames.release(token: frame.token)
         }
-        render(picture, into: layer)
+        render(picture, into: layer, for: source)
     }
 
     private func upload(_ frame: VideoFrame, into picture: VideoPicture) {
@@ -316,7 +330,7 @@ private final class VideoPainter: @unchecked Sendable {
 
     /// Draws the picture letterboxed on black; a picture without planes yet clears what the
     /// layer showed before (another stream's picture), so the stage shows through.
-    private func render(_ picture: VideoPicture, into layer: CAMetalLayer) {
+    private func render(_ picture: VideoPicture, into layer: CAMetalLayer, for source: VideoSource) {
         let empty = picture.planes.count != 3
         if empty && !showsPicture { return }
         guard let pipeline = renderer.pipeline else { return }
@@ -349,8 +363,15 @@ private final class VideoPainter: @unchecked Sendable {
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
         encoder.endEncoding()
-        buffer.present(drawable)
-        buffer.commit()
+        // The view may have stopped drawing since the draw began (the app leaving the screen):
+        // checked under the lock, so that nothing is submitted after `setSource(nil)` returned.
+        let submitted: Bool = lock.withLock {
+            guard source.isSame(as: self.source) else { return false }
+            buffer.present(drawable)
+            buffer.commit()
+            return true
+        }
+        guard submitted else { return }
         showsPicture = !empty
         // The next picture is copied into the same textures; it must not change this one
         // while the GPU still reads it.
