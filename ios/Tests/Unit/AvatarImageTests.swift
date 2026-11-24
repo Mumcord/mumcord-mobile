@@ -128,5 +128,45 @@ final class AvatarImageTests: XCTestCase {
 
     func testBytesThatAreNoPictureAreRefused() {
         XCTAssertNil(avatarImage(Data("hello".utf8)))
+        XCTAssertNil(avatarPicture(Data("hello".utf8), maxPixelSize: 96))
+    }
+
+    /// A PNG of one colour, `edge` pixels square: a few kilobytes for millions of pixels.
+    private func plainPng(edge: Int) throws -> Data {
+        let context = try XCTUnwrap(CGContext(
+            data: nil,
+            width: edge,
+            height: edge,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.none.rawValue
+        ))
+        let image = try XCTUnwrap(context.makeImage())
+        let data = NSMutableData()
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))
+        CGImageDestinationAddImage(destination, image, nil)
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        return data as Data
+    }
+
+    /// A server's avatar is drawn at the size it is shown, however large the picture claims to be.
+    func testAnAvatarFromTheServerIsDecodedNoLargerThanItIsDrawn() throws {
+        let huge = try plainPng(edge: 8000)
+        XCTAssertLessThan(huge.count, 1_000_000, "a small file")
+
+        let drawn = try XCTUnwrap(avatarPicture(huge, maxPixelSize: 288))
+        XCTAssertEqual(drawn.width, 288)
+        XCTAssertEqual(drawn.height, 288)
+
+        let wide = try XCTUnwrap(avatarPicture(XCTUnwrap(UIImage(cgImage: picture(width: 400, height: 200) { _ in .red }).pngData()), maxPixelSize: 96))
+        XCTAssertEqual(wide.width, 96)
+        XCTAssertEqual(wide.height, 48)
+    }
+
+    func testASmallAvatarIsNotEnlarged() throws {
+        let small = try XCTUnwrap(UIImage(cgImage: picture(width: 40, height: 40) { _ in .blue }).pngData())
+        let decoded = try XCTUnwrap(avatarPicture(small, maxPixelSize: 288))
+        XCTAssertEqual(decoded.width, 40)
     }
 }

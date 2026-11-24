@@ -145,7 +145,9 @@ func decodeChatImage(_ bytes: Data, maxPixelSize: Int) -> LoadedImage? {
     return LoadedImage(image: UIImage(cgImage: first), frames: frames, duration: duration, width: width, height: height)
 }
 
-private func decodeFrame(_ source: CGImageSource, _ index: Int, maxPixelSize: Int) -> CGImage? {
+/// One frame decoded straight to at most `maxPixelSize` on its longer side, never at its full
+/// size: a small file can claim a huge picture.
+func decodeFrame(_ source: CGImageSource, _ index: Int, maxPixelSize: Int) -> CGImage? {
     let options: [CFString: Any] = [
         kCGImageSourceCreateThumbnailFromImageAlways: true,
         // Turns a photo the way its camera held it.

@@ -111,12 +111,14 @@ private struct ProfileCard: View {
         let colors = theme.colors
         let shape = RoundedRectangle(cornerRadius: MumcordRadius.list)
         HStack(spacing: MumcordSpace.s4) {
-            MumcordAvatar(
-                initials: profile.name.initials(1),
-                colorSlot: avatarSlot(profile.name),
-                size: .tile,
-                image: profile.avatar.flatMap(avatarPicture)
-            )
+            AvatarPicture(bytes: profile.avatar, points: MumcordAvatarSize.tile.diameter) { picture in
+                MumcordAvatar(
+                    initials: profile.name.initials(1),
+                    colorSlot: avatarSlot(profile.name),
+                    size: .tile,
+                    image: picture
+                )
+            }
             VStack(alignment: .leading, spacing: 0) {
                 LineText(profile.name, style: .title, color: colors.text)
                     .accessibilityAddTraits(.isHeader)

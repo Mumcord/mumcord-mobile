@@ -14,10 +14,20 @@ struct EditProfileScreen: View {
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
+        // Decoded once for the large avatar; the preview draws the same picture smaller.
+        AvatarPicture(bytes: state.avatar, points: MumcordAvatarSize.profile.diameter) { picture in
+            content(picture)
+        }
+        .onChange(of: state.edit.error) { _, error in
+            // An error that appears below the avatar is spoken.
+            if let error { AccessibilityNotification.Announcement(errorText(error)).post() }
+        }
+    }
+
+    private func content(_ picture: UIImage?) -> some View {
         let edit = state.edit
         let colors = theme.colors
-        let picture = state.avatar.flatMap(avatarPicture)
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             MumcordAppBar(title: Strings.profileTitle, onBack: actions.close, backLabel: Strings.actionBack) {
                 MumcordButton(text: Strings.profileSave, small: true, action: actions.save)
                     .disabled(!edit.canSave)
@@ -55,10 +65,6 @@ struct EditProfileScreen: View {
                 .padding(.bottom, MumcordSpace.s4)
             }
             .scrollDismissesKeyboard(.interactively)
-        }
-        .onChange(of: edit.error) { _, error in
-            // An error that appears below the avatar is spoken.
-            if let error { AccessibilityNotification.Announcement(errorText(error)).post() }
         }
     }
 

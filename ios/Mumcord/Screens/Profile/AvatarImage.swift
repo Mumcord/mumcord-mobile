@@ -59,9 +59,40 @@ private func pngWithoutProperties(_ image: CGImage) -> Data? {
     return data as Data
 }
 
-/// An avatar's bytes as a picture to draw, or nil for bytes that are no picture. Avatars are
-/// small (the server's at most a few hundred pixels, a new one at most `avatarMaxEdge`), so
-/// they are decoded where they are drawn.
-func avatarPicture(_ bytes: Data) -> UIImage? {
-    UIImage(data: bytes)
+/// An avatar's bytes as a picture of at most `maxPixelSize` pixels on its longer side, or nil
+/// for bytes that are no picture. The bytes come from the server and are untrusted: a small file
+/// can claim a huge picture, so it is decoded straight to the size it is drawn at, as the chat's
+/// pictures are. Runs off the main thread.
+func avatarPicture(_ bytes: Data, maxPixelSize: Int) -> CGImage? {
+    let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+    guard let source = CGImageSourceCreateWithData(bytes as CFData, sourceOptions), CGImageSourceGetCount(source) > 0 else {
+        return nil
+    }
+    return decodeFrame(source, 0, maxPixelSize: maxPixelSize)
+}
+
+/// Draws an avatar from its bytes, decoded once per change of the bytes, off the main thread and
+/// at the size `points` it is drawn at (see `avatarPicture`). `content` gets nil while there is
+/// no picture or it is being decoded.
+struct AvatarPicture<Content: View>: View {
+    let bytes: Data?
+    /// The diameter the picture is drawn at.
+    let points: CGFloat
+    @ViewBuilder let content: (UIImage?) -> Content
+    @Environment(\.displayScale) private var displayScale
+    @State private var picture: UIImage?
+
+    var body: some View {
+        content(picture)
+            .task(id: bytes) {
+                guard let bytes else {
+                    picture = nil
+                    return
+                }
+                let pixels = Int((points * displayScale).rounded(.up))
+                let decoded = await Task.detached(priority: .userInitiated) { avatarPicture(bytes, maxPixelSize: pixels) }.value
+                if Task.isCancelled { return }
+                picture = decoded.map { UIImage(cgImage: $0) }
+            }
+    }
 }

@@ -653,7 +653,9 @@ comes from the app's own dark or light set that matches the theme's brightness
 has exactly the colours of `design/tokens.json`. In every mode the status bar, the keyboard and the
 system's sheets follow the brightness of the drawn colours: the window's root view controller is
 set to it. The phone's own setting is read from the window, which that setting does not reach, so
-System follows the phone live.
+System follows the phone live. Avatars are decoded off the main thread, once per change of their
+bytes and straight to the size they are drawn at (`AvatarPicture`), because a server's picture
+can claim any size.
 
 A chosen or taken profile picture is decoded upright and written again as a PNG of its pixels
 only, at most 512 pixels on its longest edge (`ios/Mumcord/Screens/Profile/AvatarImage.swift`),
