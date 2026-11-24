@@ -152,6 +152,20 @@ extension XCTestCase {
         }
     }
 
+    /// Waits until two screenshots in a row are the same, so sheets and bars that slide or fade
+    /// in have settled; a fixed wait only hopes so.
+    func awaitStillScreen(file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = Date().addingTimeInterval(10)
+        var before = XCUIScreen.main.screenshot().pngRepresentation
+        while Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.2)
+            let now = XCUIScreen.main.screenshot().pngRepresentation
+            if now == before { return }
+            before = now
+        }
+        XCTFail("the screen does not settle", file: file, line: line)
+    }
+
     /// Kept in the result bundle also for a passing test, so CI can publish the picture.
     func keepScreenshot(of app: XCUIApplication, named name: String) {
         let screenshot = XCTAttachment(screenshot: app.screenshot())

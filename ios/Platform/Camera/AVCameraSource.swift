@@ -141,7 +141,7 @@ final class AVCameraSource: CameraSource {
 private let cameraOpened = Notification.Name("app.mumcord.mobile.camera-opened")
 
 /// An angle in degrees as the nearest of 0, 90, 180 and 270.
-private func quarterTurns(_ degrees: CGFloat) -> UInt32 {
+func quarterTurns(_ degrees: CGFloat) -> UInt32 {
     let turns = Int((degrees / 90).rounded()) % 4
     return UInt32((turns + 4) % 4 * 90)
 }

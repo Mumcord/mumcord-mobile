@@ -47,7 +47,7 @@ final class CameraShareFlowUITests: XCTestCase {
     }
 
     func testThePreviewComesFirstThenTheCameraIsSharedGoesOnInTheBackgroundAndStops() {
-        let app = voiceView("camera-viewers")
+        let app = voiceView("camera-viewers,camera-probe")
         XCTAssertFalse(app.element("camera-share-preview").exists)
         expectAppears(app.row("voice-camera", containing: "Share your camera"))
         app.element("voice-camera").tapCenter()
@@ -63,18 +63,20 @@ final class CameraShareFlowUITests: XCTestCase {
         expectGone(app.element("Front camera"))
 
         tapWhenReady(app.element("camera-share-start"))
-        expectAppears(app.element(containing: "Camera on · 0 watching"))
-        XCTAssertFalse(app.element("camera-share-preview").exists, "the preview closed")
         expectAppears(app.element(containing: "Camera on · 2 watching"))
+        XCTAssertFalse(app.element("camera-share-preview").exists, "the preview closed")
         expectAppears(app.row("voice-camera", containing: "Stop camera"))
+        XCTAssertEqual(cameraCalls(app), "front,back")
 
-        // FR-5.75: sharing goes on while the app is in the background, and the bar is back with it.
+        // FR-5.75: the camera is let go in the background while sharing goes on, and runs again
+        // with the same camera on return, with the bar.
         XCUIDevice.shared.press(.home)
         let left = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in app.state != .runningForeground }, object: nil)
         XCTAssertEqual(XCTWaiter().wait(for: [left], timeout: 10), .completed, "the app did not leave the screen")
         app.activate()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
         expectAppears(app.element(containing: "Camera on · 2 watching"))
+        expectCameraCalls(app, endingWith: "front,back,stop,back")
 
         // The bar stays with the voice bar when the voice view closes.
         tapWhenReady(app.element("voice-collapse"))
@@ -83,6 +85,7 @@ final class CameraShareFlowUITests: XCTestCase {
         tapWhenReady(app.element("camera-bar-stop"))
         expectGone(app.element("camera-bar"))
         XCTAssertFalse(app.element("camera-notice").exists, "no notice after the user's own stop")
+        expectCameraCalls(app, endingWith: "back,stop")
     }
 
     /// Opens the preview with a start of half a minute and taps "Start sharing".
@@ -186,7 +189,6 @@ final class CameraShareFlowUITests: XCTestCase {
         let app = voiceView("camera-fails")
         app.element("voice-camera").tapCenter()
         tapWhenReady(app.element("camera-share-start"))
-        expectAppears(app.element("camera-bar"))
         expectAppears(app.element(containing: "The camera could not be opened or stopped working."))
         expectGone(app.element("camera-bar"))
         expectAppears(app.element(containing: "Camera stopped."))

@@ -15,7 +15,7 @@ final class CameraShareScreenshotUITests: XCTestCase {
 
     private func capture(_ app: XCUIApplication, _ name: String, theme: String) {
         // Sheets and bars slide in; the picture is taken once they are still.
-        Thread.sleep(forTimeInterval: 1)
+        awaitStillScreen()
         keepScreenshot(of: app, named: "ios-camera-\(name)-\(theme)")
     }
 

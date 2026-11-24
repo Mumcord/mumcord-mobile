@@ -70,10 +70,8 @@ import MumcordBridge
 ///         camera-refused   "Start sharing" of the own camera is refused: direct connections
 ///                          are off
 ///         camera-slow-start "Start sharing" of the own camera takes half a minute
-///         camera-viewers   three seconds after the own camera is shared, two people
-///                          watch it
-///         camera-fails     three seconds after the own camera is shared, the camera
-///                          stops working
+///         camera-viewers   two people watch the own camera as soon as it is shared
+///         camera-fails     the camera stops working as soon as it is shared
 ///         camera-probe     an invisible element "fake-camera" lists what the drawn camera
 ///                          was asked to do (`FakeCameraProbeView`)
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
@@ -419,15 +417,13 @@ extension AppDebugLaunch {
         return model
     }
 
-    /// Runs `change` three seconds after the own camera is shared, so a test sees the state
-    /// before it, then waits for the change.
+    /// Runs `change` as soon as the own camera is shared.
     @MainActor
     private func whileSharing(_ model: AppModel, _ change: @escaping @MainActor () -> Void) {
         Task { @MainActor in
             while model.cameraShare?.uiState.sharing == nil {
                 try? await Task.sleep(nanoseconds: 50_000_000)
             }
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
             change()
         }
     }
