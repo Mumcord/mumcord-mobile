@@ -22,7 +22,11 @@
 #   scripts/build-ios.sh --check-groups
 #                                 fail if a test class belongs to no group; runs on any OS
 #
-# The simulator is chosen by name: IOS_SIMULATOR="iPhone 17" scripts/build-ios.sh --test
+# The simulator: IOS_SIMULATOR names one (by name or UDID) and then must exist, e.g.
+#   IOS_SIMULATOR="iPhone 17" scripts/build-ios.sh --test
+# Without it the script takes "iPhone 17" when it is installed, else the newest available iPhone
+# simulator, else it creates one for the newest iOS runtime. GitHub's macOS runners do not always
+# have the same simulators.
 set -euo pipefail
 
 BRIDGE_PACKAGE="mumcord-mobile-bridge"
@@ -32,7 +36,10 @@ SIMULATOR_TARGET="aarch64-apple-ios-sim"
 # Same value as the deployment target in ios/project.yml, so the C parts of the engine are
 # compiled for the iOS version the app is linked for.
 export IPHONEOS_DEPLOYMENT_TARGET="17.0"
-SIMULATOR_NAME="${IOS_SIMULATOR:-iPhone 17}"
+DEFAULT_SIMULATOR="iPhone 17"
+# Set by choose_simulator.
+SIMULATOR_ID=""
+SIMULATOR_NAME=""
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IOS_DIR="${REPO_ROOT}/ios"
@@ -109,20 +116,85 @@ list_groups() {
   printf '[%s]\n' "${json}"
 }
 
+# Prints what to do for the simulator, from `xcrun simctl list --json` on standard input:
+# "use<TAB><udid><TAB><name>" for an installed one, or
+# "create<TAB><device type><TAB><runtime><TAB><name>" when no iPhone simulator is installed.
+# Newest means the newest iOS runtime first, then the newest model (its model identifier, such as
+# "iPhone18,3").
+SIMULATOR_CHOICE='
+import json, re, sys
+
+wanted, default = sys.argv[1], sys.argv[2]
+listing = json.load(sys.stdin)
+
+def version(text):
+    return tuple(int(part) for part in re.findall(r"\d+", text or ""))
+
+types = {t["identifier"]: t for t in listing["devicetypes"]}
+def model(type_id):
+    return version(types.get(type_id, {}).get("modelIdentifier"))
+
+runtimes = {r["identifier"]: r for r in listing["runtimes"]
+            if r.get("platform") == "iOS" and r.get("isAvailable")}
+devices = [(runtimes[runtime], device) for runtime, found in listing["devices"].items()
+           if runtime in runtimes for device in found if device.get("isAvailable")]
+
+def use(device):
+    print("use", device["udid"], device["name"], sep="\t")
+    sys.exit(0)
+
+if wanted:
+    for _, device in devices:
+        if wanted in (device["name"], device["udid"]):
+            use(device)
+    sys.exit("simulator \"%s\" is not installed" % wanted)
+for _, device in devices:
+    if device["name"] == default:
+        use(device)
+iphones = [(runtime, device) for runtime, device in devices
+           if types.get(device["deviceTypeIdentifier"], {}).get("productFamily") == "iPhone"]
+if iphones:
+    use(max(iphones, key=lambda pair: (version(pair[0]["version"]), model(pair[1]["deviceTypeIdentifier"])))[1])
+if not runtimes:
+    sys.exit("no iOS simulator runtime is installed")
+runtime = max(runtimes.values(), key=lambda r: version(r["version"]))
+phones = [t for t in runtime.get("supportedDeviceTypes", []) if t.get("productFamily") == "iPhone"]
+if not phones:
+    sys.exit("the runtime %s supports no iPhone" % runtime["name"])
+phone = max(phones, key=lambda t: model(t["identifier"]))
+print("create", phone["identifier"], runtime["identifier"], phone["name"], sep="\t")
+'
+
+# Sets SIMULATOR_ID and SIMULATOR_NAME; creates an iPhone simulator when none is installed. Every
+# later step addresses the simulator by its UDID, so other simulators that run on the same Mac
+# (booted or not, with the same name or not) are never touched.
+choose_simulator() {
+  local choice action rest device_type runtime
+  [[ -z "${SIMULATOR_ID}" ]] || return 0
+  command -v python3 >/dev/null || die "'python3' not found (ships with the Xcode command line tools)"
+  choice="$(xcrun simctl list --json | python3 -c "${SIMULATOR_CHOICE}" "${IOS_SIMULATOR:-}" "${DEFAULT_SIMULATOR}")" ||
+    die "no simulator to run on (see above); pick an installed one with IOS_SIMULATOR=\"<name>\" ('xcrun simctl list devices available')"
+  IFS=$'\t' read -r action rest <<<"${choice}"
+  case "${action}" in
+    use) IFS=$'\t' read -r SIMULATOR_ID SIMULATOR_NAME <<<"${rest}" ;;
+    create)
+      IFS=$'\t' read -r device_type runtime SIMULATOR_NAME <<<"${rest}"
+      log "No iPhone simulator is installed; creating '${SIMULATOR_NAME}' (${runtime})"
+      SIMULATOR_ID="$(xcrun simctl create "${SIMULATOR_NAME}" "${device_type}" "${runtime}")" ;;
+    *) die "unexpected simulator choice '${choice}'" ;;
+  esac
+  log "Simulator: ${SIMULATOR_NAME} (${SIMULATOR_ID})"
+}
+
 # Boots the simulator and allows the microphone. The audio tests open the microphone side of the
 # audio unit; allowed up front, the simulator does not put the system's permission question
 # over the tests. Never a reason to fail.
 prepare_simulator() {
-  local available
-  available="$(xcrun simctl list devices available)"
-  if ! grep -qF "    ${SIMULATOR_NAME} (" <<<"${available}"; then
-    printf '%s\n' "${available}" >&2
-    die "simulator '${SIMULATOR_NAME}' is not installed; pick one from the list above with IOS_SIMULATOR=\"<name>\""
-  fi
-  xcrun simctl boot "${SIMULATOR_NAME}" 2>/dev/null || true
+  choose_simulator
+  xcrun simctl boot "${SIMULATOR_ID}" 2>/dev/null || true
   # A cold simulator on a fresh machine takes minutes; wait here, where it shows in the log.
-  xcrun simctl bootstatus "${SIMULATOR_NAME}" -b >/dev/null
-  xcrun simctl privacy booted grant microphone app.mumcord.mobile ||
+  xcrun simctl bootstatus "${SIMULATOR_ID}" -b >/dev/null
+  xcrun simctl privacy "${SIMULATOR_ID}" grant microphone app.mumcord.mobile ||
     log "warning: could not allow the microphone in the simulator"
 }
 
@@ -137,11 +209,11 @@ warm_up_app() {
     return 0
   fi
   log "Warming up the app in the simulator"
-  if xcrun simctl install booted "${app}" &&
-    xcrun simctl launch booted app.mumcord.mobile -mumcordFakeEngine plain -mumcordSetupDone YES >/dev/null; then
+  if xcrun simctl install "${SIMULATOR_ID}" "${app}" &&
+    xcrun simctl launch "${SIMULATOR_ID}" app.mumcord.mobile -mumcordFakeEngine plain -mumcordSetupDone YES >/dev/null; then
     # Long enough for the first screen of a cold start to be drawn.
     sleep 15
-    xcrun simctl terminate booted app.mumcord.mobile || true
+    xcrun simctl terminate "${SIMULATOR_ID}" app.mumcord.mobile || true
   else
     log "warning: could not warm up the app in the simulator"
   fi
@@ -156,7 +228,7 @@ test_group() {
   rm -rf "${bundle}"
   xcodebuild test-without-building \
     -testProductsPath "${TEST_PRODUCTS}" \
-    -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
+    -destination "platform=iOS Simulator,id=${SIMULATOR_ID}" \
     -resultBundlePath "${bundle}" \
     "${selection[@]}"
 }
@@ -245,10 +317,11 @@ if [[ "${mode}" == build-for-testing || "${mode}" == test ]]; then
   # A test products bundle carries everything the tests need, so another machine can run them
   # without building.
   rm -rf "${TEST_PRODUCTS}"
+  choose_simulator
   xcodebuild build-for-testing \
     -project "${IOS_DIR}/Mumcord.xcodeproj" \
     -scheme Mumcord \
-    -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
+    -destination "platform=iOS Simulator,id=${SIMULATOR_ID}" \
     -derivedDataPath "${BUILD_DIR}/DerivedData" \
     -testProductsPath "${TEST_PRODUCTS}"
 fi

@@ -38,8 +38,8 @@ defaults:
 
 env:
   CARGO_TERM_COLOR: always
-  # Must exist in the Xcode of the runner image below.
-  IOS_SIMULATOR: iPhone 17
+  # No IOS_SIMULATOR: scripts/build-ios.sh takes "iPhone 17" when the runner has it and another
+  # available iPhone simulator when not; a fixed name would fail on a runner without it.
 
 jobs:
   # Fails at once when a UI test class belongs to no group, and hands the groups to the matrix.
