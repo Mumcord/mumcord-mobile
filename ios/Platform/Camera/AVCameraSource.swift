@@ -13,7 +13,12 @@ import UIKit
 @MainActor
 final class AVCameraSource: CameraSource {
     let facings: Set<CameraFacing>
-    private let capture: CameraRunner
+    private let frames: CameraFrames
+    private lazy var capture = CameraRunner(frames: frames) { [weak self] in
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { self?.notOpen() }
+        }
+    }
     private let onTrouble: (CameraTrouble) -> Void
     private let log: @Sendable (String) -> Void
     /// The camera the caller wants while it runs; nil while stopped.
@@ -26,7 +31,7 @@ final class AVCameraSource: CameraSource {
     private var errorObserver: NSObjectProtocol?
 
     init(frames: CameraFrames, onTrouble: @escaping (CameraTrouble) -> Void, log: @escaping @Sendable (String) -> Void) {
-        capture = CameraRunner(frames: frames)
+        self.frames = frames
         self.onTrouble = onTrouble
         self.log = log
         facings = Set(CameraFacing.allCases.filter { Self.device(facing: $0) != nil })
@@ -76,6 +81,13 @@ final class AVCameraSource: CameraSource {
         AnyView(CameraPreview(session: capture.session, device: device))
     }
 
+    /// The engine refuses the pictures: it has closed the camera, so the camera stops.
+    private func notOpen() {
+        guard wanted != nil else { return }
+        log("camera: the engine has not opened the camera")
+        onTrouble(.notOpen)
+    }
+
     /// A camera taken by another app or by the system (a call, multitasking) only interrupts the
     /// session, which goes on by itself afterwards; meanwhile no frames come and sharing stays
     /// on. A reset of the media services is recovered once; anything else ends sharing.
@@ -116,12 +128,12 @@ private final class CameraRunner: NSObject, AVCaptureVideoDataOutputSampleBuffer
     private let output = AVCaptureVideoDataOutput()
     private let sessionQueue = DispatchQueue(label: "app.mumcord.mobile.camera-session")
     private let framesQueue = DispatchQueue(label: "app.mumcord.mobile.camera-frames")
-    private let frames: CameraFrames
-    /// Only read and written on `framesQueue`.
-    private var rotation: UInt32 = 0
+    /// Only used on `framesQueue`.
+    private let feed: CameraFrameFeed
 
-    init(frames: CameraFrames) {
-        self.frames = frames
+    /// - Parameter notOpen: called on the frame queue when the engine has not opened the camera.
+    init(frames: CameraFrames, notOpen: @escaping @Sendable () -> Void) {
+        feed = CameraFrameFeed(frames: frames, notOpen: notOpen)
         super.init()
         // NV12, which the engine's push reads in place; late frames are dropped, never queued.
         output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
@@ -152,6 +164,7 @@ private final class CameraRunner: NSObject, AVCaptureVideoDataOutputSampleBuffer
                 session.addOutput(output)
             }
             session.commitConfiguration()
+            framesQueue.async { [feed] in feed.restart() }
             if !session.isRunning { session.startRunning() }
             opened(true)
         }
@@ -175,12 +188,12 @@ private final class CameraRunner: NSObject, AVCaptureVideoDataOutputSampleBuffer
     }
 
     func setRotation(_ degrees: UInt32) {
-        framesQueue.async { [self] in rotation = degrees }
+        framesQueue.async { [feed] in feed.rotation = degrees }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let pixels = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        frames.push(pixels, rotation: rotation)
+        feed.push(pixels)
     }
 }
 

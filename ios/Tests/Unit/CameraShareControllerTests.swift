@@ -204,6 +204,34 @@ final class CameraShareControllerTests: XCTestCase {
         XCTAssertEqual(model.uiState.session.ownCamera, cameraOff)
     }
 
+    func testAConnectionEndingClosesTheCameraEvenIfTheEngineNeverStopsIt() async {
+        let (model, controller) = await connected()
+        controller.open()
+        await assertEventually { self.sources.first?.running == .front }
+        controller.start()
+        await assertEventually { controller.uiState.sharing != nil }
+
+        // The connection ends, but the engine never stops the app's camera.
+        engine.emit(.connectionChanged(state: .disconnected(error: .ServerUnreachable(detail: "gone"))))
+        await assertEventually { model.uiState.session.ownCamera == cameraOff }
+        await assertEventually { self.source.running == nil }
+        XCTAssertNil(camera.source, "the camera is let go")
+        XCTAssertFalse(controller.uiState.on)
+    }
+
+    func testACameraTheEngineHasNotOpenedStopsWithoutANotice() async {
+        let (_, controller) = await connected()
+        controller.open()
+        await assertEventually { self.sources.first?.running == .front }
+
+        // The engine refuses the pictures (MUMCORD_CAMERA_NOT_OPEN) and its stop never arrives.
+        source.trouble(.notOpen)
+        XCTAssertNil(source.running)
+        XCTAssertNil(camera.source)
+        XCTAssertEqual(engine.captureFailures, [], "nothing failed: the engine has closed it")
+        XCTAssertNil(controller.uiState.notice)
+    }
+
     func testTheCameraIsExplainedBeforeTheSystemAsksForIt() async {
         let gateway = FakeCameraGateway(permission: .undetermined, answer: true)
         let (_, controller) = await connected(permission: gateway)

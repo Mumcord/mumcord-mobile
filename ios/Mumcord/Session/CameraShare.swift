@@ -6,10 +6,12 @@ import Observation
 
 /// The phone's camera for sharing it (FR-5.74, FR-5.75). The engine decides when the camera is
 /// open (from the preview until sharing ends) and says so through `CameraCapture`; this runs the
-/// camera only while the engine wants it, the app is on screen and the user sees the camera (its
-/// preview or the "Camera on" bar), so it pauses in the background and behind another sheet and
-/// resumes on return while sharing goes on (voice is unaffected). Nothing of the camera exists
-/// before the user opened the preview.
+/// camera only while the engine wants it, the app's own state shows it on, the app is on screen
+/// and the user sees the camera (its preview or the "Camera on" bar). So it pauses in the
+/// background and behind another sheet and resumes on return while sharing goes on (voice is
+/// unaffected), and it closes by itself whenever the app's state says the camera is off, also
+/// when the engine never stops it. Nothing of the camera exists before the user opened the
+/// preview.
 @MainActor
 @Observable
 final class CameraShare {
@@ -23,6 +25,10 @@ final class CameraShare {
     @ObservationIgnored private var engineWants = false
     @ObservationIgnored private var onScreen = false
     @ObservationIgnored private var visible = false
+    /// The own camera as the session last reported it.
+    @ObservationIgnored private var session = OwnCameraState.off
+    /// The preview was asked for and the session does not show it yet.
+    @ObservationIgnored private var opening = false
     /// The user turned the camera off; it stays closed until the next preview, whatever the
     /// engine still wants.
     @ObservationIgnored private var closing = false
@@ -35,6 +41,12 @@ final class CameraShare {
     init(store: SessionStore, newSource: @escaping (@escaping (CameraTrouble) -> Void) -> CameraSource) {
         self.store = store
         self.newSource = newSource
+        let states = store.states()
+        Task { [weak self] in
+            for await state in states {
+                self?.follow(state.ownCamera.state)
+            }
+        }
     }
 
     /// The cameras of the phone; empty while the camera is closed.
@@ -61,14 +73,21 @@ final class CameraShare {
     func openPreview() async -> Outcome<Void> {
         facing = .front
         closing = false
+        opening = true
         store.setCameraCapture(capture)
-        return await store.openCameraPreview()
+        let result = await store.openCameraPreview()
+        if case .failed = result {
+            opening = false
+            follow()
+        }
+        return result
     }
 
     /// Cancel or Stop: the camera is let go at once, also while the engine is still busy with a
     /// start.
     func close() {
         closing = true
+        opening = false
         follow()
     }
 
@@ -84,8 +103,17 @@ final class CameraShare {
         follow()
     }
 
+    /// The session's own camera changed. The connection may end without the engine stopping the
+    /// camera (a lost connection, a disconnect that timed out): the app's off is enough.
+    private func follow(_ state: OwnCameraState) {
+        guard state != session else { return }
+        session = state
+        if state != .off { opening = false }
+        follow()
+    }
+
     private func follow() {
-        let wanted = engineWants && !closing
+        let wanted = engineWants && !closing && (opening || session != .off)
         if wanted && onScreen && visible {
             let camera = source ?? newSource { [weak self] trouble in self?.trouble(trouble) }
             if source == nil { source = camera }
@@ -103,9 +131,15 @@ final class CameraShare {
         if !wanted { source = nil }
     }
 
-    /// Either trouble ends sharing; the engine tells the user that the camera stopped.
     private func trouble(_ trouble: CameraTrouble) {
-        store.cameraCaptureFailed(.cameraFailed)
+        switch trouble {
+        case .notOpen:
+            // The engine has closed the camera, even if its stop never arrives.
+            setEngineWants(false)
+        case .noCamera, .failed:
+            // Either ends sharing; the engine tells the user that the camera stopped.
+            store.cameraCaptureFailed(.cameraFailed)
+        }
     }
 }
 

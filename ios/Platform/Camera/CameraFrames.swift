@@ -7,9 +7,17 @@ import Foundation
 /// never waits.
 protocol CameraFrames: AnyObject, Sendable {
     /// Hands one picture to the engine. `rotation` is the clockwise turn in degrees (0, 90, 180,
-    /// 270) that makes it upright. Returns a `MumcordCameraPush` value.
+    /// 270) that makes it upright. Returns a `MumcordCameraPush` value (`CameraPush`).
     @discardableResult
     func push(_ pixels: CVPixelBuffer, rotation: UInt32) -> Int32
+}
+
+/// The values of `MumcordCameraPush` (`bridge/include/mumcord_camera.h`) the app acts on.
+enum CameraPush {
+    static let sent = Int32(MUMCORD_CAMERA_SENT.rawValue)
+    /// The engine has not opened the camera: the header asks to stop capturing.
+    static let notOpen = Int32(MUMCORD_CAMERA_NOT_OPEN.rawValue)
+    static let invalid = Int32(MUMCORD_CAMERA_INVALID.rawValue)
 }
 
 /// The engine's camera input, through the C function of `bridge/include/mumcord_camera.h`. The
@@ -33,7 +41,7 @@ final class EngineCameraFrames: CameraFrames, @unchecked Sendable {
     }
 
     func push(_ pixels: CVPixelBuffer, rotation: UInt32) -> Int32 {
-        let invalid = Int32(MUMCORD_CAMERA_INVALID.rawValue)
+        let invalid = CameraPush.invalid
         // The capture output is asked for NV12 (`AVCameraSource`): a Y plane and one plane of
         // interleaved U and V at half width and height.
         let format = CVPixelBufferGetPixelFormatType(pixels)
@@ -66,5 +74,32 @@ final class EngineCameraFrames: CameraFrames, @unchecked Sendable {
             uv_pixel_stride: 2
         )
         return mumcord_camera_push_frame(current, &image)
+    }
+}
+
+/// Hands every picture of the camera to the engine, on the camera's frame queue. When the
+/// engine answers that it has not opened the camera, `notOpen` is told once per run of the
+/// camera, so the camera stops as the header asks, without a call for every picture.
+final class CameraFrameFeed: @unchecked Sendable {
+    private let frames: CameraFrames
+    private let notOpen: @Sendable () -> Void
+    /// The clockwise turn that makes the pictures upright. Only on the frame queue, as all of it.
+    var rotation: UInt32 = 0
+    private var told = false
+
+    init(frames: CameraFrames, notOpen: @escaping @Sendable () -> Void) {
+        self.frames = frames
+        self.notOpen = notOpen
+    }
+
+    /// The camera runs again: a refusal is told again.
+    func restart() {
+        told = false
+    }
+
+    func push(_ pixels: CVPixelBuffer) {
+        guard frames.push(pixels, rotation: rotation) == CameraPush.notOpen, !told else { return }
+        told = true
+        notOpen()
     }
 }

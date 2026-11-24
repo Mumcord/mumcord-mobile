@@ -13,6 +13,9 @@ enum CameraTrouble: Equatable {
     case noCamera
     /// The camera could not be opened or stopped working.
     case failed
+    /// The engine refuses the pictures because it has not opened the camera
+    /// (`MUMCORD_CAMERA_NOT_OPEN`): the camera must stop, as the bridge's header asks.
+    case notOpen
 }
 
 /// Where the pictures of the shared camera come from: the phone's camera (`AVCameraSource`) or,
