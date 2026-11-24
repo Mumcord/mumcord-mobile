@@ -117,6 +117,55 @@ final class MoreStateTests: XCTestCase {
         XCTAssertFalse(try hasEarpiece([]), "no voice session")
     }
 
+    // MARK: The server list's More screen
+
+    /// The settings as the engine keeps them without a connection.
+    private func offlineSession() -> SessionState {
+        let events: [BridgeEvent] = [
+            .mobileSettingsChanged(settings: mobileSettings),
+            .appSettingsChanged(settings: appSettings),
+        ]
+        return events.reduce(SessionState()) { state, event in state.fold(event) }
+    }
+
+    private func fromServerList(_ session: SessionState, _ local: MoreLocal = MoreLocal(), output: OutputState = OutputState()) -> MoreUiState? {
+        moreUiState(
+            session: session,
+            local: local,
+            serverName: "",
+            output: output,
+            senderOnly: false,
+            extras: MoreExtras(profile: OwnProfile(name: "Me", comment: "", avatar: nil)),
+            fromServerList: true
+        )
+    }
+
+    func testTheServerListsMoreScreenExistsWithoutAConnectionAndLeavesOutTheProfile() throws {
+        XCTAssertNil(state(offlineSession()), "the More tab needs a server")
+        let more = try XCTUnwrap(fromServerList(offlineSession()))
+        XCTAssertFalse(more.connected)
+        XCTAssertNil(more.profile, "the profile lives on the server")
+        XCTAssertEqual(more.page, .main)
+
+        let connected = try XCTUnwrap(fromServerList(session()))
+        XCTAssertTrue(connected.connected, "a connection shows the More tab itself")
+    }
+
+    func testTheSettingsWithoutAConnectionLeaveOutTheLevelAndTheDefaultOutput() throws {
+        var local = MoreLocal()
+        local.page = .settings
+        let output = OutputState(available: [speaker, earpiece], current: speaker)
+        let settings = try XCTUnwrap(try XCTUnwrap(fromServerList(offlineSession(), local, output: output)).settings)
+        XCTAssertFalse(settings.connected, "no level meter")
+        XCTAssertFalse(settings.hasEarpiece, "the outputs are only known while the voice runs")
+        XCTAssertEqual(settings.app, appSettings)
+        XCTAssertEqual(settings.mobile, mobileSettings)
+
+        let connected = try XCTUnwrap(try XCTUnwrap(state(session(), local, output: output)).settings)
+        XCTAssertTrue(connected.connected)
+        XCTAssertTrue(connected.hasEarpiece)
+    }
+
     func testTheHistoryChoicesAreTheDesktops() {
         XCTAssertEqual(historyAgeDays, [nil, 7, 30, 90, 365])
     }

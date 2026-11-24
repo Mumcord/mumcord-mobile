@@ -7,7 +7,9 @@ private let fabClearance: CGFloat = 84
 
 /// The saved servers with people online and latency, and the way to add, edit, remove and
 /// connect. While `editing`, every row offers Edit and Remove instead of Connect. "Find more"
-/// leads to the public server browser.
+/// leads to the public server browser, the settings icon (mockup `01-server-list`) to what works
+/// without a connection: identities, themes and settings. The mockup's search icon is left out
+/// until searching the list exists.
 struct ServerListScreen: View {
     let rows: [ServerRow]
     let loaded: Bool
@@ -22,13 +24,17 @@ struct ServerListScreen: View {
     let onRetry: () -> Void
     let onDismissError: () -> Void
     let onOpenSettings: () -> Void
+    let onMore: () -> Void
     var onScan: () -> Void = {}
     var onBrowsePublic: () -> Void = {}
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
         MumcordScreen {
-            MumcordAppBar(title: Strings.serversTitle, large: true)
+            MumcordAppBar(title: Strings.serversTitle, large: true) {
+                MumcordIconButton(icon: MumcordIcons.settings, label: Strings.serversSettings, action: onMore)
+                    .accessibilityIdentifier("server-settings")
+            }
             if let failure {
                 FailureBanner(failure: failure, onRetry: onRetry, onDismiss: onDismissError, onOpenSettings: onOpenSettings)
             }

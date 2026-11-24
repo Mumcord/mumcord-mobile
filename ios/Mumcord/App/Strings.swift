@@ -42,6 +42,8 @@ enum Strings {
     static var serversEmptyText: String { text("servers_empty_text") }
     static var serversFindMore: String { text("servers_find_more") }
     static var serversBrowsePublic: String { text("servers_browse_public") }
+    static var serversSettings: String { text("servers_settings") }
+    static var serversMoreBack: String { text("servers_more_back") }
     static var publicTitle: String { text("public_title") }
     static var publicBack: String { text("public_back") }
     static var publicLoading: String { text("public_loading") }

@@ -41,12 +41,18 @@ struct SettingsUiState: Equatable {
     let noiseSuppression: Bool?
     /// "Earpiece" is only offered on a phone that has one.
     let hasEarpiece: Bool
+    /// False on the server list's More screen: the microphone level only moves while the voice
+    /// runs, so its row is left out there.
+    let connected: Bool
     let senderOnly: Bool
     let sheet: SettingsSheet?
 }
 
 struct MoreUiState: Equatable {
     let page: MorePage
+    /// False for the server list's More screen, which shows only what works without a server:
+    /// no profile, activity, blocked people or Disconnect.
+    let connected: Bool
     let serverName: String
     /// Entries by others since the log was last looked at.
     let activityBadge: Int
@@ -72,16 +78,19 @@ struct MoreExtras: Equatable {
     var themes = ThemesLocal()
 }
 
-/// The More tab as a value, or nil while no server is shown.
+/// The More tab as a value; with `fromServerList` and no server shown, the server list's More
+/// screen. Nil while neither is shown.
 func moreUiState(
     session: SessionState,
     local: MoreLocal,
     serverName: String,
     output: OutputState,
     senderOnly: Bool,
-    extras: MoreExtras = MoreExtras()
+    extras: MoreExtras = MoreExtras(),
+    fromServerList: Bool = false
 ) -> MoreUiState? {
-    guard session.showsServer else { return nil }
+    let connected = session.showsServer
+    guard connected || fromServerList else { return nil }
     var settings: SettingsUiState?
     if local.page == .settings, let mobile = session.mobileSettings, let app = session.appSettings {
         settings = SettingsUiState(
@@ -89,20 +98,25 @@ func moreUiState(
             app: app,
             talkMode: session.talkMode,
             noiseSuppression: local.noiseSuppression,
-            hasEarpiece: output.available.contains { $0.kind == .earpiece },
+            // Which outputs the phone has is only known while a voice session runs, so
+            // "Default audio output" waits for one.
+            hasEarpiece: connected && output.available.contains { $0.kind == .earpiece },
+            connected: connected,
             senderOnly: senderOnly,
             sheet: local.sheet
         )
     }
     return MoreUiState(
         page: local.page,
+        connected: connected,
         serverName: serverName,
         activityBadge: local.page == .activity ? 0 : unseenActivity(session.activity, seenId: local.seenActivityId),
         activity: session.activity,
         filter: local.filter,
         settings: settings,
-        profile: extras.profile,
-        profileEdit: local.page == .editProfile
+        // The profile lives on the server.
+        profile: connected ? extras.profile : nil,
+        profileEdit: connected && local.page == .editProfile
             ? extras.profile.flatMap { own in extras.profileEdit.map { profileEditUiState(own: own, edit: $0) } }
             : nil,
         themeName: appThemeName(session),

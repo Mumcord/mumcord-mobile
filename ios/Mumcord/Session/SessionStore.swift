@@ -762,9 +762,12 @@ final class SessionStore: @unchecked Sendable {
         reportFailure()
     }
 
-    /// Shows a failed command of the connected screens like a refusal by the server.
+    /// Shows a failed command of the connected screens like a refusal by the server. Without a
+    /// connection (the server list's More screen) there is no banner for it, and a refusal kept
+    /// until then would show up wrongly on the next connection; the failure is logged by `call`.
     func reportFailure() {
         update { state in
+            guard state.showsServer else { return state }
             var next = state
             next.denied = DeniedAction(channelId: nil, detail: "")
             return next

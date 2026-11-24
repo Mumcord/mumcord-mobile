@@ -3,9 +3,9 @@
 import MumcordBridge
 import Observation
 
-/// What the user does on the More tab: the profile, the themes, the activity log and the
-/// settings. Every setting is saved at once; a failure is shown like a refusal. The end of a
-/// connection starts it afresh.
+/// What the user does on the More tab and on the server list's More screen: the profile, the
+/// themes, the activity log and the settings. Every setting is saved at once; a failure is shown
+/// like a refusal. The start and the end of a connection start it afresh.
 ///
 /// An object of its own, apart from `AppModel`, like the Messages tab: only the More tab's own
 /// views read it.
@@ -39,12 +39,15 @@ final class MoreController {
         themes = ThemesController(store: store)
         let states = store.states()
         Task { [weak self] in
+            // Only the start and the end of a connection start the screens afresh: the server
+            // list's More screen changes settings without one, and each change is a new state.
+            var shown = false
             for await state in states {
                 guard let self else { return }
-                if !state.showsServer {
-                    if self.local != MoreLocal() { self.local = MoreLocal() }
-                    self.themes.reset()
-                }
+                guard state.showsServer != shown else { continue }
+                shown = state.showsServer
+                if self.local != MoreLocal() { self.local = MoreLocal() }
+                self.themes.reset()
             }
         }
         profile.onClosed = { [weak self] in self?.back() }
@@ -57,15 +60,22 @@ final class MoreController {
         }
     }
 
-    /// The More tab as a value, or nil while no server is shown.
-    func uiState(session: SessionState, serverName: String, output: OutputState) -> MoreUiState? {
+    /// The More tab as a value; with `fromServerList` and no server shown, the server list's
+    /// More screen. Nil while neither is shown.
+    func uiState(
+        session: SessionState,
+        serverName: String,
+        output: OutputState,
+        fromServerList: Bool = false
+    ) -> MoreUiState? {
         moreUiState(
             session: session,
             local: local,
             serverName: serverName,
             output: output,
             senderOnly: senderOnly,
-            extras: MoreExtras(profile: profile.own, profileEdit: profile.edit, themes: themes.local)
+            extras: MoreExtras(profile: profile.own, profileEdit: profile.edit, themes: themes.local),
+            fromServerList: fromServerList
         )
     }
 

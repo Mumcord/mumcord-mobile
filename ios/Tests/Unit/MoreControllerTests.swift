@@ -318,4 +318,92 @@ final class MoreControllerTests: XCTestCase {
         XCTAssertNil(model.moreUiState)
         XCTAssertEqual(model.uiState.session.activity, [])
     }
+
+    // MARK: The server list's More screen
+
+    /// A model on the server list, not connected.
+    private func makeOnServerList() async -> AppModel {
+        let store = makeStore(box, server: mockupVoiceServer(), servers: [savedServer(1, "Nordlicht")])
+        let model = PhoneFakes().makeModel(
+            store: store,
+            setupStore: InMemorySetupStore(firstStartDone: true),
+            messageSettings: messageSettings
+        )
+        await assertEventually { model.uiState.session.serversLoaded && model.uiState.session.appSettings != nil }
+        return model
+    }
+
+    func testTheSettingsIconOpensTheMoreScreenWithoutAConnectionAndBackLeadsToTheList() async throws {
+        let model = await makeOnServerList()
+        XCTAssertEqual(model.uiState.screen, .serverList)
+        XCTAssertNil(model.moreUiState)
+
+        model.toggleEditing()
+        model.openMore()
+        XCTAssertEqual(model.uiState.screen, .more)
+        XCTAssertFalse(model.uiState.editing, "the list is no longer edited behind it")
+        let more = try XCTUnwrap(model.moreUiState)
+        XCTAssertFalse(more.connected)
+        XCTAssertNil(more.profile)
+
+        model.identities.open()
+        XCTAssertEqual(model.uiState.screen, .identities)
+        model.identities.close()
+        XCTAssertEqual(model.uiState.screen, .more, "the identities lead back to the More screen")
+
+        model.more.openThemes()
+        await assertEventually { model.moreUiState?.themes != nil }
+        model.more.back()
+        XCTAssertEqual(model.moreUiState?.page, .main)
+
+        model.closeMore()
+        XCTAssertEqual(model.uiState.screen, .serverList)
+        XCTAssertNil(model.moreUiState)
+    }
+
+    /// Every saved setting is a new state of the session; without a connection none of them may
+    /// close the settings again.
+    func testSettingsChangedWithoutAConnectionAreSavedAndTheScreenStaysOpen() async throws {
+        let model = await makeOnServerList()
+        model.openMore()
+        model.more.openSettings()
+        await assertEventually { self.settings(model)?.noiseSuppression != nil }
+
+        model.more.changeMobile { $0.idleDisconnect = true }
+        model.more.changeApp { $0.notifyMentions = false }
+        model.more.setNoiseSuppression(true)
+        model.more.selectTalkMode(.pushToTalk)
+        await assertEventually {
+            self.engine.storedMobileSettings.idleDisconnect && !self.engine.storedAppSettings.notifyMentions
+                && self.engine.noiseSuppression && model.uiState.session.talkMode == .pushToTalk
+        }
+        await assertEventually { self.settings(model)?.mobile.idleDisconnect == true }
+        let shown = try XCTUnwrap(settings(model))
+        XCTAssertEqual(model.moreUiState?.page, .settings)
+        XCTAssertFalse(shown.connected)
+        XCTAssertFalse(shown.hasEarpiece)
+        XCTAssertEqual(shown.talkMode, .pushToTalk)
+    }
+
+    func testAFailedSettingWithoutAConnectionIsNotKeptForTheNextConnection() async {
+        let model = await makeOnServerList()
+        model.openMore()
+        model.more.openSettings()
+        model.store.reportFailure()
+        XCTAssertNil(model.uiState.session.denied, "no banner without a server, and none later")
+    }
+
+    func testAConnectionClosesTheMoreScreenAndItsEndLeadsToTheList() async {
+        let model = await makeOnServerList()
+        model.openMore()
+        model.more.openSettings()
+
+        model.connect(1)
+        await assertEventually { model.uiState.screen == .channels }
+        await assertEventually { model.more.local == MoreLocal() }
+        XCTAssertEqual(model.moreUiState?.connected, true)
+
+        model.disconnect()
+        await assertEventually { model.uiState.screen == .serverList }
+    }
 }

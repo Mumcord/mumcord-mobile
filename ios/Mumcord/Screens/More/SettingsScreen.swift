@@ -14,7 +14,8 @@ private let defaultOutputs: [DefaultOutput] = [.ask, .speaker, .earpiece]
 /// (the phone's own voice processing does it, there is nothing to switch), link previews (the
 /// chat shows none yet), language and about. Dark, light or system is chosen on the themes
 /// screen (mockup `19-themes`). The level meter, the "Chat" section and the note under
-/// "Notifications" have no mockup.
+/// "Notifications" have no mockup. Opened from the server list, without a connection, the level
+/// meter and "Default audio output" are left out: both need a running voice session.
 struct SettingsScreen: View {
     let state: SettingsUiState
     let actions: MoreController
@@ -88,12 +89,15 @@ struct SettingsScreen: View {
                     onCheckedChange: actions.setNoiseSuppression
                 )
             }
-            MumcordListRow(
-                title: Strings.voiceLevel,
-                icon: MumcordIcons.volume,
-                divider: true,
-                trailing: { SettingsLevelMeter(level: inputLevel) }
-            )
+            // The level only moves while the voice runs: not on the server list's More screen.
+            if state.connected {
+                MumcordListRow(
+                    title: Strings.voiceLevel,
+                    icon: MumcordIcons.volume,
+                    divider: true,
+                    trailing: { SettingsLevelMeter(level: inputLevel) }
+                )
+            }
             if state.hasEarpiece {
                 SettingsValueRow(
                     title: Strings.settingsDefaultOutput,

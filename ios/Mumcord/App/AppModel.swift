@@ -201,6 +201,11 @@ final class AppModel {
             // The whisper bar goes away with the person or channel it is for.
             closeWhisper()
         }
+        if state.showsServer && local.moreOpen {
+            // A connection (from a link, say) brings its own More tab; the end of it leads back
+            // to the server list, not to the More screen left behind.
+            local.moreOpen = false
+        }
         if whisperEnded {
             // The engine ended the whisper by itself and already talks to the channel again,
             // so there is nothing to stop: only the bar goes away.
@@ -238,12 +243,14 @@ final class AppModel {
         messages.uiState(session: session, notificationsGranted: notificationState.granted)
     }
 
-    /// The More tab as a value, or nil while no server is shown. Only its own views read it.
+    /// The More tab as a value, or the server list's More screen while that is open; nil
+    /// otherwise. Only their own views read it.
     var moreUiState: MoreUiState? {
         more.uiState(
             session: session,
             serverName: local.activeServerName(session) ?? "",
-            output: outputNotice.state
+            output: outputNotice.state,
+            fromServerList: local.moreOpen
         )
     }
 
@@ -442,6 +449,19 @@ final class AppModel {
                 }
             }
         }
+    }
+
+    // MARK: More without a connection
+
+    /// The settings icon of the server list: the More screen with what works without a server.
+    func openMore() {
+        local.editing = false
+        local.moreOpen = true
+    }
+
+    func closeMore() {
+        more.back()
+        local.moreOpen = false
     }
 
     // MARK: Public servers

@@ -36,6 +36,8 @@
 "servers_empty_text" = "Add a Mumble server to start talking.";
 "servers_find_more" = "Find more";
 "servers_browse_public" = "Browse public servers";
+"servers_settings" = "Settings";
+"servers_more_back" = "Back to the server list";
 "public_title" = "Public servers";
 "public_back" = "Back to the server list";
 "public_loading" = "Loading the list…";

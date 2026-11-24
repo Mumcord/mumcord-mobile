@@ -3,10 +3,12 @@
 import SwiftUI
 
 /// The More tab: connects its screens to the model. It reads the tab's own state, so a new
-/// activity entry redraws this view and not the channel list.
+/// activity entry redraws this view and not the channel list. With `onBack` it is the server
+/// list's More screen, without a connection.
 struct MoreTab: View {
     let model: AppModel
     let onDisconnect: () -> Void
+    var onBack: (() -> Void)?
     @State private var clock = ChatClock()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -37,7 +39,8 @@ struct MoreTab: View {
                             actions: model.more,
                             onBlocked: model.messages.openBlocked,
                             onIdentities: model.identities.open,
-                            onDisconnect: onDisconnect
+                            onDisconnect: onDisconnect,
+                            onBack: onBack
                         )
                     }
                 }
@@ -51,20 +54,23 @@ struct MoreTab: View {
 }
 
 /// The sheet of a setting, of the profile or of the themes when one is open, else the sheets of
-/// messages and chat, over the whole screen. There is never more than one.
+/// messages and chat, over the whole screen. There is never more than one. Also over the
+/// server list's More screen, which has no messages or chat.
 struct MoreOverlayHost: View {
     let model: AppModel
 
     var body: some View {
-        let more = model.connectedLocal.tab == .more ? model.moreUiState : nil
+        let state = model.moreUiState
+        let fromServerList = state?.connected == false
+        let more = fromServerList || model.connectedLocal.tab == .more ? state : nil
         if let edit = more?.profileEdit {
             // Also without an open sheet: it holds the photo library and the camera.
             ProfileOverlays(state: edit, actions: model.more.profile)
         } else if let themes = more?.themes, themes.sheet != nil {
             ThemesSheetHost(state: themes, actions: model.more.themes)
-        } else if let settings = model.moreUiState?.settings, settings.sheet != nil {
+        } else if let settings = state?.settings, settings.sheet != nil {
             SettingsSheetHost(state: settings, actions: model.more)
-        } else {
+        } else if !fromServerList {
             MessagesOverlayHost(model: model)
         }
     }

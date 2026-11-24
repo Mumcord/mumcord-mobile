@@ -9,28 +9,39 @@ private let maxBadge = 99
 /// log, the identities, the themes, the blocked people (not in the mockup; it has no other
 /// place), the settings, and leaving the server. Left out until their features exist: "About
 /// Mumcord" and "Server information".
+///
+/// Without a connection (`state.connected` false) it is the screen behind the server list's
+/// settings icon, with a back button and only the identities, the themes and the settings:
+/// the profile, the activity log and Disconnect belong to a server, and the blocked people
+/// are the ones of the identity used on the connection.
 struct MoreScreen: View {
     let state: MoreUiState
     let actions: MoreController
     let onBlocked: () -> Void
     let onIdentities: () -> Void
     let onDisconnect: () -> Void
+    /// Back to the server list; only without a connection.
+    var onBack: (() -> Void)?
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
         VStack(spacing: 0) {
-            MumcordAppBar(title: Strings.tabMore, large: true)
+            if let onBack {
+                MumcordAppBar(title: Strings.tabMore, onBack: onBack, backLabel: Strings.serversMoreBack)
+            } else {
+                MumcordAppBar(title: Strings.tabMore, large: true)
+            }
             ScrollView {
                 VStack(spacing: MumcordSpace.s3) {
                     if let profile = state.profile {
                         ProfileCard(profile: profile, onEdit: actions.openProfile)
                     }
                     MumcordList {
-                        activityRow
+                        if state.connected { activityRow }
                         MumcordListRow(
                             title: Strings.identitiesTitle,
                             icon: MumcordIcons.key,
-                            divider: true,
+                            divider: state.connected,
                             action: onIdentities,
                             trailing: { chevron }
                         )
@@ -46,14 +57,16 @@ struct MoreScreen: View {
                             }
                         )
                         .accessibilityIdentifier("more-themes")
-                        MumcordListRow(
-                            title: Strings.moreBlocked,
-                            icon: MumcordIcons.shield,
-                            divider: true,
-                            action: onBlocked,
-                            trailing: { chevron }
-                        )
-                        .accessibilityIdentifier("more-blocked")
+                        if state.connected {
+                            MumcordListRow(
+                                title: Strings.moreBlocked,
+                                icon: MumcordIcons.shield,
+                                divider: true,
+                                action: onBlocked,
+                                trailing: { chevron }
+                            )
+                            .accessibilityIdentifier("more-blocked")
+                        }
                         MumcordListRow(
                             title: Strings.settingsTitle,
                             icon: MumcordIcons.settings,
@@ -63,14 +76,16 @@ struct MoreScreen: View {
                         )
                         .accessibilityIdentifier("more-settings")
                     }
-                    MumcordList {
-                        MumcordListRow(
-                            title: Strings.moreDisconnect(state.serverName),
-                            icon: MumcordIcons.phoneOff,
-                            danger: true,
-                            action: onDisconnect
-                        )
-                        .accessibilityIdentifier("more-disconnect")
+                    if state.connected {
+                        MumcordList {
+                            MumcordListRow(
+                                title: Strings.moreDisconnect(state.serverName),
+                                icon: MumcordIcons.phoneOff,
+                                danger: true,
+                                action: onDisconnect
+                            )
+                            .accessibilityIdentifier("more-disconnect")
+                        }
                     }
                 }
                 .padding(.top, MumcordSpace.s2)

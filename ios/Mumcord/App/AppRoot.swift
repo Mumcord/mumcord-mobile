@@ -67,7 +67,7 @@ struct AppContent: View {
         let identitySheet = uiState.screen == .identities || uiState.screen == .identitySetup ? uiState.identities.sheet : nil
         let cameraQuestion = uiState.screen == .scan && uiState.identities.scan?.camera == .explain
         let settingsSheet = model.more.local.sheet != nil
-        let moreSheet = uiState.connected?.tab == .more && model.more.sheetOpen
+        let moreSheet = (uiState.connected?.tab == .more || uiState.screen == .more) && model.more.sheetOpen
         let serverThemeSheet = uiState.screen == .serverForm ? uiState.form.flatMap { $0.themeSheet ? $0 : nil } : nil
         let allThemes = uiState.session.builtInThemes + (uiState.session.themes?.customThemes ?? [])
         let streams = model.streams.uiState
@@ -126,7 +126,7 @@ struct AppContent: View {
                 CameraShareSheet(sheet: cameraSheet, controller: camera)
             } else if let connectedSheet {
                 ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model), model: model)
-            } else if uiState.connected != nil {
+            } else if uiState.connected != nil || uiState.screen == .more {
                 MoreOverlayHost(model: model)
             }
         }
@@ -197,11 +197,17 @@ struct AppContent: View {
                 onRetry: model.retry,
                 onDismissError: model.dismissError,
                 onOpenSettings: model.openSettings,
+                onMore: model.openMore,
                 onScan: model.identities.openScan,
                 onBrowsePublic: model.openPublicServers
             )
         case .publicServers:
             PublicServersHost(model: model)
+        case .more:
+            // The connected shell draws the backdrop behind the More tab; here it is drawn alone.
+            MumcordScreen {
+                MoreTab(model: model, onDisconnect: model.disconnect, onBack: model.closeMore)
+            }
         case .serverForm:
             if let form = uiState.form {
                 ServerFormScreen(
