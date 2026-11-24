@@ -60,7 +60,8 @@ group_tests() {
   case "$1" in
     app-screens)
       printf '%s\n' MumcordUITests/AppScreenshotUITests MumcordUITests/DesignReferenceUITests \
-        MumcordUITests/LaunchUITests ;;
+        MumcordUITests/LaunchUITests MumcordUITests/PublicServersFlowUITests \
+        MumcordUITests/PublicServersScreenshotUITests ;;
     core)
       printf '%s\n' MumcordTests MumcordUITests/AppFlowUITests MumcordUITests/VoiceFlowUITests ;;
     voice-chat-screens)

@@ -46,6 +46,7 @@ struct MumcordApp: App {
                 AppRoot(model: model, theme: theme)
                     .overlay(alignment: .topLeading) {
                         if let probe = AppDebugLaunch.cameraProbe { FakeCameraProbeView(probe: probe) }
+                        if let probe = AppDebugLaunch.publicListProbe { FakePublicListProbeView(probe: probe) }
                     }
             }
             #else

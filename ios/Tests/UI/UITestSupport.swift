@@ -54,12 +54,14 @@ extension XCUIApplication {
 extension XCTestCase {
     /// Starts the app against the fake engine with canned data (`AppDebugLaunch`). `locale` is
     /// the region whose formats the app uses for dates, such as "en_US"; the simulator's when nil.
+    /// `textSize` is a Dynamic Type size such as "UICTContentSizeCategoryAccessibilityL".
     func launchApp(
         _ options: String,
         setupDone: Bool = true,
         theme: String = "dark",
         identitiesPreset: String? = nil,
-        locale: String? = nil
+        locale: String? = nil,
+        textSize: String? = nil
     ) -> XCUIApplication {
         let app = XCUIApplication()
         var arguments = ["-mumcordFakeEngine", options]
@@ -67,6 +69,7 @@ extension XCTestCase {
         arguments += ["-mumcordTheme", theme]
         if let identitiesPreset { arguments += ["-mumcordIdentities", identitiesPreset] }
         if let locale { arguments += ["-AppleLocale", locale] }
+        if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
         app.launchArguments = arguments
         app.launch()
         // A cold simulator takes its time; nothing is tapped before the app is on screen.

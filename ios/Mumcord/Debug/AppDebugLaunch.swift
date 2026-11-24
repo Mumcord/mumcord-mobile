@@ -74,6 +74,16 @@ import MumcordBridge
 ///         camera-fails     the camera stops working as soon as it is shared
 ///         camera-probe     an invisible element "fake-camera" lists what the drawn camera
 ///                          was asked to do (`FakeCameraProbeView`)
+///         public           the public server list of `PublicServersMockup`, with ping answers;
+///                          without it the list is empty. Never the real list service.
+///         public-lantern   the server list holds only Lantern Guild, which is also listed
+///         public-slow      downloading the public list takes half a minute
+///         public-down      every download of the public list fails
+///         public-down-first the first download of the public list fails
+///         public-refresh-fails every download after the first that worked fails
+///         public-ping-slow a listed server takes ten seconds to answer a ping
+///         public-probe     an invisible element "fake-public-list" says how often the list was
+///                          downloaded and the listed servers pinged (`FakePublicListProbeView`)
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
@@ -143,13 +153,16 @@ struct AppDebugLaunch {
                     return changed
                 }
             }
+            var servers = options.contains("servers") ? Mockup.servers : []
+            if options.contains("public-lantern") { servers = PublicServersMockup.savedLantern }
             let engine = FakeEngine(
                 listener: listener,
                 server: server,
                 prompt: prompt,
-                servers: options.contains("servers") ? Mockup.servers : []
+                servers: servers
             )
             engine.pings = Mockup.pings
+            Self.fakePublicList(engine, options)
             if options.contains("messages") {
                 MessagesMockup.fill(engine)
             }
@@ -243,6 +256,34 @@ struct AppDebugLaunch {
 }
 
 extension AppDebugLaunch {
+    /// The public server list and its failures as the options describe them.
+    private static func fakePublicList(_ engine: FakeEngine, _ options: Set<String>) {
+        if options.contains("public") {
+            engine.publicServers = PublicServersMockup.servers
+            engine.publicPings = PublicServersMockup.pings
+        }
+        if options.contains("public-slow") {
+            engine.publicDownloadDelay = .seconds(30)
+        }
+        if options.contains("public-ping-slow") {
+            engine.publicPingDelay = .seconds(10)
+        }
+        // Enough downloads for any test; the numbers count from 1.
+        let downloads = 1...100
+        var failing: Set<Int> = []
+        if options.contains("public-down") {
+            failing.formUnion(downloads)
+        }
+        if options.contains("public-down-first") {
+            failing.insert(1)
+        }
+        if options.contains("public-refresh-fails") {
+            let firstWorking = downloads.first { !failing.contains($0) } ?? 1
+            failing.formUnion(downloads.filter { $0 > firstWorking })
+        }
+        engine.failingPublicDownloads = failing
+    }
+
     /// Mira's stream as the options describe it.
     static func stream(_ options: Set<String>) -> MumcordBridge.Stream {
         if options.contains("stream-camera") {
@@ -342,15 +383,26 @@ extension AppDebugLaunch {
     @MainActor private static var networkSession: NetworkSession?
     /// What the drawn camera was asked to do, with the option `camera-probe`.
     @MainActor private(set) static var cameraProbe: FakeCameraProbe?
+    /// What the fake engine did with the public list, with the option `public-probe`.
+    @MainActor private(set) static var publicListProbe: FakePublicListProbe?
 
     @MainActor
     func makeModel() -> AppModel {
         let factory = engineFactory
         let engine = Observed<FakeEngine?>(nil)
+        let publicProbe = options.contains("public-probe") ? FakePublicListProbe() : nil
+        Self.publicListProbe = publicProbe
         let store = SessionStore(
             engineFactory: { listener in
                 let created = try factory(listener)
-                engine.set(created as? FakeEngine)
+                let fake = created as? FakeEngine
+                engine.set(fake)
+                if let publicProbe, let fake {
+                    fake.onPublicActivity = { activity in
+                        Task { @MainActor in publicProbe.take(activity) }
+                    }
+                    fake.reportPublicActivity()
+                }
                 return created
             },
             log: AppLog.write
