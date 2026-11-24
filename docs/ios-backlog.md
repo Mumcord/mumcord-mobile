@@ -46,6 +46,14 @@ Notifications (with "Show sender only", which left More) and Chat. Differences f
 offer the earpiece; the whole settings do not fit one picture, so the screenshots show them in
 two parts.
 
+Watching screen shares and cameras (the watching half of 7.5, mirroring Android commit
+`6b3821d`): built and checked in the simulator against the fake engine, whose pictures are made in
+the app and drawn through the real Metal path. Live tile under the sharer, "Tap to watch" on mobile
+data, full screen with volume, landscape button and stop, mini window, unreachable states with
+"Try again", the direct connection question. Unit tests `StreamsStateTests` and
+`StreamsControllerTests`, UI tests `StreamsFlowUITests`, screenshots `ios-streams-*`. Differences
+from Android: no system picture-in-picture (FR-5.76), see the open points.
+
 ## Open tasks
 
 ### 2.10 Public server browser (FR-5.9, AC-5.38)
@@ -96,16 +104,12 @@ Translations (task 8.1) and the language override of task 8.3 are done on Androi
 - The language override: iOS offers the per-app language in the system settings; the app
   follows it and saves it as the shared `language` setting.
 
-### 7.5 Streams and camera (FR-5.70 … FR-5.76)
+### 7.5 Sharing the phone camera (FR-5.74, FR-5.75)
 
-Waits for the Android tasks 7.3 (watching streams) and 7.4 (camera sharing). Notes:
-
-- The video codecs are already cross-built for iOS device and simulator
-  (`scripts/build-codecs.sh`, task 7.1).
-- The bridge (task 7.2) hands decoded frames as I420 through a signal plus a C pull function
-  (no bytes through UniFFI); iOS uploads the planes into a Metal texture.
-- Nothing camera-related may load before the user taps a camera (AC-5.23); a direct
-  connection reveals the IP address to the other person, so the app asks first.
+Watching streams is built (see "State when paused"). Open is the second half, mirroring Android
+commit `c88cfd5`: the preview sheet, front and back camera, 540p30, pause in the background. The
+simulator has no camera picture: tests use the app's fake camera, the real camera is a device
+check.
 
 ### 9.2 Tablet layout and 9.4 accessibility
 
@@ -141,6 +145,14 @@ simulator app; linking for a real device is first proven here.
 - There are no iOS end-to-end tests against the local test server yet (task 10.4): the
   simulator half of `e2e/run.sh` (the same scenarios against the test server on `localhost`, run
   in the iOS CI job) and the iOS column of [acceptance.md](acceptance.md) are open.
+
+- Streams, still open on iOS: the system's picture-in-picture window when leaving the app while
+  watching (FR-5.76; needs `AVPictureInPictureController` with sample buffers, so the pictures
+  would be copied into pixel buffers, and the decoding would go on in the background); real
+  streams from the desktop app on a real iPhone (picture, sound, decoding load, rotation); an
+  end-to-end scenario with `e2e/stream-peer` against the local test server. The status bar stays
+  dark on the black full screen in the light theme. The tablet layout of a stream (right column,
+  chat strip) comes with the iPad layout.
 
 ## CI notes
 

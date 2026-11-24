@@ -7,8 +7,9 @@ FR and AC numbers to `specs/05-mobile-app-specification.md` there. The specifica
 truth; this plan adds nothing to it.
 
 State on 2026-11-24: steps 1 (moderation) and 2 (More tab, activity log, settings) are built on
-`feat/ios-backlog`, each read by a review round whose confirmed findings are fixed. Everything else
-is open.
+`feat/ios-backlog`, each read by a review round whose confirmed findings are fixed. Step 6
+(watching streams) is built on `ios/streams`, without the system's picture-in-picture window.
+Everything else is open.
 
 ## Starting point
 

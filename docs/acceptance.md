@@ -73,6 +73,16 @@ All end-to-end scenarios and instrumented tests run in CI on every push to a pul
 | AC-5.37 | Local network permission: explanation, system prompt, error with the way to settings | End-to-end `LocalNetworkFlowTest`; instrumented `AppFlowTest` |
 | AC-5.38 | Public servers from a local list: filters, ping, add, refresh keeps the list | End-to-end `PublicServersFlowTest` (the list is served inside the emulator, never the real list service); instrumented `PublicServersUiFlowTest` |
 
+## iOS so far
+
+The iOS half is checked in the simulator against the fake engine; the end-to-end scenarios
+against the local test server are open for iOS (task 10.4).
+
+| Criterion | iOS tests |
+|---|---|
+| AC-5.22 | UI flow `StreamsFlowUITests` (tile, full screen, landscape button, mini window, stop; the picture's colours are checked on screen), unit `StreamsControllerTests`. Not yet: a real share from the desktop app |
+| AC-5.23 | Unit `StreamsStateTests`, `StreamsControllerTests` (nothing is watched before the tap on mobile data, also for a camera; "Start streams automatically" starts a visible tile); UI flow `StreamsFlowUITests` (no picture before the tap) |
+
 ## Deviation from the task plan
 
 Task 10.4 names a separate workflow `.github/workflows/e2e.yml`. The end-to-end run stays in the

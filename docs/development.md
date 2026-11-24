@@ -418,7 +418,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `core` | all unit tests (`MumcordTests`), app flow, voice flow |
 | `voice-chat-screens` | voice screenshots, chat screenshots |
 | `chat-flow` | chat flow, session-ended notice, moderation flow and its screenshots, activity log flow |
-| `messages` | messages flow, messages screenshots |
+| `messages` | messages flow, messages screenshots, streams flow and its screenshots |
 | `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots and those of More and the activity log |
 | `identities` | identities and "Scan from desktop app" flow, their screenshots |
 
@@ -550,3 +550,30 @@ scanner see the QR codes of a scripted transfer (`FakeDesktopTransfer`) instead,
 `-mumcordIdentities <preset>` puts the identity screens into the states of the screenshots.
 Only a real iPhone can show the camera picture, reading the desktop's codes from a screen and the
 system's camera question; a transfer made by the desktop app is checked there by hand.
+
+### Watching streams (iOS)
+
+The streams of the people in the user's channel come from the bridge as one list
+(`StreamsChanged`); `ios/Mumcord/Screens/Streams/StreamsController.swift` decides which of them
+are watched, the same way as on Android: the stream the user opened, and a tile on screen where
+streams start by themselves (Wi-Fi, or mobile data with "Start streams automatically"). Nothing
+is watched while the app is in the background. Only the difference is told to the engine, so
+nothing is fetched before the tap on mobile data, and a camera's room stays closed until a camera
+is watched.
+
+Pictures are drawn by `ios/Platform/Video/VideoLayerView.swift` into a `CAMetalLayer`. The
+engine's `VideoSink` only schedules a redraw; a serial render queue takes the newest I420
+picture with `mumcord_video_frame_acquire` (`bridge/include/mumcord_video.h`, reached through
+the bridging header), copies the three planes straight from the engine's memory into three
+single-channel textures, gives the picture back at once and lets a BT.601 shader draw it,
+letterboxed on black. Nothing is queued and nothing is drawn on the main thread or while the view
+is off screen. The shader is compiled from source when the first picture is drawn, because
+building `.metal` files needs Xcode's separate Metal toolchain (`xcodebuild -downloadComponent
+MetalToolchain`), which CI and a fresh Mac do not have.
+
+The fake engine plays the bridge for the tests: the debug launch options `streams`,
+`stream-camera`, `stream-crowd`, `stream-question`, `stream-unreachable` and `stream-colours`
+(`ios/Mumcord/Debug/AppDebugLaunch.swift`) give Mira a stream, and `FakeVideoFrames` makes its
+pictures in the app, so the real render path draws them; `StreamsFlowUITests` checks the colours
+on screen. Only a real iPhone against the desktop app can show real streams, decoding load and
+the system's rotation.
