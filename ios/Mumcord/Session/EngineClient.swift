@@ -13,6 +13,11 @@ protocol EngineClient: AnyObject, Sendable {
     func updateServer(serverId: Int64, input: ServerInput) async throws -> SavedServer
     func removeServer(serverId: Int64) async throws
     func pingServer(serverId: Int64, refresh: Bool) async throws -> ServerPing?
+    /// A page of the public server list (FR-5.9). The list is downloaded on the first call and
+    /// with `query.refresh`, never in the background; a failed download keeps the last list.
+    func publicServers(query: PublicServerQuery) async throws -> PublicServerPage
+    /// People online, user limit and latency of a listed server, or nil when it does not answer.
+    func pingPublicServer(host: String, port: UInt16) async throws -> ServerPing?
     func connectServer(serverId: Int64, password: String?, channelPath: [String]) async throws
     func answerCertificatePrompt(fingerprint: String, trust: Bool) async throws
     func disconnect() async throws

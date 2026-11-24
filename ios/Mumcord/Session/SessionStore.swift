@@ -249,6 +249,40 @@ final class SessionStore: @unchecked Sendable {
         }
     }
 
+    // MARK: Public servers
+
+    /// The most servers the bridge returns in one page.
+    static let publicPage: UInt32 = 100
+
+    /// The whole public server list, read page by page (FR-5.9). The engine downloads it on the
+    /// first call and when `refresh` is set, otherwise it answers from the last download; a
+    /// failed download leaves that one in place.
+    func publicServers(refresh: Bool) async -> Outcome<[PublicServer]> {
+        await call("public servers") { engine in
+            var servers: [PublicServer] = []
+            while true {
+                let page = try await engine.publicServers(query: PublicServerQuery(
+                    search: "",
+                    countryCode: nil,
+                    offset: UInt32(servers.count),
+                    limit: Self.publicPage,
+                    // Only the first page may download; the others read that download.
+                    refresh: refresh && servers.isEmpty
+                ))
+                servers += page.servers
+                if page.servers.isEmpty || servers.count >= Int(page.total) { return servers }
+            }
+        }
+    }
+
+    /// People online, user limit and latency of a listed server, or nil when it does not answer.
+    func pingPublicServer(host: String, port: UInt16) async -> ServerPing? {
+        switch await call("ping public server", { try await $0.pingPublicServer(host: host, port: port) }) {
+        case .ok(let ping): ping
+        case .failed: nil
+        }
+    }
+
     func setTalkMode(_ mode: TalkMode) async -> Outcome<Void> {
         let outcome: Outcome<Void> = await call("set talk mode") { try await $0.setTalkMode(mode: mode) }
         if case .ok = outcome {

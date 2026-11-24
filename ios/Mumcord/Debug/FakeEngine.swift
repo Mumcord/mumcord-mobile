@@ -363,6 +363,119 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         }
     }
 
+    // MARK: Public servers
+
+    // The list "as the directory would give it" is `publicServers`; the app gets it in pages
+    // from the last download, as from the bridge. No list service and no server is contacted.
+
+    private var _publicServers: [PublicServer] = []
+    private var _downloadedPublic: [PublicServer]?
+    private var _publicDownloads = 0
+    private var _failingPublicDownloads: Set<Int> = []
+    private var _publicDownloadDelay: Duration?
+    private var _publicPings: [String: ServerPing] = [:]
+    private var _publicPingRequests: [String] = []
+    private var _publicPingsAnswered = 0
+    private var _publicPingDelay: Duration?
+    private var _onPublicActivity: (@Sendable (PublicActivity) -> Void)?
+
+    /// The public server list as the list service would give it.
+    var publicServers: [PublicServer] {
+        get { locked { _publicServers } }
+        set { locked { _publicServers = newValue } }
+    }
+
+    /// How often the list was downloaded: on the first call and on every refresh.
+    var publicDownloads: Int { locked { _publicDownloads } }
+
+    /// The downloads (counted from 1) that fail as an unreachable list service would; the list
+    /// downloaded before stays, as in the bridge.
+    var failingPublicDownloads: Set<Int> {
+        get { locked { _failingPublicDownloads } }
+        set { locked { _failingPublicDownloads = newValue } }
+    }
+
+    /// How long a download takes; at once when nil.
+    var publicDownloadDelay: Duration? {
+        get { locked { _publicDownloadDelay } }
+        set { locked { _publicDownloadDelay = newValue } }
+    }
+
+    /// What listed servers answer, by "host:port"; the others give no answer.
+    var publicPings: [String: ServerPing] {
+        get { locked { _publicPings } }
+        set { locked { _publicPings = newValue } }
+    }
+
+    /// Every ping of a listed server, as "host:port", in order.
+    var publicPingRequests: [String] { locked { _publicPingRequests } }
+
+    /// How many pings of listed servers have answered (or not answered) so far.
+    var publicPingsAnswered: Int { locked { _publicPingsAnswered } }
+
+    /// How long a listed server takes to answer a ping; at once when nil.
+    var publicPingDelay: Duration? {
+        get { locked { _publicPingDelay } }
+        set { locked { _publicPingDelay = newValue } }
+    }
+
+    /// Told after every download and ping how far they are, for the probe of the UI tests.
+    var onPublicActivity: (@Sendable (PublicActivity) -> Void)? {
+        get { locked { _onPublicActivity } }
+        set { locked { _onPublicActivity = newValue } }
+    }
+
+    /// Tells `onPublicActivity` how far the downloads and pings are.
+    func reportPublicActivity() {
+        let (report, activity) = locked {
+            (_onPublicActivity, PublicActivity(downloads: _publicDownloads, pings: _publicPingRequests.count, answered: _publicPingsAnswered))
+        }
+        report?(activity)
+    }
+
+    func publicServers(query: PublicServerQuery) async throws -> PublicServerPage {
+        var list = locked { query.refresh ? nil : _downloadedPublic }
+        if list == nil {
+            let (download, delay) = locked {
+                _publicDownloads += 1
+                return (_publicDownloads, _publicDownloadDelay)
+            }
+            reportPublicActivity()
+            if let delay { try await Task.sleep(for: delay) }
+            list = try locked {
+                if _failingPublicDownloads.contains(download) {
+                    throw BridgeError.ServerUnreachable(detail: "the list service is not reachable")
+                }
+                _downloadedPublic = _publicServers
+                return _publicServers
+            }
+        }
+        let search = query.search.trimmingCharacters(in: .whitespaces)
+        let matching = (list ?? []).filter { server in
+            (search.isEmpty || server.name.range(of: search, options: .caseInsensitive) != nil)
+                && (query.countryCode.map { server.countryCode.caseInsensitiveCompare($0) == .orderedSame } ?? true)
+        }
+        return PublicServerPage(
+            servers: Array(matching.dropFirst(Int(query.offset)).prefix(Int(min(query.limit, 100)))),
+            total: UInt32(matching.count)
+        )
+    }
+
+    func pingPublicServer(host: String, port: UInt16) async throws -> ServerPing? {
+        let delay = locked {
+            _publicPingRequests.append("\(host):\(port)")
+            return _publicPingDelay
+        }
+        reportPublicActivity()
+        defer { reportPublicActivity() }
+        // A ping the app cancels ends at once, without an answer it would use.
+        if let delay { try? await Task.sleep(for: delay) }
+        return locked {
+            _publicPingsAnswered += 1
+            return _publicPings["\(host):\(port)"]
+        }
+    }
+
     func joinChannel(channelId: UInt32, password: String?) async throws {
         let (denied, needed): (Bool, String?) = locked {
             _joinCalls.append((channelId, password))
