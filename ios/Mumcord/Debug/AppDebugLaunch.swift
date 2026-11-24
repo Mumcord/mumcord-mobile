@@ -62,7 +62,8 @@ import MumcordBridge
 ///         stream-camera    Mira shares her camera instead of her screen
 ///         stream-crowd     three people watch Mira's screen
 ///         stream-question  the first watch asks whether direct connections are allowed
-///         stream-unreachable a watch ends with "Stream not reachable from this network"
+///         stream-unreachable the first watch ends with "Stream not reachable from this network";
+///                          trying again gets through
 ///         stream-colours   the stream's picture is red on the left half and blue on the right,
 ///                          instead of the picture of the mockups
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
@@ -220,7 +221,7 @@ struct AppDebugLaunch {
                 engine.asksDirectConnections = true
             }
             if options.contains("stream-unreachable") {
-                engine.watchOutcome = .unreachable(reason: .noPath)
+                engine.firstWatchOutcome = .unreachable(reason: .noPath)
             }
             return engine
         }

@@ -69,11 +69,14 @@ final class StreamsFlowUITests: XCTestCase {
     }
 
     func testAStreamThatCannotBeReachedSaysWhyAndIsTriedAgain() {
-        let app = connect("metered,stream-unreachable")
+        // Only the first watch fails, so the picture after the retry proves it was tried again.
+        let app = connect("metered,stream-unreachable,stream-colours")
         app.element("stream-tile").tapCenter()
-        expectAppears(app.element("Stream not reachable from this network"))
+        let unreachable = app.element("Stream not reachable from this network")
+        expectAppears(unreachable)
         tapWhenReady(app.element("stream-retry"))
-        expectAppears(app.element("Stream not reachable from this network"))
+        expectGone(unreachable)
+        awaitColours(in: app.element("stream-full-screen"))
     }
 
     func testTheRotateButtonTurnsToLandscapeAndBack() {

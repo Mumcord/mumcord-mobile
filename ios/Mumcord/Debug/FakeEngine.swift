@@ -993,7 +993,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     // MARK: Streams
 
     // The tests set the streams with `showStreams` (or `streamsOnConnect`); a watch goes to
-    // Connecting and then to `watchOutcome`, after the direct connection question when
+    // Connecting and then to `watchOutcome` (the first one to `firstWatchOutcome` if set), after the direct connection question when
     // `asksDirectConnections`. While a stream is watched and a sink is set, the fake plays the
     // bridge's video thread and says 15 times a second that a picture is ready; the pictures
     // themselves come from `FakeVideoFrames`.
@@ -1004,6 +1004,7 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _stopCalls: [StreamKey] = []
     private var _directAnswers: [Bool] = []
     private var _watchOutcome = StreamWatch.watching(path: .direct)
+    private var _firstWatchOutcome: StreamWatch?
     private var _asksDirectConnections = false
     private var _videoSink: VideoSink?
     private var _videoSinkCalls = 0
@@ -1024,6 +1025,11 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     var watchOutcome: StreamWatch {
         get { locked { _watchOutcome } }
         set { locked { _watchOutcome = newValue } }
+    }
+    /// What the first watch turns into instead of `watchOutcome`; nil: the same as the others.
+    var firstWatchOutcome: StreamWatch? {
+        get { locked { _firstWatchOutcome } }
+        set { locked { _firstWatchOutcome = newValue } }
     }
     /// The first watch asks "Allow direct connections?" and waits for the answer.
     var asksDirectConnections: Bool {
@@ -1055,16 +1061,16 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func watchStream(session: UInt32, kind: StreamKind) async throws {
         let key = StreamKey(session: session, kind: kind)
-        let ask = locked {
+        let (ask, outcome): (Bool, StreamWatch) = locked {
             _watchCalls.append(key)
-            return _asksDirectConnections && _directAnswers.isEmpty
+            let first = _watchCalls.count == 1 ? _firstWatchOutcome : nil
+            return (_asksDirectConnections && _directAnswers.isEmpty, first ?? _watchOutcome)
         }
         try changeStream(key) { $0.watch = .connecting }
         if ask {
             emit(.directConnectionsQuestion)
             return
         }
-        let outcome = watchOutcome
         try changeStream(key) { $0.watch = outcome }
     }
 
