@@ -23,6 +23,8 @@ final class SessionStoreTests: XCTestCase {
         state.mobileSettings = box.engines.last?.mobileSettings()
         state.appSettings = box.engines.last?.appSettings()
         state.identities = box.engines.last?.savedIdentities()
+        state.themes = box.engines.last?.themeSettings()
+        state.builtInThemes = box.engines.last?.builtInThemes() ?? []
         return state
     }
 

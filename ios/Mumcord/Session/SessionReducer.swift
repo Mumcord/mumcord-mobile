@@ -96,9 +96,10 @@ extension SessionState {
             next.appSettings = settings
         case .activityAdded(let entry):
             next.activity = Array(([entry] + activity).prefix(maxActivity))
-        // The profile and theme screens (task 8.6) follow these themselves.
-        case .profileChanged, .themesChanged:
-            break
+        case .profileChanged(let session):
+            if session == server?.selfSession { next.ownProfileChanges += 1 }
+        case .themesChanged(let settings):
+            next.themes = settings
         // Messages and unread counts go to `ChatStore` and never reach this state. The rest
         // belongs to the Messages tab.
         case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,

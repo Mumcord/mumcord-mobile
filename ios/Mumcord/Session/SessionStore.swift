@@ -184,12 +184,18 @@ final class SessionStore: @unchecked Sendable {
     /// Reads the saved servers once; later changes arrive as events. A failure can be retried.
     func loadServers() async {
         if state.serversLoaded { return }
-        switch await call("load servers", { ($0.savedServers(), $0.savedIdentities()) }) {
+        // The themes come with the servers, so the first screen is drawn in the user's theme.
+        let loaded = await call("load servers") {
+            ($0.savedServers(), $0.savedIdentities(), $0.themeSettings(), $0.builtInThemes())
+        }
+        switch loaded {
         // An event that arrived in between is newer than the snapshot.
-        case .ok(let (servers, identities)):
+        case .ok(let (servers, identities, themes, builtInThemes)):
             update { state in
-                if state.serversLoaded { return state }
                 var next = state
+                if next.themes == nil { next.themes = themes }
+                next.builtInThemes = builtInThemes
+                if state.serversLoaded { return next }
                 next.servers = servers
                 next.serversLoaded = true
                 if next.identities == nil { next.identities = identities }

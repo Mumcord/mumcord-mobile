@@ -127,6 +127,8 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var connection = ConnectionState.disconnected(error: nil)
     private var storedServers: [SavedServer]
     private var nextServerId: Int64
+    /// The user's profile and the themes, kept apart (`FakeEngine+ProfileThemes.swift`).
+    let profileThemes = FakeProfileThemes()
 
     init(
         listener: EngineListener,
@@ -248,6 +250,9 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         get { locked { _deniedChannels } }
         set { locked { _deniedChannels = newValue } }
     }
+
+    /// The user's own session on the fake server.
+    var selfSession: UInt32 { server.selfSession }
 
     func emit(_ event: BridgeEvent) {
         if case .connectionChanged(let state) = event {

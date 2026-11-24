@@ -73,6 +73,27 @@ protocol EngineClient: AnyObject, Sendable {
     /// The settings shared with the desktop's settings model (notifications, chat history).
     func appSettings() -> AppSettings
     func setAppSettings(settings: AppSettings) async throws
+    /// Profiles (FR-5.80): the comment and avatar of a person on the connected server, and
+    /// editing the own ones there. A change arrives as `ProfileChanged`.
+    func personProfile(session: UInt32) async throws -> Profile
+    func setOwnComment(text: String) async throws
+    /// Image bytes, or nil to remove the avatar; the engine scales the picture itself.
+    func setOwnAvatar(image: Data?) async throws
+
+    /// Themes (FR-5.81). Every change arrives as `ThemesChanged`.
+    func themeSettings() -> ThemeSettings
+    func builtInThemes() -> [Theme]
+    /// The colours to draw with: of `themeId`, or of the app theme for nil or an unknown id.
+    func themeTokens(themeId: String?, variant: ThemeVariant) -> ThemeTokens
+    func setThemeMode(mode: ThemeMode) async throws
+    func setAppTheme(themeId: String) async throws
+    func setServerTheme(serverId: Int64, themeId: String?) async throws
+    func deleteCustomTheme(themeId: String) async throws
+    func themeShare(themeId: String) throws -> ThemeShare
+    /// Reads the first theme code in a pasted text without importing it; throws `ThemeCodeError`.
+    func themeCodePreview(text: String) throws -> ThemeCodePreview
+    func importThemeCode(text: String) async throws -> Theme
+
     /// The voice settings as they apply now; they have no event of their own.
     func voiceSettings() async throws -> VoiceSettings
     func setNoiseSuppression(on: Bool) async throws

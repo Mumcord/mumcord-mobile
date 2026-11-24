@@ -280,6 +280,20 @@ final class SessionReducerTests: XCTestCase {
         XCTAssertNil(ended.activeServerId)
     }
 
+    func testOnlyAChangeOfTheOwnProfileMakesTheProfileBeReadAgain() {
+        let state = fold(connected)
+        XCTAssertEqual(state.fold(.profileChanged(session: 10)).ownProfileChanges, 1)
+        XCTAssertEqual(state.fold(.profileChanged(session: 11)).ownProfileChanges, 0, "another person's")
+        XCTAssertEqual(SessionState().fold(.profileChanged(session: 10)).ownProfileChanges, 0, "no server shown")
+    }
+
+    func testTheThemesFollowTheEngine() {
+        let settings = ThemeSettings(mode: .dark, appThemeId: "preset:ocean", customThemes: [], serverThemes: [1: "preset:paper"])
+        let state = fold(connected + [.themesChanged(settings: settings)])
+        XCTAssertEqual(state.themes, settings)
+        XCTAssertEqual(state.fold(.connectionChanged(state: .disconnected(error: nil))).themes, settings, "not tied to the connection")
+    }
+
     func testEveryEngineErrorMapsToItsOwnConnectionError() {
         let mapping: [(BridgeError, ConnectionError)] = [
             (.NotConnected(detail: "d"), .notConnected),

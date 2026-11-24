@@ -41,6 +41,13 @@ struct SessionState: Equatable {
     var directConnectionsQuestion = false
     /// The user's own camera as the engine last reported it (FR-5.74).
     var ownCamera = cameraOff
+    /// The appearance mode and the themes; nil until they have been read.
+    var themes: ThemeSettings?
+    /// The themes that come with the app, Mumcord first; read with `themes`.
+    var builtInThemes: [Theme] = []
+    /// How often the user's own comment or avatar may have changed on the shown server; the
+    /// profile is read again each time it grows.
+    var ownProfileChanges = 0
 
     /// True once the server's channels are known and the connection is still alive.
     var showsServer: Bool {
