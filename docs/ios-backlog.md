@@ -143,9 +143,6 @@ simulator app; linking for a real device is first proven here.
   colours and no dithering (Pillow, `quantize(colors=256, method=MAXCOVERAGE, dither=NONE)`),
   a picture takes about 0.1 to 0.2 MB instead of 0.9 to 1.7 MB, and no colour is off by more
   than 7 of 255. The older sets are still as they were.
-- "Show sender only" flipped on and off very quickly: the settings are saved one after the
-  other, but that switch saves through its own task, so the order of two quick flips of this
-  one switch is not guaranteed.
 - Wording needing product review: the notification explanation sheet ("Mumcord shows private
   messages and mentions as notifications while you are connected.") and the camera permission
   text ("Mumcord uses the camera to read the codes shown by the desktop app and to take photos
