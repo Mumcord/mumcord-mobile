@@ -142,7 +142,7 @@ final class SettingsFlowUITests: XCTestCase {
 
         // The talk mode is the one of the voice view.
         tapWhenReady(app.element("Back to More"))
-        tapWhenReady(app.element(containing: "Voice connected"))
+        openVoiceViewThroughTheBar(in: app)
         expectAppears(app.element("voice-hold"))
     }
 

@@ -17,9 +17,7 @@ final class CameraShareFlowUITests: XCTestCase {
     private func voiceView(_ options: String) -> XCUIApplication {
         let app = launchApp("servers,voice-server," + options)
         tapWhenReady(app.element("Connect to Nordlicht"))
-        expectAppears(app.element("voice-bar"))
-        tapWhenReady(app.element(containing: "Voice connected"))
-        expectAppears(app.element("voice-view"))
+        openVoiceViewThroughTheBar(in: app)
         return app
     }
 

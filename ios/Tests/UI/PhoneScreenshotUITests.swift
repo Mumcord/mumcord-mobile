@@ -27,8 +27,7 @@ final class PhoneScreenshotUITests: XCTestCase {
 
     private func openVoiceView(_ app: XCUIApplication) {
         expectAppears(app.row("person-row", containing: "Jonas"))
-        tapWhenReady(app.element(containing: "Voice connected"))
-        expectAppears(app.element("voice-view"))
+        openVoiceViewThroughTheBar(in: app)
     }
 
     // MARK: States

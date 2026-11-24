@@ -169,6 +169,49 @@ extension XCTestCase {
         XCTFail("the screen does not settle", file: file, line: line)
     }
 
+    /// Waits until the element exists, lies wholly inside the app's window and keeps its frame
+    /// across two reads in a row, so a tap lands where the element is going to stay. A bar that
+    /// slides in still moves for a moment after it exists; on a slow machine that moment is long.
+    /// `isHittable` cannot tell: it reports the app's SwiftUI controls as covered (see
+    /// `tapCenter`), so the window check stands in for it.
+    func awaitSteady(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 20,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        expectAppears(element, timeout: timeout, file: file, line: line)
+        let deadline = Date().addingTimeInterval(timeout)
+        var before = element.frame
+        while Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.1)
+            let now = element.frame
+            if !now.isEmpty, now == before, app.frame.contains(now) { return }
+            before = now
+        }
+        XCTFail("does not hold still: \(element)", file: file, line: line)
+    }
+
+    /// Opens the voice view with a tap on the voice bar, the way a person does. The tap waits
+    /// until the bar has stopped moving in; a tap during its entrance can miss it (seen on GitHub's
+    /// macOS runners). If the voice view still does not open, the tap is tried once more.
+    func openVoiceViewThroughTheBar(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        let bar = app.element("voice-bar")
+        expectAppears(bar, timeout: 20, file: file, line: line)
+        let open = bar.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS %@", "Voice connected"))
+            .firstMatch
+        let voiceView = app.element("voice-view")
+        for timeout: TimeInterval in [5, 10] {
+            if voiceView.exists { return }
+            awaitSteady(open, in: app, file: file, line: line)
+            open.tapCenter()
+            if voiceView.waitForExistence(timeout: timeout) { return }
+        }
+        XCTFail("the voice bar did not open the voice view", file: file, line: line)
+    }
+
     /// Kept in the result bundle also for a passing test, so CI can publish the picture.
     func keepScreenshot(of app: XCUIApplication, named name: String) {
         let screenshot = XCTAttachment(screenshot: app.screenshot())

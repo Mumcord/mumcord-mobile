@@ -24,8 +24,7 @@ final class CameraShareScreenshotUITests: XCTestCase {
         let app = launchApp("servers," + options, theme: theme)
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.row("person-row", containing: "Jonas"))
-        tapWhenReady(app.element(containing: "Voice connected"))
-        expectAppears(app.element("voice-view"))
+        openVoiceViewThroughTheBar(in: app)
         return app
     }
 
