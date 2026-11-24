@@ -115,6 +115,9 @@ check.
 
 iPad layout after the Android tablet layout (9.1); accessibility pass (VoiceOver labels and
 order, talking announcements, Dynamic Type at 200 %, reduced motion, 44 pt targets) after 9.3.
+The stream full screen has no "Turn to landscape" button on an iPad so far: the app allows
+iPad multitasking, so iOS ignores its wish for an orientation there. The tablet layout decides
+whether a stream needs a landscape of its own on an iPad.
 
 ### 10.3 Release: TestFlight and About screen (FR-5.102)
 

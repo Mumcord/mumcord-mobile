@@ -123,12 +123,15 @@ private struct StageBottom: View {
             }
             HStack {
                 muteButton
-                MumcordStageButton(
-                    icon: MumcordIcons.maximize,
-                    label: landscape ? Strings.streamRotatePortrait : Strings.streamRotateLandscape,
-                    action: actions.toggleLandscape
-                )
-                .accessibilityIdentifier("stream-rotate")
+                // An iPad ignores the app's wish to turn, so the button would do nothing there.
+                if OrientationLock.canTurn {
+                    MumcordStageButton(
+                        icon: MumcordIcons.maximize,
+                        label: landscape ? Strings.streamRotatePortrait : Strings.streamRotateLandscape,
+                        action: actions.toggleLandscape
+                    )
+                    .accessibilityIdentifier("stream-rotate")
+                }
                 Spacer(minLength: 0)
                 MumcordStageButton(icon: MumcordIcons.monitor, label: Strings.streamCollapse, action: actions.collapse)
                 Spacer(minLength: 0)
