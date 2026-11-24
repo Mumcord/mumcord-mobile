@@ -80,7 +80,8 @@ group_tests() {
         MumcordUITests/SettingsFlowUITests MumcordUITests/MoreScreenshotUITests ;;
     identities)
       printf '%s\n' MumcordUITests/IdentitiesFlowUITests MumcordUITests/IdentitiesScreenshotUITests \
-        MumcordUITests/ProfileThemesFlowUITests ;;
+        MumcordUITests/ProfileThemesFlowUITests MumcordUITests/ServerListMoreFlowUITests \
+        MumcordUITests/ServerListMoreScreenshotUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
   esac
 }
