@@ -15,6 +15,7 @@ final class FakeProfileThemes: @unchecked Sendable {
     private var _profile = Profile(comment: nil, commentText: "", commentImages: [], avatar: nil)
     private var _ownAvatar: Data?
     private var _saveFailure: BridgeError?
+    private var _avatarFailure: BridgeError?
     private var _settings = ThemeSettings(
         mode: .system,
         appThemeId: MockupThemes.mumcordId,
@@ -42,6 +43,12 @@ final class FakeProfileThemes: @unchecked Sendable {
     var saveFailure: BridgeError? {
         get { locked { _saveFailure } }
         set { locked { _saveFailure = newValue } }
+    }
+
+    /// The next avatar change fails with this, once.
+    var avatarFailure: BridgeError? {
+        get { locked { _avatarFailure } }
+        set { locked { _avatarFailure = newValue } }
     }
 
     var settings: ThemeSettings {
@@ -79,8 +86,12 @@ final class FakeProfileThemes: @unchecked Sendable {
         }
     }
 
-    fileprivate func setAvatar(_ image: Data?) {
-        locked {
+    fileprivate func setAvatar(_ image: Data?) throws {
+        try locked {
+            if let failure = _avatarFailure {
+                _avatarFailure = nil
+                throw failure
+            }
             _ownAvatar = image
             _profile.avatar = image.map { ImageData(bytes: $0, mime: "image/png", width: 1, height: 1, animated: false) }
         }
@@ -101,7 +112,7 @@ extension FakeEngine {
     }
 
     func setOwnAvatar(image: Data?) async throws {
-        profileThemes.setAvatar(image)
+        try profileThemes.setAvatar(image)
         emit(.profileChanged(session: selfSession))
     }
 

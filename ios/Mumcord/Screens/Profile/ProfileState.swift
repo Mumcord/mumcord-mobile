@@ -17,6 +17,10 @@ enum ProfileError: Equatable {
     case avatarUnreadable
     /// The server refused or the connection failed while saving.
     case saveFailed
+    /// The engine refused the comment as too long for the server. The counter counts the typed
+    /// characters, as on Android; what is sent is the comment as Mumble HTML (an escaped `<` or
+    /// `&`, a `<br>` per line break), which can be longer.
+    case commentTooLong
 }
 
 /// The sheet of the avatar: where a new picture comes from, or removing it.

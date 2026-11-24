@@ -136,6 +136,31 @@ final class ProfileThemesTests: XCTestCase {
         XCTAssertEqual(engine.profileThemes.profile.commentText, "Hello")
     }
 
+    /// The counter counts what was typed; the engine checks the comment as Mumble HTML, where a
+    /// `<` takes four characters, so it can refuse a comment the counter let through.
+    func testACommentTheServerFindsTooLongSaysSo() async {
+        let model = await connected { $0.profileThemes.saveFailure = .InvalidInput(detail: "message length 12 exceeds the limit of 10") }
+        await assertEventually { self.ui(model)?.profile != nil }
+        model.more.openProfile()
+        model.more.profile.changeComment("<<<")
+        model.more.profile.save()
+
+        await assertEventually { self.ui(model)?.profileEdit?.edit.error == .commentTooLong }
+        XCTAssertEqual(ui(model)?.page, .editProfile)
+    }
+
+    func testARefusedPictureIsNoTooLongComment() async {
+        let model = await connected()
+        await assertEventually { self.ui(model)?.profile != nil }
+        engine.profileThemes.avatarFailure = .InvalidInput(detail: "no image")
+        model.more.openProfile()
+        model.more.profile.changeComment("Hello")
+        model.more.profile.pickAvatar(Data([9]))
+        model.more.profile.save()
+
+        await assertEventually { self.ui(model)?.profileEdit?.edit.error == .saveFailed }
+    }
+
     func testLeavingTheEditorDropsWhatWasNotSaved() async {
         let model = await connected()
         await assertEventually { self.ui(model)?.profile != nil }

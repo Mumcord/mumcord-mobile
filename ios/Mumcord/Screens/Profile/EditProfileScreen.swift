@@ -111,6 +111,7 @@ struct EditProfileScreen: View {
         switch error {
         case .avatarUnreadable: Strings.profileAvatarUnreadable
         case .saveFailed: Strings.profileSaveFailed
+        case .commentTooLong: Strings.profileTooLong
         }
     }
 }

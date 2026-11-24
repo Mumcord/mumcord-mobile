@@ -169,6 +169,11 @@ simulator app; linking for a real device is first proven here.
   you choose to send in a chat."). That text is the one iOS shows in its own camera question, and
   it does not mention sharing the camera with the channel, which the app now also does; it was
   left as it is, because neither the specification nor Android gives a text for it.
+- The comment counter counts the typed characters, as on Android, while the engine checks the
+  comment as Mumble HTML (a `<` or `&` takes four or five characters, a line break `<br>`, and
+  the engine may add its status lines). A comment the counter lets through can therefore be
+  refused; iOS then says "Can't save: your comment is too long for this server" instead of the
+  general error. Counting what will be sent needs the bridge to say it, for both apps.
 - Headset behaviour differs from Android on purpose: on iOS the system's End button always
   leaves the session, only the CallKit mute action toggles mute. Wired EarPods' single press
   therefore leaves. Decide after trying real headsets (one function, `endRequestMeans`).

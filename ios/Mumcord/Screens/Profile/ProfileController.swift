@@ -125,7 +125,9 @@ final class ProfileController {
             case .set(let image): avatar = await store.setOwnAvatar(image)
             }
             let saved: Outcome<Void>
+            var commentSent = false
             if case .ok = avatar, edit.commentChanged {
+                commentSent = true
                 saved = await store.setOwnComment(edit.comment)
             } else {
                 saved = avatar
@@ -134,12 +136,13 @@ final class ProfileController {
             case .ok:
                 // Only while the editor is still open: the user may have left it meanwhile.
                 if self.edit != nil { close() }
-            case .failed:
+            case .failed(let error):
                 guard self.edit != nil else { return }
                 // A saved avatar is not sent again with the next try.
                 if case .ok = avatar { self.edit?.avatar = .keep }
                 self.edit?.saving = false
-                self.edit?.error = .saveFailed
+                // The only input the engine refuses in a comment is one too long for the server.
+                self.edit?.error = commentSent && error == .invalidInput ? .commentTooLong : .saveFailed
             }
         }
     }
