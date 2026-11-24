@@ -140,7 +140,7 @@ on Mumcord for desktop in the same channel.
 - [ ] (iPhone) Share the camera with the phone upright, then turned sideways, with the front and with the back camera. Pass: the preview and the desktop's picture are upright each time, and the front camera's preview is mirrored while the desktop's picture is not. [AC-5.24, FR-5.74]
 - [ ] (iPhone) Watch the camera indicator (green dot). Pass: it is off before the camera button is tapped, on from the preview, and off again after Cancel, after Stop and while the app is in the background. [FR-5.74, FR-5.75]
 - [ ] (iPhone) While sharing, take a phone call, then open another app that uses the camera, and come back each time. Pass: voice behaves as in section 4, sharing stays on and the picture comes back by itself; if the camera cannot come back, the app says "Camera stopped." [FR-5.75]
-- [ ] (iPhone) The first tap on the camera button. Pass: Mumcord explains the camera first, then iOS asks; after "Don't Allow" the next tap leads to the system settings. [FR-5.74]
+- [ ] (iPhone) The first tap on the camera button. Pass: Mumcord explains the camera first, then iOS asks; after "Don't Allow" the sheet says at once that the camera can be allowed in the system settings, and "Open settings" leads there. [FR-5.74]
 - [ ] Watch a desktop screen share: full screen, rotate to landscape, go back to the floating mini window above the chat. Pass: sound and picture stay smooth, and the chat is usable. [AC-5.22]
 - [ ] Tablet: two columns in portrait and landscape; a stream fills the right column with the chat strip below. [AC-5.31]
 

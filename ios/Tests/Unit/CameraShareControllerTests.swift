@@ -232,6 +232,17 @@ final class CameraShareControllerTests: XCTestCase {
         XCTAssertNil(controller.uiState.notice)
     }
 
+    func testARefusalOfTheSystemQuestionPointsToTheSettings() async {
+        let gateway = FakeCameraGateway(permission: .undetermined, answer: false)
+        let (_, controller) = await connected(permission: gateway)
+        controller.cameraButton()
+        XCTAssertEqual(controller.question, .undetermined)
+        controller.allowCamera()
+        XCTAssertEqual(gateway.requests, 1)
+        await assertEventually { controller.question == .denied }
+        XCTAssertTrue(sources.isEmpty, "the camera is never opened without the permission")
+    }
+
     func testTheCameraIsExplainedBeforeTheSystemAsksForIt() async {
         let gateway = FakeCameraGateway(permission: .undetermined, answer: true)
         let (_, controller) = await connected(permission: gateway)

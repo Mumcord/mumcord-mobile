@@ -58,13 +58,22 @@ final class CameraShareController {
     }
 
     /// "Continue" in the explanation: the system asks, and the preview opens once it is allowed.
+    /// After a refusal iOS does not ask again, so the sheet says at once that only the system
+    /// settings help.
     func allowCamera() {
         question = nil
         permission.request { granted in
-            guard granted else { return }
             DispatchQueue.main.async { [weak self] in
-                MainActor.assumeIsolated { self?.open() }
+                MainActor.assumeIsolated { self?.answered(granted) }
             }
+        }
+    }
+
+    private func answered(_ granted: Bool) {
+        if granted {
+            open()
+        } else {
+            question = .denied
         }
     }
 

@@ -154,6 +154,15 @@ final class CameraShareFlowUITests: XCTestCase {
         expectAppears(app.element("camera-share-preview"))
     }
 
+    func testRefusingTheSystemQuestionPointsToTheSettings() {
+        let app = voiceView("camera-refuse")
+        app.element("voice-camera").tapCenter()
+        tapWhenReady(app.element("camera-continue"))
+        expectAppears(app.element(containing: "Allow “Camera” for Mumcord in the system settings."))
+        expectAppears(app.row("camera-continue", containing: "Open settings"))
+        XCTAssertFalse(app.element("camera-share-preview").exists, "the camera stays closed")
+    }
+
     func testAfterARefusalTheSheetPointsToTheSettings() {
         let app = voiceView("camera-blocked")
         app.element("voice-camera").tapCenter()
