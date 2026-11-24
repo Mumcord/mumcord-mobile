@@ -570,9 +570,10 @@ letterboxed on black. The textures belong to the stream, not to the view: the la
 each watched stream is kept (`VideoPictures`), so a view that takes the stream over (tile, full
 screen, mini window) shows it at once instead of waiting for the sender's next picture, which a
 still screen share may not send for a long time. Nothing is queued and nothing is drawn on the
-main thread or while the view is off screen. The shader is compiled from source when the first
-picture is drawn, because building `.metal` files needs Xcode's separate Metal toolchain
-(`xcodebuild -downloadComponent MetalToolchain`), which CI and a fresh Mac do not have.
+main thread or while the view is off screen. The shader is compiled from source on the render
+queue as soon as the first stream view is made, never on the main thread, because building
+`.metal` files needs Xcode's separate Metal toolchain (`xcodebuild -downloadComponent
+MetalToolchain`), which CI and a fresh Mac do not have.
 
 The fake engine plays the bridge for the tests: the debug launch options `streams`,
 `stream-camera`, `stream-crowd`, `stream-question`, `stream-unreachable`, `stream-colours` and

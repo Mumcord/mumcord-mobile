@@ -5,8 +5,9 @@ import QuartzCore
 import UIKit
 
 /// The shader that draws one I420 picture from three single-channel textures (Y, U, V) as RGB.
-/// Compiled when the first picture is drawn instead of with the app: building `.metal` files
-/// needs Xcode's separate Metal toolchain, which neither CI nor a fresh Mac has.
+/// Compiled from source on the render queue as soon as the first stream view is made, instead
+/// of with the app: building `.metal` files needs Xcode's separate Metal toolchain, which
+/// neither CI nor a fresh Mac has.
 private let i420Shader = """
 #include <metal_stdlib>
 using namespace metal;
@@ -42,24 +43,55 @@ fragment half4 i420_fragment(
 """
 
 /// What every stream picture is drawn with: one Metal device, the I420 shader and one serial
-/// render queue. Nil where the device has no Metal (no supported iPhone lacks it) or the shader
-/// cannot be compiled; the failure is logged and streams then show no picture.
+/// render queue. Nil where the device has no Metal (no supported iPhone lacks it); the failure
+/// is logged and streams then show no picture.
 final class VideoRenderer: @unchecked Sendable {
     static let shared: VideoRenderer? = VideoRenderer()
 
     let device: MTLDevice
     let commands: MTLCommandQueue
-    let pipeline: MTLRenderPipelineState
     let sampler: MTLSamplerState
     /// Uploading and drawing happen here, never on the main thread.
     let queue = DispatchQueue(label: "app.mumcord.mobile.video", qos: .userInteractive)
     static let pixelFormat = MTLPixelFormat.bgra8Unorm
+
+    /// Render queue only: nil until the shader was compiled, then its pipeline, or nil inside
+    /// when it did not compile.
+    private var compiled: MTLRenderPipelineState??
 
     private init?() {
         guard let device = MTLCreateSystemDefaultDevice(), let commands = device.makeCommandQueue() else {
             AppLog.write("stream pictures: no Metal device")
             return nil
         }
+        let samplerDescription = MTLSamplerDescriptor()
+        samplerDescription.minFilter = .linear
+        samplerDescription.magFilter = .linear
+        samplerDescription.sAddressMode = .clampToEdge
+        samplerDescription.tAddressMode = .clampToEdge
+        guard let sampler = device.makeSamplerState(descriptor: samplerDescription) else {
+            AppLog.write("stream pictures: no sampler")
+            return nil
+        }
+        self.device = device
+        self.commands = commands
+        self.sampler = sampler
+        // The renderer is first asked for on the main thread, by a new view; compiling takes a
+        // moment, so it happens here, before that view's first picture arrives.
+        queue.async { _ = self.pipeline }
+    }
+
+    /// The pipeline of the I420 shader; nil when it did not compile, which is logged once.
+    /// Render queue only.
+    var pipeline: MTLRenderPipelineState? {
+        dispatchPrecondition(condition: .onQueue(queue))
+        if let compiled { return compiled }
+        let pipeline = Self.makePipeline(device)
+        compiled = .some(pipeline)
+        return pipeline
+    }
+
+    private static func makePipeline(_ device: MTLDevice) -> MTLRenderPipelineState? {
         let library: MTLLibrary
         do {
             library = try device.makeLibrary(source: i420Shader, options: nil)
@@ -70,22 +102,13 @@ final class VideoRenderer: @unchecked Sendable {
         let description = MTLRenderPipelineDescriptor()
         description.vertexFunction = library.makeFunction(name: "i420_vertex")
         description.fragmentFunction = library.makeFunction(name: "i420_fragment")
-        description.colorAttachments[0].pixelFormat = Self.pixelFormat
-        let samplerDescription = MTLSamplerDescriptor()
-        samplerDescription.minFilter = .linear
-        samplerDescription.magFilter = .linear
-        samplerDescription.sAddressMode = .clampToEdge
-        samplerDescription.tAddressMode = .clampToEdge
-        guard let pipeline = try? device.makeRenderPipelineState(descriptor: description),
-              let sampler = device.makeSamplerState(descriptor: samplerDescription)
-        else {
-            AppLog.write("stream pictures: no render pipeline")
+        description.colorAttachments[0].pixelFormat = pixelFormat
+        do {
+            return try device.makeRenderPipelineState(descriptor: description)
+        } catch {
+            AppLog.write("stream pictures: no render pipeline: \(error)")
             return nil
         }
-        self.device = device
-        self.commands = commands
-        self.pipeline = pipeline
-        self.sampler = sampler
     }
 }
 
@@ -296,6 +319,7 @@ private final class VideoPainter: @unchecked Sendable {
     private func render(_ picture: VideoPicture, into layer: CAMetalLayer) {
         let empty = picture.planes.count != 3
         if empty && !showsPicture { return }
+        guard let pipeline = renderer.pipeline else { return }
         let area = layer.drawableSize
         guard area.width >= 1, area.height >= 1,
               let drawable = layer.nextDrawable(),
@@ -317,7 +341,7 @@ private final class VideoPainter: @unchecked Sendable {
                 znear: 0,
                 zfar: 1
             ))
-            encoder.setRenderPipelineState(renderer.pipeline)
+            encoder.setRenderPipelineState(pipeline)
             for (index, plane) in picture.planes.enumerated() {
                 encoder.setFragmentTexture(plane, index: index)
             }
