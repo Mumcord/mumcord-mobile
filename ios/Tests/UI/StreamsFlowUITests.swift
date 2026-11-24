@@ -105,48 +105,14 @@ final class StreamsFlowUITests: XCTestCase {
 
     /// Waits until the picture in the element is red on the left and blue on the right.
     private func awaitColours(in element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
-        expectAppears(element, file: file, line: line)
-        let deadline = Date().addingTimeInterval(10)
-        while Date() < deadline {
-            if showsColours(in: element.frame) { return }
-            Thread.sleep(forTimeInterval: 0.3)
-        }
-        XCTFail("the picture is not drawn in its colours", file: file, line: line)
+        awaitStreamPicture(in: element, file: file, line: line, isRedAndBlue)
     }
 
-    /// Whether the 16:9 picture letterboxed in the middle of `frame` is red at a quarter of its
-    /// width and blue at three quarters, on its middle line.
     private func showsColours(in frame: CGRect) -> Bool {
-        let screenshot = XCUIScreen.main.screenshot().image
-        guard let image = screenshot.cgImage, frame.width > 0, frame.height > 0 else { return false }
-        let scale = CGFloat(image.width) / screenshot.size.width
-        let width = min(frame.width, frame.height * 16 / 9)
-        let left = frame.minX + (frame.width - width) / 2
-        let y = frame.midY
-        guard let red = pixel(image, x: (left + width * 0.25) * scale, y: y * scale),
-              let blue = pixel(image, x: (left + width * 0.75) * scale, y: y * scale)
-        else { return false }
-        return red.r > 200 && red.b < 60 && blue.b > 200 && blue.r < 60
+        streamPictureShows(in: frame, isRedAndBlue)
     }
+}
 
-    private func pixel(_ image: CGImage, x: CGFloat, y: CGFloat) -> (r: Int, g: Int, b: Int)? {
-        var bytes = [UInt8](repeating: 0, count: 4)
-        guard let context = CGContext(
-            data: &bytes,
-            width: 1,
-            height: 1,
-            bitsPerComponent: 8,
-            bytesPerRow: 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
-        // Draws the image so that the wanted pixel lands on the context's only one.
-        context.draw(image, in: CGRect(
-            x: -x.rounded(.down),
-            y: y.rounded(.down) - CGFloat(image.height) + 1,
-            width: CGFloat(image.width),
-            height: CGFloat(image.height)
-        ))
-        return (Int(bytes[0]), Int(bytes[1]), Int(bytes[2]))
-    }
+private func isRedAndBlue(_ left: ScreenColour, _ right: ScreenColour) -> Bool {
+    left.r > 200 && left.b < 60 && right.b > 200 && right.r < 60
 }

@@ -178,3 +178,64 @@ extension XCUIElement {
         coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 }
+
+/// One pixel of a screenshot, 0 to 255 per channel.
+struct ScreenColour {
+    let r: Int
+    let g: Int
+    let b: Int
+}
+
+extension XCTestCase {
+    /// Waits until the stream picture letterboxed in the element passes `check`, which gets the
+    /// colours of the 16:9 picture on its middle line at a quarter and at three quarters of its
+    /// width. Proves that the picture is drawn, where a fixed wait only hopes so.
+    func awaitStreamPicture(
+        in element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        _ check: (_ left: ScreenColour, _ right: ScreenColour) -> Bool
+    ) {
+        expectAppears(element, file: file, line: line)
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline {
+            if streamPictureShows(in: element.frame, check) { return }
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        XCTFail("the stream picture is not drawn", file: file, line: line)
+    }
+
+    func streamPictureShows(in frame: CGRect, _ check: (_ left: ScreenColour, _ right: ScreenColour) -> Bool) -> Bool {
+        let screenshot = XCUIScreen.main.screenshot().image
+        guard let image = screenshot.cgImage, frame.width > 0, frame.height > 0 else { return false }
+        let scale = CGFloat(image.width) / screenshot.size.width
+        let width = min(frame.width, frame.height * 16 / 9)
+        let left = frame.minX + (frame.width - width) / 2
+        let y = frame.midY
+        guard let first = pixel(image, x: (left + width * 0.25) * scale, y: y * scale),
+              let second = pixel(image, x: (left + width * 0.75) * scale, y: y * scale)
+        else { return false }
+        return check(first, second)
+    }
+
+    private func pixel(_ image: CGImage, x: CGFloat, y: CGFloat) -> ScreenColour? {
+        var bytes = [UInt8](repeating: 0, count: 4)
+        guard let context = CGContext(
+            data: &bytes,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        // Draws the image so that the wanted pixel lands on the context's only one.
+        context.draw(image, in: CGRect(
+            x: -x.rounded(.down),
+            y: y.rounded(.down) - CGFloat(image.height) + 1,
+            width: CGFloat(image.width),
+            height: CGFloat(image.height)
+        ))
+        return ScreenColour(r: Int(bytes[0]), g: Int(bytes[1]), b: Int(bytes[2]))
+    }
+}

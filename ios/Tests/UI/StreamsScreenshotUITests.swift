@@ -12,8 +12,14 @@ final class StreamsScreenshotUITests: XCTestCase {
     }
 
     private func capture(_ app: XCUIApplication, _ name: String, theme: String) {
-        // Sheets slide in and the first pictures arrive; the picture is taken once they are still.
+        // Sheets and notices slide in; the picture is taken once they are still.
         Thread.sleep(forTimeInterval: 1)
+        keepScreenshot(of: app, named: "ios-streams-\(name)-\(theme)")
+    }
+
+    /// Taken once the stream's picture is drawn in `element`, instead of after a fixed wait.
+    private func capture(_ app: XCUIApplication, _ name: String, theme: String, picture element: XCUIElement) {
+        awaitStreamPicture(in: element, isMockupPicture)
         keepScreenshot(of: app, named: "ios-streams-\(name)-\(theme)")
     }
 
@@ -29,14 +35,14 @@ final class StreamsScreenshotUITests: XCTestCase {
     /// On Wi-Fi the tile plays by itself.
     private func tile(theme: String) {
         let app = connect("plain", theme: theme)
-        capture(app, "tile", theme: theme)
+        capture(app, "tile", theme: theme, picture: app.element("stream-tile"))
     }
 
     private func fullScreen(theme: String) {
         let app = connect("stream-crowd", theme: theme)
         app.element("stream-tile").tapCenter()
         expectAppears(app.element(containing: "3 watching"))
-        capture(app, "full-screen", theme: theme)
+        capture(app, "full-screen", theme: theme, picture: app.element("stream-full-screen"))
     }
 
     /// The mini window above the Lobby chat of the chat mockup.
@@ -47,7 +53,7 @@ final class StreamsScreenshotUITests: XCTestCase {
         expectAppears(app.element("stream-mini-window"))
         tapWhenReady(app.element("Chat"))
         expectAppears(app.element(containing: "Sure, give me five minutes."))
-        capture(app, "mini-window", theme: theme)
+        capture(app, "mini-window", theme: theme, picture: app.element("stream-mini-window"))
     }
 
     // No mockup exists for the states below; they are built from the design system.
@@ -86,4 +92,10 @@ final class StreamsScreenshotUITests: XCTestCase {
     func testUnreachableLight() { unreachable(theme: "light") }
     func testDirectQuestionDark() { directQuestion(theme: "dark") }
     func testDirectQuestionLight() { directQuestion(theme: "light") }
+}
+
+/// The mockup picture (`FakeVideoFrames`): the dark code window on the left, the game's light
+/// blue sky on the right.
+private func isMockupPicture(_ left: ScreenColour, _ right: ScreenColour) -> Bool {
+    left.r < 60 && left.g < 60 && left.b < 90 && right.b > 180 && right.g > 130 && right.r < 150
 }
