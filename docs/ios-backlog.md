@@ -228,8 +228,13 @@ simulator app; linking for a real device is first proven here.
 
 - Runner noise seen repeatedly: a macOS runner without the "iPhone 17" simulator ("Unable to
   find a device matching …"), and `NativeAudioTests` aborting with "RPC timeout … deadlocked".
-  Both pass on re-run. A fix that picks or creates an available iPhone simulator in
-  `scripts/build-ios.sh` is still open.
+  Both pass on re-run. `scripts/build-ios.sh` now picks the newest available iPhone simulator, or
+  creates one, when "iPhone 17" is missing (plan step 0); not yet proven on a runner that lacks
+  it. The audio test abort is still open.
+- The test group `output-settings` failed in CI because a tap on the voice bar came while the bar
+  was still moving in and did not open the voice view. Every test now opens the voice view through
+  one helper that waits until the bar holds still and taps once more if needed (plan step 0);
+  proof on GitHub's runners is still to come.
 - The first UI test of a group on a cold simulator used to time out; every test group now
   starts the app once before its tests.
 - On a Mac whose simulator has a camera (seen with Xcode 26.6 and the iOS 26.5 simulator),

@@ -11,7 +11,8 @@ appearance and themes), 4 (public server browser), 6 (watching streams, without 
 picture-in-picture window) and 7 (sharing the phone camera) are built on `feat/ios-backlog`.
 Steps 1, 2, 3, 6 and 7 were each read by a review round whose confirmed findings are fixed; step
 4 waits for the product manager's look at the screenshots. The real camera and a real stream are
-device checks (step 12). Everything else is open.
+device checks (step 12). Step 0 (stable ground) is built and passes locally; its proof on GitHub's
+macOS runners is still to come. Everything else is open.
 
 ## Starting point
 
@@ -81,6 +82,19 @@ Sizes are the size of the Android reference (changed lines under `android/`), as
   "iPhone 17" is missing (open CI note).
 - Can only be proven on GitHub's runners: needs CI runs in the fork. Optional for our own work,
   because we test locally; useful for the maintainer.
+
+Built: `openVoiceViewThroughTheBar` in `ios/Tests/UI/UITestSupport.swift` waits until the bar's
+open button exists, lies wholly inside the app's window and keeps its frame across two reads,
+taps it, and taps once more if the voice view does not appear. (`isHittable` cannot be used for
+this: it reports the app's SwiftUI controls as covered although touches reach them.) Every test that opens the voice view through the bar uses it:
+the four files above and `CameraShareFlowUITests`, `CameraShareScreenshotUITests` and
+`SettingsFlowUITests`. `scripts/build-ios.sh` takes the simulator named by `IOS_SIMULATOR` (name
+or UDID) when it is set, else "iPhone 17" when it is installed, else the newest available iPhone
+simulator (newest iOS runtime, then newest model), else it creates one for the newest iOS
+runtime; every later step addresses it by its UDID. The CI workflow no longer sets
+`IOS_SIMULATOR`, so the runner uses that choice. Passes locally; the proof on GitHub's runners
+(the `Build for testing` job and the test groups `output-settings`, `core` and
+`voice-chat-screens`, which hold the changed tests) is still to come.
 
 ### 1 – Moderation
 
