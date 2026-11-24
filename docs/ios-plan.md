@@ -104,8 +104,8 @@ colours switch at runtime, including the per-server theme. `SessionReducer.swift
 
 Entry points, the "Public servers" screen with search, country chips, refresh and all states;
 "Add" and "Connect"; pings only for rows on screen, four at a time, stopped in the background.
-Tests against a fake list only. **Needs product review:** the screen has no mockup. The iOS
-screen is built like the Android one; the product manager reviews both from the screenshots.
+Tests against a fake list only. The screen has no mockup: by the product manager's decision the
+iOS screen is built like the Android one and reviewed from the screenshots.
 
 ### 5 – Translations and plural rules
 
@@ -175,7 +175,8 @@ each). Two at a time is the sensible limit on one Mac.
 
 ## Decisions needed from the product manager
 
-1. Public server browser: accept the Android layout as the design, or draw a mockup first?
+1. Public server browser: decided on 2026-11-24. The Android layout is the design; no mockup
+   first. The product manager reviews the result from the screenshots.
 2. Update notice and crash reports on iOS (step 8): in or out for the first version?
 3. Step 0: allow CI runs in the fork to prove the test fix?
 4. Apple Developer account for TestFlight (step 13): whose account, and when?
