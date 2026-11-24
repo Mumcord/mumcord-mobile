@@ -26,6 +26,12 @@ final class ProfileThemesTests: XCTestCase {
 
     private func ui(_ model: AppModel) -> MoreUiState? { model.moreUiState }
 
+    /// Gives work that may have been queued (a save) the time to run, for the checks that none
+    /// was.
+    private func settle() async {
+        try? await Task.sleep(nanoseconds: 200_000_000)
+    }
+
     private func pasteSheet(_ model: AppModel) -> (text: String, read: ThemeCodeRead?, applying: Bool)? {
         guard case .paste(let text, let read, let applying) = model.moreUiState?.themes?.sheet else { return nil }
         return (text, read, applying)
@@ -109,6 +115,7 @@ final class ProfileThemesTests: XCTestCase {
         await assertEventually { self.ui(model)?.profileEdit?.edit.limit == 5 }
         model.more.profile.changeComment("too long")
         model.more.profile.save()
+        await settle()
 
         XCTAssertEqual(ui(model)?.profileEdit?.edit.tooLong, true)
         XCTAssertEqual(ui(model)?.page, .editProfile)
