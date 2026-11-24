@@ -87,11 +87,17 @@ final class AVCameraSource: CameraSource {
         device = next
         followRotation(of: next)
         capture.run(next) { [weak self] opened in
-            guard !opened else { return }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    self?.log("camera: the camera could not be opened")
-                    self?.onTrouble(.failed)
+                    guard let self else { return }
+                    if opened {
+                        // The preview's connection is a new one with each camera, also while the
+                        // session goes on running: its rotation is set again.
+                        NotificationCenter.default.post(name: cameraOpened, object: self.capture.session)
+                    } else {
+                        self.log("camera: the camera could not be opened")
+                        self.onTrouble(.failed)
+                    }
                 }
             }
         }
@@ -130,6 +136,9 @@ final class AVCameraSource: CameraSource {
         AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: facing == .front ? .front : .back)
     }
 }
+
+/// Posted with the capture session as its object once a camera runs in it.
+private let cameraOpened = Notification.Name("app.mumcord.mobile.camera-opened")
 
 /// An angle in degrees as the nearest of 0, 90, 180 and 270.
 private func quarterTurns(_ degrees: CGFloat) -> UInt32 {
@@ -178,6 +187,13 @@ private final class CameraRunner: NSObject, AVCaptureVideoDataOutputSampleBuffer
                     return
                 }
                 session.addOutput(output)
+            }
+            // The engine wants the picture as the camera sees it, never mirrored, for both
+            // cameras (the bridge only turns, crops and scales it); only the preview mirrors the
+            // front camera. The connection is a new one with each camera.
+            if let connection = output.connection(with: .video), connection.isVideoMirroringSupported {
+                connection.automaticallyAdjustsVideoMirroring = false
+                connection.isVideoMirrored = false
             }
             session.commitConfiguration()
             framesQueue.async { [feed] in feed.restart() }
@@ -239,7 +255,7 @@ private final class CameraPreviewView: UIView {
     private var device: AVCaptureDevice?
     private var rotation: AVCaptureDevice.RotationCoordinator?
     private var observation: NSKeyValueObservation?
-    private var startObserver: NSObjectProtocol?
+    private var sessionObservers: [NSObjectProtocol] = []
 
     var previewLayer: AVCaptureVideoPreviewLayer {
         // The layer class is set above, so the cast always holds.
@@ -247,19 +263,18 @@ private final class CameraPreviewView: UIView {
     }
 
     deinit {
-        if let startObserver { NotificationCenter.default.removeObserver(startObserver) }
+        for observer in sessionObservers { NotificationCenter.default.removeObserver(observer) }
     }
 
     /// Keeps the picture upright for the camera that runs, as the phone is held.
     func follow(_ next: AVCaptureDevice?) {
-        if startObserver == nil, let session = previewLayer.session {
-            // The layer's connection exists only once the session runs with the camera.
-            startObserver = NotificationCenter.default.addObserver(
-                forName: AVCaptureSession.didStartRunningNotification,
-                object: session,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated { self?.applyRotation() }
+        if sessionObservers.isEmpty, let session = previewLayer.session {
+            // The layer's connection exists only once the session runs with the camera, and is
+            // a new one after a switch of the camera.
+            sessionObservers = [AVCaptureSession.didStartRunningNotification, cameraOpened].map { name in
+                NotificationCenter.default.addObserver(forName: name, object: session, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.applyRotation() }
+                }
             }
         }
         guard next != device else { return }
