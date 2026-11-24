@@ -102,6 +102,36 @@ final class CameraShareControllerTests: XCTestCase {
         XCTAssertNil(controller.uiState.notice, "no notice after the user's own stop")
     }
 
+    func testCancelWhileStartingClosesTheCameraAtOnceAndALateStartLeavesItOff() async {
+        let (_, controller) = await connected()
+        engine.cameraStartDelay = .seconds(2)
+        controller.open()
+        await assertEventually { self.sources.first?.running == .front }
+        controller.start()
+        await assertEventually { controller.uiState.sheet?.starting == true }
+
+        controller.stop()
+        let closed = await eventually(timeout: 1) { self.source.running == nil && !controller.uiState.on }
+        XCTAssertTrue(closed, "Cancel and Stop do not wait for the start")
+        XCTAssertEqual(engine.ownCameraState, .off)
+
+        // The start ends shared after the stop; the app turns the camera off again.
+        await assertEventually { self.engine.cameraStartsEnded == 1 }
+        await assertEventually { self.engine.ownCameraState == .off && !controller.uiState.on }
+        XCTAssertNil(source.running, "the camera never came back on")
+        XCTAssertEqual(sources.count, 1)
+        XCTAssertNil(controller.uiState.notice)
+    }
+
+    func testAStopRightAfterOpeningLeavesTheCameraOff() async {
+        let (_, controller) = await connected()
+        controller.open()
+        controller.stop()
+        await assertEventually { self.engine.ownCameraState == .off && !controller.uiState.on }
+        let stayedOff = await eventually(timeout: 0.5) { self.sources.contains { $0.running != nil } }
+        XCTAssertFalse(stayedOff, "the camera runs after the stop")
+    }
+
     func testARefusedStartStaysInThePreviewWithTheReason() async {
         let (_, controller) = await connected()
         engine.cameraStartProblem = .directConnectionsOff

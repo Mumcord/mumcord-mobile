@@ -5,8 +5,9 @@ import SwiftUI
 
 /// A camera without a camera: it records what it is asked to do, and its picture is a drawn
 /// person like the mockup's. `trouble` makes it fail as a camera would. It sends nothing to the
-/// engine.
+/// engine. Observable, so `FakeCameraProbe` can show UI tests what it was asked to do.
 @MainActor
+@Observable
 final class FakeCameraSource: CameraSource {
     let facings: Set<CameraFacing>
     private let onTrouble: (CameraTrouble) -> Void
@@ -36,6 +37,40 @@ final class FakeCameraSource: CameraSource {
 
     func preview() -> AnyView {
         AnyView(FakeCameraPicture())
+    }
+}
+
+/// The drawn camera of a debug launch, for the UI tests, which cannot see inside the app: the
+/// latest camera made, which lives on after it was let go.
+@MainActor
+@Observable
+final class FakeCameraProbe {
+    var source: FakeCameraSource?
+}
+
+/// An invisible element whose value lists every start (the camera's facing) and stop of the
+/// latest drawn camera, e.g. "front,back,stop,back"; "none" before a camera was made.
+struct FakeCameraProbeView: View {
+    let probe: FakeCameraProbe
+
+    var body: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .accessibilityElement()
+            .accessibilityLabel("Fake camera")
+            .accessibilityValue(summary)
+            .accessibilityIdentifier("fake-camera")
+    }
+
+    private var summary: String {
+        guard let calls = probe.source?.calls else { return "none" }
+        return calls.map { call in
+            switch call {
+            case .front: "front"
+            case .back: "back"
+            case nil: "stop"
+            }
+        }.joined(separator: ",")
     }
 }
 

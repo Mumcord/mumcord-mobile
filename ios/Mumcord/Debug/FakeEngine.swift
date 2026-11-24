@@ -1151,6 +1151,8 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     private var _appCamera: CameraCapture?
     private var _cameraStartProblem: CameraProblem?
+    private var _cameraStartDelay: Duration?
+    private var _cameraStartsEnded = 0
     private var _cameraViewers: UInt32 = 0
     private var _captureFailures: [CaptureFailure] = []
     private var _ownCameraState = OwnCameraState.off
@@ -1162,6 +1164,15 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         get { locked { _cameraStartProblem } }
         set { locked { _cameraStartProblem = newValue } }
     }
+    /// How long "Start sharing" takes; nil: it returns at once. A slow start still ends shared
+    /// when it ends, also after a stop meanwhile, the worst an engine could do: the app must not
+    /// leave such a camera on.
+    var cameraStartDelay: Duration? {
+        get { locked { _cameraStartDelay } }
+        set { locked { _cameraStartDelay = newValue } }
+    }
+    /// How many "Start sharing" commands have returned.
+    var cameraStartsEnded: Int { locked { _cameraStartsEnded } }
     var captureFailures: [CaptureFailure] { locked { _captureFailures } }
     /// The own camera's state as last reported.
     var ownCameraState: OwnCameraState { locked { _ownCameraState } }
@@ -1189,6 +1200,10 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func startCameraSharing() async throws {
         emitCamera(.starting)
+        if let delay = cameraStartDelay {
+            try? await Task.sleep(for: delay)
+        }
+        defer { locked { _cameraStartsEnded += 1 } }
         if let problem = cameraStartProblem {
             emitCamera(.preview, problem)
             throw BridgeError.Internal(detail: "camera not shared")

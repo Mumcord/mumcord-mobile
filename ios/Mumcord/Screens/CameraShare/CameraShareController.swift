@@ -19,9 +19,10 @@ final class CameraShareController {
     @ObservationIgnored let camera: CameraShare
     @ObservationIgnored private let store: SessionStore
     @ObservationIgnored private let permission: CameraGateway
-    /// The last command sent to the engine; the next one waits for it, so a stop never
-    /// overtakes the start it ends.
-    @ObservationIgnored private var commands: Task<Void, Never>?
+    /// How often the user turned the camera off. Start and stop go to the engine independently,
+    /// so a stop never waits for a slow start; a preview or start the engine finishes after a
+    /// stop is turned off again.
+    @ObservationIgnored private var stops = 0
 
     init(store: SessionStore, camera: CameraShare, permission: CameraGateway) {
         self.store = store
@@ -75,9 +76,16 @@ final class CameraShareController {
     /// Opens the preview; the camera permission is granted.
     func open() {
         notice = nil
-        send { [weak self] _ in
-            guard let self else { return }
-            if case .failed = await camera.openPreview() { notice = .cameraFailed }
+        let stopsBefore = stops
+        Task { [weak self] in
+            guard let self, stops == stopsBefore else { return }
+            let result = await camera.openPreview()
+            if case .failed = result {
+                notice = .cameraFailed
+            } else if stops != stopsBefore {
+                camera.close()
+                _ = await store.stopCamera()
+            }
         }
     }
 
@@ -87,23 +95,25 @@ final class CameraShareController {
 
     /// "Start sharing" in the preview.
     func start() {
-        send { store in _ = await store.startCameraSharing() }
+        let stopsBefore = stops
+        Task { [weak self, store] in
+            let result = await store.startCameraSharing()
+            guard case .ok = result, let self, stops != stopsBefore else { return }
+            // Stopped while starting: whatever the engine did meanwhile, the camera is not shared.
+            camera.close()
+            _ = await store.stopCamera()
+        }
     }
 
-    /// Cancel in the preview, or Stop while sharing.
+    /// Cancel in the preview, putting the preview away, or Stop while sharing: the camera closes
+    /// at once, also while "Start sharing" is still waiting for the engine.
     func stop() {
-        send { store in _ = await store.stopCamera() }
+        stops += 1
+        camera.close()
+        Task { [store] in _ = await store.stopCamera() }
     }
 
     func dismissNotice() {
         notice = nil
-    }
-
-    private func send(_ command: @escaping @MainActor (SessionStore) async -> Void) {
-        let previous = commands
-        commands = Task { [store] in
-            await previous?.value
-            await command(store)
-        }
     }
 }

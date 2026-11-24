@@ -21,6 +21,11 @@ final class CameraShare {
     @ObservationIgnored private let newSource: (@escaping (CameraTrouble) -> Void) -> CameraSource
     @ObservationIgnored private var engineWants = false
     @ObservationIgnored private var onScreen = false
+    /// The user turned the camera off; it stays closed until the next preview, whatever the
+    /// engine still wants.
+    @ObservationIgnored private var closing = false
+    /// The camera `source` was last started with; nil while it is stopped.
+    @ObservationIgnored private var running: CameraFacing?
     @ObservationIgnored private lazy var capture = EngineCapture(owner: self)
 
     /// - Parameter newSource: makes the camera when the engine opens it, with the callback for a
@@ -45,8 +50,16 @@ final class CameraShare {
     /// Opens the preview with the front camera; the engine then starts the camera.
     func openPreview() async -> Outcome<Void> {
         facing = .front
+        closing = false
         store.setCameraCapture(capture)
         return await store.openCameraPreview()
+    }
+
+    /// Cancel or Stop: the camera is let go at once, also while the engine is still busy with a
+    /// start.
+    func close() {
+        closing = true
+        follow()
     }
 
     /// Front to back and back; also while sharing.
@@ -62,18 +75,22 @@ final class CameraShare {
     }
 
     private func follow() {
-        switch (engineWants, onScreen) {
-        case (true, true):
-            let running = source ?? newSource { [weak self] trouble in self?.trouble(trouble) }
-            if source == nil { source = running }
-            running.start(facing)
-        case (true, false):
-            // Paused: the camera is released while the app is not seen, sharing stays on.
-            source?.stop()
-        case (false, _):
-            source?.stop()
-            source = nil
+        let wanted = engineWants && !closing
+        if wanted && onScreen {
+            let camera = source ?? newSource { [weak self] trouble in self?.trouble(trouble) }
+            if source == nil { source = camera }
+            if running != facing {
+                running = facing
+                camera.start(facing)
+            }
+            return
         }
+        // Paused while the app is not seen (sharing stays on), or closed.
+        if running != nil {
+            running = nil
+            source?.stop()
+        }
+        if !wanted { source = nil }
     }
 
     /// Either trouble ends sharing; the engine tells the user that the camera stopped.

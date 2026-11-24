@@ -69,10 +69,13 @@ import MumcordBridge
 ///         stream-one-frame the stream sends a single picture and nothing new afterwards
 ///         camera-refused   "Start sharing" of the own camera is refused: direct connections
 ///                          are off
+///         camera-slow-start "Start sharing" of the own camera takes half a minute
 ///         camera-viewers   three seconds after the own camera is shared, two people
 ///                          watch it
 ///         camera-fails     three seconds after the own camera is shared, the camera
 ///                          stops working
+///         camera-probe     an invisible element "fake-camera" lists what the drawn camera
+///                          was asked to do (`FakeCameraProbeView`)
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
@@ -233,6 +236,9 @@ struct AppDebugLaunch {
             if options.contains("camera-refused") {
                 engine.cameraStartProblem = .directConnectionsOff
             }
+            if options.contains("camera-slow-start") {
+                engine.cameraStartDelay = .seconds(30)
+            }
             return engine
         }
     }
@@ -336,6 +342,8 @@ extension AppDebugLaunch {
 
     /// Lives as long as the process, as in the app on the real engine.
     @MainActor private static var networkSession: NetworkSession?
+    /// What the drawn camera was asked to do, with the option `camera-probe`.
+    @MainActor private(set) static var cameraProbe: FakeCameraProbe?
 
     @MainActor
     func makeModel() -> AppModel {
@@ -353,10 +361,11 @@ extension AppDebugLaunch {
         Self.networkSession = NetworkSession(store: store, monitor: monitor)
         let idleTimes = idleTimes
         // The simulator's camera films nothing a test can check: the shared camera is a drawn one.
-        var cameraSource: FakeCameraSource?
+        let probe = FakeCameraProbe()
+        if options.contains("camera-probe") { Self.cameraProbe = probe }
         let cameraShare = CameraShare(store: store) { onTrouble in
             let source = FakeCameraSource(onTrouble: onTrouble)
-            cameraSource = source
+            probe.source = source
             return source
         }
         let model = AppModel(
@@ -395,7 +404,7 @@ extension AppDebugLaunch {
             let options = options
             whileSharing(model) {
                 if options.contains("camera-viewers") { engine.value?.watchCamera(2) }
-                if options.contains("camera-fails") { cameraSource?.trouble(.failed) }
+                if options.contains("camera-fails") { probe.source?.trouble(.failed) }
             }
         }
         if let identitiesPreset {

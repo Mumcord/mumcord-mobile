@@ -5,8 +5,9 @@ import XCTest
 /// Sharing the own camera against the fake engine and a drawn camera (the simulator's camera
 /// films nothing a test can check): the voice view's camera button, the camera question, the
 /// preview with the camera's picture and the switch, "Start sharing", the "Camera on" bar with
-/// the people watching, going to the background and back, Stop, a refused start, and the
-/// notice of a camera that stops by itself.
+/// the people watching, going to the background and back, Stop, Cancel and putting the preview
+/// away while the start still waits for the engine, a refused start, and the notice of a camera
+/// that stops by itself.
 final class CameraShareFlowUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
@@ -20,6 +21,29 @@ final class CameraShareFlowUITests: XCTestCase {
         tapWhenReady(app.element(containing: "Voice connected"))
         expectAppears(app.element("voice-view"))
         return app
+    }
+
+    /// What the drawn camera was asked to do: its facings and stops, e.g. "front,stop"
+    /// (`FakeCameraProbeView`, with the launch option `camera-probe`).
+    private func cameraCalls(_ app: XCUIApplication) -> String {
+        app.element("fake-camera").value as? String ?? ""
+    }
+
+    /// Waits until the drawn camera's calls end with `suffix`.
+    private func expectCameraCalls(
+        _ app: XCUIApplication,
+        endingWith suffix: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let reached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            self.cameraCalls(app).hasSuffix(suffix)
+        }, object: nil)
+        XCTAssertEqual(
+            XCTWaiter().wait(for: [reached], timeout: 10), .completed,
+            "the camera's calls \"\(cameraCalls(app))\" do not end with \"\(suffix)\"",
+            file: file, line: line
+        )
     }
 
     func testThePreviewComesFirstThenTheCameraIsSharedGoesOnInTheBackgroundAndStops() {
@@ -59,6 +83,34 @@ final class CameraShareFlowUITests: XCTestCase {
         tapWhenReady(app.element("camera-bar-stop"))
         expectGone(app.element("camera-bar"))
         XCTAssertFalse(app.element("camera-notice").exists, "no notice after the user's own stop")
+    }
+
+    /// Opens the preview with a start of half a minute and taps "Start sharing".
+    private func starting() -> XCUIApplication {
+        let app = voiceView("camera-slow-start,camera-probe")
+        app.element("voice-camera").tapCenter()
+        tapWhenReady(app.element("camera-share-start"))
+        expectAppears(app.row("camera-share-start", containing: "Starting…"))
+        XCTAssertEqual(cameraCalls(app), "front")
+        return app
+    }
+
+    func testCancelWhileStartingClosesTheCameraAtOnce() {
+        let app = starting()
+        tapWhenReady(app.element("camera-share-cancel"))
+        expectGone(app.element("camera-share-preview"), timeout: 5)
+        expectCameraCalls(app, endingWith: "front,stop")
+        expectAppears(app.row("voice-camera", containing: "Share your camera"))
+        XCTAssertFalse(app.element("camera-bar").exists)
+    }
+
+    func testPuttingThePreviewAwayWhileStartingClosesTheCameraAtOnce() {
+        let app = starting()
+        // A tap above the sheet puts it away.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08)).tap()
+        expectGone(app.element("camera-share-preview"), timeout: 5)
+        expectCameraCalls(app, endingWith: "front,stop")
+        XCTAssertFalse(app.element("camera-bar").exists)
     }
 
     func testCancelInThePreviewSharesNothing() {
