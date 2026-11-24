@@ -92,6 +92,11 @@ final class ProfileController {
         edit?.sheet = nil
     }
 
+    /// Explains why the camera is needed before "Take photo" asks the system for it.
+    func explainCamera(_ permission: CameraPermission) {
+        edit?.sheet = .camera(permission)
+    }
+
     /// A new picture, already re-encoded without its metadata on the phone.
     func pickAvatar(_ image: Data) {
         edit?.avatar = .set(image)

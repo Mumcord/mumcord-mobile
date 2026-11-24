@@ -23,9 +23,13 @@ enum ProfileError: Equatable {
     case commentTooLong
 }
 
-/// The sheet of the avatar: where a new picture comes from, or removing it.
+/// A sheet over the edit profile screen.
 enum ProfileSheet: Equatable {
+    /// Where a new picture comes from, or removing it.
     case avatar
+    /// The camera explanation before "Take photo", while the camera is not allowed; `denied`
+    /// when only the system settings can allow it.
+    case camera(CameraPermission)
 }
 
 /// The edit profile screen (mockup `20-edit-profile`, FR-5.80): the comment as it is typed and

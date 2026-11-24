@@ -14,8 +14,6 @@ struct ProfileOverlays: View {
     @State private var pickingPhoto = false
     @State private var pickedPhoto: PhotosPickerItem?
     @State private var takingPhoto = false
-    /// The camera explanation before "Take photo", while the camera is not allowed.
-    @State private var photoQuestion: CameraPermission?
     @Environment(\.cameraGateway) private var camera
 
     var body: some View {
@@ -31,16 +29,17 @@ struct ProfileOverlays: View {
                     onDismiss: actions.closeSheet
                 )
             }
-            if let photoQuestion {
+            // A sheet like the others, so the screen behind it is hidden from screen readers.
+            if case .camera(let permission) = state.edit.sheet {
                 CameraSheet(
                     reason: Strings.cameraReasonAvatar,
-                    blocked: photoQuestion == .denied,
+                    blocked: permission == .denied,
                     onContinue: askForCamera,
                     onOpenSettings: {
-                        self.photoQuestion = nil
+                        actions.closeSheet()
                         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
                     },
-                    onDismiss: { self.photoQuestion = nil }
+                    onDismiss: actions.closeSheet
                 )
             }
         }
@@ -85,13 +84,13 @@ struct ProfileOverlays: View {
         if permission == .granted {
             takingPhoto = true
         } else {
-            photoQuestion = permission
+            actions.explainCamera(permission)
         }
     }
 
     /// Lets the system ask; the photo is taken once the camera is allowed.
     private func askForCamera() {
-        photoQuestion = nil
+        actions.closeSheet()
         camera.request { granted in
             if granted {
                 Task { @MainActor in takingPhoto = true }
