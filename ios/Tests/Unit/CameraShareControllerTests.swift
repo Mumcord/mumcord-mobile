@@ -33,6 +33,7 @@ final class CameraShareControllerTests: XCTestCase {
         model.connect(1)
         await assertEventually { model.uiState.connected != nil }
         camera.setOnScreen(true)
+        camera.setVisible(true)
         return (model, model.cameraShare!)
     }
 
@@ -78,6 +79,27 @@ final class CameraShareControllerTests: XCTestCase {
 
         camera.setOnScreen(true)
         XCTAssertEqual(source.running, .back, "the same camera again")
+        XCTAssertEqual(sources.count, 1)
+    }
+
+    func testThePreviewPausesWhileAnotherSheetTakesItsPlace() async {
+        let (_, controller) = await connected()
+        camera.setVisible(false)
+        controller.open()
+        await assertEventually { controller.uiState.sheet != nil }
+        XCTAssertNil(sources.first?.running, "nothing runs before the preview is on screen")
+
+        camera.setVisible(true)
+        XCTAssertEqual(source.running, .front)
+        camera.setVisible(false)
+        XCTAssertNil(source.running, "nothing runs behind another sheet")
+        XCTAssertNotNil(controller.uiState.sheet, "the preview waits behind it")
+        camera.setOnScreen(false)
+        camera.setOnScreen(true)
+        XCTAssertNil(source.running, "back in the app, another sheet is still on top")
+
+        camera.setVisible(true)
+        XCTAssertEqual(source.running, .front)
         XCTAssertEqual(sources.count, 1)
     }
 

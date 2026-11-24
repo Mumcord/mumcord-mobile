@@ -6,9 +6,10 @@ import Observation
 
 /// The phone's camera for sharing it (FR-5.74, FR-5.75). The engine decides when the camera is
 /// open (from the preview until sharing ends) and says so through `CameraCapture`; this runs the
-/// camera only while the engine wants it and the app is on screen, so it pauses in the
-/// background and resumes on return while sharing goes on (voice is unaffected). Nothing of
-/// the camera exists before the user opened the preview.
+/// camera only while the engine wants it, the app is on screen and the user sees the camera (its
+/// preview or the "Camera on" bar), so it pauses in the background and behind another sheet and
+/// resumes on return while sharing goes on (voice is unaffected). Nothing of the camera exists
+/// before the user opened the preview.
 @MainActor
 @Observable
 final class CameraShare {
@@ -21,6 +22,7 @@ final class CameraShare {
     @ObservationIgnored private let newSource: (@escaping (CameraTrouble) -> Void) -> CameraSource
     @ObservationIgnored private var engineWants = false
     @ObservationIgnored private var onScreen = false
+    @ObservationIgnored private var visible = false
     /// The user turned the camera off; it stays closed until the next preview, whatever the
     /// engine still wants.
     @ObservationIgnored private var closing = false
@@ -44,6 +46,14 @@ final class CameraShare {
     func setOnScreen(_ shown: Bool) {
         guard shown != onScreen else { return }
         onScreen = shown
+        follow()
+    }
+
+    /// The user sees the camera, or no longer: its preview is the sheet on screen, or the
+    /// "Camera on" bar is shown.
+    func setVisible(_ shown: Bool) {
+        guard shown != visible else { return }
+        visible = shown
         follow()
     }
 
@@ -76,7 +86,7 @@ final class CameraShare {
 
     private func follow() {
         let wanted = engineWants && !closing
-        if wanted && onScreen {
+        if wanted && onScreen && visible {
             let camera = source ?? newSource { [weak self] trouble in self?.trouble(trouble) }
             if source == nil { source = camera }
             if running != facing {
@@ -85,7 +95,7 @@ final class CameraShare {
             }
             return
         }
-        // Paused while the app is not seen (sharing stays on), or closed.
+        // Paused while the user cannot see the camera (sharing stays on), or closed.
         if running != nil {
             running = nil
             source?.stop()

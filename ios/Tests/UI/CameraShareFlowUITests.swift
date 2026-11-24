@@ -113,6 +113,29 @@ final class CameraShareFlowUITests: XCTestCase {
         XCTAssertFalse(app.element("camera-bar").exists)
     }
 
+    func testTheCameraPausesWhileAnotherSheetCoversThePreview() throws {
+        let app = voiceView("camera-probe")
+        app.element("voice-camera").tapCenter()
+        expectAppears(app.element("camera-share-preview"))
+        XCTAssertEqual(cameraCalls(app), "front")
+
+        // A link opened meanwhile shows its own sheet in place of the preview.
+        XCUIDevice.shared.system.open(try XCTUnwrap(URL(string: "mumble://Ben@new.example:40000/Games")))
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let allow = springboard.alerts.buttons["Open"]
+        if allow.waitForExistence(timeout: 3) {
+            allow.tap()
+        }
+        expectAppears(app.element("Open this server?"))
+        XCTAssertFalse(app.element("camera-share-preview").exists)
+        expectCameraCalls(app, endingWith: "front,stop")
+
+        // Back to the preview, the camera runs again.
+        tapWhenReady(app.buttons["Cancel"])
+        expectAppears(app.element("camera-share-preview"))
+        expectCameraCalls(app, endingWith: "front,stop,front")
+    }
+
     func testCancelInThePreviewSharesNothing() {
         let app = voiceView("plain")
         app.element("voice-camera").tapCenter()

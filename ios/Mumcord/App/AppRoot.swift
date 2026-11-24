@@ -66,6 +66,11 @@ struct AppContent: View {
         let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
             || settingsSheet || identitySheet != nil || cameraQuestion || directQuestion
             || cameraSheet != nil || cameraPermission != nil
+        // The camera runs only while the user sees it: its preview is the sheet shown below (the
+        // sheets before it in the chain take its place), or the "Camera on" bar is on screen.
+        let previewShown = cameraSheet != nil && prompt == nil && overlay == nil && identitySheet == nil
+            && !cameraQuestion && !directQuestion && cameraPermission == nil
+        let cameraShown = previewShown || camera?.uiState.sharing != nil
         ZStack {
             screen
                 // While a sheet is open, the screen behind it is not offered to screen readers.
@@ -114,6 +119,9 @@ struct AppContent: View {
             exported: uiState.identities.exported,
             identities: model.identities
         ))
+        .onChange(of: cameraShown, initial: true) { _, shown in
+            model.cameraShare?.camera.setVisible(shown)
+        }
     }
 
     @ViewBuilder private var screen: some View {
