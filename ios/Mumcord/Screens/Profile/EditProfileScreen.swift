@@ -95,14 +95,14 @@ struct EditProfileScreen: View {
                 minLines: commentLines
             )
             .accessibilityIdentifier("profile-comment")
-            if let limit = edit.limit {
+            if let limit = edit.shownLimit {
                 LineText(
-                    Strings.profileCommentCount(edit.length, Int(limit)),
+                    Strings.profileCommentCount(edit.length, limit),
                     style: .caption,
                     color: edit.tooLong ? theme.colors.danger : theme.colors.textMuted,
                     tabularNumbers: true
                 )
-                .accessibilityLabel(Strings.profileCommentCountDescription(edit.length, Int(limit)))
+                .accessibilityLabel(Strings.profileCommentCountDescription(edit.length, limit))
             }
         }
     }

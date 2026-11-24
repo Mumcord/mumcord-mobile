@@ -40,6 +40,20 @@ final class ProfileStateTests: XCTestCase {
         XCTAssertFalse(over.tooLong, "no limit known yet")
     }
 
+    /// Mumble reports 0 for a server without a comment limit, as for chat messages.
+    func testAServerWithoutALimitTakesAnyComment() {
+        var unlimited = edit
+        unlimited.limit = 0
+        unlimited.comment = String(repeating: "a", count: 6000)
+        XCTAssertFalse(unlimited.tooLong)
+        XCTAssertTrue(unlimited.canSave)
+        XCTAssertNil(unlimited.shownLimit, "no counter")
+        var photoOnly = ProfileEdit(comment: "", initialComment: "", limit: 0)
+        photoOnly.avatar = .set(Data([1]))
+        XCTAssertTrue(photoOnly.canSave)
+        XCTAssertEqual(edit.shownLimit, 10)
+    }
+
     /// As on Android, a character outside the basic plane counts twice.
     func testTheLimitCountsAsTheAndroidAppDoes() {
         var emoji = edit

@@ -32,7 +32,8 @@ struct ProfileEdit: Equatable {
     /// The comment as it was read; an unchanged comment is not sent again.
     var initialComment: String
     var avatar = AvatarChange.keep
-    /// The server's limit for a comment, in characters; nil until it was read.
+    /// The server's limit for a comment, in characters; nil until it was read, 0 when the server
+    /// has none (Mumble's way of saying so, as for chat messages).
     var limit: UInt32?
     var sheet: ProfileSheet?
     var saving = false
@@ -41,9 +42,15 @@ struct ProfileEdit: Equatable {
     /// The length the server's limit is counted in: UTF-16 units, as on Android.
     var length: Int { comment.utf16.count }
 
+    /// The limit the counter shows; nil while it is unknown or the server has none.
+    var shownLimit: Int? {
+        guard let limit, limit > 0 else { return nil }
+        return Int(limit)
+    }
+
     var tooLong: Bool {
-        guard let limit else { return false }
-        return length > Int(limit)
+        guard let shownLimit else { return false }
+        return length > shownLimit
     }
 
     var commentChanged: Bool { comment != initialComment }
