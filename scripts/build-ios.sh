@@ -64,7 +64,8 @@ group_tests() {
     core)
       printf '%s\n' MumcordTests MumcordUITests/AppFlowUITests MumcordUITests/VoiceFlowUITests ;;
     voice-chat-screens)
-      printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests ;;
+      printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests \
+        MumcordUITests/CameraShareFlowUITests MumcordUITests/CameraShareScreenshotUITests ;;
     chat-flow)
       printf '%s\n' MumcordUITests/ChatFlowUITests MumcordUITests/SessionEndedUITests \
         MumcordUITests/ModerationFlowUITests MumcordUITests/ModerationScreenshotUITests \
