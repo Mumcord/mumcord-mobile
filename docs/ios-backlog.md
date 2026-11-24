@@ -169,6 +169,12 @@ simulator app; linking for a real device is first proven here.
   you choose to send in a chat."). That text is the one iOS shows in its own camera question, and
   it does not mention sharing the camera with the channel, which the app now also does; it was
   left as it is, because neither the specification nor Android gives a text for it.
+- Product review: editing a formatted comment on the phone flattens it. The editor shows the
+  comment as plain text and saves plain text (FR-5.80 says nothing about formatting), so a comment
+  set on the desktop with bold text, links or a picture loses them, without a word, when the user
+  fixes a typo on the phone. Android does the same (`ProfileController.open` starts from the
+  comment's plain text). Decide whether the phone should warn before saving over such a comment,
+  keep it read-only, or accept the loss; then change both apps together.
 - The comment counter counts the typed characters, as on Android, while the engine checks the
   comment as Mumble HTML (a `<` or `&` takes four or five characters, a line break `<br>`, and
   the engine may add its status lines). A comment the counter lets through can therefore be
