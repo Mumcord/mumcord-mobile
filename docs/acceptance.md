@@ -82,6 +82,7 @@ against the local test server are open for iOS (task 10.4).
 |---|---|
 | AC-5.22 | UI flow `StreamsFlowUITests` (tile, full screen, landscape button, mini window, stop; the picture's colours are checked on screen), unit `StreamsControllerTests`. Not yet: a real share from the desktop app |
 | AC-5.23 | Unit `StreamsStateTests`, `StreamsControllerTests` (nothing is watched before the tap on mobile data, also for a camera; "Start streams automatically" starts a visible tile); UI flow `StreamsFlowUITests` (no picture before the tap) |
+| AC-5.24 | Unit `CameraShareControllerTests` (the preview sends nothing, front and back, the camera released in the background and back with the same camera on return while sharing goes on, cancel and stop, a refused start, a camera that stops by itself, leaving the channel or the server); UI flow `CameraShareFlowUITests` (camera question, preview with the drawn camera, switch, start, viewers, the app in the background and back, stop). Not yet: the real camera, and the desktop seeing it, on a real iPhone |
 
 ## Deviation from the task plan
 

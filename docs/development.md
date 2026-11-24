@@ -416,7 +416,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | --- | --- |
 | `app-screens` | app screenshots, design reference, launch test |
 | `core` | all unit tests (`MumcordTests`), app flow, voice flow |
-| `voice-chat-screens` | voice screenshots, chat screenshots |
+| `voice-chat-screens` | voice screenshots, chat screenshots, camera sharing flow and its screenshots |
 | `chat-flow` | chat flow, session-ended notice, moderation flow and its screenshots, activity log flow |
 | `messages` | messages flow, messages screenshots, streams flow and its screenshots |
 | `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots and those of More and the activity log |
@@ -581,3 +581,29 @@ The fake engine plays the bridge for the tests: the debug launch options `stream
 `FakeVideoFrames` makes its pictures in the app, so the real render path draws them;
 `StreamsFlowUITests` checks the colours on screen. Only a real iPhone against the desktop app
 can show real streams, decoding load and the system's rotation.
+
+### Sharing the camera (iOS)
+
+`ios/Mumcord/Session/CameraShare.swift` follows the engine, as on Android: the engine starts and
+stops the app's camera through the bridge's `CameraCapture` (called on an engine thread, so the
+wish is only handed to the main thread), and the camera runs only while the engine wants it and
+the app is not in the background. In the background the camera is released and nothing is sent,
+while sharing and voice go on; on return the same camera starts again. Nothing of the camera
+exists before the user opened the preview, and the camera is explained before iOS asks for it
+(`CameraSheet`, as for a photo).
+
+`ios/Platform/Camera/AVCameraSource.swift` captures with AVFoundation behind the protocol
+`CameraSource`: an `AVCaptureSession` (started and stopped on a queue of its own, because that
+blocks), 1280 x 720 NV12 frames on a frame queue, late frames dropped by the output. Each frame
+goes to `mumcord_camera_push_frame` (`bridge/include/mumcord_camera.h`, through the bridging
+header) with the turn that makes it upright, which `AVCaptureDevice.RotationCoordinator` reports
+as the phone is held; the planes are read in place while the buffer is locked
+(`EngineCameraFrames`), nothing is copied or allocated, and the bridge turns, crops and scales
+them to at most 640 x 360. A camera taken by another app or by the system only interrupts the
+session, which goes on by itself; any other failure ends sharing with "Camera stopped.".
+
+The tests never use the simulator's camera, which films nothing a test can check: a debug build
+against the fake engine shares `FakeCameraSource`, a drawn person like the mockup's. The launch
+options `camera-refused`, `camera-viewers` and `camera-fails` (`AppDebugLaunch.swift`) give the
+refused start, two viewers and a camera that stops working. Only a real iPhone shows the real
+picture, its orientation, the camera indicator and a desktop watching it.

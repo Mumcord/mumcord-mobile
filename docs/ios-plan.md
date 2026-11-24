@@ -9,7 +9,8 @@ truth; this plan adds nothing to it.
 State on 2026-11-24: steps 1 (moderation) and 2 (More tab, activity log, settings) are built on
 `feat/ios-backlog`, each read by a review round whose confirmed findings are fixed. Step 6
 (watching streams) is built on `ios/streams`, without the system's picture-in-picture window.
-Everything else is open.
+Step 7 (sharing the phone camera) is built on `ios/camera-share`, on top of step 6; the real
+camera is a device check (step 12). Everything else is open.
 
 ## Starting point
 
@@ -120,7 +121,8 @@ texts are covered in one go; later steps re-run the script.
 Watching: decoded I420 frames from the bridge's pull function into a Metal texture; nothing
 camera-related loads before the user taps a camera (AC-5.23); the question before a direct
 connection. Sharing: the phone camera through the engine, with the system's permission flow.
-The simulator has no camera: tests use the app's fake camera; the real camera is part of step 12.
+The tests use the app's drawn camera, never the simulator's (which films nothing a test can
+check, where it has one at all); the real camera is part of step 12.
 
 ### 8 – About, licences, update notice, crash reports
 

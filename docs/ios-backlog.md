@@ -54,6 +54,22 @@ data, full screen with volume, landscape button and stop, mini window, unreachab
 `StreamsControllerTests`, UI tests `StreamsFlowUITests`, screenshots `ios-streams-*`. Differences
 from Android: no system picture-in-picture (FR-5.76), see the open points.
 
+Sharing the phone camera (the sharing half of 7.5, mirroring Android commit `c88cfd5`): built and
+checked in the simulator against the fake engine and a drawn camera. The voice view's camera
+button explains the camera before iOS asks (or points to the system settings after a refusal),
+the sheet "Share your camera" shows the picture with the front camera and the switch to the back
+camera, nothing is sent before "Start sharing", the "Camera on · n watching" bar with the switch
+and Stop sits above the voice bar and the voice view's buttons, a refused start and a camera that
+stops by itself say why. The camera is released while the app is in the background and back on
+return; sharing and voice go on. Capture with AVFoundation (`ios/Platform/Camera`), frames handed
+to the bridge's C function in place. Unit tests `CameraShareControllerTests`, UI tests
+`CameraShareFlowUITests`, screenshots `ios-camera-*`. Differences from Android: the camera is
+asked for 1280 x 720 (the smallest 16:9 size every iPhone camera offers; the bridge scales it
+down to 640 x 360) instead of 640 x 360; "on screen" is every state but the background, as for
+watching streams, so the camera still runs while Control Centre or the app switcher covers the
+app; there is no picture-in-picture window to pause for; the end-to-end test pattern camera of
+Android (`TestSettings.cameraSource`) waits for the iOS end-to-end tests (task 10.4).
+
 ## Open tasks
 
 ### 2.10 Public server browser (FR-5.9, AC-5.38)
@@ -104,13 +120,6 @@ Translations (task 8.1) and the language override of task 8.3 are done on Androi
 - The language override: iOS offers the per-app language in the system settings; the app
   follows it and saves it as the shared `language` setting.
 
-### 7.5 Sharing the phone camera (FR-5.74, FR-5.75)
-
-Watching streams is built (see "State when paused"). Open is the second half, mirroring Android
-commit `c88cfd5`: the preview sheet, front and back camera, 540p30, pause in the background. The
-simulator has no camera picture: tests use the app's fake camera, the real camera is a device
-check.
-
 ### 9.2 Tablet layout and 9.4 accessibility
 
 iPad layout after the Android tablet layout (9.1); accessibility pass (VoiceOver labels and
@@ -140,7 +149,9 @@ simulator app; linking for a real device is first proven here.
 - Wording needing product review: the notification explanation sheet ("Mumcord shows private
   messages and mentions as notifications while you are connected.") and the camera permission
   text ("Mumcord uses the camera to read the codes shown by the desktop app and to take photos
-  you choose to send in a chat.").
+  you choose to send in a chat."). That text is the one iOS shows in its own camera question, and
+  it does not mention sharing the camera with the channel, which the app now also does; it was
+  left as it is, because neither the specification nor Android gives a text for it.
 - Headset behaviour differs from Android on purpose: on iOS the system's End button always
   leaves the session, only the CallKit mute action toggles mute. Wired EarPods' single press
   therefore leaves. Decide after trying real headsets (one function, `endRequestMeans`).
@@ -149,6 +160,12 @@ simulator app; linking for a real device is first proven here.
   simulator half of `e2e/run.sh` (the same scenarios against the test server on `localhost`, run
   in the iOS CI job) and the iOS column of [acceptance.md](acceptance.md) are open.
 
+- Camera sharing, still open on iOS: the real camera on a real iPhone (the picture, upright for
+  both cameras and as the phone turns, the switch while sharing, the camera indicator going off
+  after Stop and in the background, a phone call or another app taking the camera); an
+  end-to-end scenario with `e2e/stream-peer --viewer` against the local test server. As on
+  Android, viewers see the last picture instead of "paused" while the phone is in the background:
+  the engine has no paused signal for cameras (see AC-5.24 in [acceptance.md](acceptance.md)).
 - Streams, still open on iOS: the system's picture-in-picture window when leaving the app while
   watching (FR-5.76; needs `AVPictureInPictureController` with sample buffers, so the pictures
   would be copied into pixel buffers, and the decoding would go on in the background); real
