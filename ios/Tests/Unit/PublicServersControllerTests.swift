@@ -100,7 +100,8 @@ final class PublicServersControllerTests: XCTestCase {
 
         controller.showing([listed[1].key, listed[2].key])
         await assertEventually { controller.local.pings.count == 2 }
-        XCTAssertEqual(box.engine.publicPingRequests, ["s1.example:64738", "s2.example:64738"])
+        // The two pings start at the same time, so the fake hears them in either order.
+        XCTAssertEqual(box.engine.publicPingRequests.sorted(), ["s1.example:64738", "s2.example:64738"])
         XCTAssertEqual(
             controller.local.pings,
             [listed[1].key: .answered(people: 4, maxPeople: 40, latencyMs: 30), listed[2].key: .noAnswer]
