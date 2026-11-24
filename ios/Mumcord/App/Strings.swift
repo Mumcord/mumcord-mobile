@@ -701,7 +701,6 @@ enum Strings {
     static var themesYours: String { text("themes_yours") }
     static func themesItem(_ p1: String) -> String { format("themes_item", p1) }
     static func themesItemSelected(_ p1: String) -> String { format("themes_item_selected", p1) }
-    static func themesOptions(_ p1: String) -> String { format("themes_options", p1) }
     static var themesShare: String { text("themes_share") }
     static var themesDelete: String { text("themes_delete") }
     static func themesDeleteTitle(_ p1: String) -> String { format("themes_delete_title", p1) }

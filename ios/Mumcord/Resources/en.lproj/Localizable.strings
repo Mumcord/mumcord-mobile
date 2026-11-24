@@ -666,7 +666,6 @@
 "themes_yours" = "Your themes";
 "themes_item" = "%1$@, theme";
 "themes_item_selected" = "%1$@, theme, selected";
-"themes_options" = "Options for %1$@";
 "themes_share" = "Share";
 "themes_delete" = "Delete theme";
 "themes_delete_title" = "Delete “%1$@”?";
