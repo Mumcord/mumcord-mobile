@@ -122,6 +122,26 @@ texts with "…" like the server list instead of wrapping them (the accessibilit
 decides this for all lists). The end-to-end scenario with a locally served list (AC-5.38 against
 the local test server) waits for the iOS end-to-end tests (task 10.4).
 
+Settings from the server list (mockup `01-server-list`, specification section 5 "Mockups and
+missing functions"): the settings icon on the server list's title bar, with the VoiceOver label
+"Settings" and a 44 pt target, opens the More screen without a connection: a back button "Back to
+the server list" and only Identities, Themes and Settings, which are the same screens as on the
+More tab. Left out there because they need a server: the profile card and Edit profile (picture
+and comment live on the server), Activity (the log of a connection), Blocked people (the list of
+the identity used on the connection, cleared when it ends) and Disconnect. Settings leave out the
+microphone level (it only moves while the voice runs) and "Default audio output" (which outputs
+the phone has is only known during a voice session); every other setting is saved without a
+connection. The mockup's search icon is left out: searching the list does not exist. A setting
+that fails to save without a connection is only logged: the refusal banner belongs to the
+connected screens and would otherwise show up on the next connection. Unit tests in
+`MoreStateTests` and `MoreControllerTests`, UI tests `ServerListMoreFlowUITests`, screenshots
+`ios-server-list-more-*` and `ios-server-list-settings-*`.
+
+**Note for the maintainer: intended difference from Android.** Android has no settings icon on
+the server list yet (`android/app/src/main/kotlin/app/mumcord/mobile/ui/servers/ServerListScreen.kt`),
+so there Settings, Themes and Identities are only reachable through the More tab while connected.
+iOS brings the icon back as the mockup shows it; Android should follow the same way.
+
 ## Open tasks
 
 ### 8.6 Translations and the language override (FR-5.82)
