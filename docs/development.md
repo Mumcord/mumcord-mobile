@@ -414,7 +414,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 
 | Group | Tests |
 | --- | --- |
-| `app-screens` | app screenshots, design reference, launch test |
+| `app-screens` | app screenshots, design reference, launch test, public server browser flow and its screenshots |
 | `core` | all unit tests (`MumcordTests`), app flow, voice flow |
 | `voice-chat-screens` | voice screenshots, chat screenshots, camera sharing flow and its screenshots |
 | `chat-flow` | chat flow, session-ended notice, moderation flow and its screenshots, activity log flow |
@@ -550,6 +550,23 @@ scanner see the QR codes of a scripted transfer (`FakeDesktopTransfer`) instead,
 `-mumcordIdentities <preset>` puts the identity screens into the states of the screenshots.
 Only a real iPhone can show the camera picture, reading the desktop's codes from a screen and the
 system's camera question; a transfer made by the desktop app is checked there by hand.
+
+### Public servers (iOS)
+
+The browser (`ios/Mumcord/Screens/Servers/PublicServers*.swift`) follows the Android one: the
+list is read from the bridge page by page only when the browser opens and searched on the phone;
+`PublicPingScheduler` pings the rows on screen (the list reports their frames while it moves), each
+once per load, four at a time, and stops when the browser closes or the app goes to the
+background, dropping the answers of pings on their way. "Add" saves a listed server with the name
+of the default identity; "Connect" closes the browser and runs the normal connect flow.
+
+It is never tested against the real list service or a listed server: the tests run against the
+fake engine, whose list is `PublicServersMockup` (addresses under `.example`). The debug launch
+options `public`, `public-lantern`, `public-slow`, `public-down`, `public-down-first`,
+`public-refresh-fails` and `public-ping-slow` set up the list and its failures, and
+`public-probe` adds an invisible element `fake-public-list` that tells the UI tests how often the
+list was downloaded and the servers pinged. The simulator half of the end-to-end scenario (a list
+served locally, pinging the local test server) waits for the iOS end-to-end tests (task 10.4).
 
 ### Watching streams (iOS)
 

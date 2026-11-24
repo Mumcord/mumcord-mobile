@@ -73,25 +73,31 @@ watching streams, so the camera still runs while Control Centre or the app switc
 app; there is no picture-in-picture window to pause for; the end-to-end test pattern camera of
 Android (`TestSettings.cameraSource`) waits for the iOS end-to-end tests (task 10.4).
 
+Public server browser (2.10, FR-5.9, mirroring Android commit `525a028`): built and checked in
+the simulator against the fake engine and a made-up list (`PublicServersMockup`); neither the real
+list service nor a listed server is contacted by any test. "Find more" with "Browse public
+servers" below Favourites and as a button on the empty list; the "Public servers" screen with
+search by name, address or country, country chips, "N of M servers" with Refresh, the rows with
+name, "address · country" and the ping line or "No answer", the states loading, failed with "Try
+again", refresh failed (the last list kept), empty and no match; "Add" saves the server with the
+default identity's name and the row then offers "Connect", which closes the browser and runs the
+normal connect flow. Only the rows on screen are pinged, at most four at a time, once per load
+and again after Refresh, and not while the browser is closed or the app is in the background.
+Unit tests `PublicServersStateTests`, `PublicPingSchedulerTests` and
+`PublicServersControllerTests`, UI tests `PublicServersFlowUITests`, screenshots
+`ios-public-servers-*`. The screen has no mockup: it follows the Android screen and waits for the
+product manager's review of the screenshots. Differences from Android: which rows are on screen
+comes from their frames in the list (SwiftUI has no list of the visible rows); the pings pause
+when the app goes to the background, not already when Control Centre or the app switcher covers
+it, as for streams and the camera; a ping on its way when the browser closes or the app leaves
+cannot be called back in the engine, so its answer is dropped and the server is asked again
+later; what Android's screen readers hear through polite live regions (loading, the failures, an
+empty list) VoiceOver hears as announcements; with the largest text sizes the rows shorten their
+texts with "…" like the server list instead of wrapping them (the accessibility pass, step 10,
+decides this for all lists). The end-to-end scenario with a locally served list (AC-5.38 against
+the local test server) waits for the iOS end-to-end tests (task 10.4).
+
 ## Open tasks
-
-### 2.10 Public server browser (FR-5.9, AC-5.38)
-
-Mirror Android commit `525a028` (`feat(android): browse public servers`):
-
-- Entry points: a "Find more" section below Favourites with "Browse public servers", and the
-  same as a button in the empty server list. No "Scan an invite code" row (that feature does
-  not exist).
-- Screen "Public servers": search (name, address or country), country chips, header
-  "N of M servers" with Refresh, rows with name, "address · country" and "● users / max · ms"
-  or "No answer". States: loading, first load failed (with "Try again"), refresh failed (last
-  list kept), empty, no match.
-- "Add" saves the server with the default identity's name, then the row shows "In your
-  servers" and "Connect", which runs the normal connect flow.
-- Pings: only rows on screen, at most 4 at a time, once per load and again after Refresh,
-  stopped when the browser closes or the app goes to the background (FR-5.43).
-- Tests only against a fake list; never contact the real list service or public servers.
-  The browser screen has no mockup and needs product review.
 
 ### 8.6 Profile and themes (FR-5.80 … FR-5.100)
 

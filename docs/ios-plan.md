@@ -8,8 +8,10 @@ truth; this plan adds nothing to it.
 
 State on 2026-11-24: steps 1 (moderation), 2 (More tab, activity log, settings), 6 (watching
 streams, without the system's picture-in-picture window) and 7 (sharing the phone camera) are
-built on `feat/ios-backlog`, each read by a review round whose confirmed findings are fixed. The
-real camera and a real stream are device checks (step 12). Everything else is open.
+built on `feat/ios-backlog`, each read by a review round whose confirmed findings are fixed. Step
+4 (public server browser) is built on its own branch `ios/public-servers` and waits for its review
+round and the product manager's look at the screenshots. The real camera and a real stream are
+device checks (step 12). Everything else is open.
 
 ## Starting point
 
@@ -106,6 +108,10 @@ Entry points, the "Public servers" screen with search, country chips, refresh an
 "Add" and "Connect"; pings only for rows on screen, four at a time, stopped in the background.
 Tests against a fake list only. The screen has no mockup: by the product manager's decision the
 iOS screen is built like the Android one and reviewed from the screenshots.
+
+Built: see the backlog's "State when paused" for what exists and the differences from Android.
+The end-to-end half of AC-5.38 (a locally served list and the local test server) moves to step
+11.
 
 ### 5 – Translations and plural rules
 
