@@ -25,13 +25,17 @@ final class EngineMessageNotificationSettings: MessageNotificationSettings, @unc
     private let lock = NSLock()
     // The user's choice is newer than what the engine is still being asked for.
     private var chosen = false
+    /// The last save of the switch; the next one waits for it, so that quick flips are saved
+    /// in the order they were made. (The store keeps two saves from saving over each other,
+    /// but not in the order they were started.)
+    private var save: Task<Void, Never>?
 
     init(store: SessionStore) {
         self.store = store
         Task.detached { [weak self] in
             guard let settings = await store.mobileSettings(), let self else { return }
-            if !self.lock.withLock({ self.chosen }) {
-                self.choice.set(settings.notifySenderOnly)
+            self.lock.withLock {
+                if !self.chosen { self.choice.set(settings.notifySenderOnly) }
             }
         }
     }
@@ -41,11 +45,16 @@ final class EngineMessageNotificationSettings: MessageNotificationSettings, @unc
     func senderOnlyStates() -> AsyncStream<Bool> { choice.states() }
 
     func setSenderOnly(_ senderOnly: Bool) {
-        lock.withLock { chosen = true }
-        choice.set(senderOnly)
-        // A failure is logged by the store; the engine then keeps the earlier choice.
-        Task.detached { [store] in
-            _ = await store.updateMobileSettings { $0.notifySenderOnly = senderOnly }
+        // One lock for the shown choice and the queue of saves, so both keep the same order.
+        lock.withLock {
+            chosen = true
+            choice.set(senderOnly)
+            let previous = save
+            // A failure is logged by the store; the engine then keeps the earlier choice.
+            save = Task.detached { [store] in
+                await previous?.value
+                _ = await store.updateMobileSettings { $0.notifySenderOnly = senderOnly }
+            }
         }
     }
 }

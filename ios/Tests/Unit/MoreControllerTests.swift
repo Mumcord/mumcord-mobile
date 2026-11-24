@@ -134,6 +134,27 @@ final class MoreControllerTests: XCTestCase {
         }
     }
 
+    /// Every flip of "Show sender only" is saved in the order it was made, so the last one stays.
+    func testShowSenderOnlyFlippedQuicklyEndsAsItWasLeft() async {
+        let model = await makeConnected(
+            messageSettings: { EngineMessageNotificationSettings(store: $0) },
+            configure: { $0.mobileSettingsSaveDelay = .milliseconds(5) }
+        )
+        model.more.openSettings()
+
+        let flips = [true, false, true, false, true, false]
+        for senderOnly in flips {
+            model.more.setSenderOnly(senderOnly)
+        }
+
+        await assertEventually("every flip is saved") { self.engine.mobileSettingsSaves == flips.count }
+        XCTAssertFalse(engine.storedMobileSettings.notifySenderOnly, "the last flip is stored")
+        XCTAssertFalse(model.more.senderOnly, "the switch shows the last flip")
+        await assertEventually("the screen shows what was saved") {
+            self.settings(model)?.mobile == self.engine.storedMobileSettings
+        }
+    }
+
     func testShowSenderOnlyChangesItsValueBothWays() async {
         let model = await makeConnected()
         model.more.openSettings()
