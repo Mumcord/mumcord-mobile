@@ -60,6 +60,34 @@ final class ProfileThemesFlowUITests: XCTestCase {
 
     private func isDark(_ colour: ScreenColour) -> Bool { colour.r + colour.g + colour.b < 200 }
 
+    private func isRed(_ colour: ScreenColour) -> Bool { colour.r > colour.g + 80 && colour.r > colour.b + 50 }
+
+    /// Whether any pixel the element covers on screen passes `check`.
+    private func anyPixel(of element: XCUIElement, _ check: (ScreenColour) -> Bool) -> Bool {
+        let screenshot = XCUIScreen.main.screenshot().image
+        guard let image = screenshot.cgImage else { return false }
+        let scale = CGFloat(image.width) / screenshot.size.width
+        let frame = element.frame
+        let area = CGRect(x: frame.minX * scale, y: frame.minY * scale, width: frame.width * scale, height: frame.height * scale).integral
+        guard let cropped = image.cropping(to: area) else { return false }
+        let width = cropped.width
+        let height = cropped.height
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        guard let context = CGContext(
+            data: &bytes,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return false }
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return stride(from: 0, to: bytes.count, by: 4).contains { index in
+            check(ScreenColour(r: Int(bytes[index]), g: Int(bytes[index + 1]), b: Int(bytes[index + 2])))
+        }
+    }
+
     // MARK: Profile
 
     func testTheCommentIsEditedAndThePictureRemoved() {
@@ -89,7 +117,26 @@ final class ProfileThemesFlowUITests: XCTestCase {
         XCTAssertFalse(app.element("avatar-remove").exists)
     }
 
-    func testACommentOverTheLimitCannotBeSavedAndAFailedSaveSaysSo() {
+    func testACommentOverTheLimitCannotBeSaved() {
+        let app = openMore(",profile-short-limit")
+        tapWhenReady(app.element("more-edit-profile"))
+        let save = app.buttons["profile-save"]
+        let field = app.element("Comment")
+        typeText("Hello there", into: field)
+        let fits = app.element("11 of 20 characters")
+        expectAppears(fits)
+        XCTAssertFalse(anyPixel(of: fits, isRed), "the counter is not red while the comment fits")
+        XCTAssertTrue(save.isEnabled)
+
+        replaceText(in: field, with: "Hello there, everyone else")
+        let over = app.element("26 of 20 characters")
+        expectAppears(over)
+        expectAppears(app.element(containing: "Can't save: your comment is too long for this server"))
+        XCTAssertTrue(anyPixel(of: over, isRed), "the counter is red")
+        XCTAssertFalse(save.isEnabled)
+    }
+
+    func testAFailedSaveSaysSoAndGoingBackDropsTheComment() {
         let app = openMore(",profile-save-fails")
         tapWhenReady(app.element("more-edit-profile"))
         let save = app.buttons["profile-save"]

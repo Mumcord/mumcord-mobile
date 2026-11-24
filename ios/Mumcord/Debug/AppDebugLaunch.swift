@@ -88,6 +88,7 @@ import UIKit
 ///         profile          the user's comment on Nordlicht is the one of the mockup
 ///         profile-avatar   the user has a profile picture on Nordlicht
 ///         profile-save-fails saving the comment fails once
+///         profile-short-limit the server takes comments of at most 20 characters
 ///         own-theme        the user has a theme of their own, "From the desktop"
 ///         theme-ocean      the app theme is the built-in "Deep Ocean"
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
@@ -257,6 +258,10 @@ struct AppDebugLaunch {
                 engine.cameraStartDelay = .seconds(30)
             }
             Self.prepareProfileThemes(engine.profileThemes, options)
+            if options.contains("profile-short-limit") {
+                let limits = engine.limits
+                engine.limits = ChatLimits(text: 20, image: limits.image, allowHtml: limits.allowHtml)
+            }
             return engine
         }
     }

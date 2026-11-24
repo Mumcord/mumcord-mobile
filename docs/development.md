@@ -662,5 +662,5 @@ only, at most 512 pixels on its longest edge (`ios/Mumcord/Screens/Profile/Avata
 before it goes to the engine, which scales it to the server's limit. The fake engine knows the
 four built-in themes; it reads only its own code `mct1.fake` and the Deep Ocean code of the
 screenshots as theme codes. The launch options `profile`, `profile-avatar`, `profile-save-fails`,
-`own-theme` and `theme-ocean` (`AppDebugLaunch.swift`) put the screens into the states of the
-tests. Only a real iPhone shows the camera taking the profile picture.
+`profile-short-limit`, `own-theme` and `theme-ocean` (`AppDebugLaunch.swift`) put the screens into
+the states of the tests. Only a real iPhone shows the camera taking the profile picture.
