@@ -411,8 +411,9 @@ scripts/build-ios.sh --test
 scripts/build-ios.sh --build-for-testing
 scripts/build-ios.sh --test-without-building core
 
-# Another simulator
+# Another simulator; IOS_IPAD_SIMULATOR names the iPad of the test group `tablet`
 IOS_SIMULATOR="iPhone 17 Pro" scripts/build-ios.sh --test
+IOS_IPAD_SIMULATOR="iPad Pro 13-inch (M5)" scripts/build-ios.sh --test-without-building tablet
 ```
 
 The Xcode project is generated from `ios/project.yml` and not committed; open
@@ -437,6 +438,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `messages` | messages flow, messages screenshots, streams flow and its screenshots |
 | `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots and those of More and the activity log |
 | `identities` | identities and "Scan from desktop app" flow, the server list's settings icon, the app in German, their screenshots |
+| `tablet` | the two-column iPad layout: its flow and its screenshots, on an iPad simulator ("iPad Air 11-inch (M3)", the size of the tablet mockups, else the newest iPad; created when there is none) |
 
 Before its tests each group starts the app once in the simulator and ends it again (about 20
 seconds), so the first UI test does not pay for the first start of the app in a cold simulator.
@@ -566,6 +568,25 @@ scanner see the QR codes of a scripted transfer (`FakeDesktopTransfer`) instead,
 `-mumcordIdentities <preset>` puts the identity screens into the states of the screenshots.
 Only a real iPhone can show the camera picture, reading the desktop's codes from a screen and the
 system's camera question; a transfer made by the desktop app is checked there by hand.
+
+### iPad layout (iOS)
+
+The connected screens decide between one column and two from the size of the app's window
+(`connectedLayout` in `ios/Mumcord/Screens/Connected/ConnectedLayout.swift`): two columns from
+600 x 480 points, the same numbers as Android's 600 x 480 dp. Every iPad is wider in both
+orientations; no iPhone is, also not a Pro Max turned to landscape (956 x 440); a narrow Split View
+or Slide Over window is not either and gets the phone layout. The size class is not used: an iPhone
+Pro Max in landscape has a regular width, and the phone layout must stay as it is there. The app's root measures its window, the
+keyboard not counted, and tells the model (`AppModel.setTwoColumns`), so the channel chat counts as
+read while it is visible beside the channels; sheets read it from the environment and keep to 480
+points. A stream is `full` (the phone's full screen, the right column in two columns), `mini` or
+`whole` (the whole screen opened from the column).
+
+The UI tests cannot resize the app's window on the simulator. The debug launch option
+`-mumcordSplitWidth <points>` gives the app only that width while the iPad stands upright and the
+whole screen in landscape, so turning the iPad resizes the window between one column and two, as
+the Split View divider does (`DebugSplitWidth`). `tablet-chat` and `tablet-stream-chat` give the
+Lobby the conversations of the tablet mockups. The tablet tests skip themselves on an iPhone.
 
 ### Public servers (iOS)
 

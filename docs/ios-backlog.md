@@ -184,15 +184,61 @@ Texts that stay English on iOS (in every language unless named):
 Translations for these belong in the desktop repository's files (mobile-only texts) or in
 `i18n/mobile/<language>.json`; they are never written by hand into the `.lproj` files.
 
+iPad layout (task 9.2, AC-5.31, mirroring Android commit `204caa1`): built and checked on an iPad
+simulator against the fake engine. From a window of 600 x 480 points (Android's 600 x 480 dp) the
+connected screens use two columns: the navigation rail with Channels, Messages (with its count) and
+More; the channel tree with the banners, the whisper bar, the "Camera on" bar and the voice bar on
+the left (340 points); on the right the channel chat, the Messages screens or the More pages, which
+also hold Settings, Themes, Edit profile and the activity log. The phone's Chat tab is part of
+Channels there and is kept, so a window that becomes narrow again shows the chat as before; the
+channel chat counts as read while it is beside the channels. A watched stream fills the right column
+of Channels as in mockup `22-tablet-stream`: the sharer and their channel, the stage with LIVE,
+viewers, volume, the mini window and full screen buttons and "Stop watching", and a strip with the
+two newest messages of the channel chat ("Lobby chat", with "Show the whole chat") above its input
+bar; its tile leaves the tree meanwhile. The full screen button opens the whole screen, whose arrow,
+VoiceOver's escape gesture and "Leave full screen" (in place of the phone's rotate button) return to
+the column; on Messages and More the stream floats as the mini window, whose expand button goes back
+to Channels. The full voice view covers both columns, as on Android. Sheets are at most 480 points
+wide in the middle of the window in two columns; the system's own presentations (photo picker,
+camera, file picker, the share sheet of a backup or a theme) keep the system's iPad look. A window
+narrower than 600 points (Split View, Slide Over, Stage Manager) or lower than 480 gets the phone
+layout; no iPhone reaches two columns, also not in landscape. Rotating and resizing keep the tab, the
+draft, the open stream and every sheet, because they live in the model. A stream needs no landscape
+of its own on an iPad: the iPad turns by itself and the whole screen turns with it (iOS ignores an
+app's wish for an orientation while it allows multitasking). Unit tests `ConnectedLayoutTests` and
+`StreamsControllerTests`; UI tests `TabletFlowUITests`; screenshots `ios-tablet-*`; all in the test
+group `tablet` on an iPad simulator. The screens without a connection (server list, public servers,
+More from the server list, identities, the server form) stay one column across the whole width, as
+on Android.
+
+**Note for the maintainer: intended differences from Android.**
+
+- The rule is measured in points on the app's whole window (safe areas included, the keyboard not),
+  not with size classes: an iPhone Pro Max in landscape has a regular width size class, and the phone
+  layout must not change there.
+- Sheets keep to 480 points only in two columns. Android limits every sheet to 480 dp, which also
+  narrows the sheets of a phone in landscape; the iPhone's sheets stay as they were.
+- Return on a hardware keyboard does not send a message: SwiftUI's multi-line text field takes the
+  key before the app sees it (tried with `onKeyPress`), so sending from a keyboard cover needs a UIKit
+  text view; left for later. The send button and the on-screen keyboard work as on the phone.
+- No end-to-end scenario yet (Android's `TabletFlowTest`): the iOS end-to-end tests are open (task
+  10.4). The UI tests cannot resize the window on the simulator; the debug option
+  `-mumcordSplitWidth` narrows the window while the iPad stands upright, so turning it stands in for
+  dragging the Split View divider. Real Split View, Slide Over and Stage Manager windows are a device
+  check.
+- The right column has no accessibility container of its own (Android's `main-column` test tag):
+  in SwiftUI it would take the place of the chat's and the stream column's own containers.
+- One more screenshot than Android: a sheet in two columns (`ios-tablet-person-sheet-*`).
+- As on Android, the mockups' elements without a function stay out: the chat header's search and
+  info icons, the stream header's settings icon and its resolution and frame rate, the "+" of the
+  input bar (the image and GIF buttons take its place).
+
 ## Open tasks
 
-### 9.2 Tablet layout and 9.4 accessibility
+### 9.4 Accessibility
 
-iPad layout after the Android tablet layout (9.1); accessibility pass (VoiceOver labels and
-order, talking announcements, Dynamic Type at 200 %, reduced motion, 44 pt targets) after 9.3.
-The stream full screen has no "Turn to landscape" button on an iPad so far: the app allows
-iPad multitasking, so iOS ignores its wish for an orientation there. The tablet layout decides
-whether a stream needs a landscape of its own on an iPad.
+Accessibility pass (VoiceOver labels and order, talking announcements, Dynamic Type at 200 %,
+reduced motion, 44 pt targets), after Android's 9.3 (`8d4fc2a`).
 
 ### 10.3 Release: TestFlight and About screen (FR-5.102)
 
@@ -251,8 +297,7 @@ simulator app; linking for a real device is first proven here.
   would be copied into pixel buffers, and the decoding would go on in the background); real
   streams from the desktop app on a real iPhone (picture, sound, decoding load, rotation); an
   end-to-end scenario with `e2e/stream-peer` against the local test server. The status bar stays
-  dark on the black full screen in the light theme. The tablet layout of a stream (right column,
-  chat strip) comes with the iPad layout.
+  dark on the black full screen in the light theme.
 
 ## CI notes
 

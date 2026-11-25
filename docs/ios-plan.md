@@ -6,10 +6,11 @@ counts as done. Task numbers refer to `specs/05-mobile-app-tasks.md` in the Mumc
 FR and AC numbers to `specs/05-mobile-app-specification.md` there. The specification stays the
 truth; this plan adds nothing to it.
 
-State on 2026-11-24: steps 1 (moderation), 2 (More tab, activity log, settings), 3 (profile,
+State on 2026-11-25: steps 1 (moderation), 2 (More tab, activity log, settings), 3 (profile,
 appearance and themes), 4 (public server browser), 5 (translations and plural rules), 6 (watching
 streams, without the system's picture-in-picture window) and 7 (sharing the phone camera) are built
-on `feat/ios-backlog`.
+on `feat/ios-backlog`; step 9 (iPad layout) is built on `ios/ipad`, cut from it, and waits for a
+review round and a look at a real iPad.
 Steps 1, 2, 3, 6 and 7 were each read by a review round whose confirmed findings are fixed; step
 4 waits for the product manager's look at the screenshots. The real camera and a real stream are
 device checks (step 12). Step 0 (stable ground) is built and passes locally; its proof on GitHub's
@@ -159,6 +160,9 @@ decided by the specification before this step starts; unclear points go to the p
 Two-column layout with a sidebar on iPad after the Android tablet layout; then VoiceOver labels
 and order, announcements while talking, Dynamic Type at 200 %, reduced motion, 44 pt targets.
 Last among the screens, so every screen exists when they run.
+
+Built (step 9): see the backlog's "State when paused" for the layout, its rule and the differences
+from Android. Its tests run in the test group `tablet` on an iPad simulator.
 
 ### 11 – End-to-end tests
 
