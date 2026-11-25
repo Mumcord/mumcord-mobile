@@ -64,6 +64,11 @@ struct ChatScreen: View {
         .onChange(of: newestFromOthers?.id) { _, id in
             if id != nil, let newestFromOthers { announce(newestFromOthers) }
         }
+        // On a change, not when the banner appears: a switch between one column and two builds
+        // the chat again, and the notice on screen must not be read out a second time.
+        .onChange(of: state.notice) { _, notice in
+            if let notice { AccessibilityNotification.Announcement(notice.text).post() }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat-screen")
     }
@@ -160,7 +165,7 @@ private struct NoticeBanner: View {
     var body: some View {
         Button(action: onDismiss) {
             MumcordBanner(
-                text: text,
+                text: notice.text,
                 icon: notice == .gifSaved ? MumcordIcons.star : MumcordIcons.alert,
                 tone: notice == .gifSaved ? .info : .warning
             )
@@ -174,11 +179,13 @@ private struct NoticeBanner: View {
             try? await Task.sleep(nanoseconds: noticeSeconds * 1_000_000_000)
             if !Task.isCancelled { onDismiss() }
         }
-        .onAppear { AccessibilityNotification.Announcement(text).post() }
     }
+}
 
-    private var text: String {
-        switch notice {
+extension ChatNotice {
+    /// What the notice banner says.
+    var text: String {
+        switch self {
         case .gifSaved: Strings.gifSaved
         case .gifNotSaved: Strings.gifNotSaved
         case .imageUnreadable: Strings.chatImageUnreadable
