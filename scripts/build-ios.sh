@@ -88,14 +88,16 @@ group_tests() {
         MumcordUITests/StreamsFlowUITests MumcordUITests/StreamsScreenshotUITests ;;
     output-settings)
       printf '%s\n' MumcordUITests/OutputFlowUITests MumcordUITests/PhoneScreenshotUITests \
-        MumcordUITests/SettingsFlowUITests MumcordUITests/MoreScreenshotUITests ;;
+        MumcordUITests/SettingsFlowUITests MumcordUITests/MoreScreenshotUITests \
+        MumcordUITests/AccessibilityUITests MumcordUITests/LargeTextScreenshotUITests ;;
     identities)
       printf '%s\n' MumcordUITests/IdentitiesFlowUITests MumcordUITests/IdentitiesScreenshotUITests \
         MumcordUITests/ProfileThemesFlowUITests MumcordUITests/ServerListMoreFlowUITests \
         MumcordUITests/ServerListMoreScreenshotUITests MumcordUITests/LanguageFlowUITests \
         MumcordUITests/LanguageScreenshotUITests ;;
     tablet)
-      printf '%s\n' MumcordUITests/TabletFlowUITests MumcordUITests/TabletScreenshotUITests ;;
+      printf '%s\n' MumcordUITests/TabletFlowUITests MumcordUITests/TabletScreenshotUITests \
+        MumcordUITests/TabletAccessibilityUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
   esac
 }

@@ -52,6 +52,9 @@ struct MumcordApp: App {
                         if let probe = AppDebugLaunch.cameraProbe { FakeCameraProbeView(probe: probe) }
                         if let probe = AppDebugLaunch.publicListProbe { FakePublicListProbeView(probe: probe) }
                     }
+                    .onAppear {
+                        if AccessibilityProbe.requested { AccessibilityProbe.install() }
+                    }
             }
             #else
             if let model {

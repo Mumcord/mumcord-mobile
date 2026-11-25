@@ -63,6 +63,8 @@ extension XCTestCase {
     /// the region whose formats the app uses for dates, such as "en_US"; the simulator's when nil.
     /// `textSize` is a Dynamic Type size such as "UICTContentSizeCategoryAccessibilityL".
     /// `language` is the language of the texts, English unless a test asks for another one.
+    /// `accessibilityProbe` adds the element that lists what VoiceOver reaches (see
+    /// `voiceOverElements`).
     func launchApp(
         _ options: String,
         setupDone: Bool = true,
@@ -70,7 +72,8 @@ extension XCTestCase {
         identitiesPreset: String? = nil,
         locale: String? = nil,
         textSize: String? = nil,
-        language: String = "en"
+        language: String = "en",
+        accessibilityProbe: Bool = false
     ) -> XCUIApplication {
         let app = XCUIApplication()
         var arguments = ["-mumcordFakeEngine", options] + languageArguments(language)
@@ -79,6 +82,7 @@ extension XCTestCase {
         if let identitiesPreset { arguments += ["-mumcordIdentities", identitiesPreset] }
         if let locale { arguments += ["-AppleLocale", locale] }
         if let textSize { arguments += ["-UIPreferredContentSizeCategoryName", textSize] }
+        if accessibilityProbe { arguments += ["-mumcordAccessibilityProbe", "YES"] }
         app.launchArguments = arguments
         app.launch()
         // A cold simulator takes its time; nothing is tapped before the app is on screen.
@@ -356,5 +360,59 @@ extension XCTestCase {
             height: CGFloat(image.height)
         ))
         return ScreenColour(r: Int(bytes[0]), g: Int(bytes[1]), b: Int(bytes[2]))
+    }
+}
+
+/// One element VoiceOver reaches, as the app's accessibility probe lists it.
+struct VoiceOverElement: Equatable, CustomStringConvertible {
+    let label: String
+    let value: String
+    let heading: Bool
+    let button: Bool
+    let selected: Bool
+    /// Inside a sheet or another view that is modal for VoiceOver.
+    let modal: Bool
+    /// Where it is on the screen, in points.
+    let frame: CGRect
+
+    var description: String {
+        let flags = [heading ? "heading" : nil, button ? "button" : nil, selected ? "selected" : nil, modal ? "modal" : nil]
+        return "\(label) [\(value)] \(flags.compactMap { $0 }.joined(separator: ",")) \(frame)"
+    }
+}
+
+extension XCTestCase {
+    /// What VoiceOver reaches on the screen, in its order, read from the app's accessibility probe
+    /// (an app started with `accessibilityProbe: true`). The probe updates a few times a second;
+    /// this waits until two reads in a row agree, so a screen that is still being laid out is
+    /// not read halfway.
+    func voiceOverElements(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) -> [VoiceOverElement] {
+        let probe = app.element("accessibility-probe")
+        expectAppears(probe, file: file, line: line)
+        var before = ""
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.4)
+            let now = probe.value as? String ?? ""
+            if !now.isEmpty, now == before { break }
+            before = now
+        }
+        return before.split(separator: "\n").map { line in
+            // The label may hold a "|" itself: the flags come first, the value and the frame last.
+            var parts = line.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+            let box = (parts.count > 3 ? parts.removeLast() : "").split(separator: ",").compactMap { Double($0) }
+            let flags = parts.isEmpty ? "" : parts.removeFirst()
+            let value = parts.count > 1 ? parts.removeLast() : ""
+            parts = [flags, parts.joined(separator: "|"), value]
+            return VoiceOverElement(
+                label: parts.count > 1 ? parts[1] : "",
+                value: parts.count > 2 ? parts[2] : "",
+                heading: flags.contains("H"),
+                button: flags.contains("B"),
+                selected: flags.contains("S"),
+                modal: flags.contains("M"),
+                frame: box.count == 4 ? CGRect(x: box[0], y: box[1], width: box[2], height: box[3]) : .zero
+            )
+        }
     }
 }
