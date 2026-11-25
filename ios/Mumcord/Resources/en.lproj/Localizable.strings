@@ -206,6 +206,10 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Talking";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ is talking";
+"talking_announcement_two" = "%1$@ and %2$@ are talking";
+"talking_announcement_more.one" = "%1$@ and %2$ld other person are talking";
+"talking_announcement_more.other" = "%1$@ and %2$ld other people are talking";
 "voice_mute" = "Mute";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Mute microphone";

@@ -32,6 +32,16 @@ struct ConnectedShell<Chat: View>: View {
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
+        content.background {
+            // Behind every screen of the connection, so the announcements go on in the voice view,
+            // a full screen stream and every tab.
+            if let voice = state.voice, voice.connected {
+                TalkingAnnouncementsView(tiles: voice.tileRows.flatMap { $0 })
+            }
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         if let opened = streams.opened, streamCoversWindow(streams.open, twoColumns: twoColumns) {
             StreamFullScreen(
                 stream: opened,

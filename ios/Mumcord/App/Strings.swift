@@ -215,6 +215,12 @@ enum Strings {
     static var voiceView: String { text("voice_view") }
     static var voiceTalking: String { text("voice_talking") }
     static var voiceNotTalking: String { text("voice_not_talking") }
+    static func talkingAnnouncementOne(_ p1: String) -> String { format("talking_announcement_one", p1) }
+    static func talkingAnnouncementTwo(_ p1: String, _ p2: String) -> String { format("talking_announcement_two", p1, p2) }
+    /// The plural follows the number of the others, as on Android.
+    static func talkingAnnouncementMore(_ p1: String, _ p2: Int) -> String {
+        plural("talking_announcement_more", count: p2, p1, p2)
+    }
     static var voiceMute: String { text("voice_mute") }
     static var voiceUnmute: String { text("voice_unmute") }
     static var voiceMuteMicrophone: String { text("voice_mute_microphone") }
