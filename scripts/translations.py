@@ -20,6 +20,15 @@ matched to the positions through the two English texts, and the mobile-only text
 `{{arg1}}`, `{{arg2}}`. A translation with an unknown placeholder, or without one of a plain
 text's placeholders, is refused. Plurals are `<plurals>` in Android and `_one`, `_other` …
 suffixes in the desktop files; each language gets exactly its CLDR plural categories.
+
+The iOS app's English texts are written by hand in `ios/Mumcord/Resources/en.lproj/
+Localizable.strings`, under the names of the Android texts; plural forms end in `.one`,
+`.other`. Each language gets a `<language>.lproj/Localizable.strings` and every language,
+English too, a `Localizable.stringsdict` with the plurals. An iOS text takes the translation of
+the Android text of the same name when both say the same in English; an iOS text that Android
+does not have, or words differently, takes a desktop text's translations as above. All other
+iOS texts are English. iOS's `%1$@` and `%1$ld` stand for Android's `%1$s` and `%1$d`; the
+stringsdict takes the number that picks the plural form as one more argument after the text's own.
 """
 
 import argparse
@@ -27,7 +36,7 @@ import json
 import re
 import sys
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from xml.sax.saxutils import escape as xml_escape
 import xml.etree.ElementTree as ET
@@ -58,6 +67,10 @@ DESKTOP_PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z0-9_.]+)\s*\}\}")
 # Trans components (`<0>…</0>`) and nesting (`$t(…)`) have no Android counterpart.
 DESKTOP_UNSUPPORTED = re.compile(r"</?\d+>|\$t\(|\{\{-")
 LETTER = re.compile(r"[^\W\d_]")
+# iOS: `%1$@`, `%1$ld`, `%1$d` or unnumbered; `%%` is a literal '%'.
+IOS_FORMAT = re.compile(r"%(?:(\d+)\$)?(@|ld|d)|%%")
+IOS_ENGLISH = Path("ios/Mumcord/Resources/en.lproj/Localizable.strings")
+IOS_STRINGS_LINE = re.compile(r'^"((?:[^"\\]|\\.)*)"\s*=\s*"((?:[^"\\]|\\.)*)";$')
 
 
 class TranslationError(Exception):
@@ -494,13 +507,314 @@ def read_mobile(i18n: Path, lang: str, entries: list[Entry], keys: dict[str, str
     return texts
 
 
+# --- iOS ----------------------------------------------------------------------------------------
+
+
+def ios_unescape(value: str) -> str:
+    out = []
+    i = 0
+    while i < len(value):
+        if value[i] == "\\" and i + 1 < len(value):
+            out.append({"n": "\n", "t": "\t"}.get(value[i + 1], value[i + 1]))
+            i += 2
+        else:
+            out.append(value[i])
+            i += 1
+    return "".join(out)
+
+
+def ios_escape(text: str) -> str:
+    """The `.strings` value that makes iOS show `text`."""
+    return text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\t", "\\t")
+
+
+def read_ios_strings(path: Path) -> list[tuple[str, str]]:
+    """The keys and texts of a `.strings` file, in file order; comments and blank lines skipped."""
+    texts = []
+    in_comment = False
+    for number, line in enumerate(path.read_text("utf-8").splitlines(), 1):
+        line = line.strip()
+        if in_comment or line.startswith("/*"):
+            in_comment = "*/" not in line
+            continue
+        if not line or line.startswith("//"):
+            continue
+        match = IOS_STRINGS_LINE.match(line)
+        if not match:
+            raise TranslationError(f"{path}:{number}: not a line of the form \"key\" = \"text\";")
+        texts.append((ios_unescape(match.group(1)), ios_unescape(match.group(2))))
+    keys = [key for key, _ in texts]
+    duplicates = sorted({key for key in keys if keys.count(key) > 1})
+    if duplicates:
+        raise TranslationError(f"{path}: keys written twice: {duplicates}")
+    return texts
+
+
+def ios_args(text: str, where: str) -> dict[int, str]:
+    """Position → iOS conversion (`@`, `ld`, `d`) of each placeholder of an iOS text."""
+    matches = [match for match in IOS_FORMAT.finditer(text) if match.group(2)]
+    if len({match.group(1) is None for match in matches}) > 1:
+        raise TranslationError(f"{where}: numbered and unnumbered placeholders mixed")
+    args: dict[int, str] = {}
+    for index, match in enumerate(matches):
+        position = int(match.group(1)) if match.group(1) else index + 1
+        if args.setdefault(position, match.group(2)) != match.group(2):
+            raise TranslationError(f"{where}: placeholder {position} with two types")
+    return args
+
+
+def ios_to_android(text: str) -> str:
+    """An iOS text with Android's placeholders, to match it with the Android and desktop texts."""
+    return IOS_FORMAT.sub(
+        lambda m: m.group(0) if not m.group(2) else f"%{m.group(1) + '$' if m.group(1) else ''}{'s' if m.group(2) == '@' else 'd'}",
+        text,
+    )
+
+
+def numbered(text: str, pattern: re.Pattern[str], typed: bool) -> str:
+    """A text whose placeholders are all numbered (`%1$s`), or only numbered (`%1$`) when the
+    type does not matter, so that `%d` and `%1$ld` compare equal."""
+    counter = iter(range(1, 1000))
+
+    def number(match: re.Match[str]) -> str:
+        if not match.group(2):
+            return match.group(0)
+        position = match.group(1) or str(next(counter))
+        return f"%{position}${match.group(2) if typed else ''}"
+
+    return pattern.sub(number, text)
+
+
+def to_ios(text: str, specs: dict[int, str], where: str) -> str:
+    """An Android text (as `translate` writes it) with the iOS placeholders of the English text."""
+
+    def convert(match: re.Match[str]) -> str:
+        if not match.group(2):
+            return match.group(0)
+        position = int(match.group(1))
+        spec = specs.get(position)
+        # A number may be passed as text, so that iOS writes it without a thousands separator.
+        if spec is None or (match.group(2) == "s" and spec != "@"):
+            raise TranslationError(f"{where}: placeholder %{position}${match.group(2)} does not fit the iOS text")
+        return f"%{position}${spec}"
+
+    return ANDROID_FORMAT.sub(convert, numbered(text, ANDROID_FORMAT, typed=True))
+
+
+@dataclass
+class IosEntry:
+    """A text of the iOS English file; a plural gathers the `.one`, `.other` … keys of one name."""
+
+    entry: Entry
+    # The iOS conversion of each placeholder position, from the English text.
+    specs: dict[int, str]
+
+
+def ios_entries(texts: list[tuple[str, str]], path: Path) -> list[IosEntry]:
+    entries: dict[str, IosEntry] = {}
+    for key, text in texts:
+        name, dot, quantity = key.partition(".")
+        where = f"{path.name}/{key}"
+        if dot and quantity not in CATEGORY_ORDER:
+            raise TranslationError(f"{where}: '{quantity}' is not a plural category")
+        specs = ios_args(text, where)
+        known = entries.get(name)
+        if known is None:
+            known = entries[name] = IosEntry(Entry(name, plural={} if dot else None), {})
+        elif (known.entry.plural is None) == bool(dot) or not dot:
+            raise TranslationError(f"{where}: {name} is written as a text and as a plural")
+        for position, spec in specs.items():
+            if known.specs.setdefault(position, spec) != spec:
+                raise TranslationError(f"{where}: placeholder {position} with two types")
+        if dot:
+            known.entry.plural[quantity] = ios_to_android(text)
+        else:
+            known.entry.text = ios_to_android(text)
+    for ios in entries.values():
+        if ios.entry.plural is not None and "other" not in ios.entry.plural:
+            raise TranslationError(f"{path.name}/{ios.entry.name}: plural without '.other'")
+    return list(entries.values())
+
+
+def same_text(ios: Entry, android: Entry) -> bool:
+    """Whether an iOS and an Android text say the same in English, placeholder types aside."""
+
+    def plain(text: str) -> str:
+        return numbered(text, ANDROID_FORMAT, typed=False)
+
+    if ios.plural is None or android.plural is None:
+        return ios.plural is None and android.plural is None and plain(ios.text) == plain(android.text)
+    return ios.plural.keys() == android.plural.keys() and all(
+        plain(text) == plain(android.plural[quantity]) for quantity, text in ios.plural.items()
+    )
+
+
+@dataclass
+class IosSource:
+    """Where an iOS text takes its translations from."""
+
+    # The Android text of the same name, when it says the same in English.
+    android: Entry | None = None
+    # Otherwise the desktop text with the same English, if there is one.
+    desktop_key: str | None = None
+    # Why the text stays English in every language, where it does.
+    english_because: str | None = None
+
+
+def ios_sources(
+    ios: list[IosEntry], android: dict[str, Entry], keys: dict[str, str], desktop: Desktop
+) -> dict[str, IosSource]:
+    sources = {}
+    others = []
+    for item in ios:
+        match = android.get(item.entry.name)
+        if match is not None and same_text(item.entry, match):
+            sources[item.entry.name] = IosSource(android=match)
+        else:
+            others.append(item.entry)
+            sources[item.entry.name] = IosSource(
+                english_because="iOS only" if match is None else "worded differently than on Android"
+            )
+    # The texts Android does not have alike are matched with the desktop texts by their English.
+    for name, key in choose_keys(others, desktop, {}).items():
+        sources[name] = IosSource(desktop_key=key)
+    return sources
+
+
+@dataclass
+class IosCoverage:
+    translated: int = 0
+    neutral: int = 0
+    # Name → why it is English in this language.
+    english: dict[str, str] = field(default_factory=dict)
+
+
+def translate_ios(
+    item: IosEntry,
+    lang: str,
+    source: IosSource,
+    desktop: Desktop,
+    keys: dict[str, str],
+    mobile: dict[str, str],
+    coverage: IosCoverage,
+) -> str | dict[str, str]:
+    """An iOS text, or its plural forms, in one language, with iOS placeholders."""
+    counted = Coverage()
+    if source.android is not None:
+        android = source.android
+        value = translate(android, lang, desktop, keys.get(android.name), mobile, counted)
+    else:
+        value = translate(item.entry, lang, desktop, source.desktop_key, {}, counted)
+    if counted.neutral:
+        coverage.neutral += 1
+    elif counted.english:
+        coverage.english[item.entry.name] = source.english_because or "no translation in the sources"
+    else:
+        coverage.translated += 1
+    where = f"{lang}.lproj/{item.entry.name}"
+    if isinstance(value, str):
+        return to_ios(value, item.specs, where)
+    return {category: to_ios(text, item.specs, f"{where}.{category}") for category, text in value.items()}
+
+
+GENERATED_BY = "Written by scripts/translations.py from {source}. Do not edit by hand."
+
+
+def ios_strings(values: list[tuple[str, str]], source: str) -> str:
+    lines = [
+        "/* SPDX-License-Identifier: AGPL-3.0-only */",
+        f"/* {GENERATED_BY.format(source=source)} */",
+        "",
+    ]
+    lines += [f'"{ios_escape(key)}" = "{ios_escape(text)}";' for key, text in values]
+    return "\n".join(lines) + "\n"
+
+
+def ios_stringsdict(plurals: list[tuple[str, dict[str, str], int]], source: str) -> str:
+    """The plurals of a language. The number that picks the form is the argument after the
+    text's own placeholders (`count`), as Android's quantity is apart from its arguments."""
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+        "<!-- SPDX-License-Identifier: AGPL-3.0-only -->",
+        f"<!-- {GENERATED_BY.format(source=source)} -->",
+        '<plist version="1.0">',
+        "<dict>",
+    ]
+    for name, forms, count in plurals:
+        lines += [
+            f"    <key>{xml_escape(name)}</key>",
+            "    <dict>",
+            "        <key>NSStringLocalizedFormatKey</key>",
+            f"        <string>%{count}$#@count@</string>",
+            "        <key>count</key>",
+            "        <dict>",
+            "            <key>NSStringFormatSpecTypeKey</key>",
+            "            <string>NSStringPluralRuleType</string>",
+            "            <key>NSStringFormatValueTypeKey</key>",
+            "            <string>ld</string>",
+        ]
+        for category, text in forms.items():
+            lines += [f"            <key>{category}</key>", f"            <string>{xml_escape(text)}</string>"]
+        lines += ["        </dict>", "    </dict>"]
+    lines += ["</dict>", "</plist>"]
+    return "\n".join(lines) + "\n"
+
+
+def build_ios(
+    repo: Path,
+    desktop: Desktop,
+    android: dict[str, Entry],
+    keys: dict[str, str],
+    mobiles: dict[str, dict[str, str]],
+    ref: str,
+) -> tuple[dict[Path, str], dict[str, IosCoverage]]:
+    english_path = repo / IOS_ENGLISH
+    resources = english_path.parent.parent
+    items = ios_entries(read_ios_strings(english_path), english_path)
+    sources = ios_sources(items, android, keys, desktop)
+    files: dict[Path, str] = {}
+    coverage: dict[str, IosCoverage] = {}
+
+    def count_position(item: IosEntry) -> int:
+        return max(item.specs, default=0) + 1
+
+    english_plurals = [
+        (item.entry.name, {
+            category: to_ios(numbered(item.entry.plural[category], ANDROID_FORMAT, typed=True), item.specs, f"en/{item.entry.name}")
+            for category in CATEGORY_ORDER
+            if category in item.entry.plural
+        }, count_position(item))
+        for item in items
+        if item.entry.plural is not None
+    ]
+    files[resources / "en.lproj" / "Localizable.stringsdict"] = ios_stringsdict(english_plurals, IOS_ENGLISH.as_posix())
+    for lang in LANGUAGES[1:]:
+        coverage[lang] = IosCoverage()
+        source = f"Mumcord {ref[:12]} (ui/src/locales/{lang}), i18n/mobile/{lang}.json and {IOS_ENGLISH.as_posix()}"
+        strings = []
+        plurals = []
+        for item in items:
+            value = translate_ios(item, lang, sources[item.entry.name], desktop, keys, mobiles[lang], coverage[lang])
+            if isinstance(value, str):
+                strings.append((item.entry.name, value))
+            else:
+                plurals.append((item.entry.name, value, count_position(item)))
+        files[resources / f"{lang}.lproj" / "Localizable.strings"] = ios_strings(strings, source)
+        files[resources / f"{lang}.lproj" / "Localizable.stringsdict"] = ios_stringsdict(plurals, source)
+    return files, coverage
+
+
 def engine_ref(repo: Path) -> str:
     engine = tomllib.loads((repo / "engine.lock.toml").read_text("utf-8"))["engine"]
     return engine.get("rev") or engine["tag"]
 
 
-def build(repo: Path, engine: Path) -> tuple[dict[Path, str], dict[str, Coverage]]:
-    """Every file this script writes, with its content, and the coverage per language."""
+def build(
+    repo: Path, engine: Path
+) -> tuple[dict[Path, str], dict[str, Coverage], dict[str, IosCoverage]]:
+    """Every file this script writes, with its content, and the coverage per language of the
+    Android and of the iOS texts."""
     ref = engine_ref(repo)
     stamp = engine / ".fetched-ref"
     if not stamp.exists() or ref not in stamp.read_text("utf-8").split():
@@ -515,8 +829,9 @@ def build(repo: Path, engine: Path) -> tuple[dict[Path, str], dict[str, Coverage
     files: dict[Path, str] = {i18n / "mobile" / "en.json": mobile_json(entries, keys)}
     files[repo / "android/app/src/main/res/xml/locales_config.xml"] = locales_config()
     coverage = {}
+    mobiles = {}
     for lang in LANGUAGES[1:]:
-        mobile = read_mobile(i18n, lang, entries, keys)
+        mobile = mobiles[lang] = read_mobile(i18n, lang, entries, keys)
         coverage[lang] = Coverage()
         source = f"Mumcord {ref[:12]} (ui/src/locales/{lang}) and i18n/mobile/{lang}.json"
         for module in modules:
@@ -525,16 +840,22 @@ def build(repo: Path, engine: Path) -> tuple[dict[Path, str], dict[str, Coverage
                 for entry in module.entries
             ]
             files[module.res / f"values-{lang}" / module.name] = strings_xml(values, source)
-    return files, coverage
+    ios_coverage: dict[str, IosCoverage] = {}
+    if (repo / IOS_ENGLISH).exists():
+        android = {entry.name: entry for entry in entries}
+        ios_files, ios_coverage = build_ios(repo, desktop, android, keys, mobiles, ref)
+        files.update(ios_files)
+    return files, coverage, ios_coverage
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("command", choices=["generate", "check"])
     parser.add_argument("--engine", type=Path, default=REPO / ".engine", help="Mumcord checkout")
+    parser.add_argument("--verbose", action="store_true", help="list the iOS texts that stay English")
     args = parser.parse_args()
     try:
-        files, coverage = build(REPO, args.engine)
+        files, coverage, ios_coverage = build(REPO, args.engine)
     except TranslationError as error:
         print(f"translations: {error}", file=sys.stderr)
         return 1
@@ -557,6 +878,16 @@ def main() -> int:
     )
     for lang, numbers in coverage.items():
         print(f"  {lang}: {numbers.desktop} + {numbers.mobile}, {numbers.english} English")
+    if ios_coverage:
+        first = next(iter(ios_coverage.values()))
+        count = first.translated + first.neutral + len(first.english)
+        print(f"translations: iOS, {count} texts per language, {first.neutral} without words; translated, still English:")
+        for lang, numbers in ios_coverage.items():
+            print(f"  {lang}: {numbers.translated}, {len(numbers.english)} English")
+        if args.verbose:
+            for lang, numbers in ios_coverage.items():
+                for name, why in numbers.english.items():
+                    print(f"  {lang} {name}: {why}")
     return 0
 
 

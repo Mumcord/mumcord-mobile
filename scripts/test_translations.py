@@ -2,6 +2,7 @@
 """Tests of scripts/translations.py: python3 -m unittest discover -s scripts -p 'test_*.py'"""
 
 import json
+import plistlib
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
@@ -142,6 +143,49 @@ class ChooseKeysTest(unittest.TestCase):
         self.assertEqual(t.choose_keys([entry("count", "%1$d / %2$d")], source, {}), {})
 
 
+class IosTest(unittest.TestCase):
+    def test_strings_files_are_read_and_written_with_escapes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Localizable.strings"
+            path.write_text('/* header\n   more */\n\n"a" = "Say \\"hi\\"\\nnow";\n// note\n"b.one" = "%1$ld day";\n')
+            self.assertEqual(t.read_ios_strings(path), [("a", 'Say "hi"\nnow'), ("b.one", "%1$ld day")])
+        self.assertEqual(t.ios_escape('a "b" \\ c\nd'), 'a \\"b\\" \\\\ c\\nd')
+
+    def test_android_placeholders_become_those_of_the_ios_text(self):
+        specs = t.ios_args("%1$@ has %2$ld", "x")
+        self.assertEqual(specs, {1: "@", 2: "ld"})
+        self.assertEqual(t.to_ios("%2$d bei %1$s, 5 %%", specs, "x"), "%2$ld bei %1$@, 5 %%")
+        # Unnumbered placeholders are numbered, so that a plural's count can follow them.
+        self.assertEqual(t.to_ios("%d sehen zu", {1: "d"}, "x"), "%1$d sehen zu")
+        # A number may be passed as text; a text never as a number.
+        self.assertEqual(t.to_ios("%1$d Zeichen", {1: "@"}, "x"), "%1$@ Zeichen")
+        with self.assertRaises(t.TranslationError):
+            t.to_ios("%1$s", {1: "ld"}, "x")
+        with self.assertRaises(t.TranslationError):
+            t.to_ios("%2$s", {1: "@"}, "x")
+
+    def test_ios_and_android_texts_match_regardless_of_placeholder_types(self):
+        [item] = t.ios_entries([("n.one", "%ld server"), ("n.other", "%ld servers")], Path("en"))
+        self.assertTrue(t.same_text(item.entry, plural("n", "%1$d server", "%1$d servers")))
+        self.assertFalse(t.same_text(item.entry, plural("n", "%1$d server", "%1$d hosts")))
+        self.assertFalse(t.same_text(item.entry, entry("n", "%1$d servers")))
+
+    def test_a_key_must_not_be_a_text_and_a_plural(self):
+        with self.assertRaises(t.TranslationError):
+            t.ios_entries([("n", "x"), ("n.one", "y")], Path("en"))
+        with self.assertRaises(t.TranslationError):
+            t.ios_entries([("n.one", "x")], Path("en"))
+        with self.assertRaises(t.TranslationError):
+            t.ios_entries([("n.single", "x"), ("n.other", "y")], Path("en"))
+
+    def test_the_stringsdict_takes_the_count_after_the_texts_arguments(self):
+        text = t.ios_stringsdict([("n", {"one": "%1$ld of %2$ld", "other": "%1$ld of %2$ld"}, 3)], "x")
+        plist = plistlib.loads(text.encode())
+        self.assertEqual(plist["n"]["NSStringLocalizedFormatKey"], "%3$#@count@")
+        self.assertEqual(plist["n"]["count"]["NSStringFormatValueTypeKey"], "ld")
+        self.assertEqual(plist["n"]["count"]["one"], "%1$ld of %2$ld")
+
+
 class BuildTest(unittest.TestCase):
     def test_a_repository_is_written_and_checked(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -163,14 +207,54 @@ class BuildTest(unittest.TestCase):
             (repo / "i18n/desktop-keys.json").write_text("{}")
             (repo / "i18n/mobile/de.json").write_text(json.dumps({"hello": "Hallo {{arg1}}"}))
 
-            files, coverage = t.build(repo, engine)
+            ios = repo / "ios/Mumcord/Resources/en.lproj"
+            ios.mkdir(parents=True)
+            (ios / "Localizable.strings").write_text(
+                '/* English */\n"app" = "Mumcord";\n"leave" = "Leave";\n"hello" = "Hello %1$@";\n'
+                '"only" = "Leave";\n"settings" = "Phone only";\n'
+                '"days.one" = "%1$ld day";\n"days.other" = "%1$ld days";\n'
+            )
+            (res / "strings.xml").write_text(
+                '<resources><string name="app" translatable="false">Mumcord</string>'
+                '<string name="leave">Leave</string><string name="hello">Hello %1$s</string>'
+                '<plurals name="days"><item quantity="one">%1$d day</item><item quantity="other">%1$d days</item></plurals>'
+                "</resources>"
+            )
+            (repo / "i18n/mobile/de.json").write_text(
+                json.dumps({"hello": "Hallo {{arg1}}", "days_one": "{{arg1}} Tag", "days_other": "{{arg1}} Tage"})
+            )
+
+            files, coverage, ios_coverage = t.build(repo, engine)
             german = files[repo / "android/app/src/main/res/values-de/strings.xml"]
             self.assertIn('<string name="leave">Verlassen</string>', german)
             self.assertIn('<string name="hello">Hallo %1$s</string>', german)
             self.assertNotIn('name="app"', german)
             self.assertIn("abc123", german)
-            self.assertEqual(json.loads(files[repo / "i18n/mobile/en.json"]), {"hello": "Hello {{arg1}}"})
-            self.assertEqual((coverage["de"].desktop, coverage["de"].mobile, coverage["fr"].english), (1, 1, 2))
+            self.assertEqual(
+                json.loads(files[repo / "i18n/mobile/en.json"]),
+                {"hello": "Hello {{arg1}}", "days_one": "{{arg1}} day", "days_other": "{{arg1}} days"},
+            )
+            self.assertEqual((coverage["de"].desktop, coverage["de"].mobile, coverage["fr"].english), (1, 2, 3))
+
+            resources = repo / "ios/Mumcord/Resources"
+            german = files[resources / "de.lproj/Localizable.strings"]
+            self.assertIn('"leave" = "Verlassen";', german)
+            self.assertIn('"hello" = "Hallo %1$@";', german)
+            # An iOS-only text with a desktop text's English takes its translation.
+            self.assertIn('"only" = "Verlassen";', german)
+            self.assertIn('"settings" = "Phone only";', german)
+            self.assertNotIn("days", german)
+            days = plistlib.loads(files[resources / "de.lproj/Localizable.stringsdict"].encode())["days"]
+            self.assertEqual(days["NSStringLocalizedFormatKey"], "%2$#@count@")
+            self.assertEqual((days["count"]["one"], days["count"]["other"]), ("%1$ld Tag", "%1$ld Tage"))
+            polish = plistlib.loads(files[resources / "pl.lproj/Localizable.stringsdict"].encode())["days"]["count"]
+            self.assertEqual([key for key in polish if not key.startswith("NS")], ["one", "few", "many", "other"])
+            english = plistlib.loads(files[resources / "en.lproj/Localizable.stringsdict"].encode())["days"]["count"]
+            self.assertEqual((english["one"], english["other"]), ("%1$ld day", "%1$ld days"))
+            self.assertNotIn(resources / "en.lproj/Localizable.strings", files)
+            self.assertEqual(ios_coverage["de"].translated, 4)
+            self.assertEqual(ios_coverage["de"].english, {"app": "iOS only", "settings": "iOS only"})
+            self.assertEqual(ios_coverage["fr"].english["hello"], "no translation in the sources")
 
             (repo / "i18n/mobile/de.json").write_text(json.dumps({"gone": "Weg"}))
             with self.assertRaises(t.TranslationError):
