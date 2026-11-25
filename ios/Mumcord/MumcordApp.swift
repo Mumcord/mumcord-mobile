@@ -111,11 +111,7 @@ extension AppModel {
             setupStore: UserDefaultsSetupStore(),
             microphone: audio,
             localNetwork: SystemLocalNetworkGateway(log: AppLog.write),
-            openSettings: {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
-            },
+            openSettings: openSystemSettings,
             call: call,
             sessionEnded: call.takeSessionEndedNotice(),
             notifications: NotificationPrompt(gateway: notificationGateway),
@@ -127,8 +123,10 @@ extension AppModel {
             qrSource: CameraQrSource(),
             network: network,
             streamVideo: StreamVideo(frames: EngineVideoFrames(handle: { store.videoHandle() })),
-            cameraShare: cameraShare
+            cameraShare: cameraShare,
+            languages: .system
         )
+        model.more.openLanguageSettings = openSystemSettings
         notifier.onOpen { [weak model] key in
             if let chat = chatFromNotificationKey(key) { model?.openChat(chat) }
         }
@@ -141,6 +139,13 @@ extension AppModel {
         )
         return model
     }()
+
+    /// The app's page in the system settings: permissions and the app's language.
+    static func openSystemSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+    }
 
     /// Lives as long as the process: it turns the engine's message events into notifications.
     @MainActor private static var messageNotifications: MessageNotificationCenter?

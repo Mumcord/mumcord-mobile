@@ -319,6 +319,34 @@ final class MoreControllerTests: XCTestCase {
         XCTAssertEqual(model.uiState.session.activity, [])
     }
 
+    // MARK: Language
+
+    /// A model on the server list whose app has this language in the system settings.
+    private func makeWithLanguage(
+        _ preferences: [String]?,
+        configure: @escaping @Sendable (FakeEngine) -> Void = { _ in }
+    ) async -> AppModel {
+        let store = makeStore(box, server: mockupVoiceServer(), servers: [savedServer(1, "Nordlicht")], configure: configure)
+        let model = PhoneFakes().makeModel(
+            store: store,
+            setupStore: InMemorySetupStore(firstStartDone: true),
+            languages: AppLanguages { preferences }
+        )
+        await assertEventually { model.uiState.session.appSettings != nil }
+        return model
+    }
+
+    func testTheLanguageOfTheSystemSettingsIsSavedAsTheSharedSetting() async {
+        let model = await makeWithLanguage(["de-AT"])
+        await assertEventually { self.engine.storedAppSettings.language == "de" }
+        await assertEventually { model.uiState.session.appSettings?.language == "de" }
+    }
+
+    func testFollowingThePhoneAgainClearsTheSavedLanguage() async {
+        _ = await makeWithLanguage(nil) { $0.storedAppSettings.language = "fr" }
+        await assertEventually { self.engine.storedAppSettings.language == nil }
+    }
+
     // MARK: The server list's More screen
 
     /// A model on the server list, not connected.

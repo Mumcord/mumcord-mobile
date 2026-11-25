@@ -5,8 +5,9 @@ import Foundation
 /// Typed access to the texts in `Localizable.strings`. The keys equal the string names of the
 /// Android app, so both apps are translated from the same list.
 ///
-/// Plural forms are picked here between `.one` and `.other`, which is enough for English; the
-/// language task replaces this with the plural rules of each language.
+/// Plural forms come from `Localizable.stringsdict`, which `scripts/translations.py` writes with
+/// the plural rules of each language; the number that picks the form is passed after the text's
+/// own arguments, as Android passes its quantity apart from them.
 enum Strings {
     static var appName: String { text("app_name") }
     static var actionCancel: String { text("action_cancel") }
@@ -34,7 +35,7 @@ enum Strings {
     static func serversRemoveDescription(_ p1: String) -> String { format("servers_remove_description", p1) }
     static var serversConnecting: String { text("servers_connecting") }
     static func serversOnline(_ p1: Int, _ p2: Int) -> String {
-        format(p1 == 1 ? "servers_online.one" : "servers_online.other", p1, p2)
+        plural("servers_online", count: p1, p1, p2)
     }
     static var serversOffline: String { text("servers_offline") }
     static var serversAdd: String { text("servers_add") }
@@ -56,11 +57,11 @@ enum Strings {
     static var publicSearch: String { text("public_search") }
     static var publicAnyCountry: String { text("public_any_country") }
     static func publicCountAll(_ p1: Int) -> String {
-        format(p1 == 1 ? "public_count_all.one" : "public_count_all.other", p1)
+        plural("public_count_all", count: p1, p1)
     }
     /// The plural follows the total, as on Android.
     static func publicCountShown(_ p1: Int, _ p2: Int) -> String {
-        format(p2 == 1 ? "public_count_shown.one" : "public_count_shown.other", p1, p2)
+        plural("public_count_shown", count: p2, p1, p2)
     }
     static var publicEmpty: String { text("public_empty") }
     static var publicNoMatch: String { text("public_no_match") }
@@ -68,7 +69,7 @@ enum Strings {
     static func publicPing(_ p1: Int, _ p2: Int, _ p3: Int) -> String { format("public_ping", p1, p2, p3) }
     /// The plural follows the user limit, as on Android.
     static func publicPingDescription(_ p1: Int, _ p2: Int, _ p3: Int) -> String {
-        format(p2 == 1 ? "public_ping_description.one" : "public_ping_description.other", p1, p2, p3)
+        plural("public_ping_description", count: p2, p1, p2, p3)
     }
     static var publicNoAnswer: String { text("public_no_answer") }
     static var publicAdd: String { text("public_add") }
@@ -158,7 +159,7 @@ enum Strings {
     static func channelsExpand(_ p1: String) -> String { format("channels_expand", p1) }
     static var channelsMenu: String { text("channels_menu") }
     static func channelsOnline(_ p1: Int) -> String {
-        format(p1 == 1 ? "channels_online.one" : "channels_online.other", p1)
+        plural("channels_online", count: p1, p1)
     }
     static var personTalking: String { text("person_talking") }
     static var personMuted: String { text("person_muted") }
@@ -188,7 +189,7 @@ enum Strings {
     static var tabMore: String { text("tab_more") }
     static func moreDisconnect(_ p1: String) -> String { format("more_disconnect", p1) }
     static func channelsPeopleCount(_ p1: Int) -> String {
-        format(p1 == 1 ? "channels_people_count.one" : "channels_people_count.other", p1)
+        plural("channels_people_count", count: p1, p1)
     }
 
     static var localNetworkTitle: String { text("local_network_title") }
@@ -240,7 +241,7 @@ enum Strings {
 
     static func chatTitle(_ p1: String) -> String { format("chat_title", p1) }
     static func chatSubtitle(_ p1: Int, _ p2: String) -> String {
-        format(p1 == 1 ? "chat_subtitle.one" : "chat_subtitle.other", p1, p2)
+        plural("chat_subtitle", count: p1, p1, p2)
     }
     static func chatPlaceholder(_ p1: String) -> String { format("chat_placeholder", p1) }
     static var chatAddImage: String { text("chat_add_image") }
@@ -255,10 +256,10 @@ enum Strings {
     static var chatDayToday: String { text("chat_day_today") }
     static var chatDayYesterday: String { text("chat_day_yesterday") }
     static func chatNewMessages(_ p1: Int) -> String {
-        format(p1 == 1 ? "chat_new_messages.one" : "chat_new_messages.other", p1)
+        plural("chat_new_messages", count: p1, p1)
     }
     static func chatTabUnread(_ p1: Int) -> String {
-        format(p1 == 1 ? "chat_tab_unread.one" : "chat_tab_unread.other", p1)
+        plural("chat_tab_unread", count: p1, p1)
     }
     static func chatAnnounce(_ p1: String, _ p2: String) -> String { format("chat_announce", p1, p2) }
     static var chatMentionsYou: String { text("chat_mentions_you") }
@@ -277,10 +278,10 @@ enum Strings {
     static var chatImageRefused: String { text("chat_image_refused") }
     static var chatDiscard: String { text("chat_discard") }
     static func chatCharactersLeft(_ p1: Int) -> String {
-        format(p1 == 1 ? "chat_characters_left.one" : "chat_characters_left.other", p1)
+        plural("chat_characters_left", count: p1, p1)
     }
     static func chatCharactersOver(_ p1: Int) -> String {
-        format(p1 == 1 ? "chat_characters_over.one" : "chat_characters_over.other", p1)
+        plural("chat_characters_over", count: p1, p1)
     }
     static var chatImageUnreadable: String { text("chat_image_unreadable") }
     static var chatNoticeDismiss: String { text("chat_notice_dismiss") }
@@ -315,10 +316,10 @@ enum Strings {
     static var messagesPreviewPicture: String { text("messages_preview_picture") }
     static var messagesOnline: String { text("messages_online") }
     static func messagesRowUnread(_ p1: Int) -> String {
-        format(p1 == 1 ? "messages_row_unread.one" : "messages_row_unread.other", p1)
+        plural("messages_row_unread", count: p1, p1)
     }
     static func messagesTabUnread(_ p1: Int) -> String {
-        format(p1 == 1 ? "messages_tab_unread.one" : "messages_tab_unread.other", p1)
+        plural("messages_tab_unread", count: p1, p1)
     }
     static var messagesNotificationsOffTitle: String { text("messages_notifications_off_title") }
     static var messagesNotificationsOffText: String { text("messages_notifications_off_text") }
@@ -332,7 +333,7 @@ enum Strings {
     static var requestsChatRequest: String { text("requests_chat_request") }
     static var requestsChatRequestEmpty: String { text("requests_chat_request_empty") }
     static func requestsMoreMessages(_ p1: Int) -> String {
-        format(p1 == 1 ? "requests_more_messages.one" : "requests_more_messages.other", p1)
+        plural("requests_more_messages", count: p1, p1)
     }
     static var requestsAccept: String { text("requests_accept") }
     static var requestsDecline: String { text("requests_decline") }
@@ -407,7 +408,7 @@ enum Strings {
     static var moreBlocked: String { text("more_blocked") }
     static var moreActivity: String { text("more_activity") }
     static func moreActivityNew(_ p1: Int) -> String {
-        format(p1 == 1 ? "more_activity_new.one" : "more_activity_new.other", p1)
+        plural("more_activity_new", count: p1, p1)
     }
     static var activityTitle: String { text("activity_title") }
     static var activityBack: String { text("activity_back") }
@@ -468,7 +469,7 @@ enum Strings {
     static var settingsHistory: String { text("settings_history") }
     static var settingsHistoryNever: String { text("settings_history_never") }
     static func settingsHistoryDays(_ p1: Int) -> String {
-        format(p1 == 1 ? "settings_history_days.one" : "settings_history_days.other", p1)
+        plural("settings_history_days", count: p1, p1)
     }
     static var settingsHistoryNote: String { text("settings_history_note") }
     static var settingsSectionMobileData: String { text("settings_section_mobile_data") }
@@ -502,7 +503,7 @@ enum Strings {
     static var identitiesSectionAdd: String { text("identities_section_add") }
     static func identitiesDefault(_ p1: String) -> String { format("identities_default", p1) }
     static func identitiesUsedOn(_ p1: Int) -> String {
-        format(p1 == 1 ? "identities_used_on.one" : "identities_used_on.other", p1)
+        plural("identities_used_on", count: p1, p1)
     }
     static var identitiesUnused: String { text("identities_unused") }
     static func identitiesFingerprint(_ p1: String) -> String { format("identities_fingerprint", p1) }
@@ -547,7 +548,7 @@ enum Strings {
     static func identityDeleteTitle(_ p1: String) -> String { format("identity_delete_title", p1) }
     static var identityDeleteWarning: String { text("identity_delete_warning") }
     static func identityDeleteServers(_ p1: Int, _ p2: String) -> String {
-        format(p1 == 1 ? "identity_delete_servers.one" : "identity_delete_servers.other", p1, p2)
+        plural("identity_delete_servers", count: p1, p1, p2)
     }
     static func identityDeleteNextDefault(_ p1: String) -> String { format("identity_delete_next_default", p1) }
     static var identityDeleteBackup: String { text("identity_delete_backup") }
@@ -562,11 +563,11 @@ enum Strings {
     static var scanViewfinder: String { text("scan_viewfinder") }
     static var scanCodeLabel: String { text("scan_code_label") }
     static func scanCodeDescription(_ p1: Int) -> String {
-        format(p1 == 1 ? "scan_code_description.one" : "scan_code_description.other", p1)
+        plural("scan_code_description", count: p1, p1)
     }
     static var scanChecking: String { text("scan_checking") }
     static func scanWrongCode(_ p1: Int) -> String {
-        format(p1 == 1 ? "scan_wrong_code.one" : "scan_wrong_code.other", p1)
+        plural("scan_wrong_code", count: p1, p1)
     }
     static var scanCameraDenied: String { text("scan_camera_denied") }
     static var scanCameraBlocked: String { text("scan_camera_blocked") }
@@ -582,10 +583,10 @@ enum Strings {
     static var scanNoteNoCamera: String { text("scan_note_no_camera") }
     static var scanReceiving: String { text("scan_receiving") }
     static func scanReceivingIdentities(_ p1: Int) -> String {
-        format(p1 == 1 ? "scan_receiving_identities.one" : "scan_receiving_identities.other", p1)
+        plural("scan_receiving_identities", count: p1, p1)
     }
     static func scanReceivingServers(_ p1: Int) -> String {
-        format(p1 == 1 ? "scan_receiving_servers.one" : "scan_receiving_servers.other", p1)
+        plural("scan_receiving_servers", count: p1, p1)
     }
     static func scanReceivingBoth(_ p1: String, _ p2: String) -> String { format("scan_receiving_both", p1, p2) }
     static var scanSectionIdentities: String { text("scan_section_identities") }
@@ -607,10 +608,10 @@ enum Strings {
     static func streamTitleCamera(_ p1: String) -> String { format("stream_title_camera", p1) }
     static var streamLive: String { text("stream_live") }
     static func streamWatching(_ p1: Int) -> String {
-        format(p1 == 1 ? "stream_watching.one" : "stream_watching.other", p1)
+        plural("stream_watching", count: p1, p1)
     }
     static func streamViewers(_ p1: Int) -> String {
-        format(p1 == 1 ? "stream_viewers.one" : "stream_viewers.other", p1)
+        plural("stream_viewers", count: p1, p1)
     }
     static func streamTileDescription(_ p1: String) -> String { format("stream_tile_description", p1) }
     static func streamDescriptionPart(_ p1: String, _ p2: String) -> String { format("stream_description_part", p1, p2) }
@@ -654,7 +655,7 @@ enum Strings {
     static var cameraShareStarting: String { text("camera_share_starting") }
     static var cameraShareCancel: String { text("camera_share_cancel") }
     static func cameraOnWatching(_ p1: Int) -> String {
-        format(p1 == 1 ? "camera_on_watching.one" : "camera_on_watching.other", p1)
+        plural("camera_on_watching", count: p1, p1)
     }
     static var cameraStop: String { text("camera_stop") }
     static var cameraStopSharing: String { text("camera_stop_sharing") }
@@ -682,9 +683,10 @@ enum Strings {
     static var profileComment: String { text("profile_comment") }
     /// The counter's numbers are written without a thousands separator, as on Android.
     static func profileCommentCount(_ p1: Int, _ p2: Int) -> String { ungrouped("profile_comment_count", p1, p2) }
-    /// The plural form follows the limit, as on Android.
+    /// The plural form follows the limit, as on Android. The numbers are passed as text, so that
+    /// they are written without a thousands separator while the plural follows the language.
     static func profileCommentCountDescription(_ p1: Int, _ p2: Int) -> String {
-        ungrouped(p2 == 1 ? "profile_comment_count_description.one" : "profile_comment_count_description.other", p1, p2)
+        plural("profile_comment_count_description", count: p2, String(p1), String(p2))
     }
     static var profileTooLong: String { text("profile_too_long") }
     static var profilePreview: String { text("profile_preview") }
@@ -722,13 +724,42 @@ enum Strings {
     static func serverThemeTitle(_ p1: String) -> String { format("server_theme_title", p1) }
     static var serverThemeUseApp: String { text("server_theme_use_app") }
     static var serverThemeHint: String { text("server_theme_hint") }
+    static var settingsSectionLanguage: String { text("settings_section_language") }
+    static var settingsLanguage: String { text("settings_language") }
+    static var settingsLanguageSystem: String { text("settings_language_system") }
 
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }
 
     private static func format(_ key: String, _ arguments: CVarArg...) -> String {
-        String(format: text(key), locale: Locale.current, arguments: arguments)
+        String(format: text(key), locale: locale, arguments: arguments)
+    }
+
+    private static func plural(_ key: String, count: Int, _ arguments: CVarArg...) -> String {
+        pluralText(key, count: count, arguments: arguments)
+    }
+
+    /// A text of `Localizable.stringsdict` in the form for `count`. Foundation picks the form by
+    /// the plural rules of the locale's language, so the locale must be the one of the texts.
+    static func pluralText(
+        _ key: String,
+        count: Int,
+        arguments: [CVarArg],
+        bundle: Bundle = .main,
+        locale: Locale = locale
+    ) -> String {
+        String(format: bundle.localizedString(forKey: key, value: nil, table: nil), locale: locale, arguments: arguments + [count])
+    }
+
+    /// The language the app shows its texts in (the system's choice among the app's languages)
+    /// with the phone's region, whose number formats stay.
+    static var locale: Locale {
+        textLocale(language: Bundle.main.preferredLocalizations.first ?? "en", region: Locale.current.region)
+    }
+
+    static func textLocale(language: String, region: Locale.Region?) -> Locale {
+        Locale(identifier: region.map { "\(language)_\($0.identifier)" } ?? language)
     }
 
     private static func ungrouped(_ key: String, _ arguments: CVarArg...) -> String {

@@ -12,10 +12,13 @@ private let defaultOutputs: [DefaultOutput] = [.ask, .speaker, .earpiece]
 /// The settings (mockup `16-settings`, FR-5.100). Every switch is saved at once; the rows with a
 /// value open a sheet with the choices. Left out until their features exist: echo cancellation
 /// (the phone's own voice processing does it, there is nothing to switch), link previews (the
-/// chat shows none yet), language and about. Dark, light or system is chosen on the themes
-/// screen (mockup `19-themes`). The level meter, the "Chat" section and the note under
-/// "Notifications" have no mockup. Opened from the server list, without a connection, the level
-/// meter and "Default audio output" are left out: both need a running voice session.
+/// chat shows none yet) and about. Dark, light or system is chosen on the themes screen (mockup
+/// `19-themes`). The level meter, the "Chat" and "Language" sections and the note under
+/// "Notifications" have no mockup; the language is worded as in the desktop app. iOS lets the
+/// user pick an app's language only in the system settings, so the language row opens them there
+/// instead of a sheet of languages as on Android. Opened from the server list, without a
+/// connection, the level meter and "Default audio output" are left out: both need a running
+/// voice session.
 struct SettingsScreen: View {
     let state: SettingsUiState
     let actions: MoreController
@@ -50,6 +53,15 @@ struct SettingsScreen: View {
                                 icon: MumcordIcons.trash,
                                 id: "settings-history"
                             ) { actions.openSheet(.historyAge) }
+                        }
+                        MumcordSectionHeader(title: Strings.settingsSectionLanguage)
+                        MumcordList {
+                            SettingsValueRow(
+                                title: Strings.settingsLanguage,
+                                value: languageText(state.app.language),
+                                icon: MumcordIcons.globe,
+                                id: "settings-language"
+                            ) { actions.openLanguageSettings() }
                         }
                     }
                     .padding(.bottom, MumcordSpace.s4)
@@ -342,4 +354,9 @@ private func defaultOutputIcon(_ output: DefaultOutput) -> MumcordIconData {
 
 private func historyAgeText(_ days: UInt32?) -> String {
     days.map { Strings.settingsHistoryDays(Int($0)) } ?? Strings.settingsHistoryNever
+}
+
+/// A language under its own name, so that everybody finds theirs; nil follows the phone.
+private func languageText(_ language: String?) -> String {
+    language.map(languageEndonym) ?? Strings.settingsLanguageSystem
 }

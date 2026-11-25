@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 
 /* English texts of the app. The keys equal the string names of the Android app
-   (android/app/src/main/res/values/strings.xml); plural forms end in .one and .other. */
+   (android/app/src/main/res/values/strings.xml); plural forms end in .one and .other.
+   scripts/translations.py writes the other languages and every Localizable.stringsdict from
+   this file: run it after changing a text. */
 
 "app_name" = "Mumcord";
 "action_cancel" = "Cancel";
@@ -449,6 +451,10 @@
 "settings_history_days.one" = "%1$ld day";
 "settings_history_days.other" = "%1$ld days";
 "settings_history_note" = "Older messages are deleted from this phone automatically. The server is not affected.";
+/* Language (FR-5.82), worded as in the desktop app. The languages show under their own names. */
+"settings_section_language" = "Language";
+"settings_language" = "Display language";
+"settings_language_system" = "Follow system";
 "settings_section_mobile_data" = "Mobile data";
 "settings_autoplay_streams" = "Start streams automatically";
 "settings_load_media" = "Load images and GIFs";
@@ -649,8 +655,9 @@
 "profile_name_hint" = "Your name is set per server";
 "profile_comment" = "Comment";
 "profile_comment_count" = "%1$d / %2$d";
-"profile_comment_count_description.one" = "%1$d of %2$d character";
-"profile_comment_count_description.other" = "%1$d of %2$d characters";
+/* The numbers are passed as text, so that they are written without a thousands separator, as on Android. */
+"profile_comment_count_description.one" = "%1$@ of %2$@ character";
+"profile_comment_count_description.other" = "%1$@ of %2$@ characters";
 "profile_too_long" = "Can't save: your comment is too long for this server";
 "profile_preview" = "How others see you";
 "profile_you" = "(you)";

@@ -497,8 +497,11 @@ extension AppDebugLaunch {
             qrSource: qrSource,
             network: monitor,
             streamVideo: streamVideo,
-            cameraShare: cameraShare
+            cameraShare: cameraShare,
+            languages: .system
         )
+        // The real settings app, so that a test sees the language row leave the app.
+        model.more.openLanguageSettings = AppModel.openSystemSettings
         if options.contains("camera-viewers") || options.contains("camera-fails") {
             let options = options
             whileSharing(model) {

@@ -23,17 +23,22 @@ final class MoreController {
     /// Switches the talk mode as the voice view does, where a held talk button is let go. Set
     /// by the model that owns the voice view.
     @ObservationIgnored var switchTalkMode: (TalkMode) -> Void = { _ in }
+    /// Opens the app's page in the system settings, where iOS offers its language. Set by the
+    /// app; nothing in the tests of this class.
+    @ObservationIgnored var openLanguageSettings: () -> Void = {}
 
     @ObservationIgnored private let store: SessionStore
     @ObservationIgnored private let messageSettings: MessageNotificationSettings
+    @ObservationIgnored private let languages: AppLanguages
     /// The last change of a setting; the next one waits for it, so that a switch flipped twice
     /// quickly ends as it was left. (The store keeps two changes from saving over each other,
     /// but not in the order they were made.)
     @ObservationIgnored private var save: Task<Void, Never>?
 
-    init(store: SessionStore, messageSettings: MessageNotificationSettings) {
+    init(store: SessionStore, messageSettings: MessageNotificationSettings, languages: AppLanguages = .phoneOnly) {
         self.store = store
         self.messageSettings = messageSettings
+        self.languages = languages
         senderOnly = messageSettings.senderOnly
         profile = ProfileController(store: store)
         themes = ThemesController(store: store)
@@ -51,6 +56,16 @@ final class MoreController {
             }
         }
         profile.onClosed = { [weak self] in self?.back() }
+        // The system settings can change the app's language; iOS then starts the app afresh, so
+        // the shared setting follows it once the saved settings are read at the start.
+        let settingsStates = store.states()
+        Task { [weak self] in
+            for await state in settingsStates {
+                guard let settings = state.appSettings else { continue }
+                self?.syncLanguage(saved: settings.language)
+                return
+            }
+        }
         // The setting is read from the engine, which can take longer than drawing the switch.
         let senderOnlyStates = messageSettings.senderOnlyStates()
         Task { [weak self] in
@@ -194,5 +209,13 @@ final class MoreController {
     func selectHistoryAge(_ days: UInt32?) {
         closeSheet()
         changeApp { $0.historyMaxAgeDays = days }
+    }
+
+    // MARK: Language
+
+    /// Saves the system's language for the app as the shared setting where they differ.
+    func syncLanguage(saved: String?) {
+        let system = languages.current()
+        if saved != system { changeApp { $0.language = system } }
     }
 }

@@ -154,6 +154,10 @@ schemes:
         MumcordTests: [test]
         MumcordUITests: [test]
     test:
+      # The unit tests compare English texts, so the app that hosts them runs in English whatever
+      # the simulator's language is. (The UI tests pass the language to the app they start.)
+      commandLineArguments:
+        "-AppleLanguages (en)": true
       targets:
         - MumcordTests
         - MumcordUITests

@@ -89,7 +89,8 @@ final class AppModel {
         qrSource: QrSource = NoQrSource(),
         network: NetworkMonitor? = nil,
         streamVideo: StreamVideo = .none,
-        cameraShare: CameraShare? = nil
+        cameraShare: CameraShare? = nil,
+        languages: AppLanguages = .phoneOnly
     ) {
         self.store = store
         self.setupStore = setupStore
@@ -108,7 +109,7 @@ final class AppModel {
         chat = ChatController(chats: chatStore)
         conversation = ChatController(chats: chatStore, keepDraft: false)
         messages = MessagesController(store: store, chats: chatStore)
-        more = MoreController(store: store, messageSettings: messageSettings)
+        more = MoreController(store: store, messageSettings: messageSettings, languages: languages)
         self.camera = camera
         self.qrSource = qrSource
         identities = IdentitiesController(store: store, camera: camera)
