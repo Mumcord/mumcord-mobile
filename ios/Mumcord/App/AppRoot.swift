@@ -66,12 +66,8 @@ struct AppContent: View {
         // Questions wait until the first-start setup is done.
         let overlay = uiState.setupDone ? uiState.overlay : nil
         let connectedSheet = uiState.connected?.sheet
-        let messagesLocal = model.messages.local
-        let messagesSheet = messagesLocal.blockSession != nil || messagesLocal.requestSession != nil
         let identitySheet = uiState.screen == .identities || uiState.screen == .identitySetup ? uiState.identities.sheet : nil
         let cameraQuestion = uiState.screen == .scan && uiState.identities.scan?.camera == .explain
-        let settingsSheet = model.more.local.sheet != nil
-        let moreSheet = (uiState.connected?.tab == .more || uiState.screen == .more) && model.more.sheetOpen
         let serverThemeSheet = uiState.screen == .serverForm ? uiState.form.flatMap { $0.themeSheet ? $0 : nil } : nil
         let allThemes = uiState.session.builtInThemes + (uiState.session.themes?.customThemes ?? [])
         let streams = model.streams.uiState
@@ -81,18 +77,18 @@ struct AppContent: View {
         let camera = connectedScreen ? model.cameraShare : nil
         let cameraSheet = camera?.uiState.sheet
         let cameraPermission = camera?.question
-        let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
-            || settingsSheet || moreSheet || identitySheet != nil || cameraQuestion || directQuestion
-            || cameraSheet != nil || cameraPermission != nil || serverThemeSheet != nil
         // The camera runs only while the user sees it: its preview is the sheet shown below (the
         // sheets before it in the chain take its place), or the "Camera on" bar is on screen.
         let previewShown = cameraSheet != nil && prompt == nil && overlay == nil && identitySheet == nil
             && !cameraQuestion && !directQuestion && cameraPermission == nil
         let cameraShown = previewShown || camera?.uiState.sharing != nil
         ZStack {
+            // While a sheet is open, the screen behind it is not offered to screen readers: each
+            // sheet is modal for VoiceOver. Hiding the screen here instead would not work: an
+            // outer `accessibilityHidden(false)` lets VoiceOver read what the screen's own views
+            // hide (decorative dots, the backdrop), and a condition around the modifier would
+            // give the screen a new identity and lose its state whenever a sheet opens.
             screen
-                // While a sheet is open, the screen behind it is not offered to screen readers.
-                .accessibilityHidden(sheetOpen)
             if let prompt {
                 CertificateSheet(
                     prompt: prompt,

@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import SwiftUI
+import UIKit
 
 /// A bottom sheet over the screen: the dimmed backdrop and the sheet frame with `title` and
 /// `content`, which scrolls when it is taller than the screen. Tapping the backdrop calls
 /// `onDismiss`; a sheet with a decision that must be made on purpose passes nil and cannot be
 /// dismissed. A sheet without a visible `title` names itself for VoiceOver with
 /// `accessibilityTitle`.
+///
+/// The sheet is modal for VoiceOver: the screen behind it is left out, and VoiceOver's focus
+/// moves to the sheet's title (its first element) when it opens.
 struct SheetOverlay<Content: View>: View {
     private let title: String?
     private let accessibilityTitle: String
@@ -59,6 +63,10 @@ struct SheetOverlay<Content: View>: View {
             .accessibilityAction(.escape) { onDismiss?() }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            // Once the sheet is laid out; without VoiceOver nothing happens.
+            DispatchQueue.main.async { UIAccessibility.post(notification: .screenChanged, argument: nil) }
+        }
     }
 
     /// Content and area are laid out on whole pixels and may differ by less than a point.

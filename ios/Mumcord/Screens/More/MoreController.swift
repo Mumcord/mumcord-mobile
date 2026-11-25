@@ -94,15 +94,6 @@ final class MoreController {
         )
     }
 
-    /// A sheet of the profile or the themes screen is open over the screen.
-    var sheetOpen: Bool {
-        switch local.page {
-        case .editProfile: profile.edit?.sheet != nil
-        case .themes: themes.local.sheet != nil
-        case .main, .activity, .settings: false
-        }
-    }
-
     // MARK: Profile and themes
 
     func openProfile() {

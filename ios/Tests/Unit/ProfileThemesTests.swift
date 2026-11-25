@@ -168,20 +168,6 @@ final class ProfileThemesTests: XCTestCase {
         await assertEventually { self.ui(model)?.profileEdit?.edit.error == .saveFailed }
     }
 
-    /// The camera explanation hides the editor from VoiceOver like every other sheet.
-    func testTheCameraExplanationCountsAsAnOpenSheet() async {
-        let model = await connected()
-        await assertEventually { self.ui(model)?.profile != nil }
-        model.more.openProfile()
-        XCTAssertFalse(model.more.sheetOpen)
-
-        model.more.profile.explainCamera(.undetermined)
-        XCTAssertEqual(ui(model)?.profileEdit?.edit.sheet, .camera(.undetermined))
-        XCTAssertTrue(model.more.sheetOpen)
-        model.more.profile.closeSheet()
-        XCTAssertFalse(model.more.sheetOpen)
-    }
-
     func testLeavingTheEditorDropsWhatWasNotSaved() async {
         let model = await connected()
         await assertEventually { self.ui(model)?.profile != nil }
