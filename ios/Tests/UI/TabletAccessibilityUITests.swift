@@ -38,9 +38,10 @@ final class TabletAccessibilityUITests: XCTestCase {
         return app
     }
 
-    /// 0 for the rail, 1 for the left column, 2 for the right one.
+    /// 0 for the rail, 1 for the left column, 2 for the right one, by the element's middle: the
+    /// chevrons of the channel tree reach a little into the rail with their touch area.
     private func column(_ element: VoiceOverElement) -> Int {
-        element.frame.minX < railEnd ? 0 : element.frame.minX < sideEnd ? 1 : 2
+        element.frame.midX < railEnd ? 0 : element.frame.midX < sideEnd ? 1 : 2
     }
 
     /// The columns are read one after the other, never back and forth.
