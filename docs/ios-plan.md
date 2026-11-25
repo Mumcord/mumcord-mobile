@@ -10,7 +10,8 @@ State on 2026-11-25: steps 1 (moderation), 2 (More tab, activity log, settings),
 appearance and themes), 4 (public server browser), 5 (translations and plural rules), 6 (watching
 streams, without the system's picture-in-picture window) and 7 (sharing the phone camera) are built
 on `feat/ios-backlog`; step 9 (iPad layout) is built on `ios/ipad`, cut from it, and waits for a
-review round and a look at a real iPad.
+review round and a look at a real iPad; step 10 (accessibility pass) is built on `ios/a11y`, cut
+from `feat/ios-backlog`, and waits for a review round and the VoiceOver pass on a real iPhone.
 Steps 1, 2, 3, 6 and 7 were each read by a review round whose confirmed findings are fixed; step
 4 waits for the product manager's look at the screenshots. The real camera and a real stream are
 device checks (step 12). Step 0 (stable ground) is built and passes locally; its proof on GitHub's
@@ -163,6 +164,10 @@ Last among the screens, so every screen exists when they run.
 
 Built (step 9): see the backlog's "State when paused" for the layout, its rule and the differences
 from Android. Its tests run in the test group `tablet` on an iPad simulator.
+
+Built (step 10): see the backlog's "State when paused" for what VoiceOver gets, the text sizes, the
+decisions and the differences from Android. Its tests run in the test groups `output-settings`
+(phone) and `tablet` (iPad).
 
 ### 11 – End-to-end tests
 

@@ -117,9 +117,9 @@ when the app goes to the background, not already when Control Centre or the app 
 it, as for streams and the camera; a ping on its way when the browser closes or the app leaves
 cannot be called back in the engine, so its answer is dropped and the server is asked again
 later; what Android's screen readers hear through polite live regions (loading, the failures, an
-empty list) VoiceOver hears as announcements; with the largest text sizes the rows shorten their
-texts with "…" like the server list instead of wrapping them (the accessibility pass, step 10,
-decides this for all lists). The end-to-end scenario with a locally served list (AC-5.38 against
+empty list) VoiceOver hears as announcements; with the accessibility text sizes the rows wrap their
+texts and put "Add" or "Connect" below them, as every list row does since the accessibility pass
+(step 10). The end-to-end scenario with a locally served list (AC-5.38 against
 the local test server) waits for the iOS end-to-end tests (task 10.4).
 
 Settings from the server list (mockup `01-server-list`, specification section 5 "Mockups and
@@ -233,12 +233,60 @@ on Android.
   info icons, the stream header's settings icon and its resolution and frame rate, the "+" of the
   input bar (the image and GIF buttons take its place).
 
+Accessibility pass (task 9.4, AC-5.33, mirroring Android commits `8d4fc2a` and `a81d199`): built
+and checked in the simulator against the fake engine. VoiceOver says politely who starts talking in
+the user's channel with Android's rules and texts ("Anna is talking", "Anna and Ben are talking",
+"Anna and 2 other people are talking"): at most one announcement every five seconds, people who
+start within that time named together, the same person again only after 30 seconds, never the user
+and never the end of talking; it runs only while VoiceOver is on and the voice is connected, reads
+the people from the session state on the main thread, never from the audio path, and queues the
+sentence behind what VoiceOver is saying. Mute and deafen in the voice bar and the voice view say
+"Muted" and "Deafened" as their value; the volume sliders say the percentage shown instead of their
+share of the track. Every screen reads its title first, as a heading (also before the back button and
+the voice view's chevron); sheets are modal for VoiceOver and move its focus to their title; on the
+iPad the rail, the left column with the voice bar and the right column are read one after the other.
+A modifier on the app's root that was meant to hide the screen behind a sheet (`accessibilityHidden`
+with the value false while no sheet was open) undid the hiding of the views below it, so VoiceOver
+read the backdrop, the dots, the server tile's initials and other decoration; it is gone, and the
+sheets' own modal trait keeps VoiceOver inside them. The small figure below the settings
+(`SettingsFigure`) is among the views that are hidden again. Text follows the system's text size up
+to 235 % (`largestTextSize`, the first step past 200 %); the two larger steps keep that size. With the
+accessibility sizes list rows wrap their texts and move their end (a button, a value, a switch, a
+chevron) below them, as on Android: this settles the rows that ended in "…" (server list, public
+servers, Messages, More, Settings, the sheets' rows). The voice bar's two lines, the voice view's
+status line and the hint lines ("Jonas shared a file …") wrap; tab labels shrink to fit down to the
+normal size; the labels under the voice view's round buttons shrink until their longest word fits, so
+no word breaks in the middle. Lines that stay single and end in "…" at every size, as on Android: the
+quote in a reply and the channel or person names that do not fit their row. With Reduce Motion the
+chat's input bar jumps above the keyboard instead of gliding; the app adds no other animation of its
+own (sheets, the voice bar and the mini window come and go without one). The audit finds no target
+under 44 pt on the checked screens; the 8 pt microphone level of the voice view now shares one
+element with its hint. Debug builds started with `-mumcordAccessibilityProbe YES` list what
+VoiceOver reaches, with headings and modal elements, for the UI tests (XCUITest lists every
+view and no traits). Unit tests `TalkingAnnouncerTests` and `AccessibilityLabelTests`, UI tests
+`AccessibilityUITests` (with Xcode's accessibility audit) and, on an iPad, `TabletAccessibilityUITests`,
+screenshots `ios-large-text-*` (server list, server form, channels with the voice bar, voice view,
+chat, Messages, Settings).
+
+**Note for the maintainer: intended differences from Android.**
+
+- The largest text size is 235 %, not 200 %: iOS's sizes come in steps (194 % and 235 % around 200 %),
+  and the app stops at the first one past 200 %. Android follows any font scale.
+- The voice bar's lines, the voice view's status line and the hint lines wrap at the accessibility
+  sizes; on Android they end in "…". The labels under the voice view's buttons shrink so that no word
+  breaks; Android has room for them at 200 %.
+- Announcements are VoiceOver announcements queued behind its speech; Android uses a polite live
+  region. The talking announcement does not need Android's emptying after the gap.
+- When a sheet closes, VoiceOver's focus is not moved back to the control that opened it (Android
+  does this); SwiftUI has no way to name the opener without a focus state on every control that
+  opens a sheet. VoiceOver picks the element itself.
+- The audit of the UI tests leaves out contrast, Dynamic Type, clipped text and element detection,
+  which report the app's own font scaling, the film grain and decorative initials as faults (see
+  `AccessibilityUITests`); Android's checks run on every screenshot.
+- The rows of a settings switch read the title twice (the row's text, then the switch with the same
+  label), as before; Android merges them.
+
 ## Open tasks
-
-### 9.4 Accessibility
-
-Accessibility pass (VoiceOver labels and order, talking announcements, Dynamic Type at 200 %,
-reduced motion, 44 pt targets), after Android's 9.3 (`8d4fc2a`).
 
 ### 10.3 Release: TestFlight and About screen (FR-5.102)
 
@@ -249,6 +297,20 @@ App Store Connect API key as GitHub secrets in a protected environment (like
 simulator app; linking for a real device is first proven here.
 
 ## Open points from the iOS work so far
+
+- Contrast of the built-in themes (the desktop's derived colours in
+  `bridge/src/themes/vectors.json`):
+  the text on the danger colour (`onAccent` on `danger`, black there: the label of a danger button
+  such as "Kick" or "Ban") reaches only 3.26:1 in Deep Ocean light and 3.45:1 in Forest light,
+  below 4.5:1. Android did not change these colours either;
+  the colours come from the engine's theme derivation, so the fix belongs there, for both apps and
+  the desktop. Every other text and control pair of the four built-in themes passes.
+- Animated GIFs and pictures in the chat keep playing with Reduce Motion, as on Android. iOS 18 has a
+  separate setting for animated images ("Auto-Play Animated Images"); following it needs a newer
+  deployment target or a check at run time.
+- The VoiceOver pass on a real iPhone and iPad (device checklist, section 10): hearing the
+  announcements, the focus moving into a sheet, the rotor's actions, Reduce Motion and the largest
+  text size cannot be checked by the simulator's tests.
 
 - The small decorative figure below the settings (`SettingsFigure`) is meant to show only while
   the list is pulled past its end. On the server list's Settings, which has no voice bar and no
