@@ -33,7 +33,7 @@ final class ProfileThemesScreenshotUITests: XCTestCase {
 
     /// The More tab of Nordlicht, connected through the server list.
     private func openMore(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers,voice-server" + options, theme: theme)
+        let app = launchApp("servers,voice-server" + options, theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.row("person-row", containing: "Jonas"))
@@ -115,7 +115,7 @@ final class ProfileThemesScreenshotUITests: XCTestCase {
 
     /// The theme of a server, chosen in its form; it has no mockup.
     private func serverTheme(theme: String) {
-        let app = launchApp("servers", theme: theme)
+        let app = launchApp("servers", theme: theme, locale: "en_US")
         tapWhenReady(app.element("Edit"))
         tapWhenReady(app.element("Edit Nordlicht"))
         let row = app.element("server-form-theme")
@@ -126,7 +126,7 @@ final class ProfileThemesScreenshotUITests: XCTestCase {
     }
 
     private func oceanChannels(theme: String) {
-        let app = launchApp("servers,voice-server,theme-ocean", theme: theme)
+        let app = launchApp("servers,voice-server,theme-ocean", theme: theme, locale: "en_US")
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.row("person-row", containing: "Jonas"))
         capture(app, "themes-ocean-channels", theme: theme)

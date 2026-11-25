@@ -18,7 +18,7 @@ final class MoreScreenshotUITests: XCTestCase {
 
     /// The More tab of Nordlicht, connected through the server list.
     private func openMore(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers,voice-server" + options, theme: theme)
+        let app = launchApp("servers,voice-server" + options, theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.row("person-row", containing: "Jonas"))

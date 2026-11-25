@@ -11,7 +11,7 @@ final class SessionEndedUITests: XCTestCase {
     }
 
     private func launchWithNotice(theme: String = "dark") -> XCUIApplication {
-        let app = launchApp("servers,session-ended", theme: theme)
+        let app = launchApp("servers,session-ended", theme: theme, locale: "en_US")
         expectAppears(app.element("Session ended"))
         expectAppears(app.element(containing: "Mumcord was closed by the system while you were connected to Nordlicht."))
         return app

@@ -21,7 +21,7 @@ final class TabletScreenshotUITests: XCTestCase {
 
     private func connect(_ options: String, theme: String, landscape: Bool) -> XCUIApplication {
         XCUIDevice.shared.orientation = landscape ? .landscapeLeft : .portrait
-        let app = launchApp("servers,messages," + options, theme: theme)
+        let app = launchApp("servers,messages," + options, theme: theme, locale: "en_US")
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.element("navigation-rail"))
         return app

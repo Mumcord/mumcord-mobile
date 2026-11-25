@@ -24,7 +24,7 @@ final class StreamsScreenshotUITests: XCTestCase {
     }
 
     private func connect(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers,streams," + options, theme: theme)
+        let app = launchApp("servers,streams," + options, theme: theme, locale: "en_US")
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.element("stream-tile"))
         return app

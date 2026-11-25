@@ -17,7 +17,7 @@ final class MessagesScreenshotUITests: XCTestCase {
     }
 
     private func connect(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp(options.isEmpty ? "servers" : "servers," + options, theme: theme)
+        let app = launchApp(options.isEmpty ? "servers" : "servers," + options, theme: theme, locale: "en_US")
         tapWhenReady(app.element("Connect to Nordlicht"))
         // The question about notifications covers the channels, which are then not offered
         // to the tests either.

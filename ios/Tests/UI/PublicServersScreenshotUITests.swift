@@ -20,7 +20,7 @@ final class PublicServersScreenshotUITests: XCTestCase {
     }
 
     private func openBrowser(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp(options, theme: theme)
+        let app = launchApp(options, theme: theme, locale: "en_US")
         let entry = app.element("server-browse-public")
         reveal(entry, in: app)
         entry.tapCenter()

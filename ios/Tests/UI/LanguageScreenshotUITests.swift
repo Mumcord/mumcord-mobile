@@ -17,7 +17,7 @@ final class LanguageScreenshotUITests: XCTestCase {
     }
 
     private func serverList(theme: String) {
-        let app = launchApp("servers", theme: theme, language: "de")
+        let app = launchApp("servers", theme: theme, locale: "de_DE", language: "de")
         expectAppears(app.element("Mit Nordlicht verbinden"))
         capture(app, "server-list", theme: theme)
     }
@@ -25,7 +25,7 @@ final class LanguageScreenshotUITests: XCTestCase {
     /// The settings while connected, at their end with the language row; the voice bar and the
     /// tabs cover the space below the list.
     private func settings(theme: String) {
-        let app = launchApp("servers,voice-server", theme: theme, language: "de")
+        let app = launchApp("servers,voice-server", theme: theme, locale: "de_DE", language: "de")
         tapWhenReady(app.element("Mit Nordlicht verbinden"))
         expectAppears(app.row("person-row", containing: "Jonas"))
         tapWhenReady(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Mehr")).firstMatch)

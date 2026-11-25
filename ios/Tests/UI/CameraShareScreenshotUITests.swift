@@ -21,7 +21,7 @@ final class CameraShareScreenshotUITests: XCTestCase {
 
     /// Connected to the server of mockup `02-channels`, with the voice view open.
     private func voiceView(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers," + options, theme: theme)
+        let app = launchApp("servers," + options, theme: theme, locale: "en_US")
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.row("person-row", containing: "Jonas"))
         openVoiceViewThroughTheBar(in: app)

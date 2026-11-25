@@ -16,7 +16,7 @@ final class ServerListMoreScreenshotUITests: XCTestCase {
     }
 
     private func openMore(theme: String) -> XCUIApplication {
-        let app = launchApp("servers", theme: theme)
+        let app = launchApp("servers", theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         tapWhenReady(app.element("server-settings"))
         expectAppears(app.element("more-settings"))

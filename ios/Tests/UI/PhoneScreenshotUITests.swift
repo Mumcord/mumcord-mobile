@@ -18,7 +18,7 @@ final class PhoneScreenshotUITests: XCTestCase {
 
     /// Connects to Nordlicht through the server list, once its ping answers are there.
     private func launchAndConnect(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers,voice-server,ptt," + options, theme: theme)
+        let app = launchApp("servers,voice-server,ptt," + options, theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         expectAppears(app.element(containing: "Offline"))
         tapWhenReady(app.element("Connect to Nordlicht"))
@@ -61,7 +61,7 @@ final class PhoneScreenshotUITests: XCTestCase {
 
     /// The app after it disconnected because the user was alone; it has no mockup.
     private func idleDisconnected(theme: String) {
-        let app = launchApp("servers,alone,idle-on,idle-short", theme: theme)
+        let app = launchApp("servers,alone,idle-on,idle-short", theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         expectAppears(app.element(containing: "Offline"))
         tapWhenReady(app.element("Connect to Nordlicht"))

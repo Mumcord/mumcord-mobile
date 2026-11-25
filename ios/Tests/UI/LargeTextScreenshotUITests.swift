@@ -13,7 +13,7 @@ final class LargeTextScreenshotUITests: XCTestCase {
     // MARK: Helpers
 
     private func launch(_ options: String, theme: String) -> XCUIApplication {
-        launchApp(options, theme: theme, textSize: AccessibilityUITests.largestTextSize)
+        launchApp(options, theme: theme, locale: "en_US", textSize: AccessibilityUITests.largestTextSize)
     }
 
     private func capture(_ app: XCUIApplication, _ name: String, theme: String) {

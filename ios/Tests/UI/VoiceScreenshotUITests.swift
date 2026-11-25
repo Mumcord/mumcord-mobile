@@ -19,7 +19,7 @@ final class VoiceScreenshotUITests: XCTestCase {
 
     /// The server list with Nordlicht at the top, with its ping answers.
     private func launchWithServers(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers," + options, theme: theme)
+        let app = launchApp("servers," + options, theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         expectAppears(app.element(containing: "Offline"))
         return app

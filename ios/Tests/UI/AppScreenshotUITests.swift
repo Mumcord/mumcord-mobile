@@ -21,7 +21,7 @@ final class AppScreenshotUITests: XCTestCase {
 
     /// The server list with Nordlicht at the top, with its ping answers, as the mockup shows it.
     private func launchWithServers(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp(options, theme: theme)
+        let app = launchApp(options, theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         expectAppears(app.element(containing: "Offline"))
         return app
@@ -43,7 +43,7 @@ final class AppScreenshotUITests: XCTestCase {
     // MARK: States
 
     private func talkModeChoice(theme: String) {
-        let app = launchApp("plain", setupDone: false, theme: theme)
+        let app = launchApp("plain", setupDone: false, theme: theme, locale: "en_US")
         // Push-to-talk picked, as the mockup shows it; the app itself starts with nothing picked.
         tapWhenReady(app.element("talk-mode-push-to-talk"))
         expectAppears(app.element("talk-mode-continue"))
@@ -56,14 +56,14 @@ final class AppScreenshotUITests: XCTestCase {
     }
 
     private func serverListEmpty(theme: String) {
-        let app = launchApp("plain", theme: theme)
+        let app = launchApp("plain", theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "No servers yet"))
         capture(app, "server-list-empty", theme: theme)
     }
 
     /// An invalid port and no user name, with the errors shown after a try to save.
     private func serverForm(theme: String) {
-        let app = launchApp("plain", theme: theme)
+        let app = launchApp("plain", theme: theme, locale: "en_US")
         tapWhenReady(app.element("server-add"))
         replaceText(in: app.input("Port"), with: "99999")
         typeText("Nordlicht", into: app.input("Name"))

@@ -61,6 +61,8 @@ func languageArguments(_ language: String = "en") -> [String] {
 extension XCTestCase {
     /// Starts the app against the fake engine with canned data (`AppDebugLaunch`). `locale` is
     /// the region whose formats the app uses for dates, such as "en_US"; the simulator's when nil.
+    /// The screenshot tests always pass one, so their pictures do not change with the region of
+    /// the simulator they run on.
     /// `textSize` is a Dynamic Type size such as "UICTContentSizeCategoryAccessibilityL".
     /// `language` is the language of the texts, English unless a test asks for another one.
     /// `accessibilityProbe` adds the element that lists what VoiceOver reaches (see
