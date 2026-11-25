@@ -312,13 +312,15 @@ struct KeyboardLifted<Content: View>: View {
     @ViewBuilder let content: () -> Content
     /// Where the keyboard begins on the screen, or the bottom of the screen without one.
     @Environment(\.keyboardTop) private var keyboardTop
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { area in
             let lift = max(0, area.frame(in: .global).maxY - keyboardTop)
             content()
                 .padding(.bottom, lift)
-                .animation(.easeOut(duration: 0.25), value: lift)
+                // With Reduce Motion the input bar jumps to its place instead of gliding there.
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: lift)
         }
     }
 }
