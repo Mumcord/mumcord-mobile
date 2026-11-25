@@ -139,6 +139,22 @@ From Android 13 on, Settings → Language picks the app's language (the system's
 the phone's own settings is saved there too. Android 12 has no language per app, so the app
 follows the phone's language and the row is hidden.
 
+The iOS app's English texts are written by hand in
+`ios/Mumcord/Resources/en.lproj/Localizable.strings` (keys equal the Android names; plural forms
+end in `.one` and `.other`). The same script writes `<language>.lproj/Localizable.strings` for
+the other 23 languages and a `Localizable.stringsdict` with the plurals for all 24, English too;
+run it after changing an English iOS text. An iOS text takes the Android text's translation
+where both say the same in English, otherwise a desktop text's with the same English, otherwise
+it stays English; `python3 -B scripts/translations.py generate --verbose` lists those. iOS's
+`%1$@` and `%1$ld` stand for Android's `%1$s` and `%1$d`. `Strings.swift` passes the number that
+picks a plural form after the text's own arguments, and formats in the language the app shows.
+`ci-ios.yml` runs the same check as Android's CI. On iOS the language is chosen in the system
+settings (Settings → Mumcord → Language); Settings → Language in the app opens them there, and
+the app saves the system's choice as the shared `language` setting at every start. The tests run
+the app in English whatever the simulator's language is: the UI tests pass `-AppleLanguages (en)`
+to the app they start (`languageArguments` in `UITestSupport.swift`), and the scheme's test action
+passes it to the app that hosts the unit tests (`ios/project.yml`).
+
 ## End-to-end tests
 
 The end-to-end tests run the real app with the real engine in the emulator against the local
@@ -420,7 +436,7 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 | `chat-flow` | chat flow, session-ended notice, moderation flow and its screenshots, activity log flow |
 | `messages` | messages flow, messages screenshots, streams flow and its screenshots |
 | `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots and those of More and the activity log |
-| `identities` | identities and "Scan from desktop app" flow, their screenshots |
+| `identities` | identities and "Scan from desktop app" flow, the server list's settings icon, the app in German, their screenshots |
 
 Before its tests each group starts the app once in the simulator and ends it again (about 20
 seconds), so the first UI test does not pay for the first start of the app in a cold simulator.

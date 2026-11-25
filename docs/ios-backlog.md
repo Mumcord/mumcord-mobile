@@ -142,24 +142,49 @@ the server list yet (`android/app/src/main/kotlin/app/mumcord/mobile/ui/servers/
 so there Settings, Themes and Identities are only reachable through the More tab while connected.
 iOS brings the icon back as the mockup shows it; Android should follow the same way.
 
+Languages (task 8.1 for iOS and the language of task 8.3, FR-5.82): `scripts/translations.py`
+also writes `ios/Mumcord/Resources/<language>.lproj/Localizable.strings` for the 23 languages
+besides English and a `Localizable.stringsdict` with the plurals for all 24, from the same sources
+as Android. The iOS English file stays the source of the iOS texts; an iOS text takes the
+translation of the Android text of the same name where both say the same in English, otherwise
+a desktop text's translation with the same English, otherwise it stays English. The plurals use
+each language's CLDR forms (Polish, Czech, Irish and the others with more than two forms are
+right now); the number that picks the form is passed apart from the text's arguments, as on
+Android. The app follows the system's language for the app and saves it as the shared
+`language` setting at every start. Settings has a "Language" section with "Display language",
+which shows the language under its own name or "Follow system". CI checks that the written files
+are current (`ci-ios.yml`, job "Test groups"). Unit tests `StringsPluralTests` (English, German,
+Polish, Czech), `AppLanguagesTests`, `MoreControllerTests`; UI tests `LanguageFlowUITests`,
+screenshots `ios-lang-de-*`.
+
+**Note for the maintainer: intended differences from Android.**
+
+- The language is chosen in the system settings (Settings → Mumcord → Language), which iOS
+  offers for every app with more than one language. iOS has no way for an app to switch its own
+  language, so "Display language" opens the app's page in the system settings instead of a sheet
+  of languages; iOS starts the app afresh in the new language, and the app saves it as the shared
+  setting then. The row is always shown (Android hides it on Android 12, which has no language
+  per app; every supported iOS version has one).
+- The comment counter's VoiceOver text ("1200 of 5000 characters") passes its numbers as text,
+  so that they keep no thousands separator while the plural follows the language.
+
+Texts that stay English on iOS (in every language unless named):
+
+- iOS only, with no desktop text of the same English: `servers_more_back` ("Back to the server
+  list"), `form_address_placeholder`.
+- Worded differently than on Android, because iOS says something else: `local_network_text`,
+  `local_network_denied`, `local_network_suspected` (iOS's "Local Network" instead of Android's
+  "Nearby devices"), `notifications_text` (iOS explains message notifications, Android the voice
+  notification), `identities_fingerprint` (two spaces after "SHA-1").
+- Mobile-only texts without a translation in `i18n/mobile/<language>.json`: 385 in every
+  language but German, which so far only lacks the 18 texts of camera sharing (`camera_reason_share`,
+  `camera_share_*`, `camera_on_watching`, `camera_stop_sharing`, `camera_stopped`,
+  `camera_problem_*`), as on Android.
+
+Translations for these belong in the desktop repository's files (mobile-only texts) or in
+`i18n/mobile/<language>.json`; they are never written by hand into the `.lproj` files.
+
 ## Open tasks
-
-### 8.6 Translations and the language override (FR-5.82)
-
-Task 8.6 is the iOS scope of the Android tasks 8.3, 8.4 and 8.5. Moderation (8.4), the More
-tab, the activity log and the settings (8.5), and the profile and themes of 8.3 are built, see
-"State when paused". What is left of 8.3 is the language.
-
-Translations (task 8.1) and the language override of task 8.3 are done on Android only. For iOS:
-
-- Extend `scripts/translations.py` to write `<language>.lproj/Localizable.strings` from the same
-  sources (keys equal the Android names; `%1$s` becomes `%1$@`, `%1$d` stays) and a
-  `Localizable.stringsdict` for the plurals.
-- The Swift code picks `.one` and `.other` keys by the English rule today; it must use the
-  `.stringsdict` plurals instead, or Polish, Czech, Irish and the other languages with more
-  plural forms show wrong texts.
-- The language override: iOS offers the per-app language in the system settings; the app
-  follows it and saves it as the shared `language` setting.
 
 ### 9.2 Tablet layout and 9.4 accessibility
 
@@ -179,6 +204,11 @@ simulator app; linking for a real device is first proven here.
 
 ## Open points from the iOS work so far
 
+- The small decorative figure below the settings (`SettingsFigure`) is meant to show only while
+  the list is pulled past its end. On the server list's Settings, which has no voice bar and no
+  tabs below it, the Language section makes the list long enough to scroll, and at rest at its
+  end the figure now stands in the space above the home indicator. Left as it is with the
+  languages (step 5); decide whether that is fine or the space below the list should change.
 - Screenshots are large (about 37 MB for the Messages set alone); shrink the PNGs. The sets
   of moderation, More, the activity log and the settings show how: saved with a palette of 256
   colours and no dithering (Pillow, `quantize(colors=256, method=MAXCOVERAGE, dither=NONE)`),

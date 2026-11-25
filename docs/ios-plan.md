@@ -7,8 +7,9 @@ FR and AC numbers to `specs/05-mobile-app-specification.md` there. The specifica
 truth; this plan adds nothing to it.
 
 State on 2026-11-24: steps 1 (moderation), 2 (More tab, activity log, settings), 3 (profile,
-appearance and themes), 4 (public server browser), 6 (watching streams, without the system's
-picture-in-picture window) and 7 (sharing the phone camera) are built on `feat/ios-backlog`.
+appearance and themes), 4 (public server browser), 5 (translations and plural rules), 6 (watching
+streams, without the system's picture-in-picture window) and 7 (sharing the phone camera) are built
+on `feat/ios-backlog`.
 Steps 1, 2, 3, 6 and 7 were each read by a review round whose confirmed findings are fixed; step
 4 waits for the product manager's look at the screenshots. The real camera and a real stream are
 device checks (step 12). Step 0 (stable ground) is built and passes locally; its proof on GitHub's
@@ -134,6 +135,9 @@ The end-to-end half of AC-5.38 (a locally served list and the local test server)
 `.stringsdict` plurals instead of the English rule; the app follows the per-app language of the
 system settings and saves it as the shared `language` setting. Placed after steps 1–4 so their
 texts are covered in one go; later steps re-run the script.
+
+Built: see the backlog's "State when paused" for what exists, the texts that stay English and
+the differences from Android. Step 5 waits for a review round.
 
 ### 6 and 7 – Streams and camera
 
