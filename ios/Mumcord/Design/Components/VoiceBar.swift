@@ -35,6 +35,7 @@ struct MumcordVoiceBar: View {
     let onLeave: () -> Void
     var muteEnabled = true
     @Environment(\.mumcordTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let colors = theme.colors
@@ -44,8 +45,15 @@ struct MumcordVoiceBar: View {
                 HStack(spacing: MumcordSpace.s2) {
                     talkIndicator
                     VStack(alignment: .leading, spacing: 0) {
-                        LineText(channelName, style: .bodyTight, color: colors.text)
-                        LineText(status, style: .captionTight, color: colors.textMuted)
+                        // With the accessibility text sizes the names wrap instead of ending in
+                        // "…": the bar grows taller, the buttons keep their room.
+                        if typeSize.isAccessibilitySize {
+                            ParagraphText(channelName, style: .bodyTight, color: colors.text)
+                            ParagraphText(status, style: .captionTight, color: colors.textMuted)
+                        } else {
+                            LineText(channelName, style: .bodyTight, color: colors.text)
+                            LineText(status, style: .captionTight, color: colors.textMuted)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }

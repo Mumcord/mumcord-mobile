@@ -78,13 +78,21 @@ struct MumcordSliderRow: View {
 struct MumcordHintLine: View {
     let text: String
     @Environment(\.mumcordTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let colors = theme.colors
         HStack(spacing: MumcordSpace.s2) {
             MumcordIcon(icon: MumcordIcons.info, label: nil, tint: colors.textMuted, size: MumcordSize.iconSm)
-            LineText(text, style: .small, color: colors.textMuted)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // With the accessibility text sizes the line wraps instead of ending in "…".
+            Group {
+                if typeSize.isAccessibilitySize {
+                    ParagraphText(text, style: .small, color: colors.textMuted)
+                } else {
+                    LineText(text, style: .small, color: colors.textMuted)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, MumcordSpace.s4)
         .padding(.vertical, MumcordSpace.s1)

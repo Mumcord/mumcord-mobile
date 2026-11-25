@@ -2,6 +2,11 @@
 
 import SwiftUI
 
+/// The largest text size the app follows: the first of the system's steps past twice the normal
+/// size (235 %; the specification asks for 200 % without clipping). The two larger steps keep this
+/// size, where the screens would otherwise have room for only a few words.
+let largestTextSize = DynamicTypeSize.accessibility3
+
 /// Connects the screens to the model; everything below it only gets values and closures.
 struct AppRoot: View {
     let model: AppModel
@@ -11,6 +16,7 @@ struct AppRoot: View {
 
     var body: some View {
         AppContent(uiState: model.uiState, model: model)
+            .dynamicTypeSize(...largestTextSize)
             // One column or two follows the window, again on every rotation and resize; what
             // the user did lives in the model and stays.
             .environment(\.twoColumns, model.twoColumns)

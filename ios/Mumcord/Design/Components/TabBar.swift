@@ -73,6 +73,7 @@ private struct TabItem: View {
     var minHeight: CGFloat = 50
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
+    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
 
     var body: some View {
         let colors = theme.colors
@@ -89,6 +90,9 @@ private struct TabItem: View {
                         }
                     }
                 LineText(tab.label, style: .tab, color: selected ? colors.text : colors.textMuted)
+                    // With a large text size the label shrinks to fit its tab, down to the normal
+                    // size, instead of being cut off ("Chann…"); only then does it end in "…".
+                    .minimumScaleFactor(1 / max(scale, 1))
             }
             .frame(maxWidth: .infinity, minHeight: minHeight)
             .contentShape(Rectangle())

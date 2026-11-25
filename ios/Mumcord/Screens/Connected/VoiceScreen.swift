@@ -24,6 +24,7 @@ struct VoiceScreen: View {
     /// Sharing the own camera; nil where it cannot be shared.
     var camera: CameraShareController?
     @Environment(\.mumcordTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let colors = theme.colors
@@ -37,7 +38,12 @@ struct VoiceScreen: View {
                             .accessibilityAddTraits(.isHeader)
                             // The view's title is read first, before the chevron above it.
                             .accessibilitySortPriority(1)
-                        LineText(voice.statusLine, style: .small, color: colors.textMuted)
+                        // With the accessibility text sizes the line wraps instead of ending in "…".
+                        if typeSize.isAccessibilitySize {
+                            ParagraphText(voice.statusLine, style: .small, color: colors.textMuted)
+                        } else {
+                            LineText(voice.statusLine, style: .small, color: colors.textMuted)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     if let output = voice.output {
