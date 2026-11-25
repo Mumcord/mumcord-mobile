@@ -533,6 +533,9 @@
 "stream_rotate_portrait" = "Back to portrait";
 "stream_stop" = "Lõpeta vaatamine";
 "stream_expand" = "Open full screen";
+"stream_leave_full_screen" = "Välju täisekraanist";
+"stream_chat_strip" = "%1$@ chat";
+"stream_chat_strip_open" = "Show the whole chat";
 "stream_volume" = "Stream volume";
 "stream_try_again" = "Proovi uuesti";
 "stream_unreachable_no_path" = "Stream not reachable from this network";

@@ -533,6 +533,9 @@
 "stream_rotate_portrait" = "Back to portrait";
 "stream_stop" = "Parar de ver";
 "stream_expand" = "Open full screen";
+"stream_leave_full_screen" = "Sair do ecrã inteiro";
+"stream_chat_strip" = "%1$@ chat";
+"stream_chat_strip_open" = "Show the whole chat";
 "stream_volume" = "Stream volume";
 "stream_try_again" = "Tentar novamente";
 "stream_unreachable_no_path" = "Stream not reachable from this network";
