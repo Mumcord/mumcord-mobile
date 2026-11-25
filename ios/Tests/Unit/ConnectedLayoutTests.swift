@@ -37,6 +37,13 @@ final class ConnectedLayoutTests: XCTestCase {
         XCTAssertEqual(connectedLayout(width: 1180, height: 479), .oneColumn)
     }
 
+    func testTheAppHasOneWindowOnAnIPad() throws {
+        // One engine per process: a second window would share the layout, the voice and the
+        // streams of the first one.
+        let manifest = try XCTUnwrap(Bundle.main.object(forInfoDictionaryKey: "UIApplicationSceneManifest") as? [String: Any])
+        XCTAssertEqual(manifest["UIApplicationSupportsMultipleScenes"] as? Bool, false)
+    }
+
     func testTheChatTabOfThePhoneIsPartOfChannelsInTwoColumns() {
         XCTAssertEqual(ConnectedTab.chat.inTwoColumns, .channels)
         XCTAssertEqual(ConnectedTab.channels.inTwoColumns, .channels)

@@ -111,6 +111,11 @@ targets:
         # running while it plays and records, `voip` lets it show the session to the system
         # as a call.
         UIBackgroundModes: [audio, voip]
+        # One window: the app has one engine per process, and the layout, the voice and the
+        # streams belong to it. An iPad still turns it and puts it into Split View, Slide Over
+        # and Stage Manager; it only cannot open a second window of its own.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile
@@ -124,7 +129,8 @@ targets:
           - "$(SRCROOT)/../bridge/include"
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: Mumcord
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        # Not generated: the generated manifest allows several windows (see `info` above).
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: NO
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
