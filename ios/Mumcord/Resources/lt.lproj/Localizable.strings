@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Kalba";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ kalba";
+"talking_announcement_two" = "%1$@ ir %2$@ kalba";
 "voice_mute" = "Nutildyti mikrofoną";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Nutildyti mikrofoną";

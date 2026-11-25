@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Puhuu";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ puhuu";
+"talking_announcement_two" = "%1$@ ja %2$@ puhuvat";
 "voice_mute" = "Mykistä mikrofoni";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Mykistä mikrofoni";

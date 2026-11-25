@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Praat";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ praat";
+"talking_announcement_two" = "%1$@ en %2$@ praten";
 "voice_mute" = "Microfoon dempen";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Microfoon dempen";

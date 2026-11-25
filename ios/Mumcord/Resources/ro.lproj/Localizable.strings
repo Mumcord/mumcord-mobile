@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Vorbește";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ vorbește";
+"talking_announcement_two" = "%1$@ și %2$@ vorbesc";
 "voice_mute" = "Oprește microfonul";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Oprește microfonul";

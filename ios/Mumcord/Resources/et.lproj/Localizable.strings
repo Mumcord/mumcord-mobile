@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Räägib";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ räägib";
+"talking_announcement_two" = "%1$@ ja %2$@ räägivad";
 "voice_mute" = "Vaigista mikrofon";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Vaigista mikrofon";

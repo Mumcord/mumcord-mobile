@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Pratar";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ pratar";
+"talking_announcement_two" = "%1$@ och %2$@ pratar";
 "voice_mute" = "Stäng av mikrofonen";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Stäng av mikrofonen";

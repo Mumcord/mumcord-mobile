@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Runā";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ runā";
+"talking_announcement_two" = "%1$@ un %2$@ runā";
 "voice_mute" = "Apklusināt";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Apklusināt mikrofonu";

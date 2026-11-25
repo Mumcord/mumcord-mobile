@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Hablando";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ está hablando";
+"talking_announcement_two" = "%1$@ y %2$@ están hablando";
 "voice_mute" = "Silenciar micrófono";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Silenciar micrófono";

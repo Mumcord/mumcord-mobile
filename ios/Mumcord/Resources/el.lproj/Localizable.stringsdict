@@ -100,6 +100,22 @@
             <string>%1$ld άτομα</string>
         </dict>
     </dict>
+    <key>talking_announcement_more</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%3$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$@ and %2$ld other person are talking</string>
+            <key>other</key>
+            <string>%1$@ and %2$ld other people are talking</string>
+        </dict>
+    </dict>
     <key>chat_subtitle</key>
     <dict>
         <key>NSStringLocalizedFormatKey</key>

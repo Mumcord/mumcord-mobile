@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Qed jitkellem";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ qed jitkellem";
+"talking_announcement_two" = "%1$@ u %2$@ qed jitkellmu";
 "voice_mute" = "Sikket";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Sikket il-mikrofonu";

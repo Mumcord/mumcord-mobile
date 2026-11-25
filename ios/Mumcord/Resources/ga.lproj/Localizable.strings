@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Ag caint";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "Tá %1$@ ag caint";
+"talking_announcement_two" = "Tá %1$@ agus %2$@ ag caint";
 "voice_mute" = "Balbhaigh";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Balbhaigh an micreafón";

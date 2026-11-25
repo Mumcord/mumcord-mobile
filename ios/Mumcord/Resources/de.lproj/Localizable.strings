@@ -186,6 +186,8 @@
 "voice_view" = "Sprachansicht";
 "voice_talking" = "Spricht";
 "voice_not_talking" = "Spricht nicht";
+"talking_announcement_one" = "%1$@ spricht";
+"talking_announcement_two" = "%1$@ und %2$@ sprechen";
 "voice_mute" = "Stummschalten";
 "voice_unmute" = "Stummschaltung aufheben";
 "voice_mute_microphone" = "Mikrofon stummschalten";

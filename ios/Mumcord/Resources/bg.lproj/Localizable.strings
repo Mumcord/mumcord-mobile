@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Говори";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ говори";
+"talking_announcement_two" = "%1$@ и %2$@ говорят";
 "voice_mute" = "Заглуши микрофона";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Заглуши микрофона";

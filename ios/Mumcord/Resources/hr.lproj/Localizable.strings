@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Govori";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ govori";
+"talking_announcement_two" = "%1$@ i %2$@ govore";
 "voice_mute" = "Isključi mikrofon";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Isključi mikrofon";

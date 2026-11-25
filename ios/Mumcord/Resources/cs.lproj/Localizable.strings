@@ -186,6 +186,8 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Mluví";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ mluví";
+"talking_announcement_two" = "%1$@ a %2$@ mluví";
 "voice_mute" = "Ztlumit mikrofon";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Ztlumit mikrofon";
