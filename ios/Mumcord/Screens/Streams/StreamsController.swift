@@ -30,6 +30,8 @@ final class StreamsController {
     @ObservationIgnored private var commands: Task<Void, Never>?
     /// The streams whose last picture is kept for the next view of them: the watched ones.
     @ObservationIgnored private var keptPictures: Set<UInt64> = []
+    /// How many tiles of each stream are on screen (see `tileShown`).
+    @ObservationIgnored private var tileCounts: [StreamKey: Int] = [:]
 
     /// - Parameter network: decides with the mobile data settings whether streams start by
     ///   themselves (FR-5.41); nil counts as Wi-Fi.
@@ -179,14 +181,27 @@ final class StreamsController {
         }
     }
 
+    /// A tile of the stream came on screen or left it. One stream can have two tiles for a moment:
+    /// when the window switches between one column and two, the tile of the new layout appears
+    /// just before or just after the one of the old layout goes. Counting the tiles and letting
+    /// the last one go only one turn later hands the stream over without stopping or restarting
+    /// it, so it keeps playing and keeps its last picture.
     func tileShown(_ key: StreamKey, _ shown: Bool) {
-        var next = local
+        let count = max((tileCounts[key] ?? 0) + (shown ? 1 : -1), 0)
+        tileCounts[key] = count > 0 ? count : nil
         if shown {
+            guard !local.visibleTiles.contains(key) else { return }
+            var next = local
             next.visibleTiles.insert(key)
-        } else {
-            next.visibleTiles.remove(key)
+            update(next)
+        } else if count == 0 {
+            Task { [weak self] in
+                guard let self, self.tileCounts[key] == nil, self.local.visibleTiles.contains(key) else { return }
+                var next = self.local
+                next.visibleTiles.remove(key)
+                self.update(next)
+            }
         }
-        update(next)
     }
 
     /// The app came on screen or left it.

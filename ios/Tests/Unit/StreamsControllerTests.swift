@@ -75,6 +75,43 @@ final class StreamsControllerTests: XCTestCase {
         await assertEventually { self.engine.stopCalls.count == 2 }
     }
 
+    /// A tile that started by itself, playing, with its last picture.
+    private func playingTile() async -> (AppModel, VideoPicture) {
+        network.status = fakeWifi
+        let model = await connected()
+        model.streams.tileShown(key, true)
+        await assertEventually { self.stream(model)?.tile == .playing(videoId: mockupStream().videoId) }
+        return (model, model.streams.video.router.pictures.picture(for: mockupStream().videoId, held: nil))
+    }
+
+    /// Nothing was stopped or started again, and the last picture is still there.
+    private func assertHandedOver(_ model: AppModel, _ picture: VideoPicture, file: StaticString = #filePath, line: UInt = #line) async {
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(engine.watchCalls, [key], "not started again", file: file, line: line)
+        XCTAssertTrue(engine.stopCalls.isEmpty, "not stopped", file: file, line: line)
+        XCTAssertEqual(stream(model)?.tile, .playing(videoId: mockupStream().videoId), file: file, line: line)
+        let now = model.streams.video.router.pictures.picture(for: mockupStream().videoId, held: nil)
+        XCTAssertTrue(now === picture, "the last picture is kept", file: file, line: line)
+    }
+
+    func testATileOfTheNewLayoutThatAppearsBeforeTheOldOneGoesKeepsTheStream() async {
+        let (model, picture) = await playingTile()
+        // One column and two each have a tile of the stream; the new one is there first.
+        model.streams.tileShown(key, true)
+        model.streams.tileShown(key, false)
+        await assertHandedOver(model, picture)
+
+        model.streams.tileShown(key, false)
+        await assertEventually("the last tile gone, the stream stops") { self.engine.stopCalls == [self.key] }
+    }
+
+    func testATileOfTheNewLayoutThatAppearsJustAfterTheOldOneWentKeepsTheStream() async {
+        let (model, picture) = await playingTile()
+        model.streams.tileShown(key, false)
+        model.streams.tileShown(key, true)
+        await assertHandedOver(model, picture)
+    }
+
     func testStartStreamsAutomaticallyLetsATileStartOnMobileData() async {
         let model = await connected()
         model.more.changeMobile { $0.mobileDataAutoplayStreams = true }
