@@ -625,6 +625,9 @@ enum Strings {
     static var streamRotatePortrait: String { text("stream_rotate_portrait") }
     static var streamStop: String { text("stream_stop") }
     static var streamExpand: String { text("stream_expand") }
+    static var streamLeaveFullScreen: String { text("stream_leave_full_screen") }
+    static func streamChatStrip(_ p1: String) -> String { format("stream_chat_strip", p1) }
+    static var streamChatStripOpen: String { text("stream_chat_strip_open") }
     static var streamVolume: String { text("stream_volume") }
     static var streamTryAgain: String { text("stream_try_again") }
     static var streamUnreachableNoPath: String { text("stream_unreachable_no_path") }

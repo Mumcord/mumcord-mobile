@@ -37,9 +37,40 @@ struct MumcordTabBar: View {
     }
 }
 
+/// Width of the navigation rail (`.tabbar--rail`).
+let railWidth: CGFloat = 88
+
+/// The same tabs as a navigation rail at the left edge (`.tabbar--rail`), for two columns on an
+/// iPad. Its background reaches up into the status bar area and down into the home indicator's;
+/// the tabs start below the status bar.
+struct MumcordNavigationRail: View {
+    let tabs: [MumcordTab]
+    let selectedIndex: Int
+    let onSelect: (Int) -> Void
+    @Environment(\.mumcordTheme) private var theme
+
+    var body: some View {
+        let colors = theme.colors
+        VStack(spacing: MumcordSpace.s2) {
+            ForEach(tabs.indices, id: \.self) { index in
+                TabItem(tab: tabs[index], selected: index == selectedIndex, minHeight: 60) { onSelect(index) }
+            }
+        }
+        .padding(.vertical, MumcordSpace.s3)
+        .frame(width: railWidth)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .overlay(alignment: .trailing) {
+            Rectangle().fill(colors.border).frame(width: 1).ignoresSafeArea()
+        }
+        .background { colors.bgServers.ignoresSafeArea() }
+        .accessibilityElement(children: .contain)
+    }
+}
+
 private struct TabItem: View {
     let tab: MumcordTab
     let selected: Bool
+    var minHeight: CGFloat = 50
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
 
@@ -59,7 +90,7 @@ private struct TabItem: View {
                     }
                 LineText(tab.label, style: .tab, color: selected ? colors.text : colors.textMuted)
             }
-            .frame(maxWidth: .infinity, minHeight: 50)
+            .frame(maxWidth: .infinity, minHeight: minHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

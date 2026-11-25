@@ -109,6 +109,20 @@ final class StreamsControllerTests: XCTestCase {
         XCTAssertEqual(stream(model)?.tile, .tapToWatch)
     }
 
+    func testInTwoColumnsTheFullScreenButtonOpensTheWholeScreenAndLeavingItReturnsToTheColumn() async {
+        let model = await connected()
+        model.streams.open(key)
+        await assertEventually { self.engine.watchCalls == [self.key] }
+        XCTAssertEqual(stream(model)?.channel, "Gaming", "the header names the sharer's channel")
+        model.streams.fillScreen()
+        XCTAssertEqual(model.streams.uiState.open?.view, .whole)
+        model.streams.expand()
+        XCTAssertEqual(model.streams.uiState.open?.view, .full)
+        try? await Task.sleep(nanoseconds: 200_000_000)
+        XCTAssertEqual(engine.watchCalls.count, 1, "still watched")
+        XCTAssertTrue(engine.stopCalls.isEmpty, "nothing was stopped on the way")
+    }
+
     func testLeavingTheAppStopsTheStreamAndComingBackResumesTheOpenedOne() async {
         let model = await connected()
         model.streams.open(key)

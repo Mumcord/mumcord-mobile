@@ -12,11 +12,13 @@ extension Stream {
     var key: StreamKey { StreamKey(session: session, kind: kind) }
 }
 
-/// How an opened stream is shown: the whole screen, or the floating mini window above the other
-/// screens.
+/// How an opened stream is shown: `full` is the whole screen on a phone layout and the right
+/// column in two columns, `mini` the floating mini window above the other screens, and `whole`
+/// the whole screen that the right column's full screen button opens.
 enum StreamView: Equatable {
     case full
     case mini
+    case whole
 }
 
 struct OpenStream: Equatable {
@@ -111,6 +113,8 @@ struct StreamUi: Equatable {
     let volume: Int
     let viewers: Int?
     let tile: TileLook
+    /// The channel the sharer is in, for the stream's header in two columns; untrusted text.
+    var channel: String?
 
     /// The picture is there to be drawn.
     var playing: Bool {
@@ -136,7 +140,8 @@ func streamsUiState(
     names: (UInt32) -> String?,
     local: StreamsLocal,
     autoplay: Bool,
-    directConnectionsQuestion: Bool
+    directConnectionsQuestion: Bool,
+    channels: (UInt32) -> String? = { _ in nil }
 ) -> StreamsUiState {
     var shown: [StreamKey: StreamUi] = [:]
     for stream in streams {
@@ -152,7 +157,8 @@ func streamsUiState(
             hasSound: stream.hasSound,
             volume: local.volumeDrafts[key] ?? Int(stream.volume),
             viewers: stream.viewers.map(Int.init),
-            tile: tileLook(stream, local: local, autoplay: autoplay)
+            tile: tileLook(stream, local: local, autoplay: autoplay),
+            channel: channels(stream.session)
         )
     }
     return StreamsUiState(

@@ -6,6 +6,7 @@ struct StreamActions {
     let tileShown: (StreamKey, Bool) -> Void
     let collapse: () -> Void
     let expand: () -> Void
+    let fillScreen: () -> Void
     let close: () -> Void
     let toggleLandscape: () -> Void
     let retry: (StreamKey) -> Void
@@ -21,6 +22,7 @@ extension StreamActions {
             tileShown: controller.tileShown,
             collapse: controller.collapse,
             expand: controller.expand,
+            fillScreen: controller.fillScreen,
             close: controller.close,
             toggleLandscape: controller.toggleLandscape,
             retry: controller.retry,

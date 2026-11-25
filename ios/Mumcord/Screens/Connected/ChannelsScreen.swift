@@ -6,12 +6,14 @@ import SwiftUI
 private let indent: CGFloat = 28
 
 /// The Channels tab: server header, optional search field, the channel tree with the tiles of
-/// the streams in the user's channel, and the hints.
+/// the streams in the user's channel, and the hints. `hiddenStream` is the stream shown in the
+/// right column of two columns, which has no tile as well.
 struct ChannelsScreen: View {
     let state: ConnectedUiState
     let actions: ConnectedActions
     let streams: StreamsUiState
     let streamActions: StreamActions
+    var hiddenStream: StreamKey?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -52,7 +54,8 @@ struct ChannelsScreen: View {
                     hints: state.hints,
                     actions: actions,
                     streams: streams,
-                    streamActions: streamActions
+                    streamActions: streamActions,
+                    hiddenStream: hiddenStream
                 )
             }
         }
@@ -65,6 +68,7 @@ private struct ChannelList: View {
     let actions: ConnectedActions
     let streams: StreamsUiState
     let streamActions: StreamActions
+    let hiddenStream: StreamKey?
 
     var body: some View {
         ScrollView {
@@ -80,7 +84,7 @@ private struct ChannelList: View {
                         PersonLine(item: item, onOpen: actions.openPerson)
                             .padding(.leading, indent * CGFloat(item.depth))
                     case .stream(let key, let depth):
-                        if let stream = streams.streams[key] {
+                        if let stream = streams.streams[key], key != hiddenStream {
                             StreamTileLine(stream: stream, actions: streamActions)
                                 .padding(.leading, indent * CGFloat(depth))
                         }

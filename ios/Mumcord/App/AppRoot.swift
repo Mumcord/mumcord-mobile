@@ -11,6 +11,10 @@ struct AppRoot: View {
 
     var body: some View {
         AppContent(uiState: model.uiState, model: model)
+            // One column or two follows the window, again on every rotation and resize; what
+            // the user did lives in the model and stays.
+            .environment(\.twoColumns, model.twoColumns)
+            .onConnectedLayoutChange(model.setTwoColumns)
             .environment(\.cameraGateway, model.camera)
             .environment(\.streamVideo, model.streams.video)
             // The colours switch at run time to the shown theme, on every screen (FR-5.81).
@@ -227,6 +231,7 @@ struct AppContent: View {
                     streamActions: StreamActions(controller: model.streams),
                     onDisconnect: model.disconnect,
                     chatBadge: model.chatBadge,
+                    twoColumns: model.twoColumns,
                     model: model
                 ) {
                     ChatTab(model: model)

@@ -7,7 +7,10 @@ import SwiftUI
 /// bottom. The collapse buttons, and the escape gesture of VoiceOver, shrink it to the mini
 /// window.
 ///
-/// `mute` is the user's own microphone for its button; nil hides the button.
+/// `mute` is the user's own microphone for its button; nil hides the button. `onLeave` is set
+/// where the whole screen was opened from the right column of two columns: the collapse arrow
+/// and the escape gesture return there, and the rotate button becomes "Leave full screen",
+/// because an iPad turns by itself.
 struct StreamFullScreen: View {
     let stream: StreamUi
     let landscape: Bool
@@ -15,12 +18,14 @@ struct StreamFullScreen: View {
     let onToggleMute: () -> Void
     let onMicrophone: () -> Void
     let actions: StreamActions
+    var onLeave: (() -> Void)?
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
         let colors = theme.colors
+        let back = onLeave ?? actions.collapse
         GeometryReader { area in
-            let portrait = area.size.height > area.size.width
+            let portrait = onLeave == nil && area.size.height > area.size.width
             ZStack {
                 colors.stageBg.ignoresSafeArea()
                 if stream.playing {
@@ -36,7 +41,7 @@ struct StreamFullScreen: View {
                         .accessibilityHidden(true)
                 }
                 VStack(spacing: 0) {
-                    StageTop(stream: stream, onCollapse: actions.collapse)
+                    StageTop(stream: stream, onCollapse: back)
                     Spacer(minLength: 0)
                     StageBottom(
                         stream: stream,
@@ -44,14 +49,15 @@ struct StreamFullScreen: View {
                         mute: mute,
                         onToggleMute: onToggleMute,
                         onMicrophone: onMicrophone,
-                        actions: actions
+                        actions: actions,
+                        onLeave: onLeave
                     )
                 }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stream-full-screen")
-        .accessibilityAction(.escape, actions.collapse)
+        .accessibilityAction(.escape, back)
         .streamOrientation(landscape: landscape)
     }
 
@@ -101,6 +107,7 @@ private struct StageBottom: View {
     let onToggleMute: () -> Void
     let onMicrophone: () -> Void
     let actions: StreamActions
+    let onLeave: (() -> Void)?
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
@@ -123,8 +130,11 @@ private struct StageBottom: View {
             }
             HStack {
                 muteButton
-                // An iPad ignores the app's wish to turn, so the button would do nothing there.
-                if OrientationLock.canTurn {
+                if let onLeave {
+                    MumcordStageButton(icon: MumcordIcons.maximize, label: Strings.streamLeaveFullScreen, action: onLeave)
+                        .accessibilityIdentifier("stream-leave-full-screen")
+                } else if OrientationLock.canTurn {
+                    // An iPad ignores the app's wish to turn, so the button would do nothing there.
                     MumcordStageButton(
                         icon: MumcordIcons.maximize,
                         label: landscape ? Strings.streamRotatePortrait : Strings.streamRotateLandscape,

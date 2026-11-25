@@ -14,15 +14,19 @@ let miniWindowBottom: CGFloat = 72
 
 /// The floating mini window (FR-5.71, `.pip`): the stream keeps playing above the chat and the
 /// channels. A tap or the expand button opens it full screen; the cross stops watching.
+/// `onExpand` replaces the expand action where opening needs more, such as going back to the
+/// Channels column of two columns, where the stream has its place.
 struct StreamMiniWindow: View {
     let stream: StreamUi
     let actions: StreamActions
+    var onExpand: (() -> Void)?
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
         let colors = theme.colors
         let shape = RoundedRectangle(cornerRadius: MumcordRadius.lg)
-        Button(action: actions.expand) {
+        let expand = onExpand ?? actions.expand
+        Button(action: expand) {
             ZStack {
                 colors.stageBg
                 if stream.playing {
@@ -56,7 +60,7 @@ struct StreamMiniWindow: View {
                     label: Strings.streamExpand,
                     size: 30,
                     iconSize: 16,
-                    action: actions.expand
+                    action: expand
                 )
                 .accessibilityIdentifier("stream-expand")
                 MumcordStageButton(icon: MumcordIcons.x, label: Strings.streamStop, size: 30, iconSize: 16, action: actions.close)

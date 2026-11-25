@@ -68,6 +68,10 @@ final class AppModel {
     private var local: AppUiState
     private var session = SessionState()
     var connectedLocal = ConnectedLocal()
+    /// The window is laid out in two columns (an iPad, see `connectedLayout`), as the app's root
+    /// last measured it. Kept apart from `connectedLocal`, which a connection starts afresh: the
+    /// window stays what it is.
+    private(set) var twoColumns = false
     private var microphoneNotice = MicrophoneNotice.none
     private var notificationState: NotificationState
     private var outputNotice: OutputNotice
@@ -218,14 +222,27 @@ final class AppModel {
     }
 
     /// Tells the chat which chat to show (the one of the user's channel) and whether its
-    /// screen is the one on top. Called whenever the connection, the tab or the voice view
-    /// changes.
+    /// screen is the one on top. Called whenever the connection, the tab, the voice view or the
+    /// layout changes.
     func syncChat() {
         chat.open(currentChannelChat(session))
-        chat.setShown(session.showsServer && connectedLocal.tab == .chat && !connectedLocal.voiceOpen)
+        chat.setShown(session.showsServer && channelChatShown && !connectedLocal.voiceOpen)
         let open = session.showsServer ? messages.local.open?.chat : nil
         conversation.open(open)
         conversation.setShown(open != nil && connectedLocal.tab == .messages && !connectedLocal.voiceOpen)
+    }
+
+    /// The channel chat is on screen: its tab, or the right column of Channels in two columns.
+    var channelChatShown: Bool {
+        showsChannelChat(tab: connectedLocal.tab, twoColumns: twoColumns)
+    }
+
+    /// The app's root measured its window again (rotation, resize, Split View). In two columns
+    /// the channel chat is on screen beside the channels, so it counts as read there.
+    func setTwoColumns(_ twoColumns: Bool) {
+        guard twoColumns != self.twoColumns else { return }
+        self.twoColumns = twoColumns
+        syncChat()
     }
 
     /// The chat controller of the tab on screen; the chat's sheets and pictures go to it.
@@ -327,7 +344,7 @@ final class AppModel {
 
     /// The number on the Chat tab.
     var chatBadge: Int {
-        chatTabBadge(unread: chat.unread, session: session, chatTabOpen: connectedLocal.tab == .chat)
+        chatTabBadge(unread: chat.unread, session: session, chatTabOpen: channelChatShown)
     }
 
     /// After a server on a local or private address could not be reached: asks the system

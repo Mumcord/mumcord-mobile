@@ -16,6 +16,8 @@ final class StreamsController {
     private(set) var local = StreamsLocal()
     private var streams: [Stream] = []
     private var names: [UInt32: String] = [:]
+    /// The name of the channel each person is in, for the header of a stream in two columns.
+    private var channelNames: [UInt32: String] = [:]
     private var directConnectionsQuestion = false
     private var autoplay: Bool
 
@@ -58,7 +60,8 @@ final class StreamsController {
             names: { names[$0] },
             local: local,
             autoplay: autoplay,
-            directConnectionsQuestion: directConnectionsQuestion
+            directConnectionsQuestion: directConnectionsQuestion,
+            channels: { channelNames[$0] }
         )
     }
 
@@ -66,6 +69,10 @@ final class StreamsController {
         let people = state.server?.people.mapValues(\.name) ?? [:]
         // Only what changed is set, so the views are not drawn again for other news.
         if people != names { names = people }
+        let channels = state.server.map { server in
+            server.people.compactMapValues { server.channels[$0.channelId]?.name }
+        } ?? [:]
+        if channels != channelNames { channelNames = channels }
         if state.directConnectionsQuestion != directConnectionsQuestion {
             directConnectionsQuestion = state.directConnectionsQuestion
         }
@@ -130,10 +137,19 @@ final class StreamsController {
         update(next)
     }
 
-    /// The mini window's expand button: full screen again.
+    /// The mini window's expand button: full screen again, which is the right column in two
+    /// columns; also the way back from the whole screen to that column.
     func expand() {
         var next = local
         next.open?.view = .full
+        update(next)
+    }
+
+    /// The full screen button of the stream in the right column (two columns): the whole screen.
+    /// Leaving it goes back to the column with `expand`.
+    func fillScreen() {
+        var next = local
+        next.open?.view = .whole
         update(next)
     }
 
