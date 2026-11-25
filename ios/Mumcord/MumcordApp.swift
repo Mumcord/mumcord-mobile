@@ -13,6 +13,7 @@ struct MumcordApp: App {
     private let theme: MumcordThemeMode
     #if DEBUG
     private let designLaunch: DesignDebugLaunch?
+    private let splitWidth: CGFloat?
     #endif
 
     init() {
@@ -21,10 +22,12 @@ struct MumcordApp: App {
         // Debug builds can be started on a screen of the design system (see DesignDebugLaunch)
         // or against the fake engine (see AppDebugLaunch).
         designLaunch = DesignDebugLaunch.fromLaunchArguments()
+        let launch = designLaunch == nil ? AppDebugLaunch.fromLaunchArguments() : nil
+        splitWidth = launch?.splitWidth
         if designLaunch != nil {
             model = nil
             theme = .system
-        } else if let launch = AppDebugLaunch.fromLaunchArguments() {
+        } else if let launch {
             model = launch.makeModel()
             theme = launch.theme
         } else {
@@ -44,6 +47,7 @@ struct MumcordApp: App {
                 DesignDebugRoot(launch: designLaunch)
             } else if let model {
                 AppRoot(model: model, theme: theme)
+                    .modifier(DebugSplitWidth(width: splitWidth))
                     .overlay(alignment: .topLeading) {
                         if let probe = AppDebugLaunch.cameraProbe { FakeCameraProbeView(probe: probe) }
                         if let probe = AppDebugLaunch.publicListProbe { FakePublicListProbeView(probe: probe) }

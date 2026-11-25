@@ -43,7 +43,8 @@ defaults:
 env:
   CARGO_TERM_COLOR: always
   # No IOS_SIMULATOR: scripts/build-ios.sh takes "iPhone 17" when the runner has it and another
-  # available iPhone simulator when not; a fixed name would fail on a runner without it.
+  # available iPhone simulator when not; a fixed name would fail on a runner without it. The test
+  # group "tablet" runs on an iPad simulator, which the script picks (or creates) the same way.
 
 jobs:
   # Fails at once when a UI test class belongs to no group or the translated texts are out of

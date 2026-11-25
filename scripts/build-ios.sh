@@ -26,7 +26,9 @@
 #   IOS_SIMULATOR="iPhone 17" scripts/build-ios.sh --test
 # Without it the script takes "iPhone 17" when it is installed, else the newest available iPhone
 # simulator, else it creates one for the newest iOS runtime. GitHub's macOS runners do not always
-# have the same simulators.
+# have the same simulators. The test group `tablet` runs on an iPad simulator instead, chosen the
+# same way: IOS_IPAD_SIMULATOR, else "iPad Air 11-inch (M3)" (the size of the tablet mockups),
+# else the newest available iPad simulator, else a new one.
 set -euo pipefail
 
 BRIDGE_PACKAGE="mumcord-mobile-bridge"
@@ -37,9 +39,11 @@ SIMULATOR_TARGET="aarch64-apple-ios-sim"
 # compiled for the iOS version the app is linked for.
 export IPHONEOS_DEPLOYMENT_TARGET="17.0"
 DEFAULT_SIMULATOR="iPhone 17"
+DEFAULT_IPAD_SIMULATOR="iPad Air 11-inch (M3)"
 # Set by choose_simulator.
 SIMULATOR_ID=""
 SIMULATOR_NAME=""
+SIMULATOR_FAMILY=""
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IOS_DIR="${REPO_ROOT}/ios"
@@ -62,7 +66,7 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 # (ios/Tests/UI) must be listed in exactly one group, or --check-groups fails. The unit tests are
 # one bundle (MumcordTests) and belong to one group as a whole. Balanced by the measured run
 # times, so the groups finish at about the same time.
-TEST_GROUPS=(app-screens core voice-chat-screens chat-flow messages output-settings identities)
+TEST_GROUPS=(app-screens core voice-chat-screens chat-flow messages output-settings identities tablet)
 group_tests() {
   case "$1" in
     app-screens)
@@ -90,7 +94,17 @@ group_tests() {
         MumcordUITests/ProfileThemesFlowUITests MumcordUITests/ServerListMoreFlowUITests \
         MumcordUITests/ServerListMoreScreenshotUITests MumcordUITests/LanguageFlowUITests \
         MumcordUITests/LanguageScreenshotUITests ;;
+    tablet)
+      printf '%s\n' MumcordUITests/TabletFlowUITests MumcordUITests/TabletScreenshotUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
+  esac
+}
+
+# The device family a test group runs on: the two-column layout needs an iPad.
+group_family() {
+  case "$1" in
+    tablet) echo iPad ;;
+    *) echo iPhone ;;
   esac
 }
 
@@ -117,15 +131,15 @@ list_groups() {
   printf '[%s]\n' "${json}"
 }
 
-# Prints what to do for the simulator, from `xcrun simctl list --json` on standard input:
-# "use<TAB><udid><TAB><name>" for an installed one, or
-# "create<TAB><device type><TAB><runtime><TAB><name>" when no iPhone simulator is installed.
+# Prints what to do for the simulator of a device family (iPhone or iPad), from
+# `xcrun simctl list --json` on standard input: "use<TAB><udid><TAB><name>" for an installed one,
+# or "create<TAB><device type><TAB><runtime><TAB><name>" when none of the family is installed.
 # Newest means the newest iOS runtime first, then the newest model (its model identifier, such as
 # "iPhone18,3").
 SIMULATOR_CHOICE='
 import json, re, sys
 
-wanted, default = sys.argv[1], sys.argv[2]
+wanted, default, family = sys.argv[1], sys.argv[2], sys.argv[3]
 listing = json.load(sys.stdin)
 
 def version(text):
@@ -152,35 +166,42 @@ if wanted:
 for _, device in devices:
     if device["name"] == default:
         use(device)
-iphones = [(runtime, device) for runtime, device in devices
-           if types.get(device["deviceTypeIdentifier"], {}).get("productFamily") == "iPhone"]
-if iphones:
-    use(max(iphones, key=lambda pair: (version(pair[0]["version"]), model(pair[1]["deviceTypeIdentifier"])))[1])
+matching = [(runtime, device) for runtime, device in devices
+            if types.get(device["deviceTypeIdentifier"], {}).get("productFamily") == family]
+if matching:
+    use(max(matching, key=lambda pair: (version(pair[0]["version"]), model(pair[1]["deviceTypeIdentifier"])))[1])
 if not runtimes:
     sys.exit("no iOS simulator runtime is installed")
 runtime = max(runtimes.values(), key=lambda r: version(r["version"]))
-phones = [t for t in runtime.get("supportedDeviceTypes", []) if t.get("productFamily") == "iPhone"]
-if not phones:
-    sys.exit("the runtime %s supports no iPhone" % runtime["name"])
-phone = max(phones, key=lambda t: model(t["identifier"]))
-print("create", phone["identifier"], runtime["identifier"], phone["name"], sep="\t")
+supported = [t for t in runtime.get("supportedDeviceTypes", []) if t.get("productFamily") == family]
+if not supported:
+    sys.exit("the runtime %s supports no %s" % (runtime["name"], family))
+newest = max(supported, key=lambda t: model(t["identifier"]))
+print("create", newest["identifier"], runtime["identifier"], newest["name"], sep="\t")
 '
 
-# Sets SIMULATOR_ID and SIMULATOR_NAME; creates an iPhone simulator when none is installed. Every
-# later step addresses the simulator by its UDID, so other simulators that run on the same Mac
-# (booted or not, with the same name or not) are never touched.
+# Sets SIMULATOR_ID and SIMULATOR_NAME for a device family (iPhone unless named); creates a
+# simulator when none of the family is installed. Every later step addresses the simulator by its
+# UDID, so other simulators that run on the same Mac (booted or not, with the same name or not)
+# are never touched.
 choose_simulator() {
-  local choice action rest device_type runtime
-  [[ -z "${SIMULATOR_ID}" ]] || return 0
+  local family="${1:-iPhone}" choice action rest device_type runtime wanted default
+  [[ -z "${SIMULATOR_ID}" || "${SIMULATOR_FAMILY}" != "${family}" ]] || return 0
   command -v python3 >/dev/null || die "'python3' not found (ships with the Xcode command line tools)"
-  choice="$(xcrun simctl list --json | python3 -c "${SIMULATOR_CHOICE}" "${IOS_SIMULATOR:-}" "${DEFAULT_SIMULATOR}")" ||
-    die "no simulator to run on (see above); pick an installed one with IOS_SIMULATOR=\"<name>\" ('xcrun simctl list devices available')"
+  if [[ "${family}" == iPad ]]; then
+    wanted="${IOS_IPAD_SIMULATOR:-}" default="${DEFAULT_IPAD_SIMULATOR}"
+  else
+    wanted="${IOS_SIMULATOR:-}" default="${DEFAULT_SIMULATOR}"
+  fi
+  choice="$(xcrun simctl list --json | python3 -c "${SIMULATOR_CHOICE}" "${wanted}" "${default}" "${family}")" ||
+    die "no ${family} simulator to run on (see above); pick an installed one with IOS_SIMULATOR or IOS_IPAD_SIMULATOR=\"<name>\" ('xcrun simctl list devices available')"
+  SIMULATOR_FAMILY="${family}"
   IFS=$'\t' read -r action rest <<<"${choice}"
   case "${action}" in
     use) IFS=$'\t' read -r SIMULATOR_ID SIMULATOR_NAME <<<"${rest}" ;;
     create)
       IFS=$'\t' read -r device_type runtime SIMULATOR_NAME <<<"${rest}"
-      log "No iPhone simulator is installed; creating '${SIMULATOR_NAME}' (${runtime})"
+      log "No ${family} simulator is installed; creating '${SIMULATOR_NAME}' (${runtime})"
       SIMULATOR_ID="$(xcrun simctl create "${SIMULATOR_NAME}" "${device_type}" "${runtime}")" ;;
     *) die "unexpected simulator choice '${choice}'" ;;
   esac
@@ -191,7 +212,7 @@ choose_simulator() {
 # audio unit; allowed up front, the simulator does not put the system's permission question
 # over the tests. Never a reason to fail.
 prepare_simulator() {
-  choose_simulator
+  choose_simulator "${1:-iPhone}"
   xcrun simctl boot "${SIMULATOR_ID}" 2>/dev/null || true
   # A cold simulator on a fresh machine takes minutes; wait here, where it shows in the log.
   xcrun simctl bootstatus "${SIMULATOR_ID}" -b >/dev/null
@@ -261,7 +282,7 @@ esac
 if [[ "${mode}" == test-without-building ]]; then
   group_tests "${group}" >/dev/null
   command -v xcodebuild >/dev/null || die "'xcodebuild' not found (Xcode)"
-  prepare_simulator
+  prepare_simulator "$(group_family "${group}")"
   warm_up_app
   test_group "${group}"
   log "Done"
@@ -328,10 +349,16 @@ if [[ "${mode}" == build-for-testing || "${mode}" == test ]]; then
 fi
 
 if [[ "${mode}" == test ]]; then
-  prepare_simulator
-  warm_up_app
   failed=()
   for group in "${TEST_GROUPS[@]}"; do
+    family="$(group_family "${group}")"
+    if [[ "${family}" != "${SIMULATOR_FAMILY}" || -z "${booted:-}" ]]; then
+      # One simulator at a time: the one of the groups before is shut down first.
+      [[ -z "${booted:-}" ]] || xcrun simctl shutdown "${SIMULATOR_ID}" 2>/dev/null || true
+      prepare_simulator "${family}"
+      warm_up_app
+      booted=yes
+    fi
     test_group "${group}" || failed+=("${group}")
   done
   [[ ${#failed[@]} -eq 0 ]] || die "test groups failed: ${failed[*]}"

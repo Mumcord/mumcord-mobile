@@ -32,6 +32,9 @@ import UIKit
 ///         chat-link-warning the Chat tab warns about a misleading link
 ///         chat-viewer      the Chat tab shows the picture of Ben's message large
 ///         chat-gifs        the Chat tab shows the GIF favourites
+///         tablet-chat      the Lobby chat of the tablet mockup `21-tablet-channels-chat`
+///         tablet-stream-chat the Lobby chat of the tablet mockup `22-tablet-stream`, whose two
+///                          messages the strip under the stream shows
 ///         session-ended    the last run was closed in the middle of a session with Nordlicht
 ///         outputs          the phone has a loudspeaker and an earpiece and plays on the earpiece
 ///         output-bluetooth the Bluetooth headset "Lea's Buds" is connected as well
@@ -92,6 +95,10 @@ import UIKit
 ///         own-theme        the user has a theme of their own, "From the desktop"
 ///         theme-ocean      the app theme is the built-in "Deep Ocean"
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
+///     -mumcordSplitWidth <points>    in portrait the app gets only this width of the screen, as
+///                                    in a narrow Split View on an iPad; in landscape the whole
+///                                    screen. Turning the iPad then resizes the app's window
+///                                    between one column and two (`DebugSplitWidth`).
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
 ///
@@ -101,6 +108,7 @@ struct AppDebugLaunch {
     let identitiesPreset: String?
     let setupDone: Bool
     let theme: MumcordThemeMode
+    var splitWidth: CGFloat?
 
     /// Launch arguments of the form `-key value` are readable as user defaults.
     static func fromLaunchArguments(_ defaults: UserDefaults = .standard) -> AppDebugLaunch? {
@@ -109,7 +117,10 @@ struct AppDebugLaunch {
             options: Set(options.split(separator: ",").map(String.init)),
             identitiesPreset: defaults.string(forKey: "mumcordIdentities"),
             setupDone: defaults.bool(forKey: "mumcordSetupDone"),
-            theme: defaults.string(forKey: "mumcordTheme").flatMap(MumcordThemeMode.init(rawValue:)) ?? .system
+            theme: defaults.string(forKey: "mumcordTheme").flatMap(MumcordThemeMode.init(rawValue:)) ?? .system,
+            splitWidth: defaults.object(forKey: "mumcordSplitWidth") == nil
+                ? nil
+                : CGFloat(defaults.double(forKey: "mumcordSplitWidth"))
         )
     }
 
@@ -209,6 +220,14 @@ struct AppDebugLaunch {
                 if options.contains("chat-unread") {
                     engine.unread = [ChatMockup.lobby: 2]
                 }
+            }
+            if options.contains("tablet-chat") || options.contains("tablet-stream-chat") {
+                engine.messages = [
+                    ChatMockup.lobby: options.contains("tablet-stream-chat")
+                        ? TabletMockup.duringTheStream()
+                        : TabletMockup.conversation(),
+                ]
+                engine.chatImages = TabletMockup.chatImages()
             }
             if options.contains("no-identity") {
                 engine.identities = []

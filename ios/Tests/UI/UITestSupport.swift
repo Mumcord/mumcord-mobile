@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import UIKit
 import XCTest
 
 // The UI tests run in a process of their own and know nothing of the app's code: they find
@@ -274,7 +275,7 @@ extension XCTestCase {
     }
 
     func streamPictureShows(in frame: CGRect, _ check: (_ left: ScreenColour, _ right: ScreenColour) -> Bool) -> Bool {
-        let screenshot = XCUIScreen.main.screenshot().image
+        let screenshot = uprightScreenshot()
         guard let image = screenshot.cgImage, frame.width > 0, frame.height > 0 else { return false }
         let scale = CGFloat(image.width) / screenshot.size.width
         let width = min(frame.width, frame.height * 16 / 9)
@@ -284,6 +285,31 @@ extension XCTestCase {
               let second = pixel(image, x: (left + width * 0.75) * scale, y: y * scale)
         else { return false }
         return check(first, second)
+    }
+
+    /// The screen as the user sees it. A turned iPad's screenshot holds its pixels as the screen
+    /// stands upright and only notes the turn, which the pixel reads and the attachments' PNG
+    /// files ignore; it is drawn upright here. An upright screenshot is returned as it is.
+    func uprightScreenshot() -> UIImage {
+        let image = XCUIScreen.main.screenshot().image
+        guard image.imageOrientation != .up else { return image }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = image.scale
+        return UIGraphicsImageRenderer(size: image.size, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+        }
+    }
+
+    /// Like `keepScreenshot`, but upright also on a turned iPad (see `uprightScreenshot`).
+    func keepUprightScreenshot(named name: String) {
+        guard let png = uprightScreenshot().pngData() else {
+            XCTFail("no screenshot of \(name)")
+            return
+        }
+        let screenshot = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+        screenshot.name = name + ".png"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
 
     /// The colour of the screen at a point given as a fraction of its width and height.
