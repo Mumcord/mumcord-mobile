@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import MumcordBridge
+import SwiftUI
+import UIKit
 import XCTest
 
 @testable import Mumcord
@@ -35,6 +37,31 @@ final class ConnectedLayoutTests: XCTestCase {
         XCTAssertEqual(connectedLayout(width: 320, height: 1180), .oneColumn)
         XCTAssertEqual(connectedLayout(width: 599, height: 1180), .oneColumn)
         XCTAssertEqual(connectedLayout(width: 1180, height: 479), .oneColumn)
+    }
+
+    func testADockedKeyboardDoesNotChangeTheLayout() async throws {
+        // An 11-inch iPad in landscape with its docked keyboard (398 points): the space above the
+        // keyboard alone would be one column, the window is two.
+        let keyboard: CGFloat = 398
+        XCTAssertEqual(connectedLayout(width: 1180, height: 820 - keyboard), .oneColumn)
+        let reported = LayoutReports()
+        let host = UIHostingController(rootView: Color.clear.onConnectedLayoutChange { reported.values.append($0) })
+        let scene = try XCTUnwrap(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let window = UIWindow(windowScene: scene)
+        window.frame = CGRect(x: 0, y: 0, width: 1180, height: 820)
+        window.rootViewController = host
+        window.isHidden = false
+        await assertEventually { reported.values == [true] }
+
+        // The measurement leaves out every inset at the window's edges, the keyboard's too; an
+        // inset of the keyboard's height stands in for it here.
+        host.additionalSafeAreaInsets = UIEdgeInsets(top: 0, left: 0, bottom: keyboard, right: 0)
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertGreaterThanOrEqual(host.view.safeAreaInsets.bottom, keyboard, "the inset is in place")
+        XCTAssertEqual(reported.values, [true], "still two columns")
+        window.isHidden = true
     }
 
     func testTheAppHasOneWindowOnAnIPad() throws {
@@ -125,4 +152,10 @@ final class ConnectedLayoutTests: XCTestCase {
         XCTAssertEqual(model.uiState.connected?.tab, .chat)
         await assertEventually { model.chatBadge == 0 }
     }
+}
+
+/// What `onConnectedLayoutChange` reported, in order: true for two columns.
+@MainActor
+private final class LayoutReports {
+    var values: [Bool] = []
 }
