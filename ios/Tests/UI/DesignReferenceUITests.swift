@@ -21,7 +21,7 @@ final class DesignReferenceUITests: XCTestCase {
     /// The gallery is longer than the screen, so it is captured page by page.
     func testComponentGalleryShowsEveryGroup() {
         let app = XCUIApplication()
-        app.launchArguments = ["-mumcordDesignScreen", "gallery", "-mumcordDesignTheme", "dark"]
+        app.launchArguments = ["-mumcordDesignScreen", "gallery", "-mumcordDesignTheme", "dark"] + languageArguments()
         app.launch()
 
         XCTAssertTrue(app.staticTexts["Components"].waitForExistence(timeout: 10))
@@ -54,7 +54,7 @@ final class DesignReferenceUITests: XCTestCase {
 
     private func captureChannelsReference(theme: String) {
         let app = XCUIApplication()
-        app.launchArguments = ["-mumcordDesignScreen", "channels", "-mumcordDesignTheme", theme]
+        app.launchArguments = ["-mumcordDesignScreen", "channels", "-mumcordDesignTheme", theme] + languageArguments()
         app.launch()
 
         XCTAssertTrue(app.staticTexts["Nordlicht"].waitForExistence(timeout: 10))
