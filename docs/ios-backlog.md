@@ -253,8 +253,8 @@ simulator app; linking for a real device is first proven here.
 - The small decorative figure below the settings (`SettingsFigure`) is meant to show only while
   the list is pulled past its end. On the server list's Settings, which has no voice bar and no
   tabs below it, the Language section makes the list long enough to scroll, and at rest at its
-  end the figure now stands in the space above the home indicator. Left as it is with the
-  languages (step 5); decide whether that is fine or the space below the list should change.
+  end the figure now stands in the space above the home indicator. The product manager looked
+  at it on 2026-11-25: it stays as it is.
 - Screenshots are large (about 37 MB for the Messages set alone); shrink the PNGs. The sets
   of moderation, More, the activity log and the settings show how: saved with a palette of 256
   colours and no dithering (Pillow, `quantize(colors=256, method=MAXCOVERAGE, dither=NONE)`),
