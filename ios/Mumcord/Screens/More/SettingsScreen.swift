@@ -109,6 +109,11 @@ struct SettingsScreen: View {
                     divider: true,
                     trailing: { SettingsLevelMeter(level: inputLevel) }
                 )
+                // One VoiceOver element for title and meter: the 8 pt meter alone is too small
+                // to touch, and the row would say "Microphone level" twice.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Strings.voiceLevel)
+                .accessibilityIdentifier("settings-input-level")
             }
             if state.hasEarpiece {
                 SettingsValueRow(
@@ -325,7 +330,6 @@ private struct SettingsLevelMeter: View {
     var body: some View {
         MumcordLevelMeter(level: Double(level.percent) / 100, label: Strings.voiceLevel)
             .frame(width: levelMeterWidth)
-            .accessibilityIdentifier("settings-input-level")
     }
 }
 
