@@ -199,13 +199,23 @@ bar; its tile leaves the tree meanwhile. The full screen button opens the whole 
 VoiceOver's escape gesture and "Leave full screen" (in place of the phone's rotate button) return to
 the column; on Messages and More the stream floats as the mini window, whose expand button goes back
 to Channels. The full voice view covers both columns, as on Android. Sheets are at most 480 points
-wide in the middle of the window in two columns; the system's own presentations (photo picker,
+wide in the middle of a window that is wide enough for two columns; the limit follows the app-wide
+layout, so on a wide iPad it also holds for the sheets over the server list and the other screens
+without a connection, as on Android; the system's own presentations (photo picker,
 camera, file picker, the share sheet of a backup or a theme) keep the system's iPad look. A window
 narrower than 600 points (Split View, Slide Over, Stage Manager) or lower than 480 gets the phone
 layout; no iPhone reaches two columns, also not in landscape. Rotating and resizing keep the tab, the
 draft, the open stream and every sheet, because they live in the model. A stream needs no landscape
 of its own on an iPad: the iPad turns by itself and the whole screen turns with it (iOS ignores an
-app's wish for an orientation while it allows multitasking). Unit tests `ConnectedLayoutTests` and
+app's wish for an orientation while it allows multitasking). A hold button (talk, whisper, shout)
+that leaves the screen while it is held, because the layout switches, the voice view takes the
+bar's place or a stream covers it, lets go, so the voice is not sent on unseen. A stream that plays
+by itself in its tile keeps playing, with its last picture, while the tile of the new layout takes
+over from the one of the old layout: the controller counts the tiles of each stream and lets the
+last one go one turn later. The app has one window (`UIApplicationSupportsMultipleScenes` is off in
+`ios/project.yml`): it runs one engine per process, and the layout, the voice and the streams belong
+to it, so a second window would share and overwrite them. Split View, Slide Over, Stage Manager and
+turning still work. Unit tests `ConnectedLayoutTests` and
 `StreamsControllerTests`; UI tests `TabletFlowUITests`; screenshots `ios-tablet-*`; all in the test
 group `tablet` on an iPad simulator. The screens without a connection (server list, public servers,
 More from the server list, identities, the server form) stay one column across the whole width, as
@@ -232,6 +242,31 @@ on Android.
 - As on Android, the mockups' elements without a function stay out: the chat header's search and
   info icons, the stream header's settings icon and its resolution and frame rate, the "+" of the
   input bar (the image and GIF buttons take its place).
+
+**Open points from the review of the iPad layout (for the maintainer).**
+
+- The channel chat counts as read while a stream covers it. In two columns a stream in the right
+  column of Channels leaves only the strip with the two newest messages, and the whole screen leaves
+  none; the app still treats the chat as on screen (`showsChannelChat`), marks new messages read and
+  holds back their notifications as "chat open". Android does the same (`showsChannelChat` in
+  `ConnectedState.kt`, used for the chat's `shown` in `AppViewModel.kt`), also for a phone's full
+  screen stream over the Chat tab, so iOS keeps it for now. A fix (the stream's view taken into
+  account, and the chat told again when a stream opens or closes) would be a change for both apps.
+- In two columns the channel chat's unread count has no place to show while Messages or More is
+  open: the rail has no Chat item. The same on Android; a badge on the rail's Channels item would be
+  a change for both apps.
+- On Messages or More the opened stream floats as the mini window; if the window then becomes
+  narrow, the stream's view is still "full", which the phone layout shows full screen. The same on
+  Android.
+- At exactly 600 points the right column, the chat, is only 172 points wide (600 minus the rail and
+  the 340-point left column). The same threshold as on Android.
+- Switching between one column and two builds the connected screens again: the chat's scroll
+  position goes back to the newest message, the keyboard loses its focus and a notice banner in the
+  chat starts its four seconds again. The notice is no longer read out a second time by VoiceOver;
+  it is announced when it changes, not when its banner appears. Keeping the rest needs the scroll
+  position and the focus in the model.
+- Android keeps a plain set of the tiles on screen (`StreamsController.tileShown`); whether a
+  layout switch there hands a playing stream over between two tiles the same way was not checked.
 
 Accessibility pass (task 9.4, AC-5.33, mirroring Android commits `8d4fc2a` and `a81d199`): built
 and checked in the simulator against the fake engine. VoiceOver says politely who starts talking in
