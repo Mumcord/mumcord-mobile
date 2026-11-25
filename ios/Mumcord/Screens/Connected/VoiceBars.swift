@@ -14,6 +14,15 @@ extension VoiceUiState {
 }
 
 extension MuteControl {
+    /// The state VoiceOver reads on a mute button while the microphone is off; nil while it is on
+    /// and when muted by the server, whose action label already says so.
+    var stateLabel: String? {
+        switch self {
+        case .unmuted, .serverMuted: nil
+        case .muted, .noMicrophone: Strings.personMuted
+        }
+    }
+
     /// What VoiceOver reads for the mute button, which also says why it cannot be used.
     var actionLabel: String {
         switch self {
@@ -48,7 +57,9 @@ struct VoiceBar: View {
                 unmute: muteLabel,
                 deafen: Strings.voiceDeafen,
                 undeafen: Strings.voiceUndeafen,
-                leave: Strings.voiceLeaveServer
+                leave: Strings.voiceLeaveServer,
+                muted: voice.mute.stateLabel,
+                deafened: Strings.personDeafened
             ),
             onOpen: actions.openVoice,
             onToggleMute: voice.mute == .noMicrophone ? actions.requestMicrophone : actions.toggleMute,

@@ -150,6 +150,7 @@ private struct StageControls: View {
                     MumcordSlider(
                         value: Double(stream.volume) / Double(maxStreamVolume),
                         label: Strings.streamVolume,
+                        valueText: Strings.personVolumeValue(stream.volume),
                         onMedia: true,
                         onValueChange: { fraction in
                             actions.changeVolume(stream.key, Int((fraction * Double(maxStreamVolume)).rounded()))

@@ -50,7 +50,9 @@ struct ChannelsReferenceScreen: View {
                     unmute: "Unmute microphone",
                     deafen: "Deafen",
                     undeafen: "Undeafen",
-                    leave: "Leave server"
+                    leave: "Leave server",
+                    muted: "Muted",
+                    deafened: "Deafened"
                 ),
                 onOpen: {},
                 onToggleMute: {},

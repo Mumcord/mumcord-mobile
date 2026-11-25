@@ -325,6 +325,8 @@ private struct SettingsLevelMeter: View {
     var body: some View {
         MumcordLevelMeter(level: Double(level.percent) / 100, label: Strings.voiceLevel)
             .frame(width: levelMeterWidth)
+            // The row's title already names it, and its moving level is not announced.
+            .accessibilityHidden(true)
             .accessibilityIdentifier("settings-input-level")
     }
 }

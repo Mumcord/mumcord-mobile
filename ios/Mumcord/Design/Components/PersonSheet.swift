@@ -64,7 +64,9 @@ struct MumcordSliderRow: View {
                     .layoutPriority(1)
             }
             .padding(.top, MumcordSpace.s2)
-            MumcordSlider(value: value, label: title, onValueChange: onValueChange)
+            // The slider says both, as its label and its value.
+            .accessibilityHidden(true)
+            MumcordSlider(value: value, label: title, valueText: valueText, onValueChange: onValueChange)
         }
         .padding(.horizontal, MumcordSpace.s4)
         .padding(.top, MumcordSpace.s2)

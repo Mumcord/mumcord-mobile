@@ -45,13 +45,14 @@ struct MumcordVoiceTile: View {
 }
 
 /// A large round action of the full voice view with its name below (`.vaction`): a 64 pt
-/// button and a label. `spokenLabel` is what VoiceOver reads for the button; the visible
-/// `label` is not read a second time. Disable it with `.disabled(true)`.
+/// button and a label. `spokenLabel` is what VoiceOver reads for the button, `value` what is on
+/// now; the visible `label` is not read a second time. Disable it with `.disabled(true)`.
 struct MumcordVoiceAction: View {
     let icon: MumcordIconData
     let label: String
     let spokenLabel: String
     var style = MumcordIconButtonStyle.tonal
+    var value: String?
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
     @Environment(\.isEnabled) private var isEnabled
@@ -71,6 +72,8 @@ struct MumcordVoiceAction: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(spokenLabel)
+        // Always set, also empty, so switching keeps the button's identity and VoiceOver's focus.
+        .accessibilityValue(value ?? "")
     }
 
     private var tint: Color {

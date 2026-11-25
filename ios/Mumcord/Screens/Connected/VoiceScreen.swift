@@ -35,6 +35,8 @@ struct VoiceScreen: View {
                         // The mockup's title is one step larger than the app bar title.
                         LineText(voice.channelName, style: TextToken.title.with(size: 24), color: colors.text)
                             .accessibilityAddTraits(.isHeader)
+                            // The view's title is read first, before the chevron above it.
+                            .accessibilitySortPriority(1)
                         LineText(voice.statusLine, style: .small, color: colors.textMuted)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -162,6 +164,7 @@ private struct VoiceActions: View {
                 label: muteLabel,
                 spokenLabel: voice.mute.actionLabel,
                 style: voice.mute == .unmuted ? .tonal : .off,
+                value: voice.mute.stateLabel,
                 action: voice.mute == .noMicrophone ? actions.requestMicrophone : actions.toggleMute
             )
             .disabled(voice.mute == .serverMuted)
@@ -172,6 +175,7 @@ private struct VoiceActions: View {
                 label: voice.deafened ? Strings.voiceUndeafen : Strings.voiceDeafen,
                 spokenLabel: voice.deafened ? Strings.voiceUndeafen : Strings.voiceDeafen,
                 style: voice.deafened ? .off : .tonal,
+                value: voice.deafened ? Strings.personDeafened : nil,
                 action: actions.toggleDeafen
             )
             .frame(width: slot)
@@ -221,9 +225,13 @@ private struct InputLevelMeter: View {
         VStack(alignment: .leading, spacing: MumcordSpace.s2) {
             ParagraphText(Strings.voiceLevelHint, style: .small, color: theme.colors.textMuted)
             MumcordLevelMeter(level: Double(level.percent) / 100, label: Strings.voiceLevel)
-                .accessibilityIdentifier("voice-level")
         }
         .padding(.horizontal, MumcordSpace.s2)
         .frame(maxWidth: .infinity, minHeight: talkAreaHeight, alignment: .leading)
+        // One element for the meter and its hint: the 8 pt meter alone is too small a target.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Strings.voiceLevel)
+        .accessibilityHint(Strings.voiceLevelHint)
+        .accessibilityIdentifier("voice-level")
     }
 }

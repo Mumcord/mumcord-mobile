@@ -86,13 +86,15 @@ enum MumcordIconButtonStyle: CaseIterable {
 }
 
 /// Round icon button, 44 pt wide as in the mockups (56 pt when `large`), which is also the
-/// smallest touch target of iOS. `label` is what VoiceOver reads and must name the action.
+/// smallest touch target of iOS. `label` is what VoiceOver reads and must name the action;
+/// `value` says what is on now, such as "Muted", for buttons that switch something.
 struct MumcordIconButton: View {
     let icon: MumcordIconData
     let label: String
     var style = MumcordIconButtonStyle.plain
     var large = false
     var iconSize = MumcordSize.icon
+    var value: String?
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
     @Environment(\.isEnabled) private var isEnabled
@@ -112,6 +114,9 @@ struct MumcordIconButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
+        // Always set, also empty: a modifier that comes and goes would give the button a new
+        // identity on every switch and take VoiceOver's focus away from it.
+        .accessibilityValue(value ?? "")
         .opacity(isEnabled ? 1 : disabledOpacity)
     }
 

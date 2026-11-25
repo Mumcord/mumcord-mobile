@@ -12,6 +12,10 @@ struct MumcordVoiceBarLabels {
     let deafen: String
     let undeafen: String
     let leave: String
+    /// The state read on the mute button while the microphone is off; nil when `unmute` says it.
+    let muted: String?
+    /// The state read on the deafen button while the sound is off.
+    let deafened: String
 }
 
 /// Slim voice bar above the tabs (`.voicebar`): talk indicator, channel name with a status
@@ -56,6 +60,7 @@ struct MumcordVoiceBar: View {
                     icon: muted ? MumcordIcons.micOff : MumcordIcons.mic,
                     label: muted ? labels.unmute : labels.mute,
                     style: muted ? .off : .tonal,
+                    value: muted ? labels.muted : nil,
                     action: onToggleMute
                 )
                 .disabled(!muteEnabled)
@@ -63,6 +68,7 @@ struct MumcordVoiceBar: View {
                     icon: deafened ? MumcordIcons.headphonesOff : MumcordIcons.headphones,
                     label: deafened ? labels.undeafen : labels.deafen,
                     style: deafened ? .off : .tonal,
+                    value: deafened ? labels.deafened : nil,
                     action: onToggleDeafen
                 )
                 MumcordIconButton(icon: MumcordIcons.phoneOff, label: labels.leave, style: .danger, action: onLeave)

@@ -36,11 +36,14 @@ struct MumcordToggle: View {
 }
 
 /// Slider (`.slider`) for a `value` from 0 to 1, such as a volume. `label` names what it
-/// changes. VoiceOver gets a standard slider and changes the value in steps. `onMedia` draws it
-/// white on dark, for the stream's full screen, which is dark in both themes.
+/// changes and `valueText` is what VoiceOver reads as its value, such as "100%" for a volume
+/// that goes up to 200 %; without it VoiceOver reads the share of the track. VoiceOver gets a
+/// standard slider and changes the value in steps. `onMedia` draws it white on dark, for the
+/// stream's full screen, which is dark in both themes.
 struct MumcordSlider: View {
     let value: Double
     let label: String
+    var valueText: String?
     var onMedia = false
     let onValueChange: (Double) -> Void
     @Environment(\.mumcordTheme) private var theme
@@ -84,8 +87,15 @@ struct MumcordSlider: View {
         .frame(minWidth: 80, maxWidth: .infinity)
         .frame(height: MumcordSize.touchVisual)
         .accessibilityRepresentation {
-            Slider(value: Binding(get: { Double(fraction) }, set: onValueChange), in: 0...1) {
-                Text(label)
+            if let valueText {
+                Slider(value: Binding(get: { Double(fraction) }, set: onValueChange), in: 0...1) {
+                    Text(label)
+                }
+                .accessibilityValue(valueText)
+            } else {
+                Slider(value: Binding(get: { Double(fraction) }, set: onValueChange), in: 0...1) {
+                    Text(label)
+                }
             }
         }
     }
