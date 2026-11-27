@@ -10,8 +10,17 @@ struct MumcordTheme {
     let shadows: MumcordShadows
     let isDark: Bool
 
-    static let dark = MumcordTheme(colors: .dark, opacities: .dark, shadows: .dark, isDark: true)
-    static let light = MumcordTheme(colors: .light, opacities: .light, shadows: .light, isDark: false)
+    static let dark = MumcordTheme(colors: .dark, isDark: true)
+    static let light = MumcordTheme(colors: .light, isDark: false)
+
+    /// The colours of a theme the user picked; `isDark` says whether they are dark, which
+    /// picks the opacities and shadows. The app's own colours are the built-in "Mumcord" theme.
+    init(colors: MumcordColors, isDark: Bool) {
+        self.colors = colors
+        opacities = isDark ? .dark : .light
+        shadows = isDark ? .dark : .light
+        self.isDark = isDark
+    }
 
     /// The theme for a mode; `.system` follows the colour scheme of the device.
     static func resolve(_ mode: MumcordThemeMode, system: ColorScheme) -> MumcordTheme {

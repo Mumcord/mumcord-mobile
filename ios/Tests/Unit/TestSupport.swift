@@ -153,7 +153,9 @@ final class PhoneFakes {
         store: SessionStore,
         setupStore: SetupStore,
         sessionEnded: SessionEndedNotice? = nil,
-        outputs: OutputAccess? = nil
+        messageSettings: MessageNotificationSettings = InMemoryMessageNotificationSettings(),
+        outputs: OutputAccess? = nil,
+        languages: AppLanguages = .phoneOnly
     ) -> AppModel {
         AppModel(
             store: store,
@@ -169,15 +171,23 @@ final class PhoneFakes {
             localNetwork: localNetwork,
             openSettings: { [weak self] in self?.settingsOpened += 1 },
             sessionEnded: sessionEnded,
-            outputs: outputs
+            messageSettings: messageSettings,
+            outputs: outputs,
+            languages: languages
         )
     }
 }
 
 extension AppModel {
     /// A model for tests that do not look at voice or the local network: the microphone is
-    /// allowed and every server is on the internet.
-    convenience init(store: SessionStore, setupStore: SetupStore) {
+    /// allowed and every server is on the internet. Without a `network` streams start as on Wi-Fi.
+    convenience init(
+        store: SessionStore,
+        setupStore: SetupStore,
+        network: NetworkMonitor? = nil,
+        camera: CameraGateway = NoCamera(),
+        cameraShare: CameraShare? = nil
+    ) {
         let fakes = PhoneFakes()
         self.init(
             store: store,
@@ -191,7 +201,21 @@ extension AppModel {
                 log: { _ in }
             ),
             localNetwork: fakes.localNetwork,
-            openSettings: {}
+            openSettings: {},
+            camera: camera,
+            network: network,
+            cameraShare: cameraShare
         )
     }
+}
+
+/// A server of the public list; in Germany unless said otherwise.
+func publicServer(
+    _ name: String,
+    _ host: String,
+    country: String = "Germany",
+    code: String = "DE",
+    port: UInt16 = 64738
+) -> PublicServer {
+    PublicServer(name: name, host: host, port: port, country: country, countryCode: code)
 }

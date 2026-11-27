@@ -44,6 +44,19 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var _bitrateLimits: [UInt32?] = []
     private var _joinCalls: [(channelId: UInt32, password: String?)] = []
     private var _volumeCalls: [(session: UInt32, percent: Int)] = []
+    private var _moderationCalls: [String] = []
+    private var _moderationFailure: BridgeError?
+    private var _banTargetAnswer = BanTarget(
+        address: "192.0.2.7",
+        onlineSecs: nil,
+        banListReadable: true,
+        hasCertificate: true,
+        canKick: true,
+        canBan: true
+    )
+    private var _banResults: [BanResult] = []
+    private var _kickReasons: [String?] = []
+    private var _banInputs: [BanInput] = []
     private var _pings: [Int64: ServerPing] = [:]
     private var _connectFailure: BridgeError?
     private var _saveFailure: BridgeError?
@@ -90,6 +103,19 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         notifySenderOnly: false,
         updateCheck: true
     )
+    private var _appSettings = AppSettings(
+        language: nil,
+        linkPreviews: true,
+        historyMaxAgeDays: nil,
+        notifyPrivateMessages: true,
+        notifyMentions: true
+    )
+    private var _noiseSuppression = false
+    private var _voiceSettingsFailure: BridgeError?
+    private var _mobileSettingsSaveDelay: Duration?
+    private var _mobileSettingsSaves = 0
+    private var _settingsSaveFailure: BridgeError?
+    private var _activityOnConnect: [ActivityEntry] = []
     /// The user's own mute before a deafen, which comes back when the deafen ends.
     private var _identities: [Identity]
     private var nextIdentityId: Int64
@@ -101,6 +127,8 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private var connection = ConnectionState.disconnected(error: nil)
     private var storedServers: [SavedServer]
     private var nextServerId: Int64
+    /// The user's profile and the themes, kept apart (`FakeEngine+ProfileThemes.swift`).
+    let profileThemes = FakeProfileThemes()
 
     init(
         listener: EngineListener,
@@ -134,6 +162,27 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     var bitrateLimits: [UInt32?] { locked { _bitrateLimits } }
     var joinCalls: [(channelId: UInt32, password: String?)] { locked { _joinCalls } }
     var volumeCalls: [(session: UInt32, percent: Int)] { locked { _volumeCalls } }
+    /// Every move ("move <session> <channel>") and server mute ("mute <session> <muted>"), in order.
+    var moderationCalls: [String] { locked { _moderationCalls } }
+    /// The reason of every kick, in order.
+    var kickReasons: [String?] { locked { _kickReasons } }
+    /// Every ban as it was sent, in order.
+    var banInputs: [BanInput] { locked { _banInputs } }
+    /// Thrown by the next moderation command (move, mute, kick, ban and its target) instead of acting.
+    var moderationFailure: BridgeError? {
+        get { locked { _moderationFailure } }
+        set { locked { _moderationFailure = newValue } }
+    }
+    /// What `banTarget` reports about a person.
+    var banTargetAnswer: BanTarget {
+        get { locked { _banTargetAnswer } }
+        set { locked { _banTargetAnswer = newValue } }
+    }
+    /// What the next bans produce, in order; a ban beyond them is saved.
+    var banResults: [BanResult] {
+        get { locked { _banResults } }
+        set { locked { _banResults = newValue } }
+    }
     var currentTalkMode: TalkMode { locked { _talkMode } }
     /// Every press (true) and release (false) of the hold-to-talk button, in order.
     var pushToTalkCalls: [Bool] { locked { _pushToTalkCalls } }
@@ -202,6 +251,9 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         set { locked { _deniedChannels = newValue } }
     }
 
+    /// The user's own session on the fake server.
+    var selfSession: UInt32 { server.selfSession }
+
     func emit(_ event: BridgeEvent) {
         if case .connectionChanged(let state) = event {
             locked {
@@ -246,7 +298,14 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     }
 
     func disconnect() async throws {
-        locked { _disconnects += 1 }
+        locked {
+            _disconnects += 1
+            // The bridge's list of a connection ends with it.
+            _streams = []
+        }
+        updateFrameTimer()
+        // As the engine: the own camera ends with the connection.
+        endCamera()
         emit(.audioWantedChanged(audio: AudioWanted(capture: false, playback: false)))
         emit(.connectionChanged(state: .disconnected(error: nil)))
     }
@@ -309,6 +368,119 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         }
     }
 
+    // MARK: Public servers
+
+    // The list "as the directory would give it" is `publicServers`; the app gets it in pages
+    // from the last download, as from the bridge. No list service and no server is contacted.
+
+    private var _publicServers: [PublicServer] = []
+    private var _downloadedPublic: [PublicServer]?
+    private var _publicDownloads = 0
+    private var _failingPublicDownloads: Set<Int> = []
+    private var _publicDownloadDelay: Duration?
+    private var _publicPings: [String: ServerPing] = [:]
+    private var _publicPingRequests: [String] = []
+    private var _publicPingsAnswered = 0
+    private var _publicPingDelay: Duration?
+    private var _onPublicActivity: (@Sendable (PublicActivity) -> Void)?
+
+    /// The public server list as the list service would give it.
+    var publicServers: [PublicServer] {
+        get { locked { _publicServers } }
+        set { locked { _publicServers = newValue } }
+    }
+
+    /// How often the list was downloaded: on the first call and on every refresh.
+    var publicDownloads: Int { locked { _publicDownloads } }
+
+    /// The downloads (counted from 1) that fail as an unreachable list service would; the list
+    /// downloaded before stays, as in the bridge.
+    var failingPublicDownloads: Set<Int> {
+        get { locked { _failingPublicDownloads } }
+        set { locked { _failingPublicDownloads = newValue } }
+    }
+
+    /// How long a download takes; at once when nil.
+    var publicDownloadDelay: Duration? {
+        get { locked { _publicDownloadDelay } }
+        set { locked { _publicDownloadDelay = newValue } }
+    }
+
+    /// What listed servers answer, by "host:port"; the others give no answer.
+    var publicPings: [String: ServerPing] {
+        get { locked { _publicPings } }
+        set { locked { _publicPings = newValue } }
+    }
+
+    /// Every ping of a listed server, as "host:port", in order.
+    var publicPingRequests: [String] { locked { _publicPingRequests } }
+
+    /// How many pings of listed servers have answered (or not answered) so far.
+    var publicPingsAnswered: Int { locked { _publicPingsAnswered } }
+
+    /// How long a listed server takes to answer a ping; at once when nil.
+    var publicPingDelay: Duration? {
+        get { locked { _publicPingDelay } }
+        set { locked { _publicPingDelay = newValue } }
+    }
+
+    /// Told after every download and ping how far they are, for the probe of the UI tests.
+    var onPublicActivity: (@Sendable (PublicActivity) -> Void)? {
+        get { locked { _onPublicActivity } }
+        set { locked { _onPublicActivity = newValue } }
+    }
+
+    /// Tells `onPublicActivity` how far the downloads and pings are.
+    func reportPublicActivity() {
+        let (report, activity) = locked {
+            (_onPublicActivity, PublicActivity(downloads: _publicDownloads, pings: _publicPingRequests.count, answered: _publicPingsAnswered))
+        }
+        report?(activity)
+    }
+
+    func publicServers(query: PublicServerQuery) async throws -> PublicServerPage {
+        var list = locked { query.refresh ? nil : _downloadedPublic }
+        if list == nil {
+            let (download, delay) = locked {
+                _publicDownloads += 1
+                return (_publicDownloads, _publicDownloadDelay)
+            }
+            reportPublicActivity()
+            if let delay { try await Task.sleep(for: delay) }
+            list = try locked {
+                if _failingPublicDownloads.contains(download) {
+                    throw BridgeError.ServerUnreachable(detail: "the list service is not reachable")
+                }
+                _downloadedPublic = _publicServers
+                return _publicServers
+            }
+        }
+        let search = query.search.trimmingCharacters(in: .whitespaces)
+        let matching = (list ?? []).filter { server in
+            (search.isEmpty || server.name.range(of: search, options: .caseInsensitive) != nil)
+                && (query.countryCode.map { server.countryCode.caseInsensitiveCompare($0) == .orderedSame } ?? true)
+        }
+        return PublicServerPage(
+            servers: Array(matching.dropFirst(Int(query.offset)).prefix(Int(min(query.limit, 100)))),
+            total: UInt32(matching.count)
+        )
+    }
+
+    func pingPublicServer(host: String, port: UInt16) async throws -> ServerPing? {
+        let delay = locked {
+            _publicPingRequests.append("\(host):\(port)")
+            return _publicPingDelay
+        }
+        reportPublicActivity()
+        defer { reportPublicActivity() }
+        // A ping the app cancels ends at once, without an answer it would use.
+        if let delay { try? await Task.sleep(for: delay) }
+        return locked {
+            _publicPingsAnswered += 1
+            return _publicPings["\(host):\(port)"]
+        }
+    }
+
     func joinChannel(channelId: UInt32, password: String?) async throws {
         let (denied, needed): (Bool, String?) = locked {
             _joinCalls.append((channelId, password))
@@ -325,6 +497,8 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
                 emit(.channelPasswordChanged(channelId: channelId, state: .ended))
             }
             change(server.selfSession) { $0.channelId = channelId }
+            // As the engine: leaving the channel turns the own camera off (FR-8.21).
+            endCamera()
         }
     }
 
@@ -335,6 +509,80 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
 
     func setPersonLocalMute(session: UInt32, muted: Bool) async throws {
         change(session) { $0.locallyMuted = muted }
+    }
+
+    // MARK: Moderation
+
+    /// Call with the lock held.
+    private func failModerationOnce() throws {
+        if let failure = _moderationFailure {
+            _moderationFailure = nil
+            throw failure
+        }
+    }
+
+    /// Runs a move or a server mute. As the engine: the server's refusal of one is also told
+    /// as its refusal event.
+    private func moderate(_ call: String) throws {
+        do {
+            try locked {
+                try failModerationOnce()
+                _moderationCalls.append(call)
+            }
+        } catch BridgeError.PermissionDenied(let detail) {
+            emit(.actionDenied(channelId: nil, detail: detail))
+            throw BridgeError.PermissionDenied(detail: detail)
+        }
+    }
+
+    func movePerson(session: UInt32, channelId: UInt32) async throws -> Bool {
+        try moderate("move \(session) \(channelId)")
+        change(session) { $0.channelId = channelId }
+        return true
+    }
+
+    func setServerMute(session: UInt32, muted: Bool) async throws -> Bool {
+        try moderate("mute \(session) \(muted)")
+        change(session) { $0.serverMuted = muted }
+        return true
+    }
+
+    func kickPerson(session: UInt32, reason: String?) async throws -> Bool {
+        try locked {
+            try failModerationOnce()
+            _kickReasons.append(reason)
+        }
+        remove(session)
+        return true
+    }
+
+    func banTarget(session: UInt32) async throws -> BanTarget {
+        try locked {
+            try failModerationOnce()
+            return _banTargetAnswer
+        }
+    }
+
+    /// As a server: the person is taken off when the ban says so, and always by its default ban.
+    func banPerson(session: UInt32, ban: BanInput) async throws -> BanResult {
+        let result: BanResult = try locked {
+            try failModerationOnce()
+            _banInputs.append(ban)
+            if !_banResults.isEmpty { return _banResults.removeFirst() }
+            return ban.quick ? .quickBanned : .saved(removed: ban.removeNow)
+        }
+        if result != .conflict, ban.quick || ban.removeNow {
+            remove(session)
+        }
+        return result
+    }
+
+    /// Takes a person off the server and reports it, as the engine does.
+    private func remove(_ session: UInt32) {
+        let removed = locked { people.removeValue(forKey: session) != nil }
+        if removed {
+            emit(.personRemoved(session: session))
+        }
     }
 
     /// Changes a person and reports it, as the engine does.
@@ -656,6 +904,46 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
         set { locked { _mobileSettings = newValue } }
     }
 
+    var storedAppSettings: AppSettings {
+        get { locked { _appSettings } }
+        set { locked { _appSettings = newValue } }
+    }
+
+    /// Thrown by the next `setMobileSettings` or `setAppSettings`.
+    var settingsSaveFailure: BridgeError? {
+        get { locked { _settingsSaveFailure } }
+        set { locked { _settingsSaveFailure = newValue } }
+    }
+
+    /// How long `setMobileSettings` takes, for two changes that meet in the engine.
+    var mobileSettingsSaveDelay: Duration? {
+        get { locked { _mobileSettingsSaveDelay } }
+        set { locked { _mobileSettingsSaveDelay = newValue } }
+    }
+
+    /// How often `setMobileSettings` saved, so that a test knows every save is done.
+    var mobileSettingsSaves: Int {
+        locked { _mobileSettingsSaves }
+    }
+
+    /// Whether the engine has noise suppression switched on.
+    var noiseSuppression: Bool {
+        get { locked { _noiseSuppression } }
+        set { locked { _noiseSuppression = newValue } }
+    }
+
+    /// While set, reading the voice settings and switching noise suppression fail with it.
+    var voiceSettingsFailure: BridgeError? {
+        get { locked { _voiceSettingsFailure } }
+        set { locked { _voiceSettingsFailure = newValue } }
+    }
+
+    /// The activity entries the engine reports right after the server's channels, oldest first.
+    var activityOnConnect: [ActivityEntry] {
+        get { locked { _activityOnConnect } }
+        set { locked { _activityOnConnect = newValue } }
+    }
+
     /// The engine found a message worth a system notification.
     func notify(_ notification: ChatNotification) {
         emit(.chatNotification(notification: notification))
@@ -780,11 +1068,289 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     }
 
     func setMobileSettings(settings: MobileSettings) async throws {
-        locked { _mobileSettings = settings }
+        if let delay = mobileSettingsSaveDelay { try await Task.sleep(for: delay) }
+        try locked {
+            if let failure = _settingsSaveFailure {
+                _settingsSaveFailure = nil
+                throw failure
+            }
+            _mobileSettings = settings
+            _mobileSettingsSaves += 1
+        }
+    }
+
+    func appSettings() -> AppSettings {
+        locked { _appSettings }
+    }
+
+    /// As the engine: the saved settings arrive as an event.
+    func setAppSettings(settings: AppSettings) async throws {
+        try locked {
+            if let failure = _settingsSaveFailure {
+                _settingsSaveFailure = nil
+                throw failure
+            }
+            _appSettings = settings
+        }
+        emit(.appSettingsChanged(settings: settings))
+    }
+
+    func voiceSettings() async throws -> VoiceSettings {
+        try locked {
+            if let failure = _voiceSettingsFailure { throw failure }
+            return VoiceSettings(
+                talkMode: _talkMode,
+                noiseSuppression: _noiseSuppression,
+                autoGain: true,
+                echoCancellation: .system,
+                bitrateLimitKbps: _bitrateLimits.last ?? nil
+            )
+        }
+    }
+
+    func setNoiseSuppression(on: Bool) async throws {
+        try locked {
+            if let failure = _voiceSettingsFailure { throw failure }
+            _noiseSuppression = on
+        }
     }
 
     func setBitrateLimitKbps(kbps: UInt32?) {
         locked { _bitrateLimits.append(kbps) }
+    }
+
+    // MARK: Streams
+
+    // The tests set the streams with `showStreams` (or `streamsOnConnect`); a watch goes to
+    // Connecting and then to `watchOutcome` (the first one to `firstWatchOutcome` if set), after the direct connection question when
+    // `asksDirectConnections`. While a stream is watched and a sink is set, the fake plays the
+    // bridge's video thread and says 15 times a second that a picture is ready; the pictures
+    // themselves come from `FakeVideoFrames`.
+
+    private var _streams: [MumcordBridge.Stream] = []
+    private var _streamsOnConnect: [MumcordBridge.Stream] = []
+    private var _watchCalls: [StreamKey] = []
+    private var _stopCalls: [StreamKey] = []
+    private var _directAnswers: [Bool] = []
+    private var _watchOutcome = StreamWatch.watching(path: .direct)
+    private var _firstWatchOutcome: StreamWatch?
+    private var _asksDirectConnections = false
+    private var _videoSink: VideoSink?
+    private var _videoSinkCalls = 0
+    private var frameTimer: DispatchSourceTimer?
+
+    /// The streams shown once connected, as the bridge reports them.
+    var streamsOnConnect: [MumcordBridge.Stream] {
+        get { locked { _streamsOnConnect } }
+        set { locked { _streamsOnConnect = newValue } }
+    }
+    var watchCalls: [StreamKey] { locked { _watchCalls } }
+    var stopCalls: [StreamKey] { locked { _stopCalls } }
+    var directAnswers: [Bool] { locked { _directAnswers } }
+    var currentStreams: [MumcordBridge.Stream] { locked { _streams } }
+    /// The sink the app set last; nil before it set one.
+    var videoSink: VideoSink? { locked { _videoSink } }
+    /// What a watch turns into once it has connected.
+    var watchOutcome: StreamWatch {
+        get { locked { _watchOutcome } }
+        set { locked { _watchOutcome = newValue } }
+    }
+    /// What the first watch turns into instead of `watchOutcome`; nil: the same as the others.
+    var firstWatchOutcome: StreamWatch? {
+        get { locked { _firstWatchOutcome } }
+        set { locked { _firstWatchOutcome = newValue } }
+    }
+    /// The first watch asks "Allow direct connections?" and waits for the answer.
+    var asksDirectConnections: Bool {
+        get { locked { _asksDirectConnections } }
+        set { locked { _asksDirectConnections = newValue } }
+    }
+
+    /// Replaces the streams of the user's channel, as the bridge reports them.
+    func showStreams(_ streams: [MumcordBridge.Stream]) {
+        locked { _streams = streams }
+        streamsChanged()
+    }
+
+    private func streamsChanged() {
+        let streams = locked { _streams }
+        emit(.streamsChanged(streams: streams))
+        updateFrameTimer()
+    }
+
+    private func changeStream(_ key: StreamKey, _ change: (inout MumcordBridge.Stream) -> Void) throws {
+        try locked {
+            guard let index = _streams.firstIndex(where: { $0.key == key }) else {
+                throw BridgeError.NotFound(detail: "no such stream")
+            }
+            change(&_streams[index])
+        }
+        streamsChanged()
+    }
+
+    func watchStream(session: UInt32, kind: StreamKind) async throws {
+        let key = StreamKey(session: session, kind: kind)
+        let (ask, outcome): (Bool, StreamWatch) = locked {
+            _watchCalls.append(key)
+            let first = _watchCalls.count == 1 ? _firstWatchOutcome : nil
+            return (_asksDirectConnections && _directAnswers.isEmpty, first ?? _watchOutcome)
+        }
+        try changeStream(key) { $0.watch = .connecting }
+        if ask {
+            emit(.directConnectionsQuestion)
+            return
+        }
+        try changeStream(key) { $0.watch = outcome }
+    }
+
+    func stopWatchingStream(session: UInt32, kind: StreamKind) async throws {
+        let key = StreamKey(session: session, kind: kind)
+        locked { _stopCalls.append(key) }
+        try changeStream(key) { $0.watch = .idle }
+    }
+
+    func setStreamVolume(session: UInt32, percent: UInt16) async throws {
+        let keys = locked { _streams.filter { $0.session == session }.map(\.key) }
+        for key in keys {
+            try changeStream(key) { $0.volume = percent }
+        }
+    }
+
+    /// The answer also lets the watches that waited for it go on.
+    func answerDirectConnections(allow: Bool) async throws {
+        let (waiting, outcome): ([StreamKey], StreamWatch) = locked {
+            _directAnswers.append(allow)
+            return (_streams.filter { $0.watch == .connecting }.map(\.key), _watchOutcome)
+        }
+        for key in waiting {
+            try changeStream(key) { $0.watch = allow ? outcome : .unreachable(reason: .directConnectionsDeclined) }
+        }
+    }
+
+    func setVideoSink(sink: VideoSink?) {
+        locked { _videoSink = sink }
+        updateFrameTimer()
+    }
+
+    func videoHandle() -> UInt64 { 0 }
+
+    /// Runs the picture news while something is watched and a sink is set, and only then.
+    private func updateFrameTimer() {
+        locked {
+            let watched = _streams.contains { if case .watching = $0.watch { true } else { false } }
+            if watched && _videoSink != nil {
+                guard frameTimer == nil else { return }
+                let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "app.mumcord.mobile.fake-video"))
+                timer.schedule(deadline: .now(), repeating: .milliseconds(66))
+                timer.setEventHandler { [weak self] in self?.framesReady() }
+                timer.resume()
+                frameTimer = timer
+            } else {
+                frameTimer?.cancel()
+                frameTimer = nil
+            }
+        }
+    }
+
+    private func framesReady() {
+        let (sink, ids): (VideoSink?, [UInt64]) = locked {
+            (_videoSink, _streams.filter { if case .watching = $0.watch { true } else { false } }.map(\.videoId))
+        }
+        for id in ids {
+            sink?.onFrameReady(videoId: id, width: FakeVideoFrames.width, height: FakeVideoFrames.height)
+        }
+    }
+
+    // MARK: Own camera
+
+    // Opening starts the app's camera and shows the preview; starting shares it, or fails with
+    // `cameraStartProblem`; stopping stops the app's camera. Leaving the channel and the end of
+    // the connection turn it off as the engine does.
+
+    private var _appCamera: CameraCapture?
+    private var _cameraStartProblem: CameraProblem?
+    private var _cameraStartDelay: Duration?
+    private var _cameraStartsEnded = 0
+    private var _cameraViewers: UInt32 = 0
+    private var _captureFailures: [CaptureFailure] = []
+    private var _ownCameraState = OwnCameraState.off
+
+    /// The camera the app gave the engine; nil before it gave one.
+    var appCamera: CameraCapture? { locked { _appCamera } }
+    /// Why "Start sharing" fails; nil: it works.
+    var cameraStartProblem: CameraProblem? {
+        get { locked { _cameraStartProblem } }
+        set { locked { _cameraStartProblem = newValue } }
+    }
+    /// How long "Start sharing" takes; nil: it returns at once. A slow start still ends shared
+    /// when it ends, also after a stop meanwhile, the worst an engine could do: the app must not
+    /// leave such a camera on.
+    var cameraStartDelay: Duration? {
+        get { locked { _cameraStartDelay } }
+        set { locked { _cameraStartDelay = newValue } }
+    }
+    /// How many "Start sharing" commands have returned.
+    var cameraStartsEnded: Int { locked { _cameraStartsEnded } }
+    var captureFailures: [CaptureFailure] { locked { _captureFailures } }
+    /// The own camera's state as last reported.
+    var ownCameraState: OwnCameraState { locked { _ownCameraState } }
+
+    private func emitCamera(_ state: OwnCameraState, _ problem: CameraProblem? = nil) {
+        let viewers: UInt32 = locked {
+            _ownCameraState = state
+            return state == .sharing ? _cameraViewers : 0
+        }
+        emit(.ownCameraChanged(camera: OwnCamera(state: state, problem: problem, viewers: viewers)))
+    }
+
+    func setCameraCapture(capture: CameraCapture?) {
+        locked { _appCamera = capture }
+    }
+
+    func cameraHandle() -> UInt64 { 0 }
+
+    func openCameraPreview() async throws {
+        guard let capture = appCamera else { throw BridgeError.Internal(detail: "camera not shared: no-camera") }
+        guard case .connected = locked({ connection }) else { throw BridgeError.NotConnected(detail: "not connected") }
+        capture.start()
+        emitCamera(.preview)
+    }
+
+    func startCameraSharing() async throws {
+        emitCamera(.starting)
+        if let delay = cameraStartDelay {
+            try? await Task.sleep(for: delay)
+        }
+        defer { locked { _cameraStartsEnded += 1 } }
+        if let problem = cameraStartProblem {
+            emitCamera(.preview, problem)
+            throw BridgeError.Internal(detail: "camera not shared")
+        }
+        emitCamera(.sharing)
+    }
+
+    func stopCamera() async throws {
+        appCamera?.stop()
+        emitCamera(.off)
+    }
+
+    func cameraCaptureFailed(failure: CaptureFailure) {
+        locked { _captureFailures.append(failure) }
+        appCamera?.stop()
+        emitCamera(.off, .cameraFailed)
+    }
+
+    /// The engine reports a new number of people who get the camera.
+    func watchCamera(_ viewers: UInt32) {
+        locked { _cameraViewers = viewers }
+        emitCamera(.sharing)
+    }
+
+    /// Turns a running camera off without a reason, as the engine's stop rules do.
+    private func endCamera() {
+        guard ownCameraState != .off else { return }
+        appCamera?.stop()
+        emitCamera(.off)
     }
 
     // MARK: Identities
@@ -937,9 +1503,16 @@ final class FakeEngine: EngineClient, @unchecked Sendable {
     private func finishConnecting() {
         emit(.connectionChanged(state: .connected))
         emit(.serverSynced(server: server))
+        for entry in activityOnConnect {
+            emit(.activityAdded(entry: entry))
+        }
         emit(.audioWantedChanged(audio: audioOnConnect))
         if let level = levelOnConnect {
             emit(.inputLevelChanged(percent: level))
+        }
+        let streams = streamsOnConnect
+        if !streams.isEmpty {
+            showStreams(streams)
         }
     }
 }

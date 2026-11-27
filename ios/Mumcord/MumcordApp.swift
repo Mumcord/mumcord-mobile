@@ -6,11 +6,14 @@ import UIKit
 
 @main
 struct MumcordApp: App {
+    // Says which screen orientations are allowed (the stream's landscape button).
+    @UIApplicationDelegateAdaptor(MumcordAppDelegate.self) private var appDelegate
     // Decided once at start: the engine must exist only once per process.
     private let model: AppModel?
     private let theme: MumcordThemeMode
     #if DEBUG
     private let designLaunch: DesignDebugLaunch?
+    private let splitWidth: CGFloat?
     #endif
 
     init() {
@@ -19,10 +22,12 @@ struct MumcordApp: App {
         // Debug builds can be started on a screen of the design system (see DesignDebugLaunch)
         // or against the fake engine (see AppDebugLaunch).
         designLaunch = DesignDebugLaunch.fromLaunchArguments()
+        let launch = designLaunch == nil ? AppDebugLaunch.fromLaunchArguments() : nil
+        splitWidth = launch?.splitWidth
         if designLaunch != nil {
             model = nil
             theme = .system
-        } else if let launch = AppDebugLaunch.fromLaunchArguments() {
+        } else if let launch {
             model = launch.makeModel()
             theme = launch.theme
         } else {
@@ -42,6 +47,14 @@ struct MumcordApp: App {
                 DesignDebugRoot(launch: designLaunch)
             } else if let model {
                 AppRoot(model: model, theme: theme)
+                    .modifier(DebugSplitWidth(width: splitWidth))
+                    .overlay(alignment: .topLeading) {
+                        if let probe = AppDebugLaunch.cameraProbe { FakeCameraProbeView(probe: probe) }
+                        if let probe = AppDebugLaunch.publicListProbe { FakePublicListProbeView(probe: probe) }
+                    }
+                    .onAppear {
+                        if AccessibilityProbe.requested { AccessibilityProbe.install() }
+                    }
             }
             #else
             if let model {
@@ -95,16 +108,17 @@ extension AppModel {
         notifier.onResponse(category: SystemIdleNotifier.warningCategory) { action in
             if action == SystemIdleNotifier.stayAction { idle.stayConnected() }
         }
+        // The shared camera's pictures go to the engine's C function.
+        let cameraFrames = EngineCameraFrames(handle: { store.cameraHandle() })
+        let cameraShare = CameraShare(store: store) { onTrouble in
+            AVCameraSource(frames: cameraFrames, onTrouble: onTrouble, log: AppLog.write)
+        }
         let model = AppModel(
             store: store,
             setupStore: UserDefaultsSetupStore(),
             microphone: audio,
             localNetwork: SystemLocalNetworkGateway(log: AppLog.write),
-            openSettings: {
-                if let url = URL(string: UIApplication.openSettingsURLString) {
-                    UIApplication.shared.open(url)
-                }
-            },
+            openSettings: openSystemSettings,
             call: call,
             sessionEnded: call.takeSessionEndedNotice(),
             notifications: NotificationPrompt(gateway: notificationGateway),
@@ -113,8 +127,13 @@ extension AppModel {
             idle: idle,
             mediaPolicy: { loadMedia(network.status, store.state.mobileSettings) },
             camera: SystemCameraGateway(),
-            qrSource: CameraQrSource()
+            qrSource: CameraQrSource(),
+            network: network,
+            streamVideo: StreamVideo(frames: EngineVideoFrames(handle: { store.videoHandle() })),
+            cameraShare: cameraShare,
+            languages: .system
         )
+        model.more.openLanguageSettings = openSystemSettings
         notifier.onOpen { [weak model] key in
             if let chat = chatFromNotificationKey(key) { model?.openChat(chat) }
         }
@@ -127,6 +146,13 @@ extension AppModel {
         )
         return model
     }()
+
+    /// The app's page in the system settings: permissions and the app's language.
+    static func openSystemSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
+        }
+    }
 
     /// Lives as long as the process: it turns the engine's message events into notifications.
     @MainActor private static var messageNotifications: MessageNotificationCenter?

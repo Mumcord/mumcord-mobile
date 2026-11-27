@@ -44,13 +44,18 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile.bridge
         # The four audio functions of bridge/include/mumcord_audio.h are called by the app's C
-        # code, not by the Swift bindings. Nothing in this framework refers to them, so the
-        # linker would leave them out of it without being told to keep them.
+        # code, the two picture functions of bridge/include/mumcord_video.h by its video views
+        # and the camera function of bridge/include/mumcord_camera.h by its camera, not by the
+        # Swift bindings. Nothing in this framework refers to them, so the linker would leave
+        # them out of it without being told to keep them.
         OTHER_LDFLAGS:
           - "-Wl,-u,_mumcord_audio_capture_push_i16"
           - "-Wl,-u,_mumcord_audio_capture_push_f32"
           - "-Wl,-u,_mumcord_audio_playback_pull_i16"
           - "-Wl,-u,_mumcord_audio_playback_pull_f32"
+          - "-Wl,-u,_mumcord_video_frame_acquire"
+          - "-Wl,-u,_mumcord_video_frame_release"
+          - "-Wl,-u,_mumcord_camera_push_frame"
 
   Mumcord:
     type: application
@@ -79,6 +84,12 @@ targets:
       - sdk: CallKit.framework
       # Asks the system whether it refuses local network access.
       - sdk: Network.framework
+      # Draws the pictures of streams (Platform/Video).
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
+      # Captures the shared camera (Platform/Camera).
+      - sdk: AVFoundation.framework
+      - sdk: CoreVideo.framework
     # Keys that have no INFOPLIST_KEY_ build setting. The file is written by XcodeGen into the
     # git-ignored build folder and merged with the generated keys below.
     info:
@@ -100,6 +111,11 @@ targets:
         # running while it plays and records, `voip` lets it show the session to the system
         # as a call.
         UIBackgroundModes: [audio, voip]
+        # One window: the app has one engine per process, and the layout, the voice and the
+        # streams belong to it. An iPad still turns it and puts it into Split View, Slide Over
+        # and Stage Manager; it only cannot open a second window of its own.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.mumcord.mobile
@@ -113,7 +129,8 @@ targets:
           - "$(SRCROOT)/../bridge/include"
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: Mumcord
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        # Not generated: the generated manifest allows several windows (see `info` above).
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: NO
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
@@ -143,6 +160,10 @@ schemes:
         MumcordTests: [test]
         MumcordUITests: [test]
     test:
+      # The unit tests compare English texts, so the app that hosts them runs in English whatever
+      # the simulator's language is. (The UI tests pass the language to the app they start.)
+      commandLineArguments:
+        "-AppleLanguages (en)": true
       targets:
         - MumcordTests
         - MumcordUITests

@@ -28,99 +28,300 @@ second half), app icon.
 Identities and "Scan from desktop app" (6.5): built and pushed (commits `1666543`, `bb58722`,
 `32e72eb`); see the last CI iOS run on `feat/first-version` for its final state.
 
+Moderation in the person sheet (the moderation part of 8.6, mirroring Android commit `1218b43`):
+built on a Mac and checked in the simulator against the fake engine. The "Moderation" section
+with Move to channel…, Server mute, Kick… and Ban…, each only with the server's right; the
+channel picker, the kick question and the ban sheet with the server's default ban and the
+"changed meanwhile" conflict. Unit tests `ModerationTests` and `AppModelModerationTests`, UI
+tests `ModerationFlowUITests`, screenshots `ios-moderation-*`. A debug build started with
+`-mumcordBanSeconds <seconds>` bans for that long instead of the chosen length, for the
+end-to-end test that is still open (task 10.4).
+
+More tab, activity log and settings (8.6, the scope of the Android task 8.5): built after the
+pause, mirroring Android commit `fcceffa`. More has Activity (with a count of new entries),
+Identities, Blocked people, Settings and Disconnect; the activity log has the days, the filters
+All, Joins and Streams and its empty states; Settings have Voice, Mobile data, Battery,
+Notifications (with "Show sender only", which left More) and Chat. Differences from Android:
+"Default audio output" is hidden while a wired headset is plugged in, because iOS then does not
+offer the earpiece; the whole settings do not fit one picture, so the screenshots show them in
+two parts.
+
+Profile, appearance and themes (the profile and theme part of 8.6, mirroring Android commit
+`4d3e6d3`): built and checked in the simulator against the fake engine. More shows the own
+profile with "Edit profile" and a Themes row with the app theme's name; Edit profile has the
+picture (choose, take, remove), the name that is set per server, the comment with the server's
+limit and its counter, "How others see you", and Save, which sends only what changed (the picture
+first; a saved picture is not sent again after a failed comment). Every chosen or taken picture
+is decoded upright and written again as a PNG with nothing but its pixels, at most 512 pixels on
+its longest edge (`avatarImage`), so no location or camera data leaves the phone. Themes has
+System, Dark and Light, the built-in themes and the user's own, "Paste theme code" with the
+engine's preview in both versions and "Apply theme", and on a long press (or VoiceOver's actions)
+Share through the system's share sheet and Delete for an own theme. The edit-server form picks the
+server's theme. The app's colours come from one place (`AppThemeHost` on the app's root, fed by
+`AppThemeController`), so every screen switches at once, to the server's own theme while it is
+shown; the built-in Mumcord theme gives exactly the design tokens' colours, so the app looks as
+before in it. Unit tests `AppThemeTests`, `ProfileStateTests`, `ProfileThemesTests` and
+`AvatarImageTests`, UI tests `ProfileThemesFlowUITests` (which also check the drawn colours on
+screen), screenshots `ios-profile-*`, `ios-themes-*` and `ios-server-theme-*`. As on Android, the
+status bar, the keyboard and the system's own sheets follow the brightness of the drawn colours
+in all three modes; the phone's own setting is read from the window, which the app's setting does
+not reach, so System follows the phone live (`ProfileThemesFlowUITests` switches the simulator
+between light and dark). Differences from Android: a colour value from the engine that is not `#rrggbb` keeps the app's own
+colour instead of stopping the app; the screenshots also show the long-press sheet and the delete
+question, and the paste sheet with its keyboard. The camera for the profile picture is the
+system's camera, as for the chat, and is a device check.
+
+Watching screen shares and cameras (the watching half of 7.5, mirroring Android commit
+`6b3821d`): built and checked in the simulator against the fake engine, whose pictures are made in
+the app and drawn through the real Metal path. Live tile under the sharer, "Tap to watch" on mobile
+data, full screen with volume, landscape button and stop, mini window, unreachable states with
+"Try again", the direct connection question. Unit tests `StreamsStateTests` and
+`StreamsControllerTests`, UI tests `StreamsFlowUITests`, screenshots `ios-streams-*`. Differences
+from Android: no system picture-in-picture (FR-5.76), see the open points.
+
+Sharing the phone camera (the sharing half of 7.5, mirroring Android commit `c88cfd5`): built and
+checked in the simulator against the fake engine and a drawn camera. The voice view's camera
+button explains the camera before iOS asks (or points to the system settings after a refusal),
+the sheet "Share your camera" shows the picture with the front camera and the switch to the back
+camera, nothing is sent before "Start sharing", the "Camera on · n watching" bar with the switch
+and Stop sits above the voice bar and the voice view's buttons, a refused start and a camera that
+stops by itself say why. The camera is released while the app is in the background or another
+sheet takes the preview's place, and back on return; sharing and voice go on. Cancel and Stop
+close the camera at once, also while "Start sharing" still waits for the engine, and the camera
+closes whenever the app's state says off. Capture with AVFoundation (`ios/Platform/Camera`),
+frames handed to the bridge's C function in place, interruptions followed. Unit tests
+`CameraShareControllerTests`, `CameraFramesTests` and `CameraSessionWatchTests`, UI tests
+`CameraShareFlowUITests`, screenshots `ios-camera-*`. Differences from Android: the camera is
+asked for 1280 x 720 (the smallest 16:9 size every iPhone camera offers; the bridge scales it
+down to 640 x 360) instead of 640 x 360; "on screen" is every state but the background, as for
+watching streams, so the camera still runs while Control Centre or the app switcher covers the
+app; there is no picture-in-picture window to pause for; the end-to-end test pattern camera of
+Android (`TestSettings.cameraSource`) waits for the iOS end-to-end tests (task 10.4).
+
+Public server browser (2.10, FR-5.9, mirroring Android commit `525a028`): built and checked in
+the simulator against the fake engine and a made-up list (`PublicServersMockup`); neither the real
+list service nor a listed server is contacted by any test. "Find more" with "Browse public
+servers" below Favourites and as a button on the empty list; the "Public servers" screen with
+search by name, address or country, country chips, "N of M servers" with Refresh, the rows with
+name, "address · country" and the ping line or "No answer", the states loading, failed with "Try
+again", refresh failed (the last list kept), empty and no match; "Add" saves the server with the
+default identity's name and the row then offers "Connect", which closes the browser and runs the
+normal connect flow. Only the rows on screen are pinged, at most four at a time, once per load
+and again after Refresh, and not while the browser is closed or the app is in the background.
+Unit tests `PublicServersStateTests`, `PublicPingSchedulerTests` and
+`PublicServersControllerTests`, UI tests `PublicServersFlowUITests`, screenshots
+`ios-public-servers-*`. The screen has no mockup: it follows the Android screen and waits for the
+product manager's review of the screenshots. Differences from Android: which rows are on screen
+comes from their frames in the list (SwiftUI has no list of the visible rows); the pings pause
+when the app goes to the background, not already when Control Centre or the app switcher covers
+it, as for streams and the camera; a ping on its way when the browser closes or the app leaves
+cannot be called back in the engine, so its answer is dropped and the server is asked again
+later; what Android's screen readers hear through polite live regions (loading, the failures, an
+empty list) VoiceOver hears as announcements; with the accessibility text sizes the rows wrap their
+texts and put "Add" or "Connect" below them, as every list row does since the accessibility pass
+(step 10). The end-to-end scenario with a locally served list (AC-5.38 against
+the local test server) waits for the iOS end-to-end tests (task 10.4).
+
+Settings from the server list (mockup `01-server-list`, specification section 5 "Mockups and
+missing functions"): the settings icon on the server list's title bar, with the VoiceOver label
+"Settings" and a 44 pt target, opens the More screen without a connection: a back button "Back to
+the server list" and only Identities, Themes and Settings, which are the same screens as on the
+More tab. Left out there because they need a server: the profile card and Edit profile (picture
+and comment live on the server), Activity (the log of a connection), Blocked people (the list of
+the identity used on the connection, cleared when it ends) and Disconnect. Settings leave out the
+microphone level (it only moves while the voice runs) and "Default audio output" (which outputs
+the phone has is only known during a voice session); every other setting is saved without a
+connection. The mockup's search icon is left out: searching the list does not exist. A setting
+that fails to save without a connection is only logged: the refusal banner belongs to the
+connected screens and would otherwise show up on the next connection. Unit tests in
+`MoreStateTests` and `MoreControllerTests`, UI tests `ServerListMoreFlowUITests`, screenshots
+`ios-server-list-more-*` and `ios-server-list-settings-*`.
+
+**Note for the maintainer: intended difference from Android.** Android has no settings icon on
+the server list yet (`android/app/src/main/kotlin/app/mumcord/mobile/ui/servers/ServerListScreen.kt`),
+so there Settings, Themes and Identities are only reachable through the More tab while connected.
+iOS brings the icon back as the mockup shows it; Android should follow the same way.
+
+Languages (task 8.1 for iOS and the language of task 8.3, FR-5.82): `scripts/translations.py`
+also writes `ios/Mumcord/Resources/<language>.lproj/Localizable.strings` for the 23 languages
+besides English and a `Localizable.stringsdict` with the plurals for all 24, from the same sources
+as Android. The iOS English file stays the source of the iOS texts; an iOS text takes the
+translation of the Android text of the same name where both say the same in English, otherwise
+a desktop text's translation with the same English, otherwise it stays English. The plurals use
+each language's CLDR forms (Polish, Czech, Irish and the others with more than two forms are
+right now); the number that picks the form is passed apart from the text's arguments, as on
+Android. The app follows the system's language for the app and saves it as the shared
+`language` setting at every start. Settings has a "Language" section with "Display language",
+which shows the language under its own name or "Follow system". CI checks that the written files
+are current (`ci-ios.yml`, job "Test groups"). Unit tests `StringsPluralTests` (English, German,
+Polish, Czech), `AppLanguagesTests`, `MoreControllerTests`; UI tests `LanguageFlowUITests`,
+screenshots `ios-lang-de-*`.
+
+**Note for the maintainer: intended differences from Android.**
+
+- The language is chosen in the system settings (Settings → Mumcord → Language), which iOS
+  offers for every app with more than one language. iOS has no way for an app to switch its own
+  language, so "Display language" opens the app's page in the system settings instead of a sheet
+  of languages; iOS starts the app afresh in the new language, and the app saves it as the shared
+  setting then. The row is always shown (Android hides it on Android 12, which has no language
+  per app; every supported iOS version has one).
+- The comment counter's VoiceOver text ("1200 of 5000 characters") passes its numbers as text,
+  so that they keep no thousands separator while the plural follows the language.
+
+Texts that stay English on iOS (in every language unless named):
+
+- iOS only, with no desktop text of the same English: `servers_more_back` ("Back to the server
+  list"), `form_address_placeholder`.
+- Worded differently than on Android, because iOS says something else: `local_network_text`,
+  `local_network_denied`, `local_network_suspected` (iOS's "Local Network" instead of Android's
+  "Nearby devices"), `notifications_text` (iOS explains message notifications, Android the voice
+  notification), `identities_fingerprint` (two spaces after "SHA-1").
+- Mobile-only texts without a translation in `i18n/mobile/<language>.json`: 385 in every
+  language but German, which so far only lacks the 18 texts of camera sharing (`camera_reason_share`,
+  `camera_share_*`, `camera_on_watching`, `camera_stop_sharing`, `camera_stopped`,
+  `camera_problem_*`), as on Android.
+
+Translations for these belong in the desktop repository's files (mobile-only texts) or in
+`i18n/mobile/<language>.json`; they are never written by hand into the `.lproj` files.
+
+iPad layout (task 9.2, AC-5.31, mirroring Android commit `204caa1`): built and checked on an iPad
+simulator against the fake engine. From a window of 600 x 480 points (Android's 600 x 480 dp) the
+connected screens use two columns: the navigation rail with Channels, Messages (with its count) and
+More; the channel tree with the banners, the whisper bar, the "Camera on" bar and the voice bar on
+the left (340 points); on the right the channel chat, the Messages screens or the More pages, which
+also hold Settings, Themes, Edit profile and the activity log. The phone's Chat tab is part of
+Channels there and is kept, so a window that becomes narrow again shows the chat as before; the
+channel chat counts as read while it is beside the channels. A watched stream fills the right column
+of Channels as in mockup `22-tablet-stream`: the sharer and their channel, the stage with LIVE,
+viewers, volume, the mini window and full screen buttons and "Stop watching", and a strip with the
+two newest messages of the channel chat ("Lobby chat", with "Show the whole chat") above its input
+bar; its tile leaves the tree meanwhile. The full screen button opens the whole screen, whose arrow,
+VoiceOver's escape gesture and "Leave full screen" (in place of the phone's rotate button) return to
+the column; on Messages and More the stream floats as the mini window, whose expand button goes back
+to Channels. The full voice view covers both columns, as on Android. Sheets are at most 480 points
+wide in the middle of a window that is wide enough for two columns; the limit follows the app-wide
+layout, so on a wide iPad it also holds for the sheets over the server list and the other screens
+without a connection, as on Android; the system's own presentations (photo picker,
+camera, file picker, the share sheet of a backup or a theme) keep the system's iPad look. A window
+narrower than 600 points (Split View, Slide Over, Stage Manager) or lower than 480 gets the phone
+layout; no iPhone reaches two columns, also not in landscape. Rotating and resizing keep the tab, the
+draft, the open stream and every sheet, because they live in the model. A stream needs no landscape
+of its own on an iPad: the iPad turns by itself and the whole screen turns with it (iOS ignores an
+app's wish for an orientation while it allows multitasking). A hold button (talk, whisper, shout)
+that leaves the screen while it is held, because the layout switches, the voice view takes the
+bar's place or a stream covers it, lets go, so the voice is not sent on unseen. A stream that plays
+by itself in its tile keeps playing, with its last picture, while the tile of the new layout takes
+over from the one of the old layout: the controller counts the tiles of each stream and lets the
+last one go one turn later. The app has one window (`UIApplicationSupportsMultipleScenes` is off in
+`ios/project.yml`): it runs one engine per process, and the layout, the voice and the streams belong
+to it, so a second window would share and overwrite them. Split View, Slide Over, Stage Manager and
+turning still work. Unit tests `ConnectedLayoutTests` and
+`StreamsControllerTests`; UI tests `TabletFlowUITests`; screenshots `ios-tablet-*`; all in the test
+group `tablet` on an iPad simulator. The screens without a connection (server list, public servers,
+More from the server list, identities, the server form) stay one column across the whole width, as
+on Android.
+
+**Note for the maintainer: intended differences from Android.**
+
+- The rule is measured in points on the app's whole window (safe areas included, the keyboard not),
+  not with size classes: an iPhone Pro Max in landscape has a regular width size class, and the phone
+  layout must not change there.
+- Sheets keep to 480 points only in two columns. Android limits every sheet to 480 dp, which also
+  narrows the sheets of a phone in landscape; the iPhone's sheets stay as they were.
+- Return on a hardware keyboard does not send a message: SwiftUI's multi-line text field takes the
+  key before the app sees it (tried with `onKeyPress`), so sending from a keyboard cover needs a UIKit
+  text view; left for later. The send button and the on-screen keyboard work as on the phone.
+- No end-to-end scenario yet (Android's `TabletFlowTest`): the iOS end-to-end tests are open (task
+  10.4). The UI tests cannot resize the window on the simulator; the debug option
+  `-mumcordSplitWidth` narrows the window while the iPad stands upright, so turning it stands in for
+  dragging the Split View divider. Real Split View, Slide Over and Stage Manager windows are a device
+  check.
+- The right column has no accessibility container of its own (Android's `main-column` test tag):
+  in SwiftUI it would take the place of the chat's and the stream column's own containers.
+- One more screenshot than Android: a sheet in two columns (`ios-tablet-person-sheet-*`).
+- As on Android, the mockups' elements without a function stay out: the chat header's search and
+  info icons, the stream header's settings icon and its resolution and frame rate, the "+" of the
+  input bar (the image and GIF buttons take its place).
+
+**Open points from the review of the iPad layout (for the maintainer).**
+
+- The channel chat counts as read while a stream covers it. In two columns a stream in the right
+  column of Channels leaves only the strip with the two newest messages, and the whole screen leaves
+  none; the app still treats the chat as on screen (`showsChannelChat`), marks new messages read and
+  holds back their notifications as "chat open". Android does the same (`showsChannelChat` in
+  `ConnectedState.kt`, used for the chat's `shown` in `AppViewModel.kt`), also for a phone's full
+  screen stream over the Chat tab, so iOS keeps it for now. A fix (the stream's view taken into
+  account, and the chat told again when a stream opens or closes) would be a change for both apps.
+- In two columns the channel chat's unread count has no place to show while Messages or More is
+  open: the rail has no Chat item. The same on Android; a badge on the rail's Channels item would be
+  a change for both apps.
+- On Messages or More the opened stream floats as the mini window; if the window then becomes
+  narrow, the stream's view is still "full", which the phone layout shows full screen. The same on
+  Android.
+- At exactly 600 points the right column, the chat, is only 172 points wide (600 minus the rail and
+  the 340-point left column). The same threshold as on Android.
+- Switching between one column and two builds the connected screens again: the chat's scroll
+  position goes back to the newest message, the keyboard loses its focus and a notice banner in the
+  chat starts its four seconds again. The notice is no longer read out a second time by VoiceOver;
+  it is announced when it changes, not when its banner appears. Keeping the rest needs the scroll
+  position and the focus in the model.
+- Android keeps a plain set of the tiles on screen (`StreamsController.tileShown`); whether a
+  layout switch there hands a playing stream over between two tiles the same way was not checked.
+
+Accessibility pass (task 9.4, AC-5.33, mirroring Android commits `8d4fc2a` and `a81d199`): built
+and checked in the simulator against the fake engine. VoiceOver says politely who starts talking in
+the user's channel with Android's rules and texts ("Anna is talking", "Anna and Ben are talking",
+"Anna and 2 other people are talking"): at most one announcement every five seconds, people who
+start within that time named together, the same person again only after 30 seconds, never the user
+and never the end of talking; it runs only while VoiceOver is on and the voice is connected, reads
+the people from the session state on the main thread, never from the audio path, and queues the
+sentence behind what VoiceOver is saying. Mute and deafen in the voice bar and the voice view say
+"Muted" and "Deafened" as their value; the volume sliders say the percentage shown instead of their
+share of the track. Every screen reads its title first, as a heading (also before the back button and
+the voice view's chevron); sheets are modal for VoiceOver and move its focus to their title; on the
+iPad the rail, the left column with the voice bar and the right column are read one after the other.
+A modifier on the app's root that was meant to hide the screen behind a sheet (`accessibilityHidden`
+with the value false while no sheet was open) undid the hiding of the views below it, so VoiceOver
+read the backdrop, the dots, the server tile's initials and other decoration; it is gone, and the
+sheets' own modal trait keeps VoiceOver inside them. The small figure below the settings
+(`SettingsFigure`) is among the views that are hidden again. Text follows the system's text size up
+to 235 % (`largestTextSize`, the first step past 200 %); the two larger steps keep that size. With the
+accessibility sizes list rows wrap their texts and move their end (a button, a value, a switch, a
+chevron) below them, as on Android: this settles the rows that ended in "…" (server list, public
+servers, Messages, More, Settings, the sheets' rows). The voice bar's two lines, the voice view's
+status line and the hint lines ("Jonas shared a file …") wrap; tab labels shrink to fit down to the
+normal size; the labels under the voice view's round buttons shrink until their longest word fits, so
+no word breaks in the middle. Lines that stay single and end in "…" at every size, as on Android: the
+quote in a reply and the channel or person names that do not fit their row. With Reduce Motion the
+chat's input bar jumps above the keyboard instead of gliding; the app adds no other animation of its
+own (sheets, the voice bar and the mini window come and go without one). The audit finds no target
+under 44 pt on the checked screens; the 8 pt microphone level of the voice view now shares one
+element with its hint. Debug builds started with `-mumcordAccessibilityProbe YES` list what
+VoiceOver reaches, with headings and modal elements, for the UI tests (XCUITest lists every
+view and no traits). Unit tests `TalkingAnnouncerTests` and `AccessibilityLabelTests`, UI tests
+`AccessibilityUITests` (with Xcode's accessibility audit) and, on an iPad, `TabletAccessibilityUITests`,
+screenshots `ios-large-text-*` (server list, server form, channels with the voice bar, voice view,
+chat, Messages, Settings).
+
+**Note for the maintainer: intended differences from Android.**
+
+- The largest text size is 235 %, not 200 %: iOS's sizes come in steps (194 % and 235 % around 200 %),
+  and the app stops at the first one past 200 %. Android follows any font scale.
+- The voice bar's lines, the voice view's status line and the hint lines wrap at the accessibility
+  sizes; on Android they end in "…". The labels under the voice view's buttons shrink so that no word
+  breaks; Android has room for them at 200 %.
+- Announcements are VoiceOver announcements queued behind its speech; Android uses a polite live
+  region. The talking announcement does not need Android's emptying after the gap.
+- When a sheet closes, VoiceOver's focus is not moved back to the control that opened it (Android
+  does this); SwiftUI has no way to name the opener without a focus state on every control that
+  opens a sheet. VoiceOver picks the element itself.
+- The audit of the UI tests leaves out contrast, Dynamic Type, clipped text and element detection,
+  which report the app's own font scaling, the film grain and decorative initials as faults (see
+  `AccessibilityUITests`); Android's checks run on every screenshot.
+- The rows of a settings switch read the title twice (the row's text, then the switch with the same
+  label), as before; Android merges them.
+
 ## Open tasks
-
-### 2.10 Public server browser (FR-5.9, AC-5.38)
-
-Mirror Android commit `525a028` (`feat(android): browse public servers`):
-
-- Entry points: a "Find more" section below Favourites with "Browse public servers", and the
-  same as a button in the empty server list. No "Scan an invite code" row (that feature does
-  not exist).
-- Screen "Public servers": search (name, address or country), country chips, header
-  "N of M servers" with Refresh, rows with name, "address · country" and "● users / max · ms"
-  or "No answer". States: loading, first load failed (with "Try again"), refresh failed (last
-  list kept), empty, no match.
-- "Add" saves the server with the default identity's name, then the row shows "In your
-  servers" and "Connect", which runs the normal connect flow.
-- Pings: only rows on screen, at most 4 at a time, once per load and again after Refresh,
-  stopped when the browser closes or the app goes to the background (FR-5.43).
-- Tests only against a fake list; never contact the real list service or public servers.
-  The browser screen has no mockup and needs product review.
-
-### 8.6 Moderation, More tab, activity log, settings, profile and themes (FR-5.80 … FR-5.100)
-
-Task 8.6 is the iOS scope of the Android tasks 8.3, 8.4 and 8.5.
-
-Moderation, mirroring Android commit `1218b43` (`feat(android): moderation in the person sheet`):
-
-- A "Moderation" section at the end of the person sheet with Move to channel…, Server mute
-  ("Remove server mute" when muted), Kick… and Ban…, each only when the server grants that
-  right: move and mute by the rights in the person's channel, kick and ban by the root
-  channel. No section for yourself; no mute in a temporary channel.
-- Every step returns to the person sheet. Move and mute act at once; a refusal appears in the
-  existing refusal banner.
-- Ban sheet: reason, length (1 hour, 1 day, 7 days, 30 days, permanent) with the end date, ban
-  by certificate (only if the person has one), "Remove from server now" (only with the kick
-  right), "Kick only instead"; the server's default-ban case and the "changed meanwhile"
-  conflict. A standard server always bans the address too, which the sheet says in text.
-- A debug-only override of the ban length for tests.
-
-More tab, activity log and settings, mirroring Android commit `fcceffa`
-(`feat(android): activity log and the full settings under More`):
-
-- More: Activity (with a count of new entries), Identities, Blocked people, Settings,
-  Disconnect.
-- "Show sender only" moves from More to Settings → Notifications.
-- Activity log: groups Today / Yesterday / date, filters All, Joins and Streams (no Moderation
-  filter until the engine reports who kicked or banned), updates live, empty states.
-- Settings: Voice (talk mode sheet, noise suppression, microphone level, default audio output
-  only where an earpiece exists), Mobile data, Battery, Notifications (private messages,
-  mentions, "Show sender only", note "only while connected"), Chat (delete history older than
-  Never / 7 / 30 / 90 / 365 days).
-- `ios/Mumcord/Session/SessionReducer.swift` ignores `ActivityAdded` and `AppSettingsChanged`
-  today; they must be handled as the Android reducer does.
-
-Profile, appearance and themes, mirroring the Android task 8.3 commit (in progress on Android
-when iOS was paused):
-
-- Profile card at the top of More with "Edit profile"; Edit profile with photo (choose, take,
-  remove), read-only name, comment with the server's length limit. Profile photos must not
-  carry location or other metadata to the server (re-encode before sending).
-- Themes screen with System / Dark / Light, the built-in themes, own themes, "Paste theme
-  code" with preview, share and delete. There is no server-offered theme ("Use server theme
-  when offered" does not exist); the only per-server theme is the one the user picks in the
-  edit-server form.
-- The app's colours switch at runtime to the chosen theme, including the per-server theme
-  while connected to that server.
-- `SessionReducer.swift` ignores `ProfileChanged` and `ThemesChanged` today.
-
-Translations (task 8.1) and the language override of task 8.3 are done on Android only. For iOS:
-
-- Extend `scripts/translations.py` to write `<language>.lproj/Localizable.strings` from the same
-  sources (keys equal the Android names; `%1$s` becomes `%1$@`, `%1$d` stays) and a
-  `Localizable.stringsdict` for the plurals.
-- The Swift code picks `.one` and `.other` keys by the English rule today; it must use the
-  `.stringsdict` plurals instead, or Polish, Czech, Irish and the other languages with more
-  plural forms show wrong texts.
-- The language override: iOS offers the per-app language in the system settings; the app
-  follows it and saves it as the shared `language` setting.
-
-### 7.5 Streams and camera (FR-5.70 … FR-5.76)
-
-Waits for the Android tasks 7.3 (watching streams) and 7.4 (camera sharing). Notes:
-
-- The video codecs are already cross-built for iOS device and simulator
-  (`scripts/build-codecs.sh`, task 7.1).
-- The bridge (task 7.2) hands decoded frames as I420 through a signal plus a C pull function
-  (no bytes through UniFFI); iOS uploads the planes into a Metal texture.
-- Nothing camera-related may load before the user taps a camera (AC-5.23); a direct
-  connection reveals the IP address to the other person, so the app asks first.
-
-### 9.2 Tablet layout and 9.4 accessibility
-
-iPad layout after the Android tablet layout (9.1); accessibility pass (VoiceOver labels and
-order, talking announcements, Dynamic Type at 200 %, reduced motion, 44 pt targets) after 9.3.
 
 ### 10.3 Release: TestFlight and About screen (FR-5.102)
 
@@ -132,14 +333,47 @@ simulator app; linking for a real device is first proven here.
 
 ## Open points from the iOS work so far
 
-- Tests missing in the Messages feature: the person row turning to "Unblock" after blocking,
-  unblocking from the blocked list, the "Show sender only" switch changing its value,
-  `keepDraft: false`, `AppModel.openChat`.
-- Screenshots are large (about 37 MB for the Messages set alone); shrink the PNGs.
+- Contrast of the built-in themes (the desktop's derived colours in
+  `bridge/src/themes/vectors.json`):
+  the text on the danger colour (`onAccent` on `danger`, black there: the label of a danger button
+  such as "Kick" or "Ban") reaches only 3.26:1 in Deep Ocean light and 3.45:1 in Forest light,
+  below 4.5:1. Android did not change these colours either;
+  the colours come from the engine's theme derivation, so the fix belongs there, for both apps and
+  the desktop. Every other text and control pair of the four built-in themes passes.
+- Animated GIFs and pictures in the chat keep playing with Reduce Motion, as on Android. iOS 18 has a
+  separate setting for animated images ("Auto-Play Animated Images"); following it needs a newer
+  deployment target or a check at run time.
+- The VoiceOver pass on a real iPhone and iPad (device checklist, section 10): hearing the
+  announcements, the focus moving into a sheet, the rotor's actions, Reduce Motion and the largest
+  text size cannot be checked by the simulator's tests.
+
+- The small decorative figure below the settings (`SettingsFigure`) is meant to show only while
+  the list is pulled past its end. On the server list's Settings, which has no voice bar and no
+  tabs below it, the Language section makes the list long enough to scroll, and at rest at its
+  end the figure now stands in the space above the home indicator. The product manager looked
+  at it on 2026-11-25: it stays as it is.
+- Screenshots are large (about 37 MB for the Messages set alone); shrink the PNGs. The sets
+  of moderation, More, the activity log and the settings show how: saved with a palette of 256
+  colours and no dithering (Pillow, `quantize(colors=256, method=MAXCOVERAGE, dither=NONE)`),
+  a picture takes about 0.1 to 0.2 MB instead of 0.9 to 1.7 MB, and no colour is off by more
+  than 7 of 255. The older sets are still as they were.
 - Wording needing product review: the notification explanation sheet ("Mumcord shows private
   messages and mentions as notifications while you are connected.") and the camera permission
   text ("Mumcord uses the camera to read the codes shown by the desktop app and to take photos
-  you choose to send in a chat.").
+  you choose to send in a chat."). That text is the one iOS shows in its own camera question, and
+  it does not mention sharing the camera with the channel, which the app now also does; it was
+  left as it is, because neither the specification nor Android gives a text for it.
+- Product review: editing a formatted comment on the phone flattens it. The editor shows the
+  comment as plain text and saves plain text (FR-5.80 says nothing about formatting), so a comment
+  set on the desktop with bold text, links or a picture loses them, without a word, when the user
+  fixes a typo on the phone. Android does the same (`ProfileController.open` starts from the
+  comment's plain text). Decide whether the phone should warn before saving over such a comment,
+  keep it read-only, or accept the loss; then change both apps together.
+- The comment counter counts the typed characters, as on Android, while the engine checks the
+  comment as Mumble HTML (a `<` or `&` takes four or five characters, a line break `<br>`, and
+  the engine may add its status lines). A comment the counter lets through can therefore be
+  refused; iOS then says "Can't save: your comment is too long for this server" instead of the
+  general error. Counting what will be sent needs the bridge to say it, for both apps.
 - Headset behaviour differs from Android on purpose: on iOS the system's End button always
   leaves the session, only the CallKit mute action toggles mute. Wired EarPods' single press
   therefore leaves. Decide after trying real headsets (one function, `endRequestMeans`).
@@ -148,14 +382,47 @@ simulator app; linking for a real device is first proven here.
   simulator half of `e2e/run.sh` (the same scenarios against the test server on `localhost`, run
   in the iOS CI job) and the iOS column of [acceptance.md](acceptance.md) are open.
 
+- Camera sharing, still open on iOS: the real camera on a real iPhone (the picture, upright for
+  both cameras, as the phone turns and right after a switch, unmirrored on the desktop, the
+  camera indicator going off after Stop and in the background, a phone call, another app or
+  Split View taking the camera and the picture coming back); an
+  end-to-end scenario with `e2e/stream-peer --viewer` against the local test server. As on
+  Android, viewers see the last picture instead of "paused" while the phone is in the background:
+  the engine has no paused signal for cameras (see AC-5.24 in [acceptance.md](acceptance.md)).
+- Streams, still open on iOS: the system's picture-in-picture window when leaving the app while
+  watching (FR-5.76; needs `AVPictureInPictureController` with sample buffers, so the pictures
+  would be copied into pixel buffers, and the decoding would go on in the background); real
+  streams from the desktop app on a real iPhone (picture, sound, decoding load, rotation); an
+  end-to-end scenario with `e2e/stream-peer` against the local test server. The status bar stays
+  dark on the black full screen in the light theme.
+
 ## CI notes
 
 - Runner noise seen repeatedly: a macOS runner without the "iPhone 17" simulator ("Unable to
   find a device matching …"), and `NativeAudioTests` aborting with "RPC timeout … deadlocked".
-  Both pass on re-run. A fix that picks or creates an available iPhone simulator in
-  `scripts/build-ios.sh` is still open.
+  Both pass on re-run. `scripts/build-ios.sh` now picks the newest available iPhone simulator, or
+  creates one, when "iPhone 17" is missing (plan step 0); not yet proven on a runner that lacks
+  it. The audio test abort is still open.
+- The test group `output-settings` failed in CI because a tap on the voice bar came while the bar
+  was still moving in and did not open the voice view. Every test now opens the voice view through
+  one helper that waits until the bar holds still and taps once more if needed (plan step 0);
+  proof on GitHub's runners is still to come.
 - The first UI test of a group on a cold simulator used to time out; every test group now
   starts the app once before its tests.
+- On a Mac whose simulator has a camera (seen with Xcode 26.6 and the iOS 26.5 simulator),
+  `ChatFlowUITests.testAddingAnImageOffersThePhotoLibraryAndTheCamera` fails: it expects the
+  simulator to have no camera, and there the camera screen opens. It fails the same way on the
+  commit before the More tab and moderation were built.
+- Seen once in a full local run and green on the next run:
+  `IdentitiesScreenshotUITests.testImportWrongPasswordDark`.
+- `ProfileThemesFlowUITests.testSystemFollowsALightAndADarkPhoneAndComesBackToItAfterDark` switches
+  the simulator between light and dark. A simulator that has been running for a long time can
+  ignore that switch, and the test then fails with a light screen where it expects a dark one;
+  after shutting the simulator down and booting it again the test passes (three of three runs).
+- `DesignReferenceUITests.testComponentGalleryShowsEveryGroup` ("the gallery does not scroll to
+  its last group") failed whenever its drag started on the slider, which happened every time once
+  the profile picture's avatar size made the gallery taller. It now tries another starting point
+  where a drag moved nothing.
 - Every pushed commit gets its own complete CI run. When the macOS queue is long, cancel the
   queued iOS runs of superseded commits that do not change `ios/**`.
 - SwiftUI section headers are drawn in capitals; UI tests must look for "MOBILE DATA", not

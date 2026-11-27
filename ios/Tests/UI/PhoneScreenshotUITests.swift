@@ -3,8 +3,8 @@
 import XCTest
 
 /// Drives the app against the fake engine and a faked phone to the states of the Android
-/// screenshot tests for the audio output, the settings and "disconnect when alone", and keeps a picture of each in both themes, as
-/// `ios-<name>-<theme>`. Each state has its own test method, so a failure names the screen.
+/// screenshot tests for the audio output and "disconnect when alone", and keeps a picture of
+/// each in both themes, as `ios-<name>-<theme>`. Each state has its own test method, so a failure names the screen.
 final class PhoneScreenshotUITests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
@@ -18,7 +18,7 @@ final class PhoneScreenshotUITests: XCTestCase {
 
     /// Connects to Nordlicht through the server list, once its ping answers are there.
     private func launchAndConnect(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers,voice-server,ptt," + options, theme: theme)
+        let app = launchApp("servers,voice-server,ptt," + options, theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         expectAppears(app.element(containing: "Offline"))
         tapWhenReady(app.element("Connect to Nordlicht"))
@@ -27,8 +27,7 @@ final class PhoneScreenshotUITests: XCTestCase {
 
     private func openVoiceView(_ app: XCUIApplication) {
         expectAppears(app.row("person-row", containing: "Jonas"))
-        tapWhenReady(app.element(containing: "Voice connected"))
-        expectAppears(app.element("voice-view"))
+        openVoiceViewThroughTheBar(in: app)
     }
 
     // MARK: States
@@ -60,19 +59,9 @@ final class PhoneScreenshotUITests: XCTestCase {
         capture(app, "audio-output-first-connect", theme: theme)
     }
 
-    /// Mockup `16-settings`, the sections that exist: "Mobile data" and "Battery".
-    private func settings(theme: String) {
-        let app = launchAndConnect("", theme: theme)
-        expectAppears(app.row("person-row", containing: "Jonas"))
-        tapWhenReady(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "More")).firstMatch)
-        tapWhenReady(app.element("more-settings"))
-        expectAppears(app.switches.matching(identifier: "settings-idle-disconnect").firstMatch)
-        capture(app, "settings-data-battery", theme: theme)
-    }
-
     /// The app after it disconnected because the user was alone; it has no mockup.
     private func idleDisconnected(theme: String) {
-        let app = launchApp("servers,alone,idle-on,idle-short", theme: theme)
+        let app = launchApp("servers,alone,idle-on,idle-short", theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         expectAppears(app.element(containing: "Offline"))
         tapWhenReady(app.element("Connect to Nordlicht"))
@@ -88,8 +77,6 @@ final class PhoneScreenshotUITests: XCTestCase {
     func testAudioOutputLight() { audioOutput(theme: "light") }
     func testFirstConnectDark() { firstConnect(theme: "dark") }
     func testFirstConnectLight() { firstConnect(theme: "light") }
-    func testSettingsDark() { settings(theme: "dark") }
-    func testSettingsLight() { settings(theme: "light") }
     func testIdleDisconnectedDark() { idleDisconnected(theme: "dark") }
     func testIdleDisconnectedLight() { idleDisconnected(theme: "light") }
 }

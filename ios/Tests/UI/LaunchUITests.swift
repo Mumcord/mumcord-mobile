@@ -13,6 +13,7 @@ final class LaunchUITests: XCTestCase {
     /// choice.
     func testAppStartsOnTheRealEngineAndShowsItsFirstScreen() {
         let app = XCUIApplication()
+        app.launchArguments = languageArguments()
         app.launch()
 
         let talkModeChoice = app.element("How do you want to talk?")

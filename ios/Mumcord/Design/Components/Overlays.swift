@@ -2,13 +2,18 @@
 
 import SwiftUI
 
+/// The width of a sheet in two columns (`.tablet .sheet`); in one column it is the full width.
+let sheetMaxWidth: CGFloat = 480
+
 /// The frame of a bottom sheet (`.sheet`): rounded top, grip, optional `title`, and the content
 /// in a column. Showing and hiding it, and the dimmed backdrop behind it
-/// (`theme.colors.backdrop`), belong to the screen that uses it.
+/// (`theme.colors.backdrop`), belong to the screen that uses it. In two columns (an iPad) it is
+/// at most `sheetMaxWidth` wide, as in the tablet mockups; the screen centres it.
 struct MumcordSheetFrame<Content: View>: View {
     private let title: String?
     private let content: Content
     @Environment(\.mumcordTheme) private var theme
+    @Environment(\.twoColumns) private var twoColumns
 
     init(title: String? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
@@ -39,6 +44,7 @@ struct MumcordSheetFrame<Content: View>: View {
         }
         .background { shape.fill(colors.bgElevated).ignoresSafeArea(edges: .bottom) }
         .tokenShadow(theme.shadows.raised, shape: shape)
+        .frame(maxWidth: twoColumns ? sheetMaxWidth : .infinity)
     }
 }
 

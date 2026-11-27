@@ -51,6 +51,7 @@ extension AppModel {
         if store.state.server?.selfSession == session { return }
         connectedLocal.personSession = session
         connectedLocal.volumeDraft = nil
+        connectedLocal.moderation = nil
     }
 
     func changeVolume(_ percent: Int) {
@@ -78,41 +79,29 @@ extension AppModel {
         Task { await store.joinChannel(prompt.channelId, password: password) }
     }
 
-    /// Closes whichever sheet is open; an open password question is given up.
+    /// Closes whichever sheet is open; an open password question is given up. A moderation
+    /// step goes back to the person sheet it came from.
     func dismissSheet() {
         if store.state.channelPassword != nil {
             store.dismissChannelPassword()
             connectedLocal.password = ""
+        } else if connectedLocal.moderation != nil, uiState.connected?.sheet?.isModeration == true {
+            connectedLocal.moderation = nil
         } else {
-            connectedLocal.personSession = nil
-            connectedLocal.volumeDraft = nil
+            closePerson()
             connectedLocal.menuChannelId = nil
             connectedLocal.outputOpen = false
         }
     }
 
+    /// Closes the person sheet and the moderation step that replaced it.
+    func closePerson() {
+        connectedLocal.personSession = nil
+        connectedLocal.volumeDraft = nil
+        connectedLocal.moderation = nil
+    }
+
     func dismissDenied() {
         store.dismissDenied()
-    }
-
-    // MARK: Settings
-
-    /// Opens the settings in the More tab.
-    func openSettingsScreen() {
-        connectedLocal.settingsOpen = true
-    }
-
-    func closeSettingsScreen() {
-        connectedLocal.settingsOpen = false
-    }
-
-    /// Saves a change of the phone settings at once. A failure is logged by the store; the
-    /// switch then shows what the engine still has.
-    func changeSettings(_ change: @escaping @Sendable (inout MobileSettings) -> Void) {
-        let previous = settingsSave
-        settingsSave = Task { [store] in
-            await previous?.value
-            _ = await store.updateMobileSettings(change)
-        }
     }
 }

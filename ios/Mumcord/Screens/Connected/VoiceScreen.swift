@@ -21,7 +21,10 @@ struct VoiceScreen: View {
     let state: ConnectedUiState
     let actions: ConnectedActions
     let onLeave: () -> Void
+    /// Sharing the own camera; nil where it cannot be shared.
+    var camera: CameraShareController?
     @Environment(\.mumcordTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         let colors = theme.colors
@@ -33,7 +36,14 @@ struct VoiceScreen: View {
                         // The mockup's title is one step larger than the app bar title.
                         LineText(voice.channelName, style: TextToken.title.with(size: 24), color: colors.text)
                             .accessibilityAddTraits(.isHeader)
-                        LineText(voice.statusLine, style: .small, color: colors.textMuted)
+                            // The view's title is read first, before the chevron above it.
+                            .accessibilitySortPriority(1)
+                        // With the accessibility text sizes the line wraps instead of ending in "…".
+                        if typeSize.isAccessibilitySize {
+                            ParagraphText(voice.statusLine, style: .small, color: colors.textMuted)
+                        } else {
+                            LineText(voice.statusLine, style: .small, color: colors.textMuted)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     if let output = voice.output {
@@ -46,7 +56,10 @@ struct VoiceScreen: View {
                 if let whisper = voice.whisper {
                     WhisperBar(whisper: whisper, onHeldChange: actions.setWhisperHeld, onClose: actions.closeWhisper)
                 }
-                VoiceActions(voice: voice, actions: actions, onLeave: onLeave)
+                if let camera {
+                    CameraBar(state: camera.uiState, controller: camera)
+                }
+                VoiceActions(voice: voice, actions: actions, onLeave: onLeave, camera: camera)
                 MumcordSegmentedPill(
                     options: [Strings.talkModeVoiceActivity, Strings.talkModePushToTalk],
                     selectedIndex: talkModes.firstIndex(of: voice.talkMode) ?? 0,
@@ -139,35 +152,52 @@ private struct VoiceTiles: View {
     }
 }
 
-/// Mute, deafen and leave as large round buttons with their names (`.vactions`).
+/// Mute, deafen and leave as large round buttons with their names (`.vactions`), and the camera
+/// (no mockup) between deafen and leave where it can be shared.
 private struct VoiceActions: View {
     let voice: VoiceUiState
     let actions: ConnectedActions
     let onLeave: () -> Void
+    let camera: CameraShareController?
 
     var body: some View {
         // Each action is 88 pt wide, which leaves the mockup's 24 pt between the 64 pt buttons
-        // and room for a label of two lines.
+        // and room for a label of two lines; with the camera four share the row at 80 pt.
+        let slot: CGFloat = camera == nil ? 88 : 80
         HStack(alignment: .top, spacing: 0) {
             MumcordVoiceAction(
                 icon: voice.mute == .unmuted ? MumcordIcons.mic : MumcordIcons.micOff,
                 label: muteLabel,
                 spokenLabel: voice.mute.actionLabel,
                 style: voice.mute == .unmuted ? .tonal : .off,
+                value: voice.mute.stateLabel,
                 action: voice.mute == .noMicrophone ? actions.requestMicrophone : actions.toggleMute
             )
             .disabled(voice.mute == .serverMuted)
-            .frame(width: 88)
+            .frame(width: slot)
             .accessibilityIdentifier("voice-mute")
             MumcordVoiceAction(
                 icon: voice.deafened ? MumcordIcons.headphonesOff : MumcordIcons.headphones,
                 label: voice.deafened ? Strings.voiceUndeafen : Strings.voiceDeafen,
                 spokenLabel: voice.deafened ? Strings.voiceUndeafen : Strings.voiceDeafen,
                 style: voice.deafened ? .off : .tonal,
+                value: voice.deafened ? Strings.personDeafened : nil,
                 action: actions.toggleDeafen
             )
-            .frame(width: 88)
+            .frame(width: slot)
             .accessibilityIdentifier("voice-deafen")
+            if let camera {
+                let on = camera.uiState.on
+                MumcordVoiceAction(
+                    icon: on ? MumcordIcons.cameraOff : MumcordIcons.camera,
+                    label: on ? Strings.cameraStopSharing : Strings.cameraShareButton,
+                    spokenLabel: on ? Strings.cameraStopSharing : Strings.cameraShareTitle,
+                    style: on ? .on : .tonal,
+                    action: on ? camera.stop : camera.cameraButton
+                )
+                .frame(width: slot)
+                .accessibilityIdentifier("voice-camera")
+            }
             MumcordVoiceAction(
                 icon: MumcordIcons.phoneOff,
                 label: Strings.voiceLeave,
@@ -175,7 +205,7 @@ private struct VoiceActions: View {
                 style: .danger,
                 action: onLeave
             )
-            .frame(width: 88)
+            .frame(width: slot)
             .accessibilityIdentifier("voice-leave")
         }
         .frame(maxWidth: .infinity)
@@ -201,9 +231,13 @@ private struct InputLevelMeter: View {
         VStack(alignment: .leading, spacing: MumcordSpace.s2) {
             ParagraphText(Strings.voiceLevelHint, style: .small, color: theme.colors.textMuted)
             MumcordLevelMeter(level: Double(level.percent) / 100, label: Strings.voiceLevel)
-                .accessibilityIdentifier("voice-level")
         }
         .padding(.horizontal, MumcordSpace.s2)
         .frame(maxWidth: .infinity, minHeight: talkAreaHeight, alignment: .leading)
+        // One element for the meter and its hint: the 8 pt meter alone is too small a target.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Strings.voiceLevel)
+        .accessibilityHint(Strings.voiceLevelHint)
+        .accessibilityIdentifier("voice-level")
     }
 }

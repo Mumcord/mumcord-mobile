@@ -17,7 +17,7 @@ final class MessagesScreenshotUITests: XCTestCase {
     }
 
     private func connect(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp(options.isEmpty ? "servers" : "servers," + options, theme: theme)
+        let app = launchApp(options.isEmpty ? "servers" : "servers," + options, theme: theme, locale: "en_US")
         tapWhenReady(app.element("Connect to Nordlicht"))
         // The question about notifications covers the channels, which are then not offered
         // to the tests either.
@@ -123,13 +123,6 @@ final class MessagesScreenshotUITests: XCTestCase {
         capture(app, "person-sheet", theme: theme)
     }
 
-    private func more(theme: String) {
-        let app = connect("messages", theme: theme)
-        tapWhenReady(tab(app, "More"))
-        expectAppears(app.element("more-sender-only"))
-        capture(app, "more", theme: theme)
-    }
-
     private func notificationsExplain(theme: String) {
         let app = connect("messages,notif-ask", theme: theme)
         expectAppears(app.element("notifications-continue"))
@@ -224,14 +217,6 @@ final class MessagesScreenshotUITests: XCTestCase {
 
     func testPersonSheetLight() {
         personSheet(theme: "light")
-    }
-
-    func testMoreDark() {
-        more(theme: "dark")
-    }
-
-    func testMoreLight() {
-        more(theme: "light")
     }
 
     func testNotificationsExplainDark() {

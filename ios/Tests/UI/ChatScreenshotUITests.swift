@@ -19,7 +19,7 @@ final class ChatScreenshotUITests: XCTestCase {
 
     /// Connects to Nordlicht and opens the Chat tab.
     private func openChat(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers," + options, theme: theme)
+        let app = launchApp("servers," + options, theme: theme, locale: "en_US")
         tapWhenReady(app.element("Connect to Nordlicht"))
         expectAppears(app.row("channel-row", containing: "Lobby"))
         tapWhenReady(app.element("Chat"))

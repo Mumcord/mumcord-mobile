@@ -18,19 +18,13 @@ final class OutputFlowUITests: XCTestCase {
         return app
     }
 
-    private func openVoiceView(_ app: XCUIApplication) {
-        expectAppears(app.element("voice-bar"))
-        tapWhenReady(app.element(containing: "Voice connected"))
-        expectAppears(app.element("voice-view"))
-    }
-
     private func expectChip(_ output: String, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         expectAppears(app.row("output-chip", containing: "Audio output: " + output), file: file, line: line)
     }
 
     func testAConnectedHeadsetIsUsedAndTheSheetSwitchesBetweenAllOutputs() {
         let app = launchAndConnect("output-bluetooth")
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectChip("Lea's Buds", in: app)
 
         tapWhenReady(app.element("output-chip"))
@@ -56,7 +50,7 @@ final class OutputFlowUITests: XCTestCase {
         let app = launchAndConnect("plain")
         expectAppears(app.row("channel-row", containing: "Lobby"))
         XCTAssertFalse(app.element("output-question-speaker").exists)
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectChip("Speaker", in: app)
     }
 
@@ -65,7 +59,7 @@ final class OutputFlowUITests: XCTestCase {
         expectAppears(app.element("Loudspeaker or earpiece?"))
         tapWhenReady(app.element("output-question-speaker"))
         expectGone(app.element("output-question-speaker"))
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectChip("Speaker", in: app)
     }
 
@@ -73,7 +67,7 @@ final class OutputFlowUITests: XCTestCase {
         let app = launchAndConnect("output-ask")
         tapWhenReady(app.element("output-question-earpiece"))
         expectGone(app.element("output-question-earpiece"))
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectChip("Earpiece", in: app)
     }
 }

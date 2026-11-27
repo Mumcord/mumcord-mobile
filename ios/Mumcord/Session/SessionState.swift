@@ -28,8 +28,26 @@ struct SessionState: Equatable {
     var talkMode = TalkMode.voiceActivity
     /// The phone settings as the engine keeps them; nil until they have been read.
     var mobileSettings: MobileSettings?
+    /// The settings shared with the desktop's settings model; nil until they have been read.
+    var appSettings: AppSettings?
+    /// The activity log of the connection (Spec 11), newest first, at most `maxActivity`.
+    var activity: [ActivityEntry] = []
     /// Which of the phone's speaker and microphone the engine needs right now.
     var audio = AudioWanted(capture: false, playback: false)
+    /// The screen shares and cameras of the people in the user's channel, as the bridge last
+    /// sent them.
+    var streams: [Stream] = []
+    /// The engine waits for the answer to "Allow direct connections?" (a stream needs it).
+    var directConnectionsQuestion = false
+    /// The user's own camera as the engine last reported it (FR-5.74).
+    var ownCamera = cameraOff
+    /// The appearance mode and the themes; nil until they have been read.
+    var themes: ThemeSettings?
+    /// The themes that come with the app, Mumcord first; read with `themes`.
+    var builtInThemes: [Theme] = []
+    /// How often the user's own comment or avatar may have changed on the shown server; the
+    /// profile is read again each time it grows.
+    var ownProfileChanges = 0
 
     /// True once the server's channels are known and the connection is still alive.
     var showsServer: Bool {
@@ -139,6 +157,9 @@ struct UnsupportedHint: Equatable, Identifiable {
     let kind: UnsupportedKind
 }
 
+/// As many entries as the bridge keeps for a connection.
+let maxActivity = 200
+
 /// How many hints stay visible; older ones make room so the list stays calm.
 let maxHints = 3
 
@@ -149,3 +170,6 @@ extension SessionState {
         return next
     }
 }
+
+/// The own camera while it is off and nothing went wrong.
+let cameraOff = OwnCamera(state: .off, problem: nil, viewers: 0)

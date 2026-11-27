@@ -45,16 +45,19 @@ struct MumcordVoiceTile: View {
 }
 
 /// A large round action of the full voice view with its name below (`.vaction`): a 64 pt
-/// button and a label. `spokenLabel` is what VoiceOver reads for the button; the visible
-/// `label` is not read a second time. Disable it with `.disabled(true)`.
+/// button and a label. `spokenLabel` is what VoiceOver reads for the button, `value` what is on
+/// now; the visible `label` is not read a second time. Disable it with `.disabled(true)`.
 struct MumcordVoiceAction: View {
     let icon: MumcordIconData
     let label: String
     let spokenLabel: String
     var style = MumcordIconButtonStyle.tonal
+    var value: String?
     let action: () -> Void
     @Environment(\.mumcordTheme) private var theme
     @Environment(\.isEnabled) private var isEnabled
+    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
+    @State private var width: CGFloat = 0
 
     var body: some View {
         let colors = theme.colors
@@ -64,13 +67,23 @@ struct MumcordVoiceAction: View {
                     .frame(width: 64, height: 64)
                     .background(background, in: Circle())
                     .opacity(isEnabled ? 1 : 0.5)
-                ParagraphText(label, style: .smallStrong, color: style == .danger ? colors.danger : colors.textSecondary)
-                    .multilineTextAlignment(.center)
+                // A little room at the sides keeps the labels of neighbouring buttons apart.
+                let factor = wordFitFactor(label, font: MumcordFonts.font(.smallStrong, scale: scale), width: width - MumcordSpace.s2)
+                ParagraphText(
+                    label,
+                    style: TextToken.smallStrong.with(size: TextToken.smallStrong.size * factor),
+                    color: style == .danger ? colors.danger : colors.textSecondary
+                )
+                .multilineTextAlignment(.center)
             }
+            .frame(maxWidth: .infinity)
+            .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(spokenLabel)
+        // Always set, also empty, so switching keeps the button's identity and VoiceOver's focus.
+        .accessibilityValue(value ?? "")
     }
 
     private var tint: Color {

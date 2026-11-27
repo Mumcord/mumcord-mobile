@@ -41,6 +41,8 @@ final class SessionStore: @unchecked Sendable {
     /// What the engine last said about the connection, also what `resuming` hides.
     private var raw = RawConnection()
     private var rawObservers: [UUID: AsyncStream<RawConnection>.Continuation] = [:]
+    /// The last change of the settings, see `afterEarlierSettingsChanges`.
+    private var settingsChange: Task<Outcome<Void>, Never>?
 
     private struct RawConnection {
         var connection: ConnectionState?
@@ -182,12 +184,18 @@ final class SessionStore: @unchecked Sendable {
     /// Reads the saved servers once; later changes arrive as events. A failure can be retried.
     func loadServers() async {
         if state.serversLoaded { return }
-        switch await call("load servers", { ($0.savedServers(), $0.savedIdentities()) }) {
+        // The themes come with the servers, so the first screen is drawn in the user's theme.
+        let loaded = await call("load servers") {
+            ($0.savedServers(), $0.savedIdentities(), $0.themeSettings(), $0.builtInThemes())
+        }
+        switch loaded {
         // An event that arrived in between is newer than the snapshot.
-        case .ok(let (servers, identities)):
+        case .ok(let (servers, identities, themes, builtInThemes)):
             update { state in
-                if state.serversLoaded { return state }
                 var next = state
+                if next.themes == nil { next.themes = themes }
+                next.builtInThemes = builtInThemes
+                if state.serversLoaded { return next }
                 next.servers = servers
                 next.serversLoaded = true
                 if next.identities == nil { next.identities = identities }
@@ -207,6 +215,14 @@ final class SessionStore: @unchecked Sendable {
                     if state.mobileSettings != nil { return state }
                     var next = state
                     next.mobileSettings = settings
+                    return next
+                }
+            }
+            if case .ok(let settings) = await call("app settings", { $0.appSettings() }) {
+                update { state in
+                    if state.appSettings != nil { return state }
+                    var next = state
+                    next.appSettings = settings
                     return next
                 }
             }
@@ -234,6 +250,40 @@ final class SessionStore: @unchecked Sendable {
     /// People online and latency of a saved server, or nil when it does not answer.
     func pingServer(_ serverId: Int64, refresh: Bool) async -> ServerPing? {
         switch await call("ping server", { try await $0.pingServer(serverId: serverId, refresh: refresh) }) {
+        case .ok(let ping): ping
+        case .failed: nil
+        }
+    }
+
+    // MARK: Public servers
+
+    /// The most servers the bridge returns in one page.
+    static let publicPage: UInt32 = 100
+
+    /// The whole public server list, read page by page (FR-5.9). The engine downloads it on the
+    /// first call and when `refresh` is set, otherwise it answers from the last download; a
+    /// failed download leaves that one in place.
+    func publicServers(refresh: Bool) async -> Outcome<[PublicServer]> {
+        await call("public servers") { engine in
+            var servers: [PublicServer] = []
+            while true {
+                let page = try await engine.publicServers(query: PublicServerQuery(
+                    search: "",
+                    countryCode: nil,
+                    offset: UInt32(servers.count),
+                    limit: Self.publicPage,
+                    // Only the first page may download; the others read that download.
+                    refresh: refresh && servers.isEmpty
+                ))
+                servers += page.servers
+                if page.servers.isEmpty || servers.count >= Int(page.total) { return servers }
+            }
+        }
+    }
+
+    /// People online, user limit and latency of a listed server, or nil when it does not answer.
+    func pingPublicServer(host: String, port: UInt16) async -> ServerPing? {
+        switch await call("ping public server", { try await $0.pingPublicServer(host: host, port: port) }) {
         case .ok(let ping): ping
         case .failed: nil
         }
@@ -309,6 +359,18 @@ final class SessionStore: @unchecked Sendable {
         engineNow()?.setOpenChat(chat: chat)
     }
 
+    /// Both versions of the theme `themeId` (nil: the app theme), as the app draws them. Read
+    /// at once, so the colours change together with the state that picks them: the engine only
+    /// looks them up in memory. Nil while there is no engine yet, which never happens once the
+    /// themes have been read.
+    func themeTokensNow(_ themeId: String?) -> (dark: ThemeTokens, light: ThemeTokens)? {
+        guard let engine = engineNow() else {
+            log("read theme colours failed: no engine yet")
+            return nil
+        }
+        return (engine.themeTokens(themeId: themeId, variant: .dark), engine.themeTokens(themeId: themeId, variant: .light))
+    }
+
     private func engineNow() -> EngineClient? {
         lock.lock()
         defer { lock.unlock() }
@@ -347,6 +409,9 @@ final class SessionStore: @unchecked Sendable {
                 next.phase = .failed(error)
                 next.certificatePrompt = nil
                 next.server = nil
+                next.streams = []
+                next.directConnectionsQuestion = false
+                next.ownCamera = cameraOff
                 return next
             }
         }
@@ -471,6 +536,9 @@ final class SessionStore: @unchecked Sendable {
             next.phase = .failed(.serverUnreachable)
             next.certificatePrompt = nil
             next.server = nil
+            next.streams = []
+            next.directConnectionsQuestion = false
+            next.ownCamera = cameraOff
             setLocked(next)
         }
     }
@@ -541,6 +609,125 @@ final class SessionStore: @unchecked Sendable {
         report(await call("set person mute") { try await $0.setPersonLocalMute(session: session, muted: muted) })
     }
 
+    // MARK: Streams (FR-5.70 … FR-5.73)
+
+    // How a watch goes shows in the stream's state; a failed command only means that the
+    // stream or the connection went away meanwhile, so it is logged and not shown.
+
+    func watchStream(_ session: UInt32, kind: StreamKind) async {
+        _ = await call("watch stream") { try await $0.watchStream(session: session, kind: kind) }
+    }
+
+    func stopWatchingStream(_ session: UInt32, kind: StreamKind) async {
+        _ = await call("stop watching stream") { try await $0.stopWatchingStream(session: session, kind: kind) }
+    }
+
+    /// How loud a person's screen share sound plays, 0 to 200 percent.
+    func setStreamVolume(_ session: UInt32, percent: Int) async {
+        let clamped = UInt16(min(max(percent, 0), 200))
+        _ = await call("set stream volume") { try await $0.setStreamVolume(session: session, percent: clamped) }
+    }
+
+    /// Answers "Allow direct connections?"; the question goes away either way.
+    func answerDirectConnections(_ allow: Bool) async {
+        update { state in
+            var next = state
+            next.directConnectionsQuestion = false
+            return next
+        }
+        _ = await call("answer direct connections") { try await $0.answerDirectConnections(allow: allow) }
+    }
+
+    /// Where the news of new stream pictures goes, once an engine exists. Never waits.
+    func setVideoSink(_ sink: VideoSink?) {
+        engineNow()?.setVideoSink(sink: sink)
+    }
+
+    /// The handle for the engine's picture functions, or 0 while no engine exists. Never waits.
+    func videoHandle() -> UInt64 {
+        engineNow()?.videoHandle() ?? 0
+    }
+
+    // MARK: Own camera (FR-5.74, FR-5.75)
+
+    // The state arrives as `ownCamera`; a failed command is logged, and the reason the engine
+    // knows shows in that state.
+
+    /// The app's camera, which the engine starts with the preview and stops when sharing ends.
+    /// Never waits.
+    func setCameraCapture(_ capture: MumcordBridge.CameraCapture?) {
+        engineNow()?.setCameraCapture(capture: capture)
+    }
+
+    /// The handle for the engine's camera input, or 0 while no engine exists. Never waits.
+    func cameraHandle() -> UInt64 {
+        engineNow()?.cameraHandle() ?? 0
+    }
+
+    /// Opens the preview: the camera starts on the phone, nothing is sent.
+    func openCameraPreview() async -> Outcome<Void> {
+        await call("open camera preview") { try await $0.openCameraPreview() }
+    }
+
+    /// "Start sharing": returns once the camera is shared or with the reason it is not.
+    func startCameraSharing() async -> Outcome<Void> {
+        await call("start camera sharing") { try await $0.startCameraSharing() }
+    }
+
+    /// Cancel in the preview or Stop while sharing.
+    func stopCamera() async -> Outcome<Void> {
+        await call("stop camera") { try await $0.stopCamera() }
+    }
+
+    /// The phone's camera stopped by itself; the engine turns sharing off and names the reason.
+    /// Never waits.
+    func cameraCaptureFailed(_ failure: CaptureFailure) {
+        engineNow()?.cameraCaptureFailed(failure: failure)
+    }
+
+    // MARK: Moderation (FR-5.90 … FR-5.93)
+
+    // The commands that change a person give true when the server confirmed the change and
+    // false when it did not answer in time; either way the tree shows what happened.
+
+    func movePerson(_ session: UInt32, to channelId: UInt32) async -> Result<Bool, ModerationFailure> {
+        await moderate("move person") { try await $0.movePerson(session: session, channelId: channelId) }
+    }
+
+    func setServerMute(_ session: UInt32, muted: Bool) async -> Result<Bool, ModerationFailure> {
+        await moderate("set server mute") { try await $0.setServerMute(session: session, muted: muted) }
+    }
+
+    func kickPerson(_ session: UInt32, reason: String?) async -> Result<Bool, ModerationFailure> {
+        await moderate("kick person") { try await $0.kickPerson(session: session, reason: reason) }
+    }
+
+    /// What the ban sheet needs about a person; asks the server (up to a few seconds).
+    func banTarget(_ session: UInt32) async -> Result<BanTarget, ModerationFailure> {
+        await moderate("read ban target") { try await $0.banTarget(session: session) }
+    }
+
+    func banPerson(_ session: UInt32, _ ban: BanInput) async -> Result<BanResult, ModerationFailure> {
+        await moderate("ban person") { try await $0.banPerson(session: session, ban: ban) }
+    }
+
+    /// Runs a moderation command. Its sheet shows a refusal in the server's own words, which
+    /// are kept out of the log like every other detail.
+    private func moderate<Value>(
+        _ name: String,
+        _ command: (EngineClient) async throws -> Value
+    ) async -> Result<Value, ModerationFailure> {
+        do {
+            let client = try await engine.get()
+            lock.withLock { createdEngine = client }
+            return .success(try await command(client))
+        } catch {
+            var refusal: String?
+            if case .PermissionDenied(let detail) = error as? BridgeError { refusal = detail }
+            return .failure(moderationFailure(logged(name, error), refusal: refusal))
+        }
+    }
+
     /// Gives up on a channel password question.
     func dismissChannelPassword() {
         update { state in
@@ -575,9 +762,12 @@ final class SessionStore: @unchecked Sendable {
         reportFailure()
     }
 
-    /// Shows a failed command of the connected screens like a refusal by the server.
+    /// Shows a failed command of the connected screens like a refusal by the server. Without a
+    /// connection (the server list's More screen) there is no banner for it, and a refusal kept
+    /// until then would show up wrongly on the next connection; the failure is logged by `call`.
     func reportFailure() {
         update { state in
+            guard state.showsServer else { return state }
             var next = state
             next.denied = DeniedAction(channelId: nil, detail: "")
             return next
@@ -590,25 +780,81 @@ final class SessionStore: @unchecked Sendable {
     }
 
     /// Reads the phone settings, changes them and saves the result.
-    func updateMobileSettings(_ change: (inout MobileSettings) -> Void) async -> Outcome<Void> {
-        let read = await call("mobile settings") { $0.mobileSettings() }
-        guard case .ok(var settings) = read else {
-            if case .failed(let error) = read { return .failed(error) }
-            return .failed(.internalError)
-        }
-        change(&settings)
-        let changed = settings
-        let saved: Outcome<Void> = await call("set mobile settings") {
-            try await $0.setMobileSettings(settings: changed)
-        }
-        if case .ok = saved {
-            update { state in
-                var next = state
-                next.mobileSettings = changed
-                return next
+    func updateMobileSettings(_ change: @escaping @Sendable (inout MobileSettings) -> Void) async -> Outcome<Void> {
+        await afterEarlierSettingsChanges { [self] in
+            let read = await call("mobile settings") { $0.mobileSettings() }
+            guard case .ok(var settings) = read else {
+                if case .failed(let error) = read { return .failed(error) }
+                return .failed(.internalError)
             }
+            change(&settings)
+            let changed = settings
+            let saved: Outcome<Void> = await call("set mobile settings") {
+                try await $0.setMobileSettings(settings: changed)
+            }
+            if case .ok = saved {
+                update { state in
+                    var next = state
+                    next.mobileSettings = changed
+                    return next
+                }
+            }
+            return saved
         }
-        return saved
+    }
+
+    /// Reads the settings shared with the desktop (notifications, chat history), changes them
+    /// and saves the result, as `updateMobileSettings` does for the phone settings.
+    func updateAppSettings(_ change: @escaping @Sendable (inout AppSettings) -> Void) async -> Outcome<Void> {
+        await afterEarlierSettingsChanges { [self] in
+            let read = await call("app settings") { $0.appSettings() }
+            guard case .ok(var settings) = read else {
+                if case .failed(let error) = read { return .failed(error) }
+                return .failed(.internalError)
+            }
+            change(&settings)
+            let changed = settings
+            let saved: Outcome<Void> = await call("set app settings") {
+                try await $0.setAppSettings(settings: changed)
+            }
+            if case .ok = saved {
+                update { state in
+                    var next = state
+                    next.appSettings = changed
+                    return next
+                }
+            }
+            return saved
+        }
+    }
+
+    /// Runs a change of the settings once every earlier one is done. A change reads the whole
+    /// record and saves it back, and the settings have several writers (the More tab, the
+    /// notification settings, the audio output): two changes at the same time would each save
+    /// what they read, and the later save would undo the earlier one.
+    private func afterEarlierSettingsChanges(
+        _ change: @escaping @Sendable () async -> Outcome<Void>
+    ) async -> Outcome<Void> {
+        let task = lock.withLock {
+            let previous = settingsChange
+            let task = Task {
+                _ = await previous?.value
+                return await change()
+            }
+            settingsChange = task
+            return task
+        }
+        return await task.value
+    }
+
+    /// The voice settings as they apply now, or nil when they cannot be read.
+    func voiceSettings() async -> VoiceSettings? {
+        await call("voice settings") { try await $0.voiceSettings() }.value
+    }
+
+    /// Saves whether noise suppression runs; the engine applies it at once.
+    func setNoiseSuppression(_ on: Bool) async -> Outcome<Void> {
+        await call("set noise suppression") { try await $0.setNoiseSuppression(on: on) }
     }
 
     /// Runs a command on the engine, creating it on first use. `name` is what the log calls it.
@@ -634,6 +880,11 @@ final class SessionStore: @unchecked Sendable {
     #endif
 
     private func failed<Value>(_ command: String, _ error: Error) -> Outcome<Value> {
+        .failed(logged(command, error))
+    }
+
+    /// The kind of a failed command, written to the log.
+    private func logged(_ command: String, _ error: Error) -> ConnectionError {
         let kind: ConnectionError
         if let bridgeError = error as? BridgeError {
             kind = bridgeError.connectionError
@@ -645,7 +896,7 @@ final class SessionStore: @unchecked Sendable {
         }
         // Only the kind of failure: the detail text can contain the server address.
         log("\(command) failed: \(kind) (\(type(of: error)))")
-        return .failed(kind)
+        return kind
     }
 }
 

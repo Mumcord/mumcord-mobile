@@ -11,12 +11,16 @@ on:
       - "ios/**"
       - "design/**"
       - "bridge/**"
+      - "i18n/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "engine.lock.toml"
       - "rust-toolchain.toml"
       - "scripts/build-ios.sh"
       - "scripts/build-codecs.sh"
+      - "scripts/translations.py"
+      - "scripts/test_translations.py"
+      - "scripts/testenv.sh"
       - ".github/workflows/ci-ios.yml"
   push:
     branches: [main]
@@ -38,15 +42,17 @@ defaults:
 
 env:
   CARGO_TERM_COLOR: always
-  # Must exist in the Xcode of the runner image below.
-  IOS_SIMULATOR: iPhone 17
+  # No IOS_SIMULATOR: scripts/build-ios.sh takes "iPhone 17" when the runner has it and another
+  # available iPhone simulator when not; a fixed name would fail on a runner without it. The test
+  # group "tablet" runs on an iPad simulator, which the script picks (or creates) the same way.
 
 jobs:
-  # Fails at once when a UI test class belongs to no group, and hands the groups to the matrix.
+  # Fails at once when a UI test class belongs to no group or the translated texts are out of
+  # date, and hands the groups to the matrix.
   groups:
     name: Test groups
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     outputs:
       matrix: ${{ steps.list.outputs.matrix }}
     steps:
@@ -54,6 +60,14 @@ jobs:
 
       - name: Check that every test class has a group
         run: scripts/build-ios.sh --check-groups
+
+      # The translated texts must follow the app's English texts and the desktop translations
+      # of the pinned engine commit (scripts/translations.py), as in ci-android.yml.
+      - name: Check the translations
+        run: |
+          scripts/testenv.sh fetch
+          python3 -B -m unittest discover -s scripts -p 'test_translations.py'
+          python3 -B scripts/translations.py check
 
       - id: list
         run: echo "matrix=$(scripts/build-ios.sh --list-groups)" >> "$GITHUB_OUTPUT"

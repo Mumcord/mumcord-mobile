@@ -18,6 +18,10 @@ extension SessionState {
                 next.channelPassword = nil
                 next.denied = nil
                 next.hints = []
+                next.activity = []
+                next.streams = []
+                next.directConnectionsQuestion = false
+                next.ownCamera = cameraOff
             case .connecting:
                 next.phase = .connecting
             case .connected:
@@ -33,7 +37,9 @@ extension SessionState {
                 fingerprint: prompt.fingerprint,
                 previousFingerprint: prompt.previousFingerprint
             )
+        // A sync starts the activity log again, as the bridge does; its "connected" entry follows.
         case .serverSynced(let server):
+            next.activity = []
             next.server = ServerModel(
                 selfSession: server.selfSession,
                 channels: Dictionary(server.channels.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }),
@@ -86,17 +92,25 @@ extension SessionState {
             next.mobileSettings = settings
         case .identitiesChanged(let identities):
             next.identities = identities
-        // Profile, activity log, settings and theme screens (task 8.6) follow these themselves.
-        case .profileChanged, .activityAdded, .appSettingsChanged, .themesChanged:
-            break
+        case .appSettingsChanged(let settings):
+            next.appSettings = settings
+        case .activityAdded(let entry):
+            next.activity = Array(([entry] + activity).prefix(maxActivity))
+        case .profileChanged(let session):
+            if session == server?.selfSession { next.ownProfileChanges += 1 }
+        case .themesChanged(let settings):
+            next.themes = settings
         // Messages and unread counts go to `ChatStore` and never reach this state. The rest
         // belongs to the Messages tab.
         case .chatMessageReceived, .chatUnreadChanged, .chatNotification, .messageRequestsChanged,
              .blockedPeopleChanged:
             break
-        // Streams phase (task 7.5): the state does not follow streams yet.
-        case .streamsChanged, .directConnectionsQuestion, .ownCameraChanged:
-            break
+        case .streamsChanged(let streams):
+            next.streams = streams
+        case .directConnectionsQuestion:
+            next.directConnectionsQuestion = true
+        case .ownCameraChanged(let camera):
+            next.ownCamera = camera
         }
         return next
     }

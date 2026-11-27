@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import SwiftUI
+import UIKit
 
 /// Container of the channel tree (`.tree`).
 struct MumcordTree<Content: View>: View {
@@ -172,6 +173,8 @@ enum MumcordAvatarSize: CaseIterable {
     /// A person in the full voice view.
     case tile
     case extraLarge
+    /// The own picture on the edit profile screen.
+    case profile
 
     var diameter: CGFloat {
         switch self {
@@ -182,6 +185,7 @@ enum MumcordAvatarSize: CaseIterable {
         case .sheet: 56
         case .tile: 72
         case .extraLarge: 88
+        case .profile: 96
         }
     }
 
@@ -194,23 +198,26 @@ enum MumcordAvatarSize: CaseIterable {
         case .sheet: 24
         case .tile: 28
         case .extraLarge: 32
+        case .profile: 40
         }
     }
 }
 
 /// Round avatar with initials (`.avatar`). `colorSlot` picks one of the eight avatar colours;
 /// `talking` adds the green ring and glow. The ring is drawn outside the avatar and does not
-/// change its size.
+/// change its size. A person's own picture (`image`) is shown instead of the initials, cut to
+/// the circle.
 struct MumcordAvatar: View {
     let initials: String
     let colorSlot: Int
     var size = MumcordAvatarSize.medium
     var talking = false
+    var image: UIImage?
     @Environment(\.mumcordTheme) private var theme
 
     var body: some View {
         let colors = theme.colors
-        LineText(initials, style: TextToken.smallStrong.with(size: size.fontSize), color: colors.avatarText)
+        face
             .frame(width: size.diameter, height: size.diameter)
             .background(colors.avatar(colorSlot), in: Circle())
             .background {
@@ -226,6 +233,18 @@ struct MumcordAvatar: View {
             }
             .tokenShadow(talking ? theme.shadows.talking : nil, shape: Circle())
             .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private var face: some View {
+        if let image {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size.diameter, height: size.diameter)
+                .clipShape(Circle())
+        } else {
+            LineText(initials, style: TextToken.smallStrong.with(size: size.fontSize), color: theme.colors.avatarText)
+        }
     }
 }
 

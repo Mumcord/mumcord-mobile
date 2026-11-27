@@ -48,7 +48,7 @@ final class IdentitiesScreenshotUITests: XCTestCase {
 
     private func capture(_ name: String, theme: String) {
         guard let shot = Self.shots[name] else { return XCTFail("no state \(name)") }
-        let app = launchApp(shot.options, setupDone: shot.setupDone, theme: theme, identitiesPreset: shot.preset)
+        let app = launchApp(shot.options, setupDone: shot.setupDone, theme: theme, identitiesPreset: shot.preset, locale: "en_US")
         for tap in shot.taps {
             tapWhenReady(app.element(tap))
         }

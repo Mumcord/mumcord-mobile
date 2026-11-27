@@ -36,8 +36,28 @@ struct ConnectedActions {
     let microphoneNotNow: () -> Void
     let askNotifications: () -> Void
     let notificationsNotNow: () -> Void
+    /// Move, server mute, kick and ban of the person whose sheet is open.
+    let moderation: ModerationActions
     /// The microphone level; changes often, so only the level meter reads it.
     let inputLevel: InputLevel
+}
+
+/// What the moderation section of the person sheet and its steps can ask for.
+struct ModerationActions {
+    let openMove: () -> Void
+    let move: (UInt32) -> Void
+    let toggleServerMute: () -> Void
+    let openKick: () -> Void
+    let changeKickReason: (String) -> Void
+    let confirmKick: () -> Void
+    let openBan: () -> Void
+    let changeBanReason: (String) -> Void
+    let selectBanDuration: (UInt32) -> Void
+    let setBanByCertificate: (Bool) -> Void
+    let setBanRemoveNow: (Bool) -> Void
+    let kickInstead: () -> Void
+    let confirmBan: () -> Void
+    let banAnyway: () -> Void
 }
 
 extension ConnectedActions {
@@ -75,6 +95,22 @@ extension ConnectedActions {
             microphoneNotNow: model.microphoneNotNow,
             askNotifications: model.askNotifications,
             notificationsNotNow: model.notificationsNotNow,
+            moderation: ModerationActions(
+                openMove: model.openMove,
+                move: model.movePerson,
+                toggleServerMute: model.toggleServerMute,
+                openKick: model.openKick,
+                changeKickReason: model.changeKickReason,
+                confirmKick: model.confirmKick,
+                openBan: model.openBan,
+                changeBanReason: model.changeBanReason,
+                selectBanDuration: model.selectBanDuration,
+                setBanByCertificate: model.setBanByCertificate,
+                setBanRemoveNow: model.setBanRemoveNow,
+                kickInstead: model.kickInstead,
+                confirmBan: model.confirmBan,
+                banAnyway: model.banAnyway
+            ),
             inputLevel: model.inputLevel
         )
     }

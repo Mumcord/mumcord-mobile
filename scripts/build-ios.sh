@@ -22,7 +22,13 @@
 #   scripts/build-ios.sh --check-groups
 #                                 fail if a test class belongs to no group; runs on any OS
 #
-# The simulator is chosen by name: IOS_SIMULATOR="iPhone 17" scripts/build-ios.sh --test
+# The simulator: IOS_SIMULATOR names one (by name or UDID) and then must exist, e.g.
+#   IOS_SIMULATOR="iPhone 17" scripts/build-ios.sh --test
+# Without it the script takes "iPhone 17" when it is installed, else the newest available iPhone
+# simulator, else it creates one for the newest iOS runtime. GitHub's macOS runners do not always
+# have the same simulators. The test group `tablet` runs on an iPad simulator instead, chosen the
+# same way: IOS_IPAD_SIMULATOR, else "iPad Air 11-inch (M3)" (the size of the tablet mockups),
+# else the newest available iPad simulator, else a new one.
 set -euo pipefail
 
 BRIDGE_PACKAGE="mumcord-mobile-bridge"
@@ -32,7 +38,12 @@ SIMULATOR_TARGET="aarch64-apple-ios-sim"
 # Same value as the deployment target in ios/project.yml, so the C parts of the engine are
 # compiled for the iOS version the app is linked for.
 export IPHONEOS_DEPLOYMENT_TARGET="17.0"
-SIMULATOR_NAME="${IOS_SIMULATOR:-iPhone 17}"
+DEFAULT_SIMULATOR="iPhone 17"
+DEFAULT_IPAD_SIMULATOR="iPad Air 11-inch (M3)"
+# Set by choose_simulator.
+SIMULATOR_ID=""
+SIMULATOR_NAME=""
+SIMULATOR_FAMILY=""
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IOS_DIR="${REPO_ROOT}/ios"
@@ -55,26 +66,47 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 # (ios/Tests/UI) must be listed in exactly one group, or --check-groups fails. The unit tests are
 # one bundle (MumcordTests) and belong to one group as a whole. Balanced by the measured run
 # times, so the groups finish at about the same time.
-TEST_GROUPS=(app-screens core voice-chat-screens chat-flow messages output-settings identities)
+TEST_GROUPS=(app-screens core voice-chat-screens chat-flow messages output-settings identities tablet)
 group_tests() {
   case "$1" in
     app-screens)
       printf '%s\n' MumcordUITests/AppScreenshotUITests MumcordUITests/DesignReferenceUITests \
-        MumcordUITests/LaunchUITests ;;
+        MumcordUITests/LaunchUITests MumcordUITests/PublicServersFlowUITests \
+        MumcordUITests/PublicServersScreenshotUITests \
+        MumcordUITests/ProfileThemesScreenshotUITests ;;
     core)
       printf '%s\n' MumcordTests MumcordUITests/AppFlowUITests MumcordUITests/VoiceFlowUITests ;;
     voice-chat-screens)
-      printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests ;;
+      printf '%s\n' MumcordUITests/VoiceScreenshotUITests MumcordUITests/ChatScreenshotUITests \
+        MumcordUITests/CameraShareFlowUITests MumcordUITests/CameraShareScreenshotUITests ;;
     chat-flow)
-      printf '%s\n' MumcordUITests/ChatFlowUITests MumcordUITests/SessionEndedUITests ;;
+      printf '%s\n' MumcordUITests/ChatFlowUITests MumcordUITests/SessionEndedUITests \
+        MumcordUITests/ModerationFlowUITests MumcordUITests/ModerationScreenshotUITests \
+        MumcordUITests/ActivityFlowUITests ;;
     messages)
-      printf '%s\n' MumcordUITests/MessagesFlowUITests MumcordUITests/MessagesScreenshotUITests ;;
+      printf '%s\n' MumcordUITests/MessagesFlowUITests MumcordUITests/MessagesScreenshotUITests \
+        MumcordUITests/StreamsFlowUITests MumcordUITests/StreamsScreenshotUITests ;;
     output-settings)
       printf '%s\n' MumcordUITests/OutputFlowUITests MumcordUITests/PhoneScreenshotUITests \
-        MumcordUITests/SettingsFlowUITests ;;
+        MumcordUITests/SettingsFlowUITests MumcordUITests/MoreScreenshotUITests \
+        MumcordUITests/AccessibilityUITests MumcordUITests/LargeTextScreenshotUITests ;;
     identities)
-      printf '%s\n' MumcordUITests/IdentitiesFlowUITests MumcordUITests/IdentitiesScreenshotUITests ;;
+      printf '%s\n' MumcordUITests/IdentitiesFlowUITests MumcordUITests/IdentitiesScreenshotUITests \
+        MumcordUITests/ProfileThemesFlowUITests MumcordUITests/ServerListMoreFlowUITests \
+        MumcordUITests/ServerListMoreScreenshotUITests MumcordUITests/LanguageFlowUITests \
+        MumcordUITests/LanguageScreenshotUITests ;;
+    tablet)
+      printf '%s\n' MumcordUITests/TabletFlowUITests MumcordUITests/TabletScreenshotUITests \
+        MumcordUITests/TabletAccessibilityUITests ;;
     *) die "unknown test group '$1' (groups: ${TEST_GROUPS[*]})" ;;
+  esac
+}
+
+# The device family a test group runs on: the two-column layout needs an iPad.
+group_family() {
+  case "$1" in
+    tablet) echo iPad ;;
+    *) echo iPhone ;;
   esac
 }
 
@@ -101,20 +133,92 @@ list_groups() {
   printf '[%s]\n' "${json}"
 }
 
+# Prints what to do for the simulator of a device family (iPhone or iPad), from
+# `xcrun simctl list --json` on standard input: "use<TAB><udid><TAB><name>" for an installed one,
+# or "create<TAB><device type><TAB><runtime><TAB><name>" when none of the family is installed.
+# Newest means the newest iOS runtime first, then the newest model (its model identifier, such as
+# "iPhone18,3").
+SIMULATOR_CHOICE='
+import json, re, sys
+
+wanted, default, family = sys.argv[1], sys.argv[2], sys.argv[3]
+listing = json.load(sys.stdin)
+
+def version(text):
+    return tuple(int(part) for part in re.findall(r"\d+", text or ""))
+
+types = {t["identifier"]: t for t in listing["devicetypes"]}
+def model(type_id):
+    return version(types.get(type_id, {}).get("modelIdentifier"))
+
+runtimes = {r["identifier"]: r for r in listing["runtimes"]
+            if r.get("platform") == "iOS" and r.get("isAvailable")}
+devices = [(runtimes[runtime], device) for runtime, found in listing["devices"].items()
+           if runtime in runtimes for device in found if device.get("isAvailable")]
+
+def use(device):
+    print("use", device["udid"], device["name"], sep="\t")
+    sys.exit(0)
+
+if wanted:
+    for _, device in devices:
+        if wanted in (device["name"], device["udid"]):
+            use(device)
+    sys.exit("simulator \"%s\" is not installed" % wanted)
+for _, device in devices:
+    if device["name"] == default:
+        use(device)
+matching = [(runtime, device) for runtime, device in devices
+            if types.get(device["deviceTypeIdentifier"], {}).get("productFamily") == family]
+if matching:
+    use(max(matching, key=lambda pair: (version(pair[0]["version"]), model(pair[1]["deviceTypeIdentifier"])))[1])
+if not runtimes:
+    sys.exit("no iOS simulator runtime is installed")
+runtime = max(runtimes.values(), key=lambda r: version(r["version"]))
+supported = [t for t in runtime.get("supportedDeviceTypes", []) if t.get("productFamily") == family]
+if not supported:
+    sys.exit("the runtime %s supports no %s" % (runtime["name"], family))
+newest = max(supported, key=lambda t: model(t["identifier"]))
+print("create", newest["identifier"], runtime["identifier"], newest["name"], sep="\t")
+'
+
+# Sets SIMULATOR_ID and SIMULATOR_NAME for a device family (iPhone unless named); creates a
+# simulator when none of the family is installed. Every later step addresses the simulator by its
+# UDID, so other simulators that run on the same Mac (booted or not, with the same name or not)
+# are never touched.
+choose_simulator() {
+  local family="${1:-iPhone}" choice action rest device_type runtime wanted default
+  [[ -z "${SIMULATOR_ID}" || "${SIMULATOR_FAMILY}" != "${family}" ]] || return 0
+  command -v python3 >/dev/null || die "'python3' not found (ships with the Xcode command line tools)"
+  if [[ "${family}" == iPad ]]; then
+    wanted="${IOS_IPAD_SIMULATOR:-}" default="${DEFAULT_IPAD_SIMULATOR}"
+  else
+    wanted="${IOS_SIMULATOR:-}" default="${DEFAULT_SIMULATOR}"
+  fi
+  choice="$(xcrun simctl list --json | python3 -c "${SIMULATOR_CHOICE}" "${wanted}" "${default}" "${family}")" ||
+    die "no ${family} simulator to run on (see above); pick an installed one with IOS_SIMULATOR or IOS_IPAD_SIMULATOR=\"<name>\" ('xcrun simctl list devices available')"
+  SIMULATOR_FAMILY="${family}"
+  IFS=$'\t' read -r action rest <<<"${choice}"
+  case "${action}" in
+    use) IFS=$'\t' read -r SIMULATOR_ID SIMULATOR_NAME <<<"${rest}" ;;
+    create)
+      IFS=$'\t' read -r device_type runtime SIMULATOR_NAME <<<"${rest}"
+      log "No ${family} simulator is installed; creating '${SIMULATOR_NAME}' (${runtime})"
+      SIMULATOR_ID="$(xcrun simctl create "${SIMULATOR_NAME}" "${device_type}" "${runtime}")" ;;
+    *) die "unexpected simulator choice '${choice}'" ;;
+  esac
+  log "Simulator: ${SIMULATOR_NAME} (${SIMULATOR_ID})"
+}
+
 # Boots the simulator and allows the microphone. The audio tests open the microphone side of the
 # audio unit; allowed up front, the simulator does not put the system's permission question
 # over the tests. Never a reason to fail.
 prepare_simulator() {
-  local available
-  available="$(xcrun simctl list devices available)"
-  if ! grep -qF "    ${SIMULATOR_NAME} (" <<<"${available}"; then
-    printf '%s\n' "${available}" >&2
-    die "simulator '${SIMULATOR_NAME}' is not installed; pick one from the list above with IOS_SIMULATOR=\"<name>\""
-  fi
-  xcrun simctl boot "${SIMULATOR_NAME}" 2>/dev/null || true
+  choose_simulator "${1:-iPhone}"
+  xcrun simctl boot "${SIMULATOR_ID}" 2>/dev/null || true
   # A cold simulator on a fresh machine takes minutes; wait here, where it shows in the log.
-  xcrun simctl bootstatus "${SIMULATOR_NAME}" -b >/dev/null
-  xcrun simctl privacy booted grant microphone app.mumcord.mobile ||
+  xcrun simctl bootstatus "${SIMULATOR_ID}" -b >/dev/null
+  xcrun simctl privacy "${SIMULATOR_ID}" grant microphone app.mumcord.mobile ||
     log "warning: could not allow the microphone in the simulator"
 }
 
@@ -129,11 +233,11 @@ warm_up_app() {
     return 0
   fi
   log "Warming up the app in the simulator"
-  if xcrun simctl install booted "${app}" &&
-    xcrun simctl launch booted app.mumcord.mobile -mumcordFakeEngine plain -mumcordSetupDone YES >/dev/null; then
+  if xcrun simctl install "${SIMULATOR_ID}" "${app}" &&
+    xcrun simctl launch "${SIMULATOR_ID}" app.mumcord.mobile -mumcordFakeEngine plain -mumcordSetupDone YES >/dev/null; then
     # Long enough for the first screen of a cold start to be drawn.
     sleep 15
-    xcrun simctl terminate booted app.mumcord.mobile || true
+    xcrun simctl terminate "${SIMULATOR_ID}" app.mumcord.mobile || true
   else
     log "warning: could not warm up the app in the simulator"
   fi
@@ -148,7 +252,7 @@ test_group() {
   rm -rf "${bundle}"
   xcodebuild test-without-building \
     -testProductsPath "${TEST_PRODUCTS}" \
-    -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
+    -destination "platform=iOS Simulator,id=${SIMULATOR_ID}" \
     -resultBundlePath "${bundle}" \
     "${selection[@]}"
 }
@@ -180,7 +284,7 @@ esac
 if [[ "${mode}" == test-without-building ]]; then
   group_tests "${group}" >/dev/null
   command -v xcodebuild >/dev/null || die "'xcodebuild' not found (Xcode)"
-  prepare_simulator
+  prepare_simulator "$(group_family "${group}")"
   warm_up_app
   test_group "${group}"
   log "Done"
@@ -237,19 +341,26 @@ if [[ "${mode}" == build-for-testing || "${mode}" == test ]]; then
   # A test products bundle carries everything the tests need, so another machine can run them
   # without building.
   rm -rf "${TEST_PRODUCTS}"
+  choose_simulator
   xcodebuild build-for-testing \
     -project "${IOS_DIR}/Mumcord.xcodeproj" \
     -scheme Mumcord \
-    -destination "platform=iOS Simulator,name=${SIMULATOR_NAME}" \
+    -destination "platform=iOS Simulator,id=${SIMULATOR_ID}" \
     -derivedDataPath "${BUILD_DIR}/DerivedData" \
     -testProductsPath "${TEST_PRODUCTS}"
 fi
 
 if [[ "${mode}" == test ]]; then
-  prepare_simulator
-  warm_up_app
   failed=()
   for group in "${TEST_GROUPS[@]}"; do
+    family="$(group_family "${group}")"
+    if [[ "${family}" != "${SIMULATOR_FAMILY}" || -z "${booted:-}" ]]; then
+      # One simulator at a time: the one of the groups before is shut down first.
+      [[ -z "${booted:-}" ]] || xcrun simctl shutdown "${SIMULATOR_ID}" 2>/dev/null || true
+      prepare_simulator "${family}"
+      warm_up_app
+      booted=yes
+    fi
     test_group "${group}" || failed+=("${group}")
   done
   [[ ${#failed[@]} -eq 0 ]] || die "test groups failed: ${failed[*]}"

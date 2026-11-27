@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: AGPL-3.0-only */
 
 /* English texts of the app. The keys equal the string names of the Android app
-   (android/app/src/main/res/values/strings.xml); plural forms end in .one and .other. */
+   (android/app/src/main/res/values/strings.xml); plural forms end in .one and .other.
+   scripts/translations.py writes the other languages and every Localizable.stringsdict from
+   this file: run it after changing a text. */
 
 "app_name" = "Mumcord";
 "action_cancel" = "Cancel";
@@ -34,6 +36,39 @@
 "servers_add" = "Add server";
 "servers_empty_title" = "No servers yet";
 "servers_empty_text" = "Add a Mumble server to start talking.";
+"servers_find_more" = "Find more";
+"servers_browse_public" = "Browse public servers";
+"servers_settings" = "Settings";
+"servers_more_back" = "Back to the server list";
+"public_title" = "Public servers";
+"public_back" = "Back to the server list";
+"public_loading" = "Loading the list…";
+"public_load_failed_title" = "The list could not be loaded";
+"public_load_failed" = "Check your internet connection and try again.";
+"public_retry" = "Try again";
+"public_refresh" = "Refresh";
+"public_refreshing" = "Refreshing…";
+"public_refresh_failed" = "The list could not be refreshed. This is the list loaded before.";
+"public_search" = "Search by name, address or country";
+"public_any_country" = "Any country";
+"public_count_all.one" = "%1$ld server";
+"public_count_all.other" = "%1$ld servers";
+"public_count_shown.one" = "%1$ld of %2$ld server";
+"public_count_shown.other" = "%1$ld of %2$ld servers";
+"public_empty" = "The public server list is empty.";
+"public_no_match" = "No server matches your search and filter.";
+/* Address and country of a listed server, e.g. "voice.example.org · Germany". */
+"public_address_country" = "%1$@ · %2$@";
+/* People online, user limit and latency of a listed server, e.g. "12 / 50 · 34 ms". */
+"public_ping" = "%1$ld / %2$ld · %3$ld ms";
+/* Read by VoiceOver instead of "12 / 50 · 34 ms"; the plural follows the user limit. */
+"public_ping_description.one" = "%1$ld of %2$ld person online, %3$ld ms";
+"public_ping_description.other" = "%1$ld of %2$ld people online, %3$ld ms";
+"public_no_answer" = "No answer";
+"public_add" = "Add";
+"public_add_description" = "Add %1$@ to your servers";
+"public_add_failed" = "The server could not be added. Please try again.";
+"public_note" = "Loaded because you opened this page. Only the rows you can see are pinged, a few at a time. Nothing else is sent to a server until you connect.";
 "form_add_title" = "Add server";
 "form_edit_title" = "Edit server";
 "form_address_label" = "Address";
@@ -171,6 +206,10 @@
 "voice_view" = "Voice view";
 "voice_talking" = "Talking";
 "voice_not_talking" = "Not talking";
+"talking_announcement_one" = "%1$@ is talking";
+"talking_announcement_two" = "%1$@ and %2$@ are talking";
+"talking_announcement_more.one" = "%1$@ and %2$ld other person are talking";
+"talking_announcement_more.other" = "%1$@ and %2$ld other people are talking";
 "voice_mute" = "Mute";
 "voice_unmute" = "Unmute";
 "voice_mute_microphone" = "Mute microphone";
@@ -296,6 +335,50 @@
 "person_chat_request_pending" = "Chat request pending";
 "person_block" = "Block";
 "person_unblock" = "Unblock";
+"moderation_title" = "Moderation";
+"moderation_move" = "Move to channel…";
+"moderation_server_mute" = "Server mute";
+"moderation_server_unmute" = "Remove server mute";
+"moderation_kick" = "Kick…";
+"moderation_ban" = "Ban…";
+"moderation_person_line" = "%1$@ · in %2$@";
+"moderation_reason" = "Reason";
+"moderation_refused_title" = "The server did not allow this.";
+"moderation_refused" = "You do not have the right for this.";
+"moderation_gone" = "%1$@ is no longer on the server.";
+"moderation_disconnected" = "Disconnected from this server.";
+"moderation_failed" = "That did not work. Please try again.";
+"move_title" = "Move to channel";
+"move_text" = "Pick the channel %1$@ should move to.";
+"kick_title" = "Kick %1$@?";
+"kick_reconnect" = "They can reconnect right away.";
+"kick_reason_hint" = "Optional, shown to %1$@";
+"kick_confirm" = "Kick";
+"ban_title" = "Ban %1$@";
+"ban_loading" = "Asking the server about this person…";
+"ban_reason_hint" = "Optional, shown to %1$@ and saved in the ban list";
+"ban_duration" = "Duration";
+"ban_duration_hour" = "1 hour";
+"ban_duration_day" = "1 day";
+"ban_duration_week" = "7 days";
+"ban_duration_month" = "30 days";
+"ban_duration_permanent" = "Permanent";
+"ban_ends_on" = "Ends on %1$@";
+"ban_quick" = "This server only allows its default ban length.";
+"ban_quick_targets" = "The server decides what the ban covers.";
+"ban_by_certificate" = "Ban by certificate";
+"ban_by_certificate_hint" = "The server compares the certificate only for a registered person.";
+"ban_no_certificate" = "This person has no certificate, so only their IP address can be banned.";
+"ban_address" = "Their IP address is always banned too, because the server matches the address.";
+"ban_remove_now" = "Remove from server now";
+"ban_remove_now_hint" = "Off: the ban applies when they connect again.";
+"ban_confirm" = "Ban";
+"ban_confirm_for" = "Ban for %1$@";
+"ban_confirm_permanent" = "Ban permanently";
+"ban_kick_instead" = "Kick only instead";
+"ban_conflict_title" = "Someone changed these bans meanwhile.";
+"ban_conflict_text" = "The entry is different on the server now. Save yours anyway, or go back.";
+"ban_save_anyway" = "Save mine anyway";
 "chat_request_title" = "Chat request to %1$@";
 "chat_request_text" = "A chat request asks %1$@ to let you write to them, in case they only accept private messages from people they know.";
 "chat_request_note" = "Note (optional)";
@@ -309,10 +392,28 @@
 "block_voice" = "%1$@ is muted for you in voice, including whispers.";
 "block_silent" = "Nobody is told. You can lift the block under More, Blocked people.";
 "block_failed" = "The block could not be saved. Please try again.";
-"more_section_messages" = "Messages";
 "more_blocked" = "Blocked people";
-"more_sender_only" = "Show sender only";
-"more_sender_only_sub" = "Notifications say who wrote, not what";
+"more_activity" = "Activity";
+"more_activity_new.one" = "Activity, %1$ld new entry";
+"more_activity_new.other" = "Activity, %1$ld new entries";
+"activity_title" = "Activity";
+"activity_back" = "Back to More";
+"activity_filter_all" = "All";
+"activity_filter_joins" = "Joins";
+"activity_filter_streams" = "Streams";
+"activity_empty" = "No activity yet";
+"activity_empty_text" = "People joining, leaving and moving show up here while you are connected.";
+"activity_empty_filter" = "Nothing of this kind yet.";
+"activity_you" = "You";
+"activity_connected" = "%1$@ connected to %2$@";
+"activity_joined" = "%1$@ joined %2$@";
+"activity_joined_server" = "%1$@ joined the server";
+"activity_moved" = "%1$@ moved to %2$@";
+"activity_moved_elsewhere" = "%1$@ moved to another channel";
+"activity_left" = "%1$@ left the server";
+"activity_stream_started" = "%1$@ started a screen share in %2$@";
+"activity_stream_started_elsewhere" = "%1$@ started a screen share";
+"activity_stream_stopped" = "%1$@ stopped their screen share";
 "blocked_title" = "Blocked people";
 "blocked_back" = "Back to More";
 "blocked_empty" = "You have not blocked anybody.";
@@ -338,6 +439,26 @@
 "session_ended_alone_text" = "You were alone in a channel on %1$@ for 30 minutes, so Mumcord disconnected.";
 "settings_title" = "Settings";
 "settings_back" = "Back to More";
+"settings_section_voice" = "Voice";
+"settings_noise_suppression" = "Noise suppression";
+"settings_default_output" = "Default audio output";
+"settings_output_ask" = "Ask";
+"settings_output_note" = "Used when no headset is connected";
+"settings_section_notifications" = "Notifications";
+"settings_notify_private" = "Private messages";
+"settings_notify_mentions" = "Mentions";
+"settings_sender_only" = "Show sender only";
+"settings_notify_note" = "Notifications only arrive while you are connected to a server.";
+"settings_section_chat" = "Chat";
+"settings_history" = "Delete chat history older than";
+"settings_history_never" = "Never";
+"settings_history_days.one" = "%1$ld day";
+"settings_history_days.other" = "%1$ld days";
+"settings_history_note" = "Older messages are deleted from this phone automatically. The server is not affected.";
+/* Language (FR-5.82), worded as in the desktop app. The languages show under their own names. */
+"settings_section_language" = "Language";
+"settings_language" = "Display language";
+"settings_language_system" = "Follow system";
 "settings_section_mobile_data" = "Mobile data";
 "settings_autoplay_streams" = "Start streams automatically";
 "settings_load_media" = "Load images and GIFs";
@@ -456,3 +577,127 @@
 "scan_skipped_duplicate" = "Already on this phone";
 "scan_skipped_invalid" = "Cannot be used";
 "scan_done" = "Done";
+
+/* Watching screen shares and cameras (FR-5.70 … FR-5.76). */
+"stream_title_screen" = "%1$@'s screen";
+"stream_title_camera" = "%1$@'s camera";
+"stream_live" = "LIVE";
+"stream_watching.one" = "%d watching";
+"stream_watching.other" = "%d watching";
+"stream_viewers.one" = "%d viewer";
+"stream_viewers.other" = "%d viewers";
+/* VoiceOver text of a tile: the title, "live", then the viewers and what the tile says, where known. */
+"stream_tile_description" = "%1$@, live";
+"stream_description_part" = "%1$@, %2$@";
+"stream_tap_to_watch" = "Tap to watch";
+"stream_connecting" = "Connecting …";
+"stream_paused" = "Paused";
+"stream_open_elsewhere" = "Playing in the mini window";
+"stream_rotate_hint" = "Rotate for landscape";
+"stream_collapse" = "Collapse to mini window";
+"stream_rotate_landscape" = "Turn to landscape";
+"stream_rotate_portrait" = "Back to portrait";
+"stream_stop" = "Stop watching";
+"stream_expand" = "Open full screen";
+"stream_leave_full_screen" = "Leave full screen";
+"stream_chat_strip" = "%1$@ chat";
+"stream_chat_strip_open" = "Show the whole chat";
+"stream_volume" = "Stream volume";
+"stream_try_again" = "Try again";
+
+/* Why a stream cannot be watched. */
+"stream_unreachable_no_path" = "Stream not reachable from this network";
+"stream_unreachable_peer_to_peer_off" = "Peer-to-peer is off for this server.";
+"stream_unreachable_direct_declined" = "You said no to direct connections and this server has no relay.";
+"stream_unreachable_relay_unavailable" = "The relay can't be used right now.";
+"stream_unreachable_sharer_unsupported" = "%1$@'s app doesn't take direct connections.";
+"stream_unreachable_no_answer" = "%1$@ did not answer.";
+"stream_unreachable_full" = "Too many people are watching %1$@.";
+"stream_unreachable_needs_update" = "%1$@ needs a newer Mumcord for this.";
+"stream_unreachable_join_failed" = "Couldn't join %1$@'s camera. Trying again …";
+
+/* The engine's question before the first direct connection. From the desktop app, shortened to what applies on the phone. */
+"direct_connections_title" = "Allow direct connections?";
+"direct_connections_body" = "Direct connections are faster, but the other person can see your IP address. Mumcord uses them for streams with other Mumcord users. If you say no, streams come through the server's relay where the server has one; then the other person doesn't see your IP address.";
+"direct_connections_no" = "No";
+"direct_connections_yes" = "Yes";
+
+/* Sharing the own camera (FR-5.74, FR-5.75). */
+"camera_reason_share" = "Mumcord needs the camera to share it with the people in your channel. Nothing is sent before you start sharing.";
+"camera_share_button" = "Camera";
+"camera_share_title" = "Share your camera";
+"camera_share_preview" = "Camera preview";
+"camera_share_front" = "Front camera";
+"camera_share_back" = "Back camera";
+"camera_share_switch" = "Switch front or back camera";
+"camera_share_pauses" = "Your camera pauses when Mumcord is in the background";
+"camera_share_start" = "Start sharing";
+"camera_share_starting" = "Starting…";
+"camera_share_cancel" = "Cancel";
+"camera_on_watching.one" = "Camera on · %d watching";
+"camera_on_watching.other" = "Camera on · %d watching";
+"camera_stop" = "Stop";
+"camera_stop_sharing" = "Stop camera";
+"camera_stopped" = "Camera stopped.";
+"camera_notice_dismiss" = "Dismiss";
+
+/* Why the camera could not be shared, or why sharing ended by itself. */
+"camera_problem_not_connected" = "You are not connected to the server.";
+"camera_problem_busy" = "The camera is already in use.";
+"camera_problem_permission" = "Mumcord may not use the camera.";
+"camera_problem_failed" = "The camera could not be opened or stopped working.";
+"camera_problem_direct_off" = "Camera sharing needs direct connections between clients, which are turned off.";
+"camera_problem_no_certificate" = "Camera sharing needs an identity with a certificate.";
+"camera_problem_full" = "There is no room for another camera in this channel.";
+"camera_problem_relay_lost" = "The connection that carried your camera ended.";
+"camera_problem_refused" = "The server does not allow your camera.";
+
+/* Profile and themes (FR-5.80, FR-5.81); wording as in the desktop app where it has it. */
+"more_edit_profile" = "Edit profile";
+"more_themes" = "Themes";
+"profile_title" = "Edit profile";
+"profile_save" = "Save";
+"profile_change_photo" = "Change photo";
+"profile_name" = "Name";
+"profile_name_hint" = "Your name is set per server";
+"profile_comment" = "Comment";
+"profile_comment_count" = "%1$d / %2$d";
+/* The numbers are passed as text, so that they are written without a thousands separator, as on Android. */
+"profile_comment_count_description.one" = "%1$@ of %2$@ character";
+"profile_comment_count_description.other" = "%1$@ of %2$@ characters";
+"profile_too_long" = "Can't save: your comment is too long for this server";
+"profile_preview" = "How others see you";
+"profile_you" = "(you)";
+"profile_avatar_title" = "Profile picture";
+"profile_avatar_remove" = "Remove picture";
+"profile_avatar_unreadable" = "That picture could not be used.";
+"profile_save_failed" = "Your profile could not be saved. Please try again.";
+"camera_reason_avatar" = "Mumcord needs the camera to take your profile picture. Choosing one from your photo library works without it.";
+"themes_title" = "Themes";
+"themes_appearance" = "Appearance";
+"themes_mode_system" = "System";
+"themes_mode_dark" = "Dark";
+"themes_mode_light" = "Light";
+"themes_theme" = "Theme";
+"themes_yours" = "Your themes";
+"themes_item" = "%1$@, theme";
+"themes_item_selected" = "%1$@, theme, selected";
+"themes_share" = "Share";
+"themes_delete" = "Delete theme";
+"themes_delete_title" = "Delete “%1$@”?";
+"themes_delete_message" = "Servers that use this theme go back to the app theme.";
+"themes_delete_confirm" = "Delete";
+"themes_server_note" = "%1$@ is shown in its own theme, %2$@. You can change that in the server's settings.";
+"themes_paste" = "Paste theme code";
+"themes_import_title" = "Import a theme";
+"themes_import_label" = "Theme message or code";
+"themes_import_hint" = "Paste a chat message with a Mumcord theme, or just its code (it starts with mct1.).";
+"themes_import_invalid" = "This isn't a valid Mumcord theme.";
+"themes_import_unreadable" = "This theme isn't readable enough.";
+"themes_imported" = "Imported ✓";
+"themes_made_with_newer" = "Made with Mumcord %1$@ – update to see it fully.";
+"themes_apply" = "Apply theme";
+"server_theme" = "Theme";
+"server_theme_title" = "Theme for %1$@";
+"server_theme_use_app" = "Use app theme";
+"server_theme_hint" = "Shown while this server is shown.";

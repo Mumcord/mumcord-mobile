@@ -5,8 +5,9 @@ import Foundation
 /// Typed access to the texts in `Localizable.strings`. The keys equal the string names of the
 /// Android app, so both apps are translated from the same list.
 ///
-/// Plural forms are picked here between `.one` and `.other`, which is enough for English; the
-/// language task replaces this with the plural rules of each language.
+/// Plural forms come from `Localizable.stringsdict`, which `scripts/translations.py` writes with
+/// the plural rules of each language; the number that picks the form is passed after the text's
+/// own arguments, as Android passes its quantity apart from them.
 enum Strings {
     static var appName: String { text("app_name") }
     static var actionCancel: String { text("action_cancel") }
@@ -34,12 +35,47 @@ enum Strings {
     static func serversRemoveDescription(_ p1: String) -> String { format("servers_remove_description", p1) }
     static var serversConnecting: String { text("servers_connecting") }
     static func serversOnline(_ p1: Int, _ p2: Int) -> String {
-        format(p1 == 1 ? "servers_online.one" : "servers_online.other", p1, p2)
+        plural("servers_online", count: p1, p1, p2)
     }
     static var serversOffline: String { text("servers_offline") }
     static var serversAdd: String { text("servers_add") }
     static var serversEmptyTitle: String { text("servers_empty_title") }
     static var serversEmptyText: String { text("servers_empty_text") }
+    static var serversFindMore: String { text("servers_find_more") }
+    static var serversBrowsePublic: String { text("servers_browse_public") }
+    static var serversSettings: String { text("servers_settings") }
+    static var serversMoreBack: String { text("servers_more_back") }
+    static var publicTitle: String { text("public_title") }
+    static var publicBack: String { text("public_back") }
+    static var publicLoading: String { text("public_loading") }
+    static var publicLoadFailedTitle: String { text("public_load_failed_title") }
+    static var publicLoadFailed: String { text("public_load_failed") }
+    static var publicRetry: String { text("public_retry") }
+    static var publicRefresh: String { text("public_refresh") }
+    static var publicRefreshing: String { text("public_refreshing") }
+    static var publicRefreshFailed: String { text("public_refresh_failed") }
+    static var publicSearch: String { text("public_search") }
+    static var publicAnyCountry: String { text("public_any_country") }
+    static func publicCountAll(_ p1: Int) -> String {
+        plural("public_count_all", count: p1, p1)
+    }
+    /// The plural follows the total, as on Android.
+    static func publicCountShown(_ p1: Int, _ p2: Int) -> String {
+        plural("public_count_shown", count: p2, p1, p2)
+    }
+    static var publicEmpty: String { text("public_empty") }
+    static var publicNoMatch: String { text("public_no_match") }
+    static func publicAddressCountry(_ p1: String, _ p2: String) -> String { format("public_address_country", p1, p2) }
+    static func publicPing(_ p1: Int, _ p2: Int, _ p3: Int) -> String { format("public_ping", p1, p2, p3) }
+    /// The plural follows the user limit, as on Android.
+    static func publicPingDescription(_ p1: Int, _ p2: Int, _ p3: Int) -> String {
+        plural("public_ping_description", count: p2, p1, p2, p3)
+    }
+    static var publicNoAnswer: String { text("public_no_answer") }
+    static var publicAdd: String { text("public_add") }
+    static func publicAddDescription(_ p1: String) -> String { format("public_add_description", p1) }
+    static var publicAddFailed: String { text("public_add_failed") }
+    static var publicNote: String { text("public_note") }
     static var formAddTitle: String { text("form_add_title") }
     static var formEditTitle: String { text("form_edit_title") }
     static var formAddressLabel: String { text("form_address_label") }
@@ -123,7 +159,7 @@ enum Strings {
     static func channelsExpand(_ p1: String) -> String { format("channels_expand", p1) }
     static var channelsMenu: String { text("channels_menu") }
     static func channelsOnline(_ p1: Int) -> String {
-        format(p1 == 1 ? "channels_online.one" : "channels_online.other", p1)
+        plural("channels_online", count: p1, p1)
     }
     static var personTalking: String { text("person_talking") }
     static var personMuted: String { text("person_muted") }
@@ -153,7 +189,7 @@ enum Strings {
     static var tabMore: String { text("tab_more") }
     static func moreDisconnect(_ p1: String) -> String { format("more_disconnect", p1) }
     static func channelsPeopleCount(_ p1: Int) -> String {
-        format(p1 == 1 ? "channels_people_count.one" : "channels_people_count.other", p1)
+        plural("channels_people_count", count: p1, p1)
     }
 
     static var localNetworkTitle: String { text("local_network_title") }
@@ -179,6 +215,12 @@ enum Strings {
     static var voiceView: String { text("voice_view") }
     static var voiceTalking: String { text("voice_talking") }
     static var voiceNotTalking: String { text("voice_not_talking") }
+    static func talkingAnnouncementOne(_ p1: String) -> String { format("talking_announcement_one", p1) }
+    static func talkingAnnouncementTwo(_ p1: String, _ p2: String) -> String { format("talking_announcement_two", p1, p2) }
+    /// The plural follows the number of the others, as on Android.
+    static func talkingAnnouncementMore(_ p1: String, _ p2: Int) -> String {
+        plural("talking_announcement_more", count: p2, p1, p2)
+    }
     static var voiceMute: String { text("voice_mute") }
     static var voiceUnmute: String { text("voice_unmute") }
     static var voiceMuteMicrophone: String { text("voice_mute_microphone") }
@@ -205,7 +247,7 @@ enum Strings {
 
     static func chatTitle(_ p1: String) -> String { format("chat_title", p1) }
     static func chatSubtitle(_ p1: Int, _ p2: String) -> String {
-        format(p1 == 1 ? "chat_subtitle.one" : "chat_subtitle.other", p1, p2)
+        plural("chat_subtitle", count: p1, p1, p2)
     }
     static func chatPlaceholder(_ p1: String) -> String { format("chat_placeholder", p1) }
     static var chatAddImage: String { text("chat_add_image") }
@@ -220,10 +262,10 @@ enum Strings {
     static var chatDayToday: String { text("chat_day_today") }
     static var chatDayYesterday: String { text("chat_day_yesterday") }
     static func chatNewMessages(_ p1: Int) -> String {
-        format(p1 == 1 ? "chat_new_messages.one" : "chat_new_messages.other", p1)
+        plural("chat_new_messages", count: p1, p1)
     }
     static func chatTabUnread(_ p1: Int) -> String {
-        format(p1 == 1 ? "chat_tab_unread.one" : "chat_tab_unread.other", p1)
+        plural("chat_tab_unread", count: p1, p1)
     }
     static func chatAnnounce(_ p1: String, _ p2: String) -> String { format("chat_announce", p1, p2) }
     static var chatMentionsYou: String { text("chat_mentions_you") }
@@ -242,10 +284,10 @@ enum Strings {
     static var chatImageRefused: String { text("chat_image_refused") }
     static var chatDiscard: String { text("chat_discard") }
     static func chatCharactersLeft(_ p1: Int) -> String {
-        format(p1 == 1 ? "chat_characters_left.one" : "chat_characters_left.other", p1)
+        plural("chat_characters_left", count: p1, p1)
     }
     static func chatCharactersOver(_ p1: Int) -> String {
-        format(p1 == 1 ? "chat_characters_over.one" : "chat_characters_over.other", p1)
+        plural("chat_characters_over", count: p1, p1)
     }
     static var chatImageUnreadable: String { text("chat_image_unreadable") }
     static var chatNoticeDismiss: String { text("chat_notice_dismiss") }
@@ -280,10 +322,10 @@ enum Strings {
     static var messagesPreviewPicture: String { text("messages_preview_picture") }
     static var messagesOnline: String { text("messages_online") }
     static func messagesRowUnread(_ p1: Int) -> String {
-        format(p1 == 1 ? "messages_row_unread.one" : "messages_row_unread.other", p1)
+        plural("messages_row_unread", count: p1, p1)
     }
     static func messagesTabUnread(_ p1: Int) -> String {
-        format(p1 == 1 ? "messages_tab_unread.one" : "messages_tab_unread.other", p1)
+        plural("messages_tab_unread", count: p1, p1)
     }
     static var messagesNotificationsOffTitle: String { text("messages_notifications_off_title") }
     static var messagesNotificationsOffText: String { text("messages_notifications_off_text") }
@@ -297,7 +339,7 @@ enum Strings {
     static var requestsChatRequest: String { text("requests_chat_request") }
     static var requestsChatRequestEmpty: String { text("requests_chat_request_empty") }
     static func requestsMoreMessages(_ p1: Int) -> String {
-        format(p1 == 1 ? "requests_more_messages.one" : "requests_more_messages.other", p1)
+        plural("requests_more_messages", count: p1, p1)
     }
     static var requestsAccept: String { text("requests_accept") }
     static var requestsDecline: String { text("requests_decline") }
@@ -312,6 +354,50 @@ enum Strings {
     static var personChatRequestPending: String { text("person_chat_request_pending") }
     static var personBlock: String { text("person_block") }
     static var personUnblock: String { text("person_unblock") }
+    static var moderationTitle: String { text("moderation_title") }
+    static var moderationMove: String { text("moderation_move") }
+    static var moderationServerMute: String { text("moderation_server_mute") }
+    static var moderationServerUnmute: String { text("moderation_server_unmute") }
+    static var moderationKick: String { text("moderation_kick") }
+    static var moderationBan: String { text("moderation_ban") }
+    static func moderationPersonLine(_ p1: String, _ p2: String) -> String { format("moderation_person_line", p1, p2) }
+    static var moderationReason: String { text("moderation_reason") }
+    static var moderationRefusedTitle: String { text("moderation_refused_title") }
+    static var moderationRefused: String { text("moderation_refused") }
+    static func moderationGone(_ p1: String) -> String { format("moderation_gone", p1) }
+    static var moderationDisconnected: String { text("moderation_disconnected") }
+    static var moderationFailed: String { text("moderation_failed") }
+    static var moveTitle: String { text("move_title") }
+    static func moveText(_ p1: String) -> String { format("move_text", p1) }
+    static func kickTitle(_ p1: String) -> String { format("kick_title", p1) }
+    static var kickReconnect: String { text("kick_reconnect") }
+    static func kickReasonHint(_ p1: String) -> String { format("kick_reason_hint", p1) }
+    static var kickConfirm: String { text("kick_confirm") }
+    static func banTitle(_ p1: String) -> String { format("ban_title", p1) }
+    static var banLoading: String { text("ban_loading") }
+    static func banReasonHint(_ p1: String) -> String { format("ban_reason_hint", p1) }
+    static var banDuration: String { text("ban_duration") }
+    static var banDurationHour: String { text("ban_duration_hour") }
+    static var banDurationDay: String { text("ban_duration_day") }
+    static var banDurationWeek: String { text("ban_duration_week") }
+    static var banDurationMonth: String { text("ban_duration_month") }
+    static var banDurationPermanent: String { text("ban_duration_permanent") }
+    static func banEndsOn(_ p1: String) -> String { format("ban_ends_on", p1) }
+    static var banQuick: String { text("ban_quick") }
+    static var banQuickTargets: String { text("ban_quick_targets") }
+    static var banByCertificate: String { text("ban_by_certificate") }
+    static var banByCertificateHint: String { text("ban_by_certificate_hint") }
+    static var banNoCertificate: String { text("ban_no_certificate") }
+    static var banAddress: String { text("ban_address") }
+    static var banRemoveNow: String { text("ban_remove_now") }
+    static var banRemoveNowHint: String { text("ban_remove_now_hint") }
+    static var banConfirm: String { text("ban_confirm") }
+    static func banConfirmFor(_ p1: String) -> String { format("ban_confirm_for", p1) }
+    static var banConfirmPermanent: String { text("ban_confirm_permanent") }
+    static var banKickInstead: String { text("ban_kick_instead") }
+    static var banConflictTitle: String { text("ban_conflict_title") }
+    static var banConflictText: String { text("ban_conflict_text") }
+    static var banSaveAnyway: String { text("ban_save_anyway") }
     static func chatRequestTitle(_ p1: String) -> String { format("chat_request_title", p1) }
     static func chatRequestText(_ p1: String) -> String { format("chat_request_text", p1) }
     static var chatRequestNote: String { text("chat_request_note") }
@@ -325,10 +411,31 @@ enum Strings {
     static func blockVoice(_ p1: String) -> String { format("block_voice", p1) }
     static var blockSilent: String { text("block_silent") }
     static var blockFailed: String { text("block_failed") }
-    static var moreSectionMessages: String { text("more_section_messages") }
     static var moreBlocked: String { text("more_blocked") }
-    static var moreSenderOnly: String { text("more_sender_only") }
-    static var moreSenderOnlySub: String { text("more_sender_only_sub") }
+    static var moreActivity: String { text("more_activity") }
+    static func moreActivityNew(_ p1: Int) -> String {
+        plural("more_activity_new", count: p1, p1)
+    }
+    static var activityTitle: String { text("activity_title") }
+    static var activityBack: String { text("activity_back") }
+    static var activityFilterAll: String { text("activity_filter_all") }
+    static var activityFilterJoins: String { text("activity_filter_joins") }
+    static var activityFilterStreams: String { text("activity_filter_streams") }
+    static var activityEmpty: String { text("activity_empty") }
+    static var activityEmptyText: String { text("activity_empty_text") }
+    static var activityEmptyFilter: String { text("activity_empty_filter") }
+    static var activityYou: String { text("activity_you") }
+    // The sentences of the activity log are templates: `activitySentence` puts the name and
+    // the place in, so that the name can be bold.
+    static var activityConnected: String { text("activity_connected") }
+    static var activityJoined: String { text("activity_joined") }
+    static var activityJoinedServer: String { text("activity_joined_server") }
+    static var activityMoved: String { text("activity_moved") }
+    static var activityMovedElsewhere: String { text("activity_moved_elsewhere") }
+    static var activityLeft: String { text("activity_left") }
+    static var activityStreamStarted: String { text("activity_stream_started") }
+    static var activityStreamStartedElsewhere: String { text("activity_stream_started_elsewhere") }
+    static var activityStreamStopped: String { text("activity_stream_stopped") }
     static var blockedTitle: String { text("blocked_title") }
     static var blockedBack: String { text("blocked_back") }
     static var blockedEmpty: String { text("blocked_empty") }
@@ -354,6 +461,23 @@ enum Strings {
     static func sessionEndedAloneText(_ p1: String) -> String { format("session_ended_alone_text", p1) }
     static var settingsTitle: String { text("settings_title") }
     static var settingsBack: String { text("settings_back") }
+    static var settingsSectionVoice: String { text("settings_section_voice") }
+    static var settingsNoiseSuppression: String { text("settings_noise_suppression") }
+    static var settingsDefaultOutput: String { text("settings_default_output") }
+    static var settingsOutputAsk: String { text("settings_output_ask") }
+    static var settingsOutputNote: String { text("settings_output_note") }
+    static var settingsSectionNotifications: String { text("settings_section_notifications") }
+    static var settingsNotifyPrivate: String { text("settings_notify_private") }
+    static var settingsNotifyMentions: String { text("settings_notify_mentions") }
+    static var settingsSenderOnly: String { text("settings_sender_only") }
+    static var settingsNotifyNote: String { text("settings_notify_note") }
+    static var settingsSectionChat: String { text("settings_section_chat") }
+    static var settingsHistory: String { text("settings_history") }
+    static var settingsHistoryNever: String { text("settings_history_never") }
+    static func settingsHistoryDays(_ p1: Int) -> String {
+        plural("settings_history_days", count: p1, p1)
+    }
+    static var settingsHistoryNote: String { text("settings_history_note") }
     static var settingsSectionMobileData: String { text("settings_section_mobile_data") }
     static var settingsAutoplayStreams: String { text("settings_autoplay_streams") }
     static var settingsLoadMedia: String { text("settings_load_media") }
@@ -385,7 +509,7 @@ enum Strings {
     static var identitiesSectionAdd: String { text("identities_section_add") }
     static func identitiesDefault(_ p1: String) -> String { format("identities_default", p1) }
     static func identitiesUsedOn(_ p1: Int) -> String {
-        format(p1 == 1 ? "identities_used_on.one" : "identities_used_on.other", p1)
+        plural("identities_used_on", count: p1, p1)
     }
     static var identitiesUnused: String { text("identities_unused") }
     static func identitiesFingerprint(_ p1: String) -> String { format("identities_fingerprint", p1) }
@@ -430,7 +554,7 @@ enum Strings {
     static func identityDeleteTitle(_ p1: String) -> String { format("identity_delete_title", p1) }
     static var identityDeleteWarning: String { text("identity_delete_warning") }
     static func identityDeleteServers(_ p1: Int, _ p2: String) -> String {
-        format(p1 == 1 ? "identity_delete_servers.one" : "identity_delete_servers.other", p1, p2)
+        plural("identity_delete_servers", count: p1, p1, p2)
     }
     static func identityDeleteNextDefault(_ p1: String) -> String { format("identity_delete_next_default", p1) }
     static var identityDeleteBackup: String { text("identity_delete_backup") }
@@ -445,11 +569,11 @@ enum Strings {
     static var scanViewfinder: String { text("scan_viewfinder") }
     static var scanCodeLabel: String { text("scan_code_label") }
     static func scanCodeDescription(_ p1: Int) -> String {
-        format(p1 == 1 ? "scan_code_description.one" : "scan_code_description.other", p1)
+        plural("scan_code_description", count: p1, p1)
     }
     static var scanChecking: String { text("scan_checking") }
     static func scanWrongCode(_ p1: Int) -> String {
-        format(p1 == 1 ? "scan_wrong_code.one" : "scan_wrong_code.other", p1)
+        plural("scan_wrong_code", count: p1, p1)
     }
     static var scanCameraDenied: String { text("scan_camera_denied") }
     static var scanCameraBlocked: String { text("scan_camera_blocked") }
@@ -465,10 +589,10 @@ enum Strings {
     static var scanNoteNoCamera: String { text("scan_note_no_camera") }
     static var scanReceiving: String { text("scan_receiving") }
     static func scanReceivingIdentities(_ p1: Int) -> String {
-        format(p1 == 1 ? "scan_receiving_identities.one" : "scan_receiving_identities.other", p1)
+        plural("scan_receiving_identities", count: p1, p1)
     }
     static func scanReceivingServers(_ p1: Int) -> String {
-        format(p1 == 1 ? "scan_receiving_servers.one" : "scan_receiving_servers.other", p1)
+        plural("scan_receiving_servers", count: p1, p1)
     }
     static func scanReceivingBoth(_ p1: String, _ p2: String) -> String { format("scan_receiving_both", p1, p2) }
     static var scanSectionIdentities: String { text("scan_section_identities") }
@@ -484,11 +608,170 @@ enum Strings {
     static var scanSkippedInvalid: String { text("scan_skipped_invalid") }
     static var scanDone: String { text("scan_done") }
 
+    // MARK: Streams
+
+    static func streamTitleScreen(_ p1: String) -> String { format("stream_title_screen", p1) }
+    static func streamTitleCamera(_ p1: String) -> String { format("stream_title_camera", p1) }
+    static var streamLive: String { text("stream_live") }
+    static func streamWatching(_ p1: Int) -> String {
+        plural("stream_watching", count: p1, p1)
+    }
+    static func streamViewers(_ p1: Int) -> String {
+        plural("stream_viewers", count: p1, p1)
+    }
+    static func streamTileDescription(_ p1: String) -> String { format("stream_tile_description", p1) }
+    static func streamDescriptionPart(_ p1: String, _ p2: String) -> String { format("stream_description_part", p1, p2) }
+    static var streamTapToWatch: String { text("stream_tap_to_watch") }
+    static var streamConnecting: String { text("stream_connecting") }
+    static var streamPaused: String { text("stream_paused") }
+    static var streamOpenElsewhere: String { text("stream_open_elsewhere") }
+    static var streamRotateHint: String { text("stream_rotate_hint") }
+    static var streamCollapse: String { text("stream_collapse") }
+    static var streamRotateLandscape: String { text("stream_rotate_landscape") }
+    static var streamRotatePortrait: String { text("stream_rotate_portrait") }
+    static var streamStop: String { text("stream_stop") }
+    static var streamExpand: String { text("stream_expand") }
+    static var streamLeaveFullScreen: String { text("stream_leave_full_screen") }
+    static func streamChatStrip(_ p1: String) -> String { format("stream_chat_strip", p1) }
+    static var streamChatStripOpen: String { text("stream_chat_strip_open") }
+    static var streamVolume: String { text("stream_volume") }
+    static var streamTryAgain: String { text("stream_try_again") }
+    static var streamUnreachableNoPath: String { text("stream_unreachable_no_path") }
+    static var streamUnreachablePeerToPeerOff: String { text("stream_unreachable_peer_to_peer_off") }
+    static var streamUnreachableDirectDeclined: String { text("stream_unreachable_direct_declined") }
+    static var streamUnreachableRelayUnavailable: String { text("stream_unreachable_relay_unavailable") }
+    static func streamUnreachableSharerUnsupported(_ p1: String) -> String { format("stream_unreachable_sharer_unsupported", p1) }
+    static func streamUnreachableNoAnswer(_ p1: String) -> String { format("stream_unreachable_no_answer", p1) }
+    static func streamUnreachableFull(_ p1: String) -> String { format("stream_unreachable_full", p1) }
+    static func streamUnreachableNeedsUpdate(_ p1: String) -> String { format("stream_unreachable_needs_update", p1) }
+    static func streamUnreachableJoinFailed(_ p1: String) -> String { format("stream_unreachable_join_failed", p1) }
+    static var directConnectionsTitle: String { text("direct_connections_title") }
+    static var directConnectionsBody: String { text("direct_connections_body") }
+    static var directConnectionsNo: String { text("direct_connections_no") }
+    static var directConnectionsYes: String { text("direct_connections_yes") }
+
+    // MARK: Sharing the own camera
+
+    static var cameraReasonShare: String { text("camera_reason_share") }
+    static var cameraShareButton: String { text("camera_share_button") }
+    static var cameraShareTitle: String { text("camera_share_title") }
+    static var cameraSharePreview: String { text("camera_share_preview") }
+    static var cameraShareFront: String { text("camera_share_front") }
+    static var cameraShareBack: String { text("camera_share_back") }
+    static var cameraShareSwitch: String { text("camera_share_switch") }
+    static var cameraSharePauses: String { text("camera_share_pauses") }
+    static var cameraShareStart: String { text("camera_share_start") }
+    static var cameraShareStarting: String { text("camera_share_starting") }
+    static var cameraShareCancel: String { text("camera_share_cancel") }
+    static func cameraOnWatching(_ p1: Int) -> String {
+        plural("camera_on_watching", count: p1, p1)
+    }
+    static var cameraStop: String { text("camera_stop") }
+    static var cameraStopSharing: String { text("camera_stop_sharing") }
+    static var cameraStopped: String { text("camera_stopped") }
+    static var cameraNoticeDismiss: String { text("camera_notice_dismiss") }
+    static var cameraProblemNotConnected: String { text("camera_problem_not_connected") }
+    static var cameraProblemBusy: String { text("camera_problem_busy") }
+    static var cameraProblemPermission: String { text("camera_problem_permission") }
+    static var cameraProblemFailed: String { text("camera_problem_failed") }
+    static var cameraProblemDirectOff: String { text("camera_problem_direct_off") }
+    static var cameraProblemNoCertificate: String { text("camera_problem_no_certificate") }
+    static var cameraProblemFull: String { text("camera_problem_full") }
+    static var cameraProblemRelayLost: String { text("camera_problem_relay_lost") }
+    static var cameraProblemRefused: String { text("camera_problem_refused") }
+
+    // MARK: Profile and themes
+
+    static var moreEditProfile: String { text("more_edit_profile") }
+    static var moreThemes: String { text("more_themes") }
+    static var profileTitle: String { text("profile_title") }
+    static var profileSave: String { text("profile_save") }
+    static var profileChangePhoto: String { text("profile_change_photo") }
+    static var profileName: String { text("profile_name") }
+    static var profileNameHint: String { text("profile_name_hint") }
+    static var profileComment: String { text("profile_comment") }
+    /// The counter's numbers are written without a thousands separator, as on Android.
+    static func profileCommentCount(_ p1: Int, _ p2: Int) -> String { ungrouped("profile_comment_count", p1, p2) }
+    /// The plural form follows the limit, as on Android. The numbers are passed as text, so that
+    /// they are written without a thousands separator while the plural follows the language.
+    static func profileCommentCountDescription(_ p1: Int, _ p2: Int) -> String {
+        plural("profile_comment_count_description", count: p2, String(p1), String(p2))
+    }
+    static var profileTooLong: String { text("profile_too_long") }
+    static var profilePreview: String { text("profile_preview") }
+    static var profileYou: String { text("profile_you") }
+    static var profileAvatarTitle: String { text("profile_avatar_title") }
+    static var profileAvatarRemove: String { text("profile_avatar_remove") }
+    static var profileAvatarUnreadable: String { text("profile_avatar_unreadable") }
+    static var profileSaveFailed: String { text("profile_save_failed") }
+    static var cameraReasonAvatar: String { text("camera_reason_avatar") }
+    static var themesTitle: String { text("themes_title") }
+    static var themesAppearance: String { text("themes_appearance") }
+    static var themesModeSystem: String { text("themes_mode_system") }
+    static var themesModeDark: String { text("themes_mode_dark") }
+    static var themesModeLight: String { text("themes_mode_light") }
+    static var themesTheme: String { text("themes_theme") }
+    static var themesYours: String { text("themes_yours") }
+    static func themesItem(_ p1: String) -> String { format("themes_item", p1) }
+    static func themesItemSelected(_ p1: String) -> String { format("themes_item_selected", p1) }
+    static var themesShare: String { text("themes_share") }
+    static var themesDelete: String { text("themes_delete") }
+    static func themesDeleteTitle(_ p1: String) -> String { format("themes_delete_title", p1) }
+    static var themesDeleteMessage: String { text("themes_delete_message") }
+    static var themesDeleteConfirm: String { text("themes_delete_confirm") }
+    static func themesServerNote(_ p1: String, _ p2: String) -> String { format("themes_server_note", p1, p2) }
+    static var themesPaste: String { text("themes_paste") }
+    static var themesImportTitle: String { text("themes_import_title") }
+    static var themesImportLabel: String { text("themes_import_label") }
+    static var themesImportHint: String { text("themes_import_hint") }
+    static var themesImportInvalid: String { text("themes_import_invalid") }
+    static var themesImportUnreadable: String { text("themes_import_unreadable") }
+    static var themesImported: String { text("themes_imported") }
+    static func themesMadeWithNewer(_ p1: String) -> String { format("themes_made_with_newer", p1) }
+    static var themesApply: String { text("themes_apply") }
+    static var serverTheme: String { text("server_theme") }
+    static func serverThemeTitle(_ p1: String) -> String { format("server_theme_title", p1) }
+    static var serverThemeUseApp: String { text("server_theme_use_app") }
+    static var serverThemeHint: String { text("server_theme_hint") }
+    static var settingsSectionLanguage: String { text("settings_section_language") }
+    static var settingsLanguage: String { text("settings_language") }
+    static var settingsLanguageSystem: String { text("settings_language_system") }
+
     private static func text(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }
 
     private static func format(_ key: String, _ arguments: CVarArg...) -> String {
-        String(format: text(key), locale: Locale.current, arguments: arguments)
+        String(format: text(key), locale: locale, arguments: arguments)
+    }
+
+    private static func plural(_ key: String, count: Int, _ arguments: CVarArg...) -> String {
+        pluralText(key, count: count, arguments: arguments)
+    }
+
+    /// A text of `Localizable.stringsdict` in the form for `count`. Foundation picks the form by
+    /// the plural rules of the locale's language, so the locale must be the one of the texts.
+    static func pluralText(
+        _ key: String,
+        count: Int,
+        arguments: [CVarArg],
+        bundle: Bundle = .main,
+        locale: Locale = locale
+    ) -> String {
+        String(format: bundle.localizedString(forKey: key, value: nil, table: nil), locale: locale, arguments: arguments + [count])
+    }
+
+    /// The language the app shows its texts in (the system's choice among the app's languages)
+    /// with the phone's region, whose number formats stay.
+    static var locale: Locale {
+        textLocale(language: Bundle.main.preferredLocalizations.first ?? "en", region: Locale.current.region)
+    }
+
+    static func textLocale(language: String, region: Locale.Region?) -> Locale {
+        Locale(identifier: region.map { "\(language)_\($0.identifier)" } ?? language)
+    }
+
+    private static func ungrouped(_ key: String, _ arguments: CVarArg...) -> String {
+        String(format: text(key), arguments: arguments)
     }
 }

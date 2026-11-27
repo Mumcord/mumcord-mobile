@@ -139,6 +139,22 @@ From Android 13 on, Settings → Language picks the app's language (the system's
 the phone's own settings is saved there too. Android 12 has no language per app, so the app
 follows the phone's language and the row is hidden.
 
+The iOS app's English texts are written by hand in
+`ios/Mumcord/Resources/en.lproj/Localizable.strings` (keys equal the Android names; plural forms
+end in `.one` and `.other`). The same script writes `<language>.lproj/Localizable.strings` for
+the other 23 languages and a `Localizable.stringsdict` with the plurals for all 24, English too;
+run it after changing an English iOS text. An iOS text takes the Android text's translation
+where both say the same in English, otherwise a desktop text's with the same English, otherwise
+it stays English; `python3 -B scripts/translations.py generate --verbose` lists those. iOS's
+`%1$@` and `%1$ld` stand for Android's `%1$s` and `%1$d`. `Strings.swift` passes the number that
+picks a plural form after the text's own arguments, and formats in the language the app shows.
+`ci-ios.yml` runs the same check as Android's CI. On iOS the language is chosen in the system
+settings (Settings → Mumcord → Language); Settings → Language in the app opens them there, and
+the app saves the system's choice as the shared `language` setting at every start. The tests run
+the app in English whatever the simulator's language is: the UI tests pass `-AppleLanguages (en)`
+to the app they start (`languageArguments` in `UITestSupport.swift`), and the scheme's test action
+passes it to the app that hosts the unit tests (`ios/project.yml`).
+
 ## End-to-end tests
 
 The end-to-end tests run the real app with the real engine in the emulator against the local
@@ -395,8 +411,9 @@ scripts/build-ios.sh --test
 scripts/build-ios.sh --build-for-testing
 scripts/build-ios.sh --test-without-building core
 
-# Another simulator
+# Another simulator; IOS_IPAD_SIMULATOR names the iPad of the test group `tablet`
 IOS_SIMULATOR="iPhone 17 Pro" scripts/build-ios.sh --test
+IOS_IPAD_SIMULATOR="iPad Pro 13-inch (M5)" scripts/build-ios.sh --test-without-building tablet
 ```
 
 The Xcode project is generated from `ios/project.yml` and not committed; open
@@ -414,13 +431,14 @@ The test groups are the list `group_tests` in `scripts/build-ios.sh`, balanced b
 
 | Group | Tests |
 | --- | --- |
-| `app-screens` | app screenshots, design reference, launch test |
+| `app-screens` | app screenshots, design reference, launch test, public server browser flow and its screenshots |
 | `core` | all unit tests (`MumcordTests`), app flow, voice flow |
-| `voice-chat-screens` | voice screenshots, chat screenshots |
-| `chat-flow` | chat flow, session-ended notice (the lightest group: the place for new tests) |
-| `messages` | messages flow, messages screenshots |
-| `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots |
-| `identities` | identities and "Scan from desktop app" flow, their screenshots |
+| `voice-chat-screens` | voice screenshots, chat screenshots, camera sharing flow and its screenshots |
+| `chat-flow` | chat flow, session-ended notice, moderation flow and its screenshots, activity log flow |
+| `messages` | messages flow, messages screenshots, streams flow and its screenshots |
+| `output-settings` | audio output flow, settings and "disconnect when alone" flow, their screenshots and those of More and the activity log |
+| `identities` | identities and "Scan from desktop app" flow, the server list's settings icon, the app in German, their screenshots |
+| `tablet` | the two-column iPad layout: its flow and its screenshots, on an iPad simulator ("iPad Air 11-inch (M3)", the size of the tablet mockups, else the newest iPad; created when there is none) |
 
 Before its tests each group starts the app once in the simulator and ends it again (about 20
 seconds), so the first UI test does not pay for the first start of the app in a cold simulator.
@@ -550,3 +568,136 @@ scanner see the QR codes of a scripted transfer (`FakeDesktopTransfer`) instead,
 `-mumcordIdentities <preset>` puts the identity screens into the states of the screenshots.
 Only a real iPhone can show the camera picture, reading the desktop's codes from a screen and the
 system's camera question; a transfer made by the desktop app is checked there by hand.
+
+### iPad layout (iOS)
+
+The connected screens decide between one column and two from the size of the app's window
+(`connectedLayout` in `ios/Mumcord/Screens/Connected/ConnectedLayout.swift`): two columns from
+600 x 480 points, the same numbers as Android's 600 x 480 dp. Every iPad is wider in both
+orientations; no iPhone is, also not a Pro Max turned to landscape (956 x 440); a narrow Split View
+or Slide Over window is not either and gets the phone layout. The size class is not used: an iPhone
+Pro Max in landscape has a regular width, and the phone layout must stay as it is there. The app's root measures its window, the
+keyboard not counted, and tells the model (`AppModel.setTwoColumns`), so the channel chat counts as
+read while it is visible beside the channels; sheets read it from the environment and keep to 480
+points. A stream is `full` (the phone's full screen, the right column in two columns), `mini` or
+`whole` (the whole screen opened from the column).
+
+The UI tests cannot resize the app's window on the simulator. The debug launch option
+`-mumcordSplitWidth <points>` gives the app only that width while the iPad stands upright and the
+whole screen in landscape, so turning the iPad resizes the window between one column and two, as
+the Split View divider does (`DebugSplitWidth`). `tablet-chat` and `tablet-stream-chat` give the
+Lobby the conversations of the tablet mockups. The tablet tests skip themselves on an iPhone.
+
+### Public servers (iOS)
+
+The browser (`ios/Mumcord/Screens/Servers/PublicServers*.swift`) follows the Android one: the
+list is read from the bridge page by page only when the browser opens and searched on the phone;
+`PublicPingScheduler` pings the rows on screen (the list reports their frames while it moves), each
+once per load, four at a time, and stops when the browser closes or the app goes to the
+background, dropping the answers of pings on their way. "Add" saves a listed server with the name
+of the default identity; "Connect" closes the browser and runs the normal connect flow.
+
+It is never tested against the real list service or a listed server: the tests run against the
+fake engine, whose list is `PublicServersMockup` (addresses under `.example`). The debug launch
+options `public`, `public-lantern`, `public-slow`, `public-down`, `public-down-first`,
+`public-refresh-fails` and `public-ping-slow` set up the list and its failures, and
+`public-probe` adds an invisible element `fake-public-list` that tells the UI tests how often the
+list was downloaded and the servers pinged. The simulator half of the end-to-end scenario (a list
+served locally, pinging the local test server) waits for the iOS end-to-end tests (task 10.4).
+
+### Watching streams (iOS)
+
+The streams of the people in the user's channel come from the bridge as one list
+(`StreamsChanged`); `ios/Mumcord/Screens/Streams/StreamsController.swift` decides which of them
+are watched, the same way as on Android: the stream the user opened, and a tile on screen where
+streams start by themselves (Wi-Fi, or mobile data with "Start streams automatically"). Nothing
+is watched while the app is in the background. Only the difference is told to the engine, so
+nothing is fetched before the tap on mobile data, and a camera's room stays closed until a camera
+is watched.
+
+Pictures are drawn by `ios/Platform/Video/VideoLayerView.swift` into a `CAMetalLayer`. The
+engine's `VideoSink` only schedules a redraw; a serial render queue takes the newest I420
+picture with `mumcord_video_frame_acquire` (`bridge/include/mumcord_video.h`, reached through
+the bridging header), copies the three planes straight from the engine's memory into three
+single-channel textures, gives the picture back at once and lets a BT.601 shader draw it,
+letterboxed on black. The textures belong to the stream, not to the view: the last picture of
+each watched stream is kept (`VideoPictures`), so a view that takes the stream over (tile, full
+screen, mini window) shows it at once instead of waiting for the sender's next picture, which a
+still screen share may not send for a long time. Nothing is queued and nothing is drawn on the
+main thread or while the view is off screen. The shader is compiled from source on the render
+queue as soon as the first stream view is made, never on the main thread, because building
+`.metal` files needs Xcode's separate Metal toolchain (`xcodebuild -downloadComponent
+MetalToolchain`), which CI and a fresh Mac do not have.
+
+The fake engine plays the bridge for the tests: the debug launch options `streams`,
+`stream-camera`, `stream-crowd`, `stream-question`, `stream-unreachable`, `stream-colours` and
+`stream-one-frame` (`ios/Mumcord/Debug/AppDebugLaunch.swift`) give Mira a stream, and
+`FakeVideoFrames` makes its pictures in the app, so the real render path draws them;
+`StreamsFlowUITests` checks the colours on screen. Only a real iPhone against the desktop app
+can show real streams, decoding load and the system's rotation.
+
+### Sharing the camera (iOS)
+
+`ios/Mumcord/Session/CameraShare.swift` follows the engine, as on Android: the engine starts and
+stops the app's camera through the bridge's `CameraCapture` (called on an engine thread, so the
+wish is only handed to the main thread). The camera runs only while the engine wants it, the
+app's own state shows it on (preview, starting or sharing), the app is not in the background and
+the user sees the camera: its preview is the sheet on screen (`AppContent` knows which sheet
+that is), or the "Camera on" bar is shown. In the background or behind another sheet the camera
+is released and nothing is sent, while sharing and voice go on; on return the same camera starts
+again. When the app's state says off, for example after a lost connection, the camera closes
+without waiting for the engine. Cancel and Stop close it at once and go to the engine without
+waiting for a "Start sharing" still in progress; a preview or start the engine finishes after a
+stop is turned off again (`CameraShareController`). Nothing of the camera exists before the user
+opened the preview, and the camera is explained before iOS asks for it (`CameraSheet`, as for a
+photo); after a refusal the sheet points to the system settings.
+
+`ios/Platform/Camera/AVCameraSource.swift` captures with AVFoundation behind the protocol
+`CameraSource`: an `AVCaptureSession` (started and stopped on a queue of its own, because that
+blocks), 1280 x 720 NV12 frames on a frame queue, late frames dropped by the output. Each frame
+goes to `mumcord_camera_push_frame` (`bridge/include/mumcord_camera.h`, through the bridging
+header) with the turn that makes it upright, which `AVCaptureDevice.RotationCoordinator` reports
+as the phone is held; the planes are read in place while the buffer is locked
+(`EngineCameraFrames`), nothing is copied or allocated, and the bridge turns, crops and scales
+them to at most 640 x 360 (`withCameraPlanes` describes the planes; `CameraFramesTests` checks
+them against the bridge's rules). The pictures are sent unmirrored for both cameras; only the
+preview mirrors the front camera. When the engine answers `MUMCORD_CAMERA_NOT_OPEN`, the camera
+stops (`CameraFrameFeed`). A camera taken by another app or by the system only interrupts the
+session, which runs again when the interruption ends; a session that cannot run again, or any
+other failure, ends sharing with "Camera stopped." (`CameraSessionWatch`).
+
+The tests never use the simulator's camera, which films nothing a test can check: a debug build
+against the fake engine shares `FakeCameraSource`, a drawn person like the mockup's. The launch
+options `camera-refused`, `camera-slow-start`, `camera-viewers` and `camera-fails`
+(`AppDebugLaunch.swift`) give the refused start, a start of half a minute, two viewers and a
+camera that stops working; with `camera-probe` an invisible element `fake-camera` tells UI tests
+every start and stop of the drawn camera. Only a real iPhone shows the real
+picture, its orientation, the camera indicator and a desktop watching it.
+
+### Profile and themes (iOS)
+
+The theme the app is drawn in comes from one place: `AppThemeController`
+(`ios/Mumcord/Screens/Themes/AppThemeHost.swift`) reads both versions of the shown theme from the
+engine whenever the themes or the shown server change (the server's own theme while connected to
+it, otherwise the app theme). `AppModel` hands it every state before the screens get it and the
+engine answers at once from memory, so the first picture after the start and of a server with its
+own theme are already in its colours. `AppThemeHost` on the app's root picks the version the
+appearance mode and the phone's dark mode ask for and puts it into the environment as the
+`MumcordTheme` every view reads. The engine's tokens replace the design system's colours of the
+same name; everything a theme does not decide (avatar colours, the backdrop, the stream stage)
+comes from the app's own dark or light set that matches the theme's brightness
+(`ThemeTokens.toColors`). Before the engine answers, and in the built-in Mumcord theme, the app
+has exactly the colours of `design/tokens.json`. In every mode the status bar, the keyboard and the
+system's sheets follow the brightness of the drawn colours: the window's root view controller is
+set to it. The phone's own setting is read from the window, which that setting does not reach, so
+System follows the phone live. Avatars are decoded off the main thread, once per change of their
+bytes and straight to the size they are drawn at (`AvatarPicture`), because a server's picture
+can claim any size.
+
+A chosen or taken profile picture is decoded upright and written again as a PNG of its pixels
+only, at most 512 pixels on its longest edge (`ios/Mumcord/Screens/Profile/AvatarImage.swift`),
+before it goes to the engine, which scales it to the server's limit. The fake engine knows the
+four built-in themes; it reads only its own code `mct1.fake` and the Deep Ocean code of the
+screenshots as theme codes. The launch options `profile`, `profile-avatar`, `profile-save-fails`,
+`profile-short-limit`, `own-theme` and `theme-ocean` (`AppDebugLaunch.swift`) put the screens into
+the states of the tests. Only a real iPhone shows the camera taking the profile picture.

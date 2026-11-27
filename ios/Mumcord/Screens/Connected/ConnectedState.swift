@@ -15,11 +15,14 @@ enum ConnectedTab: Int, CaseIterable {
 enum ChannelListRow: Equatable, Identifiable {
     case channel(ChannelItem)
     case person(PersonItem)
+    /// The tile of a person's screen share or camera, under that person (FR-5.70).
+    case stream(StreamKey, depth: Int)
 
     var id: String {
         switch self {
         case .channel(let item): "channel-\(item.id)"
         case .person(let item): "person-\(item.session)"
+        case .stream(let key, _): "stream-\(key.session)-\(key.kind)"
         }
     }
 
@@ -27,6 +30,7 @@ enum ChannelListRow: Equatable, Identifiable {
         switch self {
         case .channel(let item): item.depth
         case .person(let item): item.depth
+        case .stream(_, let depth): depth
         }
     }
 }
@@ -83,11 +87,14 @@ private extension Person {
 /// A non-blank `query` filters by name, ignoring case: a person shows when the name matches, a
 /// channel when its name matches or something inside it shows. Collapsing is ignored meanwhile,
 /// so a match is never hidden.
+///
+/// The tiles of `streams` follow the person who shares them.
 func channelRows(
     root: ChannelNode?,
     selfChannelId: UInt32?,
     collapsed: Set<UInt32>,
-    query: String = ""
+    query: String = "",
+    streams: [StreamKey] = []
 ) -> [ChannelListRow] {
     guard let root else { return [] }
     let needle = query.trimmed
@@ -129,6 +136,9 @@ func channelRows(
                 locallyMuted: person.locallyMuted,
                 state: person.flags
             )))
+            for stream in streams where stream.session == person.session {
+                rows.append(.stream(stream, depth: depth + 1))
+            }
         }
         for child in node.children {
             add(child, level: level + 1)
@@ -179,8 +189,8 @@ struct ConnectedLocal: Equatable {
     var whisperHeld = false
     /// The choice of the audio output is open.
     var outputOpen = false
-    /// The settings are open in the More tab.
-    var settingsOpen = false
+    /// The moderation step that replaced the person sheet: move, kick or ban.
+    var moderation: ModerationLocal?
 }
 
 /// The sheet over the connected screens. At most one at a time.
@@ -195,8 +205,17 @@ enum ConnectedSheet: Equatable {
     /// The choice of the audio output, opened from the voice view.
     case audioOutput(rows: [OutputRow])
     case person(PersonSheetState)
+    /// Moving, kicking or banning the person of the person sheet.
+    case moderation(ModerationSheet)
     /// `expanded` as in `ChannelItem`; `canJoin` is false for the own channel.
     case channelMenu(id: UInt32, name: String, expanded: Bool?, canJoin: Bool)
+}
+
+extension ConnectedSheet {
+    var isModeration: Bool {
+        if case .moderation = self { return true }
+        return false
+    }
 }
 
 struct PersonSheetState: Equatable {
@@ -206,6 +225,7 @@ struct PersonSheetState: Equatable {
     let volumePercent: Int
     let locallyMuted: Bool
     let state: PersonFlags
+    var moderation = ModerationRows()
 }
 
 /// A refusal by the server; `channelName` and `detail` are untrusted text.
@@ -230,8 +250,6 @@ struct ConnectedUiState: Equatable {
     /// user is.
     let voice: VoiceUiState?
     let sheet: ConnectedSheet?
-    /// The phone settings while the settings screen is open in the More tab.
-    let settings: MobileSettings?
 }
 
 /// The connected screens as a value, or nil while no server is shown.
@@ -249,7 +267,8 @@ func connectedUiState(
         root: server.root,
         selfChannelId: server.selfChannelId,
         collapsed: local.collapsed,
-        query: local.searching ? local.query : ""
+        query: local.searching ? local.query : "",
+        streams: session.streams.map(\.key)
     )
     let sheet: ConnectedSheet?
     // The server waits for the password, so this question comes first.
@@ -272,14 +291,19 @@ func connectedUiState(
     } else if local.outputOpen, let outputUi = outputUiState(output) {
         sheet = .audioOutput(rows: outputUi.rows)
     } else if let person = local.personSession.flatMap({ server.people[$0] }) {
-        sheet = .person(PersonSheetState(
-            session: person.session,
-            name: person.name,
-            channelName: server.channels[person.channelId]?.name ?? "",
-            volumePercent: local.volumeDraft ?? Int(person.localVolume),
-            locallyMuted: person.locallyMuted,
-            state: person.flags
-        ))
+        if let moderation = local.moderation, moderation.session == person.session {
+            sheet = .moderation(moderationSheet(server: server, person: person, local: moderation))
+        } else {
+            sheet = .person(PersonSheetState(
+                session: person.session,
+                name: person.name,
+                channelName: server.channels[person.channelId]?.name ?? "",
+                volumePercent: local.volumeDraft ?? Int(person.localVolume),
+                locallyMuted: person.locallyMuted,
+                state: person.flags,
+                moderation: server.moderationRows(person)
+            ))
+        }
     } else if let menuChannel = local.menuChannelId.flatMap({ server.channels[$0] }) {
         var expanded: Bool?
         for case .channel(let item) in rows where item.id == menuChannel.id {
@@ -317,7 +341,6 @@ func connectedUiState(
             microphone: microphone,
             output: output.current
         ),
-        sheet: sheet,
-        settings: local.settingsOpen ? session.mobileSettings : nil
+        sheet: sheet
     )
 }

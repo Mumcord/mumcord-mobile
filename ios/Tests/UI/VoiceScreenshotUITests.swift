@@ -19,7 +19,7 @@ final class VoiceScreenshotUITests: XCTestCase {
 
     /// The server list with Nordlicht at the top, with its ping answers.
     private func launchWithServers(_ options: String, theme: String) -> XCUIApplication {
-        let app = launchApp("servers," + options, theme: theme)
+        let app = launchApp("servers," + options, theme: theme, locale: "en_US")
         expectAppears(app.element(containing: "5 online · 24 ms"))
         expectAppears(app.element(containing: "Offline"))
         return app
@@ -33,11 +33,6 @@ final class VoiceScreenshotUITests: XCTestCase {
         return app
     }
 
-    private func openVoiceView(_ app: XCUIApplication) {
-        tapWhenReady(app.element(containing: "Voice connected"))
-        expectAppears(app.element("voice-view"))
-    }
-
     // MARK: States
 
     private func voiceBar(theme: String) {
@@ -48,21 +43,21 @@ final class VoiceScreenshotUITests: XCTestCase {
 
     private func pushToTalk(theme: String) {
         let app = launchConnected("voice-server,ptt", theme: theme)
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectAppears(app.element("voice-hold"))
         capture(app, "voice-view-ptt", theme: theme)
     }
 
     private func voiceActivity(theme: String) {
         let app = launchConnected("voice-server,level", theme: theme)
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectAppears(app.element("voice-level"))
         capture(app, "voice-view-activity", theme: theme)
     }
 
     private func muted(theme: String) {
         let app = launchConnected("voice-server,ptt,self-muted", theme: theme)
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectAppears(app.row("voice-mute", containing: "Unmute microphone"))
         capture(app, "voice-view-muted", theme: theme)
     }

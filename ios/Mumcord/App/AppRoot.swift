@@ -2,16 +2,29 @@
 
 import SwiftUI
 
+/// The largest text size the app follows: the first of the system's steps past twice the normal
+/// size (235 %; the specification asks for 200 % without clipping). The two larger steps keep this
+/// size, where the screens would otherwise have room for only a few words.
+let largestTextSize = DynamicTypeSize.accessibility3
+
 /// Connects the screens to the model; everything below it only gets values and closures.
 struct AppRoot: View {
     let model: AppModel
+    /// The phone's appearance; a debug launch can force it (`-mumcordTheme`).
     var theme: MumcordThemeMode = .system
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         AppContent(uiState: model.uiState, model: model)
+            .dynamicTypeSize(...largestTextSize)
+            // One column or two follows the window, again on every rotation and resize; what
+            // the user did lives in the model and stays.
+            .environment(\.twoColumns, model.twoColumns)
+            .onConnectedLayoutChange(model.setTwoColumns)
             .environment(\.cameraGateway, model.camera)
-            .mumcordTheme(theme)
+            .environment(\.streamVideo, model.streams.video)
+            // The colours switch at run time to the shown theme, on every screen (FR-5.81).
+            .modifier(AppThemeHost(theme: model.appTheme.shown, phone: theme))
             .onOpenURL { model.openLink($0.absoluteString) }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active {
@@ -30,6 +43,19 @@ struct AppRoot: View {
             .onChange(of: scenePhase, initial: true) { _, phase in
                 model.chat.setResumed(phase == .active)
                 model.conversation.setResumed(phase == .active)
+                // Nothing is fetched or decoded for a stream nobody can see (FR-5.43).
+                model.streams.setOnScreen(phase != .background)
+                // The shared camera pauses while the app is in the background (FR-5.75).
+                model.cameraShare?.camera.setOnScreen(phase != .background)
+            }
+            // No pings of public servers while the app is not on screen (FR-5.43).
+            .onChange(of: scenePhase) { _, phase in
+                guard model.uiState.browsingPublic else { return }
+                if phase == .background {
+                    model.publicServers.pausePings()
+                } else {
+                    model.publicServers.resumePings()
+                }
             }
     }
 }
@@ -46,16 +72,29 @@ struct AppContent: View {
         // Questions wait until the first-start setup is done.
         let overlay = uiState.setupDone ? uiState.overlay : nil
         let connectedSheet = uiState.connected?.sheet
-        let messagesLocal = model.messages.local
-        let messagesSheet = messagesLocal.blockSession != nil || messagesLocal.requestSession != nil
         let identitySheet = uiState.screen == .identities || uiState.screen == .identitySetup ? uiState.identities.sheet : nil
         let cameraQuestion = uiState.screen == .scan && uiState.identities.scan?.camera == .explain
-        let sheetOpen = prompt != nil || overlay != nil || connectedSheet != nil || messagesSheet
-            || identitySheet != nil || cameraQuestion
+        let serverThemeSheet = uiState.screen == .serverForm ? uiState.form.flatMap { $0.themeSheet ? $0 : nil } : nil
+        let allThemes = uiState.session.builtInThemes + (uiState.session.themes?.customThemes ?? [])
+        let streams = model.streams.uiState
+        // The engine waits for this answer before a stream can use a direct connection.
+        let directQuestion = uiState.screen == .channels && uiState.connected != nil && streams.directConnectionsQuestion
+        let connectedScreen = uiState.screen == .channels && uiState.connected != nil
+        let camera = connectedScreen ? model.cameraShare : nil
+        let cameraSheet = camera?.uiState.sheet
+        let cameraPermission = camera?.question
+        // The camera runs only while the user sees it: its preview is the sheet shown below (the
+        // sheets before it in the chain take its place), or the "Camera on" bar is on screen.
+        let previewShown = cameraSheet != nil && prompt == nil && overlay == nil && identitySheet == nil
+            && !cameraQuestion && !directQuestion && cameraPermission == nil
+        let cameraShown = previewShown || camera?.uiState.sharing != nil
         ZStack {
+            // While a sheet is open, the screen behind it is not offered to screen readers: each
+            // sheet is modal for VoiceOver. Hiding the screen here instead would not work: an
+            // outer `accessibilityHidden(false)` lets VoiceOver read what the screen's own views
+            // hide (decorative dots, the backdrop), and a condition around the modifier would
+            // give the screen a new identity and lose its state whenever a sheet opens.
             screen
-                // While a sheet is open, the screen behind it is not offered to screen readers.
-                .accessibilityHidden(sheetOpen)
             if let prompt {
                 CertificateSheet(
                     prompt: prompt,
@@ -64,6 +103,8 @@ struct AppContent: View {
                 )
             } else if let overlay {
                 sheet(for: overlay)
+            } else if let serverThemeSheet {
+                ServerThemeSheet(form: serverThemeSheet, themes: allThemes, onChange: model.changeForm)
             } else if let identitySheet {
                 IdentitySheetHost(sheet: identitySheet, actions: model.identities)
             } else if cameraQuestion {
@@ -74,10 +115,25 @@ struct AppContent: View {
                     onOpenSettings: model.openSettings,
                     onDismiss: model.identities.cameraNotNow
                 )
+            } else if directQuestion {
+                DirectConnectionsSheet(onAnswer: model.streams.answerDirectConnections)
+            } else if let camera, let cameraPermission {
+                CameraSheet(
+                    reason: Strings.cameraReasonShare,
+                    blocked: cameraPermission == .denied,
+                    onContinue: camera.allowCamera,
+                    onOpenSettings: {
+                        camera.dismissQuestion()
+                        model.openSettings()
+                    },
+                    onDismiss: camera.dismissQuestion
+                )
+            } else if let camera, let cameraSheet {
+                CameraShareSheet(sheet: cameraSheet, controller: camera)
             } else if let connectedSheet {
                 ConnectedSheetHost(sheet: connectedSheet, actions: ConnectedActions(model: model), model: model)
-            } else if uiState.connected != nil {
-                MessagesOverlayHost(model: model)
+            } else if uiState.connected != nil || uiState.screen == .more {
+                MoreOverlayHost(model: model)
             }
         }
         .modifier(IdentityFiles(
@@ -85,6 +141,9 @@ struct AppContent: View {
             exported: uiState.identities.exported,
             identities: model.identities
         ))
+        .onChange(of: cameraShown, initial: true) { _, shown in
+            model.cameraShare?.camera.setVisible(shown)
+        }
     }
 
     @ViewBuilder private var screen: some View {
@@ -144,15 +203,25 @@ struct AppContent: View {
                 onRetry: model.retry,
                 onDismissError: model.dismissError,
                 onOpenSettings: model.openSettings,
-                onScan: model.identities.openScan
+                onMore: model.openMore,
+                onScan: model.identities.openScan,
+                onBrowsePublic: model.openPublicServers
             )
+        case .publicServers:
+            PublicServersHost(model: model)
+        case .more:
+            // The connected shell draws the backdrop behind the More tab; here it is drawn alone.
+            MumcordScreen {
+                MoreTab(model: model, onDisconnect: model.disconnect, onBack: model.closeMore)
+            }
         case .serverForm:
             if let form = uiState.form {
                 ServerFormScreen(
                     form: form,
                     onChange: model.changeForm,
                     onSave: model.saveForm,
-                    onBack: model.closeForm
+                    onBack: model.closeForm,
+                    themes: uiState.session.builtInThemes + (uiState.session.themes?.customThemes ?? [])
                 )
             }
         case .channels:
@@ -160,8 +229,11 @@ struct AppContent: View {
                 ConnectedShell(
                     state: connected,
                     actions: ConnectedActions(model: model),
+                    streams: model.streams.uiState,
+                    streamActions: StreamActions(controller: model.streams),
                     onDisconnect: model.disconnect,
                     chatBadge: model.chatBadge,
+                    twoColumns: model.twoColumns,
                     model: model
                 ) {
                     ChatTab(model: model)
@@ -217,5 +289,26 @@ struct AppContent: View {
                 onDismiss: model.dismissOverlay
             )
         }
+    }
+}
+
+/// Reads the browser's state in a view of its own, so arriving pings redraw only the browser.
+private struct PublicServersHost: View {
+    let model: AppModel
+
+    var body: some View {
+        let controller = model.publicServers
+        PublicServersScreen(
+            state: controller.uiState,
+            actions: PublicServersActions(
+                back: model.closePublicServers,
+                refresh: controller.refresh,
+                search: controller.search,
+                selectCountry: controller.selectCountry,
+                showing: controller.showing,
+                add: controller.add,
+                connect: model.connectFromPublicServers
+            )
+        )
     }
 }

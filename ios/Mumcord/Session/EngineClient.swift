@@ -13,12 +13,25 @@ protocol EngineClient: AnyObject, Sendable {
     func updateServer(serverId: Int64, input: ServerInput) async throws -> SavedServer
     func removeServer(serverId: Int64) async throws
     func pingServer(serverId: Int64, refresh: Bool) async throws -> ServerPing?
+    /// A page of the public server list (FR-5.9). The list is downloaded on the first call and
+    /// with `query.refresh`, never in the background; a failed download keeps the last list.
+    func publicServers(query: PublicServerQuery) async throws -> PublicServerPage
+    /// People online, user limit and latency of a listed server, or nil when it does not answer.
+    func pingPublicServer(host: String, port: UInt16) async throws -> ServerPing?
     func connectServer(serverId: Int64, password: String?, channelPath: [String]) async throws
     func answerCertificatePrompt(fingerprint: String, trust: Bool) async throws
     func disconnect() async throws
     func joinChannel(channelId: UInt32, password: String?) async throws
     func setPersonVolume(session: UInt32, percent: UInt16) async throws
     func setPersonLocalMute(session: UInt32, muted: Bool) async throws
+    /// Moderation (FR-5.90 … FR-5.93). The three that change a person return true when the
+    /// server confirmed the change and false when it did not answer in time.
+    func movePerson(session: UInt32, channelId: UInt32) async throws -> Bool
+    func setServerMute(session: UInt32, muted: Bool) async throws -> Bool
+    func kickPerson(session: UInt32, reason: String?) async throws -> Bool
+    /// What the ban sheet needs about a person; asks the server (up to a few seconds).
+    func banTarget(session: UInt32) async throws -> BanTarget
+    func banPerson(session: UInt32, ban: BanInput) async throws -> BanResult
     func talkMode() async throws -> TalkMode
     func setTalkMode(mode: TalkMode) async throws
     func audioEndpoints() -> AudioEndpoints
@@ -57,6 +70,33 @@ protocol EngineClient: AnyObject, Sendable {
     func unblockPerson(id: Int64) async throws
     func mobileSettings() -> MobileSettings
     func setMobileSettings(settings: MobileSettings) async throws
+    /// The settings shared with the desktop's settings model (notifications, chat history).
+    func appSettings() -> AppSettings
+    func setAppSettings(settings: AppSettings) async throws
+    /// Profiles (FR-5.80): the comment and avatar of a person on the connected server, and
+    /// editing the own ones there. A change arrives as `ProfileChanged`.
+    func personProfile(session: UInt32) async throws -> Profile
+    func setOwnComment(text: String) async throws
+    /// Image bytes, or nil to remove the avatar; the engine scales the picture itself.
+    func setOwnAvatar(image: Data?) async throws
+
+    /// Themes (FR-5.81). Every change arrives as `ThemesChanged`.
+    func themeSettings() -> ThemeSettings
+    func builtInThemes() -> [Theme]
+    /// The colours to draw with: of `themeId`, or of the app theme for nil or an unknown id.
+    func themeTokens(themeId: String?, variant: ThemeVariant) -> ThemeTokens
+    func setThemeMode(mode: ThemeMode) async throws
+    func setAppTheme(themeId: String) async throws
+    func setServerTheme(serverId: Int64, themeId: String?) async throws
+    func deleteCustomTheme(themeId: String) async throws
+    func themeShare(themeId: String) throws -> ThemeShare
+    /// Reads the first theme code in a pasted text without importing it; throws `ThemeCodeError`.
+    func themeCodePreview(text: String) throws -> ThemeCodePreview
+    func importThemeCode(text: String) async throws -> Theme
+
+    /// The voice settings as they apply now; they have no event of their own.
+    func voiceSettings() async throws -> VoiceSettings
+    func setNoiseSuppression(on: Bool) async throws
 
     /// Every identity, the default one first, as they are when asked; later changes arrive as
     /// events. Certificates and keys never leave the engine.
@@ -68,6 +108,32 @@ protocol EngineClient: AnyObject, Sendable {
     func deleteIdentity(identityId: Int64) async throws
     /// A new "Send to your phone" scan of the desktop app's QR codes.
     func startTransfer() throws -> TransferSession
+
+    /// Streams (FR-5.70 … FR-5.73). How a watch goes shows in the stream's state; nothing is
+    /// fetched before `watchStream`.
+    func watchStream(session: UInt32, kind: StreamKind) async throws
+    func stopWatchingStream(session: UInt32, kind: StreamKind) async throws
+    /// How loud a person's screen share sound plays, 0 to 200 percent.
+    func setStreamVolume(session: UInt32, percent: UInt16) async throws
+    /// Answers "Allow direct connections?"; the waiting watch goes on with the answer.
+    func answerDirectConnections(allow: Bool) async throws
+    /// Where the news of new stream pictures goes; nil stops it.
+    func setVideoSink(sink: VideoSink?)
+    /// The handle for the engine's picture functions (`bridge/include/mumcord_video.h`).
+    func videoHandle() -> UInt64
+
+    /// Sharing the own camera (FR-5.74, FR-5.75). The engine starts and stops the app's camera
+    /// through `capture`; the state arrives as `OwnCameraChanged`.
+    func setCameraCapture(capture: CameraCapture?)
+    /// The handle for the engine's camera input (`bridge/include/mumcord_camera.h`).
+    func cameraHandle() -> UInt64
+    /// Opens the preview: the camera runs on the phone, nothing is sent.
+    func openCameraPreview() async throws
+    func startCameraSharing() async throws
+    /// Cancel in the preview, or Stop while sharing.
+    func stopCamera() async throws
+    /// The app's camera stopped by itself; sharing ends with the reason.
+    func cameraCaptureFailed(failure: CaptureFailure)
 }
 
 /// The bridge's side of one "Send to your phone" scan (`TransferScan`), as the app uses it, so

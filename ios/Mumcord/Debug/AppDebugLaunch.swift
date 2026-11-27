@@ -3,6 +3,7 @@
 #if DEBUG
 import Foundation
 import MumcordBridge
+import UIKit
 
 /// Lets a debug build run against the fake engine with canned data, so UI tests and screenshot
 /// tests can walk through the app without a server:
@@ -31,6 +32,9 @@ import MumcordBridge
 ///         chat-link-warning the Chat tab warns about a misleading link
 ///         chat-viewer      the Chat tab shows the picture of Ben's message large
 ///         chat-gifs        the Chat tab shows the GIF favourites
+///         tablet-chat      the Lobby chat of the tablet mockup `21-tablet-channels-chat`
+///         tablet-stream-chat the Lobby chat of the tablet mockup `22-tablet-stream`, whose two
+///                          messages the strip under the stream shows
 ///         session-ended    the last run was closed in the middle of a session with Nordlicht
 ///         outputs          the phone has a loudspeaker and an earpiece and plays on the earpiece
 ///         output-bluetooth the Bluetooth headset "Lea's Buds" is connected as well
@@ -39,6 +43,9 @@ import MumcordBridge
 ///         idle-on          "Disconnect when alone for 30 minutes" is switched on
 ///         idle-short       "Disconnect when alone" warns after 3 s and disconnects 3 s later
 ///         metered          the phone is on mobile data (a metered network), not on Wi-Fi
+///         activity         the activity log of the mockup: yesterday evening and today
+///         activity-live    a second after the activity log was opened Ben joins the Lobby; a
+///                          second after it was left again Mira stops her screen share
 ///         no-identity      the phone has no identity yet, so the first start asks for one
 ///         two-identities   besides the default identity "Lea" there is "Work"
 ///         file-password    every identity file has the password "secret" (otherwise none)
@@ -51,7 +58,47 @@ import MumcordBridge
 ///         camera-ask       the camera has not been asked for; the user allows it
 ///         camera-refuse    the camera has not been asked for; the user refuses it
 ///         camera-blocked   the camera was refused before; only the system settings help
+///         admin            the server grants the user every right on every channel
+///         moderation-refused the server refuses the next moderation command
+///         ban-quick        the server's ban list cannot be read: only its default ban
+///         ban-conflict     the first ban finds the server's entry changed meanwhile
+///         streams          Mira shares her screen (with sound, one viewer) once connected
+///         stream-camera    Mira shares her camera instead of her screen
+///         stream-crowd     three people watch Mira's screen
+///         stream-question  the first watch asks whether direct connections are allowed
+///         stream-unreachable the first watch ends with "Stream not reachable from this network";
+///                          trying again gets through
+///         stream-colours   the stream's picture is red on the left half and blue on the right,
+///                          instead of the picture of the mockups
+///         stream-one-frame the stream sends a single picture and nothing new afterwards
+///         camera-refused   "Start sharing" of the own camera is refused: direct connections
+///                          are off
+///         camera-slow-start "Start sharing" of the own camera takes half a minute
+///         camera-viewers   two people watch the own camera as soon as it is shared
+///         camera-fails     the camera stops working as soon as it is shared
+///         camera-probe     an invisible element "fake-camera" lists what the drawn camera
+///                          was asked to do (`FakeCameraProbeView`)
+///         public           the public server list of `PublicServersMockup`, with ping answers;
+///                          without it the list is empty. Never the real list service.
+///         public-lantern   the server list holds only Lantern Guild, which is also listed
+///         public-slow      downloading the public list takes half a minute
+///         public-down      every download of the public list fails
+///         public-down-first the first download of the public list fails
+///         public-refresh-fails every download after the first that worked fails
+///         public-ping-slow a listed server takes ten seconds to answer a ping
+///         public-probe     an invisible element "fake-public-list" says how often the list was
+///                          downloaded and the listed servers pinged (`FakePublicListProbeView`)
+///         profile          the user's comment on Nordlicht is the one of the mockup
+///         profile-avatar   the user has a profile picture on Nordlicht
+///         profile-save-fails saving the comment fails once
+///         profile-short-limit the server takes comments of at most 20 characters
+///         own-theme        the user has a theme of their own, "From the desktop"
+///         theme-ocean      the app theme is the built-in "Deep Ocean"
 ///     -mumcordIdentities <preset>    put the identity screens into a state (`IdentitiesPreset`)
+///     -mumcordSplitWidth <points>    in portrait the app gets only this width of the screen, as
+///                                    in a narrow Split View on an iPad; in landscape the whole
+///                                    screen. Turning the iPad then resizes the app's window
+///                                    between one column and two (`DebugSplitWidth`).
 ///     -mumcordSetupDone YES          skip the first-start setup
 ///     -mumcordTheme dark|light       force a theme (default: the system's)
 ///
@@ -61,6 +108,7 @@ struct AppDebugLaunch {
     let identitiesPreset: String?
     let setupDone: Bool
     let theme: MumcordThemeMode
+    var splitWidth: CGFloat?
 
     /// Launch arguments of the form `-key value` are readable as user defaults.
     static func fromLaunchArguments(_ defaults: UserDefaults = .standard) -> AppDebugLaunch? {
@@ -69,7 +117,10 @@ struct AppDebugLaunch {
             options: Set(options.split(separator: ",").map(String.init)),
             identitiesPreset: defaults.string(forKey: "mumcordIdentities"),
             setupDone: defaults.bool(forKey: "mumcordSetupDone"),
-            theme: defaults.string(forKey: "mumcordTheme").flatMap(MumcordThemeMode.init(rawValue:)) ?? .system
+            theme: defaults.string(forKey: "mumcordTheme").flatMap(MumcordThemeMode.init(rawValue:)) ?? .system,
+            splitWidth: defaults.object(forKey: "mumcordSplitWidth") == nil
+                ? nil
+                : CGFloat(defaults.double(forKey: "mumcordSplitWidth"))
         )
     }
 
@@ -107,13 +158,29 @@ struct AppDebugLaunch {
                     return changed
                 }
             }
+            if options.contains("admin") {
+                server = server.granting { $0.grantAllRights() }
+            }
+            if options.contains("stream-camera") {
+                server.people = server.people.map { person in
+                    var changed = person
+                    if person.session == Mockup.mira {
+                        changed.streaming = false
+                        changed.camera = true
+                    }
+                    return changed
+                }
+            }
+            var servers = options.contains("servers") ? Mockup.servers : []
+            if options.contains("public-lantern") { servers = PublicServersMockup.savedLantern }
             let engine = FakeEngine(
                 listener: listener,
                 server: server,
                 prompt: prompt,
-                servers: options.contains("servers") ? Mockup.servers : []
+                servers: servers
             )
             engine.pings = Mockup.pings
+            Self.fakePublicList(engine, options)
             if options.contains("messages") {
                 MessagesMockup.fill(engine)
             }
@@ -131,6 +198,9 @@ struct AppDebugLaunch {
             }
             if options.contains("idle-on") {
                 engine.storedMobileSettings.idleDisconnect = true
+            }
+            if options.contains("activity") {
+                engine.activityOnConnect = ActivityMockup.entries()
             }
             if options.contains("level") {
                 engine.levelOnConnect = 60
@@ -151,6 +221,14 @@ struct AppDebugLaunch {
                     engine.unread = [ChatMockup.lobby: 2]
                 }
             }
+            if options.contains("tablet-chat") || options.contains("tablet-stream-chat") {
+                engine.messages = [
+                    ChatMockup.lobby: options.contains("tablet-stream-chat")
+                        ? TabletMockup.duringTheStream()
+                        : TabletMockup.conversation(),
+                ]
+                engine.chatImages = TabletMockup.chatImages()
+            }
             if options.contains("no-identity") {
                 engine.identities = []
             } else if options.contains("two-identities") {
@@ -170,9 +248,38 @@ struct AppDebugLaunch {
                 transfer.importFailure = .SecureStorageUnavailable(detail: "locked")
             }
             engine.transfer = transfer
+            if options.contains("moderation-refused") {
+                engine.moderationFailure = .PermissionDenied(detail: Mockup.refusal)
+            }
+            if options.contains("ban-quick") {
+                engine.banTargetAnswer.banListReadable = false
+            }
+            if options.contains("ban-conflict") {
+                engine.banResults = [.conflict]
+            }
             if options.contains("locks") {
                 engine.channelPasswords = [Mockup.music: "secret"]
                 engine.deniedChannels = [Mockup.afk]
+            }
+            if options.contains("streams") {
+                engine.streamsOnConnect = [Self.stream(options)]
+            }
+            if options.contains("stream-question") {
+                engine.asksDirectConnections = true
+            }
+            if options.contains("stream-unreachable") {
+                engine.firstWatchOutcome = .unreachable(reason: .noPath)
+            }
+            if options.contains("camera-refused") {
+                engine.cameraStartProblem = .directConnectionsOff
+            }
+            if options.contains("camera-slow-start") {
+                engine.cameraStartDelay = .seconds(30)
+            }
+            Self.prepareProfileThemes(engine.profileThemes, options)
+            if options.contains("profile-short-limit") {
+                let limits = engine.limits
+                engine.limits = ChatLimits(text: 20, image: limits.image, allowHtml: limits.allowHtml)
             }
             return engine
         }
@@ -180,6 +287,87 @@ struct AppDebugLaunch {
 }
 
 extension AppDebugLaunch {
+    /// The public server list and its failures as the options describe them.
+    private static func fakePublicList(_ engine: FakeEngine, _ options: Set<String>) {
+        if options.contains("public") {
+            engine.publicServers = PublicServersMockup.servers
+            engine.publicPings = PublicServersMockup.pings
+        }
+        if options.contains("public-slow") {
+            engine.publicDownloadDelay = .seconds(30)
+        }
+        if options.contains("public-ping-slow") {
+            engine.publicPingDelay = .seconds(10)
+        }
+        // Enough downloads for any test; the numbers count from 1.
+        let downloads = 1...100
+        var failing: Set<Int> = []
+        if options.contains("public-down") {
+            failing.formUnion(downloads)
+        }
+        if options.contains("public-down-first") {
+            failing.insert(1)
+        }
+        if options.contains("public-refresh-fails") {
+            let firstWorking = downloads.first { !failing.contains($0) } ?? 1
+            failing.formUnion(downloads.filter { $0 > firstWorking })
+        }
+        engine.failingPublicDownloads = failing
+    }
+
+    /// The comment of the edit profile mockup.
+    static let mockupComment = "Playing late, always up for a chat. Ask me about the new map!"
+
+    /// The profile and the themes as the options describe them.
+    static func prepareProfileThemes(_ fake: FakeProfileThemes, _ options: Set<String>) {
+        if options.contains("profile") {
+            fake.profile.commentText = mockupComment
+        }
+        if options.contains("profile-avatar") {
+            let picture = mockupAvatar()
+            fake.profile.avatar = ImageData(bytes: picture, mime: "image/png", width: 96, height: 96, animated: false)
+        }
+        if options.contains("profile-save-fails") {
+            fake.saveFailure = .Io(detail: "the connection dropped")
+        }
+        if options.contains("own-theme") {
+            _ = fake.addCustom(MockupThemes.fromTheDesktop)
+        }
+        if options.contains("theme-ocean") {
+            fake.settings.appThemeId = MockupThemes.oceanId
+        }
+    }
+
+    /// A profile picture drawn here: a warm circle on a cool background.
+    static func mockupAvatar() -> Data {
+        let size = CGSize(width: 96, height: 96)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            UIColor(red: 0.16, green: 0.42, blue: 0.62, alpha: 1).setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+            UIColor(red: 0.98, green: 0.69, blue: 0.47, alpha: 1).setFill()
+            context.cgContext.fillEllipse(in: CGRect(x: 24, y: 16, width: 48, height: 48))
+        }
+        return image.pngData() ?? Data()
+    }
+
+    /// Mira's stream as the options describe it.
+    static func stream(_ options: Set<String>) -> MumcordBridge.Stream {
+        if options.contains("stream-camera") {
+            return mockupStream(viewers: nil, hasSound: false, kind: .camera)
+        }
+        return mockupStream(viewers: options.contains("stream-crowd") ? 3 : 1)
+    }
+
+    /// The pictures of watched streams, made here (`FakeVideoFrames`).
+    var streamVideo: StreamVideo {
+        StreamVideo(frames: FakeVideoFrames(
+            options.contains("stream-colours") ? .colours : .mockup,
+            once: options.contains("stream-one-frame")
+        ))
+    }
+
     /// The microphone as the options describe it; allowed when they say nothing.
     var microphoneGateway: FakeMicrophoneGateway {
         if options.contains("mic-declined") {
@@ -261,13 +449,43 @@ extension AppDebugLaunch {
 
     /// Lives as long as the process, as in the app on the real engine.
     @MainActor private static var networkSession: NetworkSession?
+    /// What the drawn camera was asked to do, with the option `camera-probe`.
+    @MainActor private(set) static var cameraProbe: FakeCameraProbe?
+    /// What the fake engine did with the public list, with the option `public-probe`.
+    @MainActor private(set) static var publicListProbe: FakePublicListProbe?
 
     @MainActor
     func makeModel() -> AppModel {
-        let store = SessionStore(engineFactory: engineFactory, log: AppLog.write)
+        let factory = engineFactory
+        let engine = Observed<FakeEngine?>(nil)
+        let publicProbe = options.contains("public-probe") ? FakePublicListProbe() : nil
+        Self.publicListProbe = publicProbe
+        let store = SessionStore(
+            engineFactory: { listener in
+                let created = try factory(listener)
+                let fake = created as? FakeEngine
+                engine.set(fake)
+                if let publicProbe, let fake {
+                    fake.onPublicActivity = { activity in
+                        Task { @MainActor in publicProbe.take(activity) }
+                    }
+                    fake.reportPublicActivity()
+                }
+                return created
+            },
+            log: AppLog.write
+        )
         let monitor = FakeNetworkMonitor(network)
         Self.networkSession = NetworkSession(store: store, monitor: monitor)
         let idleTimes = idleTimes
+        // The simulator's camera films nothing a test can check: the shared camera is a drawn one.
+        let probe = FakeCameraProbe()
+        if options.contains("camera-probe") { Self.cameraProbe = probe }
+        let cameraShare = CameraShare(store: store) { onTrouble in
+            let source = FakeCameraSource(onTrouble: onTrouble)
+            probe.source = source
+            return source
+        }
         let model = AppModel(
             store: store,
             setupStore: InMemorySetupStore(firstStartDone: setupDone),
@@ -295,15 +513,57 @@ extension AppDebugLaunch {
             ),
             mediaPolicy: { loadMedia(monitor.status, store.state.mobileSettings) },
             camera: cameraGateway,
-            qrSource: qrSource
+            qrSource: qrSource,
+            network: monitor,
+            streamVideo: streamVideo,
+            cameraShare: cameraShare,
+            languages: .system
         )
+        // The real settings app, so that a test sees the language row leave the app.
+        model.more.openLanguageSettings = AppModel.openSystemSettings
+        if options.contains("camera-viewers") || options.contains("camera-fails") {
+            let options = options
+            whileSharing(model) {
+                if options.contains("camera-viewers") { engine.value?.watchCamera(2) }
+                if options.contains("camera-fails") { probe.source?.trouble(.failed) }
+            }
+        }
         if let identitiesPreset {
             IdentitiesPreset.apply(identitiesPreset, to: model.identities)
         }
         if options.contains("chat") {
             presetChat(model, store)
         }
+        if options.contains("activity-live") {
+            reportLiveActivity(model, engine)
+        }
         return model
+    }
+
+    /// Runs `change` as soon as the own camera is shared.
+    @MainActor
+    private func whileSharing(_ model: AppModel, _ change: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            while model.cameraShare?.uiState.sharing == nil {
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+            change()
+        }
+    }
+
+    /// Lets the engine report activity at the moments a test waits for it: while the log is
+    /// open, and after it was left again.
+    @MainActor
+    private func reportLiveActivity(_ model: AppModel, _ engine: Observed<FakeEngine?>) {
+        Task { @MainActor in
+            for (page, entry) in [(MorePage.activity, ActivityMockup.benJoins), (.main, ActivityMockup.miraStops)] {
+                while model.more.local.page != page {
+                    try? await Task.sleep(nanoseconds: 50_000_000)
+                }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                engine.value?.emit(.activityAdded(entry: entry(Date())))
+            }
+        }
     }
 
     /// Puts the Chat tab into the state the options name once its messages are there, through

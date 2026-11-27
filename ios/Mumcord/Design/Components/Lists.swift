@@ -3,12 +3,23 @@
 import SwiftUI
 
 /// Section header above a list (`.section`): small capitals, with an optional text action at
-/// the end such as "Edit".
+/// the end such as "Edit". Inside a bottom sheet, which has its own margin, `padding` is
+/// `sheetPadding` (`.sheet .section`).
 struct MumcordSectionHeader: View {
     let title: String
     var action: String?
     var onAction: () -> Void = {}
+    var padding = MumcordSectionHeader.screenPadding
     @Environment(\.mumcordTheme) private var theme
+
+    static let screenPadding = EdgeInsets(
+        top: MumcordSpace.s4,
+        leading: MumcordSpace.s4,
+        bottom: MumcordSpace.s2,
+        trailing: MumcordSpace.s4
+    )
+    /// The padding of a section header inside a bottom sheet.
+    static let sheetPadding = EdgeInsets(top: MumcordSpace.s1, leading: MumcordSpace.s1, bottom: 0, trailing: MumcordSpace.s1)
 
     var body: some View {
         HStack(spacing: MumcordSpace.s2) {
@@ -25,7 +36,7 @@ struct MumcordSectionHeader: View {
                 .layoutPriority(1)
             }
         }
-        .padding(EdgeInsets(top: MumcordSpace.s4, leading: MumcordSpace.s4, bottom: MumcordSpace.s2, trailing: MumcordSpace.s4))
+        .padding(padding)
     }
 }
 
@@ -88,6 +99,7 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
     private let trailing: Trailing
     private var wraps = false
     @Environment(\.mumcordTheme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     init(
         title: String,
@@ -130,6 +142,10 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
     private var row: some View {
         let colors = theme.colors
         let vertical = tall ? MumcordSpace.s3 : MumcordSpace.s2
+        // With the accessibility text sizes the texts wrap instead of ending in "…", and what sits
+        // at the end of the row moves below them, where it does not squeeze the texts to a few
+        // letters (as on Android from a font scale of 1.5).
+        let large = typeSize.isAccessibilitySize
         return HStack(spacing: MumcordSpace.s3) {
             if Leading.self != EmptyView.self {
                 leading
@@ -137,26 +153,19 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
                 MumcordIcon(icon: icon, label: nil, tint: danger ? colors.danger : colors.textSecondary)
                     .frame(width: 24)
             }
-            VStack(alignment: .leading, spacing: 0) {
-                if wraps {
-                    ParagraphText(title, style: .bodyStrong, color: danger ? colors.danger : colors.text)
-                    if let subtitle {
-                        ParagraphText(subtitle, style: .small, color: colors.textMuted)
-                    }
-                } else {
-                    LineText(title, style: .bodyStrong, color: danger ? colors.danger : colors.text)
-                    if let subtitle {
-                        LineText(subtitle, style: .small, color: colors.textMuted)
+            if large {
+                VStack(alignment: .leading, spacing: MumcordSpace.s2) {
+                    texts(wrapping: true)
+                    if Trailing.self != EmptyView.self {
+                        HStack(spacing: MumcordSpace.s2) { trailing }
                     }
                 }
-                if let status {
-                    HStack(spacing: 6) { status }
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                texts(wrapping: wraps)
+                HStack(spacing: MumcordSpace.s2) { trailing }
+                    .layoutPriority(1)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            HStack(spacing: MumcordSpace.s2) { trailing }
-                .layoutPriority(1)
         }
         // The divider line is part of the row's height, as with the CSS border.
         .padding(EdgeInsets(top: divider ? vertical + 1 : vertical, leading: MumcordSpace.s4, bottom: vertical, trailing: MumcordSpace.s4))
@@ -168,6 +177,29 @@ struct MumcordListRow<Leading: View, Trailing: View>: View {
             }
         }
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    /// The title, the subtitle and the status line, read as one.
+    private func texts(wrapping: Bool) -> some View {
+        let colors = theme.colors
+        return VStack(alignment: .leading, spacing: 0) {
+            if wrapping {
+                ParagraphText(title, style: .bodyStrong, color: danger ? colors.danger : colors.text)
+                if let subtitle {
+                    ParagraphText(subtitle, style: .small, color: colors.textMuted)
+                }
+            } else {
+                LineText(title, style: .bodyStrong, color: danger ? colors.danger : colors.text)
+                if let subtitle {
+                    LineText(subtitle, style: .small, color: colors.textMuted)
+                }
+            }
+            if let status {
+                HStack(spacing: 6) { status }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -230,7 +262,8 @@ extension MumcordListRow where Trailing == EmptyView {
 
 extension MumcordListRow {
     /// Lets the title and subtitle run over several lines instead of ending with "…", for rows
-    /// whose words must be read in full, also with a large font (a setting).
+    /// whose words must be read in full also at the normal text sizes (a setting). With the
+    /// accessibility text sizes every row wraps.
     func wrapping() -> Self {
         var row = self
         row.wraps = true

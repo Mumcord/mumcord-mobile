@@ -47,6 +47,8 @@ struct MumcordAppBar<Leading: View, Subtitle: View, Actions: View>: View {
             VStack(alignment: .leading, spacing: 0) {
                 LineText(title, style: large ? .displayLarge : .title, color: colors.text)
                     .accessibilityAddTraits(.isHeader)
+                    // The screen's title is read first, before the back button beside it.
+                    .accessibilitySortPriority(1)
                 HStack(spacing: 6) { subtitle }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -55,6 +57,8 @@ struct MumcordAppBar<Leading: View, Subtitle: View, Actions: View>: View {
         // The back button sits 10 pt further out so that its arrow lines up with the content.
         .padding(EdgeInsets(top: large ? 10 : 6, leading: onBack != nil ? 6 : 16, bottom: 6, trailing: 8))
         .frame(minHeight: large ? 64 : 56)
+        // The title's priority only orders the bar itself; the bar stays where it is on the screen.
+        .accessibilityElement(children: .contain)
         .overlay(alignment: .bottom) {
             if border {
                 Rectangle().fill(colors.border).frame(height: 1)

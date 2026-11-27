@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import CoreText
 import SwiftUI
 
 /// One icon of the set in the given colour. Pass a `label` when the icon carries meaning on its
@@ -158,4 +159,16 @@ struct MumcordTile: View {
             .clipShape(shape)
             .accessibilityHidden(true)
     }
+}
+
+/// The factor (at most 1) by which `text` in `font` has to shrink so that its longest word fits
+/// `width`: a short label under a button then never breaks in the middle of a word ("Camer a")
+/// with a large text size.
+func wordFitFactor(_ text: String, font: CTFont, width: CGFloat) -> CGFloat {
+    guard width > 0 else { return 1 }
+    let longest = text.split(whereSeparator: \.isWhitespace).map { word -> CGFloat in
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: String(word), attributes: [.font: font]))
+        return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+    }.max() ?? 0
+    return longest > width ? width / longest : 1
 }

@@ -31,19 +31,13 @@ final class VoiceFlowUITests: XCTestCase {
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).press(forDuration: seconds)
     }
 
-    private func openVoiceView(_ app: XCUIApplication) {
-        expectAppears(app.element("voice-bar"))
-        tapWhenReady(app.element(containing: "Voice connected"))
-        expectAppears(app.element("voice-view"))
-    }
-
     private func expectLabel(_ label: String, of identifier: String, in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
         expectAppears(app.row(identifier, containing: label), file: file, line: line)
     }
 
     func testTheVoiceBarOpensTheVoiceViewWithEverybodyOfTheChannelAndTheChevronClosesIt() {
         let app = launchConnected("ptt")
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         for name in ["Anna", "Ben", "Mira", "Jonas", "Lea (you)"] {
             expectAppears(app.row("voice-tile", containing: name))
         }
@@ -57,7 +51,7 @@ final class VoiceFlowUITests: XCTestCase {
 
     func testMuteAndDeafenChangeTheButtonsAndUnmutingEndsTheDeafen() {
         let app = launchConnected("ptt")
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectLabel("Mute microphone", of: "voice-mute", in: app)
         tapWhenReady(app.element("voice-mute"))
         expectLabel("Unmute microphone", of: "voice-mute", in: app)
@@ -75,7 +69,7 @@ final class VoiceFlowUITests: XCTestCase {
 
     func testTheTalkModeSwitchShowsTheLevelMeterOrTheHoldButtonWhichCanBeHeld() {
         let app = launchConnected("ptt")
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         tapWhenReady(app.element("Voice activity"))
         expectAppears(app.element("voice-level"))
         expectGone(app.element("voice-hold"))
@@ -91,7 +85,7 @@ final class VoiceFlowUITests: XCTestCase {
 
     func testLeaveEndsTheConnectionAtOnceFromTheVoiceViewAndFromTheBar() {
         let app = launchConnected("ptt")
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         tapWhenReady(app.element("voice-leave"))
         expectAppears(app.element("Connect to Nordlicht"))
         expectGone(app.element("voice-view"))
@@ -119,7 +113,7 @@ final class VoiceFlowUITests: XCTestCase {
         tapWhenReady(app.element("channel-menu-shout"))
         expectAppears(app.row("whisper-hold", containing: "Hold to shout to Gaming"))
         // The bar is also in the full voice view.
-        openVoiceView(app)
+        openVoiceViewThroughTheBar(in: app)
         expectAppears(app.row("whisper-hold", containing: "Hold to shout to Gaming"))
     }
 

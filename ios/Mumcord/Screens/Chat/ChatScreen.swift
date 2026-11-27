@@ -53,8 +53,6 @@ struct ChatScreen: View {
     /// Set for a private conversation: the way back to the conversation list.
     var onBack: (() -> Void)?
     @Environment(\.mumcordTheme) private var theme
-    /// Where the keyboard begins on the screen, or the bottom of the screen without one.
-    @Environment(\.keyboardTop) private var keyboardTop
 
     private var subtitle: String {
         guard let peer = state.peer else { return Strings.chatSubtitle(state.people, state.serverName) }
@@ -62,16 +60,14 @@ struct ChatScreen: View {
     }
 
     var body: some View {
-        GeometryReader { area in
-            // The bars under the chat (voice bar, tab bar) already take part of the keyboard's
-            // height, so only what is left of it is padded.
-            let lift = max(0, area.frame(in: .global).maxY - keyboardTop)
-            column
-                .padding(.bottom, lift)
-                .animation(.easeOut(duration: 0.25), value: lift)
-        }
+        KeyboardLifted { column }
         .onChange(of: newestFromOthers?.id) { _, id in
             if id != nil, let newestFromOthers { announce(newestFromOthers) }
+        }
+        // On a change, not when the banner appears: a switch between one column and two builds
+        // the chat again, and the notice on screen must not be read out a second time.
+        .onChange(of: state.notice) { _, notice in
+            if let notice { AccessibilityNotification.Announcement(notice.text).post() }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("chat-screen")
@@ -111,7 +107,7 @@ struct ChatScreen: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(theme.colors.bgChat)
-            Composer(state: state, actions: actions)
+            ChatComposer(state: state, actions: actions)
         }
     }
 
@@ -169,7 +165,7 @@ private struct NoticeBanner: View {
     var body: some View {
         Button(action: onDismiss) {
             MumcordBanner(
-                text: text,
+                text: notice.text,
                 icon: notice == .gifSaved ? MumcordIcons.star : MumcordIcons.alert,
                 tone: notice == .gifSaved ? .info : .warning
             )
@@ -183,11 +179,13 @@ private struct NoticeBanner: View {
             try? await Task.sleep(nanoseconds: noticeSeconds * 1_000_000_000)
             if !Task.isCancelled { onDismiss() }
         }
-        .onAppear { AccessibilityNotification.Announcement(text).post() }
     }
+}
 
-    private var text: String {
-        switch notice {
+extension ChatNotice {
+    /// What the notice banner says.
+    var text: String {
+        switch self {
         case .gifSaved: Strings.gifSaved
         case .gifNotSaved: Strings.gifNotSaved
         case .imageUnreadable: Strings.chatImageUnreadable
@@ -315,8 +313,28 @@ private struct HistoryNote: View {
 
 // MARK: Writing
 
-/// The reply bar, the `@` suggestions, the counter and the input bar.
-private struct Composer: View {
+/// Its content lifted above the keyboard. The bars under it (voice bar, tab bar) already take
+/// part of the keyboard's height, so only what is left of it is padded.
+struct KeyboardLifted<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+    /// Where the keyboard begins on the screen, or the bottom of the screen without one.
+    @Environment(\.keyboardTop) private var keyboardTop
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { area in
+            let lift = max(0, area.frame(in: .global).maxY - keyboardTop)
+            content()
+                .padding(.bottom, lift)
+                // With Reduce Motion the input bar jumps to its place instead of gliding there.
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.25), value: lift)
+        }
+    }
+}
+
+/// The reply bar, the `@` suggestions, the counter and the input bar; also under a stream in
+/// the right column of two columns.
+struct ChatComposer: View {
     let state: ChatUiState
     let actions: ChatController
     @Environment(\.mumcordTheme) private var theme

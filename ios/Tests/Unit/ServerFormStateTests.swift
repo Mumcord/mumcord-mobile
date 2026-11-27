@@ -25,6 +25,19 @@ final class ServerFormStateTests: XCTestCase {
         XCTAssertNil(form.toInput())
     }
 
+    func testTheServersThemeCountsAsChangedOnlyWhenItDiffersFromTheSavedOne() {
+        let server = savedServer(1, "Nordlicht")
+        let form = ServerFormState.edit(server, themeId: "preset:ocean")
+        XCTAssertEqual(form.themeId, "preset:ocean")
+        XCTAssertFalse(form.themeChanged)
+        var changed = form
+        changed.themeId = nil
+        XCTAssertTrue(changed.themeChanged, "back to the app theme")
+        changed.themeId = "preset:ocean"
+        XCTAssertFalse(changed.themeChanged)
+        XCTAssertFalse(ServerFormState.edit(server).themeChanged)
+    }
+
     func testPortsOutsideTheValidRangeAreRejected() {
         XCTAssertNil(changing { $0.port = "" }.portNumber)
         XCTAssertNil(changing { $0.port = "0" }.portNumber)

@@ -77,12 +77,16 @@ enum Mockup {
     static let afk: UInt32 = 4
     static let ben: UInt32 = 2
     static let lea: UInt32 = 3
+    static let mira: UInt32 = 4
     static let jonas: UInt32 = 5
 
     static let fingerprint =
         "9F:86:D0:81:88:4C:7D:65:9A:2F:EA:A0:C5:5A:D0:15:A3:BF:4F:1B:2B:0B:82:2C:D1:5D:6C:15:B0:F0:0A:08"
     static let previousFingerprint =
         "2C:F2:4D:BA:5F:B0:A3:0E:26:E8:3B:2A:C5:B9:E2:9E:1B:16:1E:5C:1F:A7:42:5E:73:04:33:62:93:8B:98:24"
+
+    /// What the server says when it refuses a moderation command.
+    static let refusal = "Moderation is off tonight"
 
     /// The server list of mockup `01-server-list`.
     static let servers = [
@@ -111,7 +115,7 @@ func mockupServer() -> ServerState {
     music.canEnter = false
     var ben = person(Mockup.ben, "Ben", channelId: Mockup.lobby)
     ben.talking = true
-    var mira = person(4, "Mira", channelId: Mockup.gaming)
+    var mira = person(Mockup.mira, "Mira", channelId: Mockup.gaming)
     mira.streaming = true
     var jonas = person(Mockup.jonas, "Jonas", channelId: Mockup.gaming)
     jonas.selfMuted = true
@@ -132,6 +136,49 @@ func mockupServer() -> ServerState {
             mira,
             jonas,
         ]
+    )
+}
+
+extension ServerState {
+    /// The server with the rights `change` gives each channel.
+    func granting(_ change: (inout Channel) -> Void) -> ServerState {
+        var server = self
+        server.channels = channels.map { channel in
+            var changed = channel
+            change(&changed)
+            return changed
+        }
+        return server
+    }
+}
+
+extension Channel {
+    /// Every moderation right, as a server admin has it.
+    mutating func grantAllRights() {
+        permissions.movePeople = true
+        permissions.muteDeafen = true
+        permissions.kick = true
+        permissions.ban = true
+    }
+}
+
+/// Mira's screen share as the bridge reports it, with the picture id the bridge gives it.
+func mockupStream(
+    watch: StreamWatch = .idle,
+    viewers: UInt32? = 1,
+    hasSound: Bool = true,
+    paused: Bool = false,
+    kind: StreamKind = .screen
+) -> Stream {
+    Stream(
+        session: Mockup.mira,
+        kind: kind,
+        videoId: (kind == .screen ? 1 << 32 : 2 << 32) | UInt64(Mockup.mira),
+        watch: watch,
+        paused: paused,
+        hasSound: hasSound,
+        volume: 136,
+        viewers: viewers
     )
 }
 

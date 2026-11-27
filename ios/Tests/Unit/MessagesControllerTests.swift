@@ -42,7 +42,6 @@ final class MessagesControllerTests: XCTestCase {
         let store: SessionStore
         let chats: ChatStore
         let controller: MessagesController
-        let settings: InMemoryMessageNotificationSettings
     }
 
     /// Connected to the mockup server; the user is Lea in the Lobby.
@@ -50,14 +49,13 @@ final class MessagesControllerTests: XCTestCase {
         let store = makeStore(box, server: mockupServer(), servers: [savedServer(1, "Nordlicht")], configure: configure)
         // Before anything is sent: the chat store is the one reader of the chat events.
         let chats = ChatStore(session: store)
-        let settings = InMemoryMessageNotificationSettings()
-        let controller = MessagesController(store: store, chats: chats, settings: settings)
+        let controller = MessagesController(store: store, chats: chats)
         controller.showMessagesTab = { [weak self] in self?.tabShown += 1 }
         controller.dismissConnectedSheet = { [weak self] in self?.sheetDismissed += 1 }
         await store.loadServers()
         await store.connectServer(1, password: nil, channelPath: [])
         await assertEventually { store.state.showsServer && store.state.server != nil }
-        return Connected(store: store, chats: chats, controller: controller, settings: settings)
+        return Connected(store: store, chats: chats, controller: controller)
     }
 
     func testTheConversationsRequestsAndBlockedPeopleAreReadWhenTheServerIsShown() async {
@@ -241,24 +239,14 @@ final class MessagesControllerTests: XCTestCase {
         await assertEventually { controller.blocked.isEmpty }
     }
 
-    func testShowSenderOnlyGoesToTheSettingsAndComesBack() async {
-        let connected = await makeConnected()
-        let controller = connected.controller
-        XCTAssertFalse(controller.local.senderOnly)
-        controller.setSenderOnly(true)
-        XCTAssertTrue(connected.settings.senderOnly)
-        await assertEventually { controller.local.senderOnly }
-    }
-
-    func testTheEndOfTheConnectionStartsAfreshButKeepsTheSetting() async {
+    func testTheEndOfTheConnectionStartsAfresh() async {
         let connected = await makeConnected { $0.conversations = [annaConversation()] }
         let controller = connected.controller
-        controller.setSenderOnly(true)
         controller.openConversation(annaChat, name: "Anna")
-        await assertEventually { controller.conversations.count == 1 && controller.local.senderOnly }
+        await assertEventually { controller.conversations.count == 1 }
         await connected.store.disconnect()
         await assertEventually { controller.local.open == nil && controller.conversations.isEmpty }
-        XCTAssertTrue(controller.local.senderOnly)
+        XCTAssertEqual(controller.local, MessagesLocal())
     }
 
     func testTheEngineSettingKeepsShowSenderOnly() async {

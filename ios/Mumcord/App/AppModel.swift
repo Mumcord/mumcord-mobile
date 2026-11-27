@@ -35,9 +35,20 @@ final class AppModel {
     @ObservationIgnored let chatStore: ChatStore
     /// The Messages tab: conversations, requests, blocking. Read only by its own views.
     @ObservationIgnored let messages: MessagesController
+    /// The More tab: the activity log and the settings. Read only by its own views.
+    @ObservationIgnored let more: MoreController
     /// The identity screens and "Scan from desktop app".
     @ObservationIgnored let identities: IdentitiesController
-    /// The camera permission, for the scanner and the chat's "Take photo".
+    /// The public server browser. Read only by its own screen.
+    @ObservationIgnored let publicServers: PublicServersController
+    /// The colours of the shown theme. Read only where the app's theme is put on screen.
+    @ObservationIgnored let appTheme: AppThemeController
+    /// Watching screen shares and cameras. Read only by the stream views.
+    @ObservationIgnored let streams: StreamsController
+    /// Sharing the own camera (FR-5.74); nil where it cannot be shared (no camera button).
+    /// Read only by the camera views.
+    @ObservationIgnored let cameraShare: CameraShareController?
+    /// The camera permission, for the scanner, the chat's "Take photo" and sharing the camera.
     @ObservationIgnored let camera: CameraGateway
     /// Where the scanner gets the texts of QR codes from.
     @ObservationIgnored let qrSource: QrSource
@@ -50,9 +61,6 @@ final class AppModel {
     @ObservationIgnored let outputs: OutputAccess
     /// "Disconnect when alone": the notice after the app disconnected by itself.
     @ObservationIgnored let idle: IdleAccess?
-    /// The last change of the phone settings; the next one waits for it, so that two switches
-    /// flipped quickly do not save over each other.
-    @ObservationIgnored var settingsSave: Task<Void, Never>?
     /// The last connect, so "Try again" and the password retry keep a link's channel.
     @ObservationIgnored private var lastTarget: ConnectTarget?
 
@@ -60,6 +68,10 @@ final class AppModel {
     private var local: AppUiState
     private var session = SessionState()
     var connectedLocal = ConnectedLocal()
+    /// The window is laid out in two columns (an iPad, see `connectedLayout`), as the app's root
+    /// last measured it. Kept apart from `connectedLocal`, which a connection starts afresh: the
+    /// window stays what it is.
+    private(set) var twoColumns = false
     private var microphoneNotice = MicrophoneNotice.none
     private var notificationState: NotificationState
     private var outputNotice: OutputNotice
@@ -78,7 +90,11 @@ final class AppModel {
         idle: IdleAccess? = nil,
         mediaPolicy: @escaping MediaPolicy = { true },
         camera: CameraGateway = NoCamera(),
-        qrSource: QrSource = NoQrSource()
+        qrSource: QrSource = NoQrSource(),
+        network: NetworkMonitor? = nil,
+        streamVideo: StreamVideo = .none,
+        cameraShare: CameraShare? = nil,
+        languages: AppLanguages = .phoneOnly
     ) {
         self.store = store
         self.setupStore = setupStore
@@ -96,10 +112,15 @@ final class AppModel {
         self.chatStore = chatStore
         chat = ChatController(chats: chatStore)
         conversation = ChatController(chats: chatStore, keepDraft: false)
-        messages = MessagesController(store: store, chats: chatStore, settings: messageSettings)
+        messages = MessagesController(store: store, chats: chatStore)
+        more = MoreController(store: store, messageSettings: messageSettings, languages: languages)
         self.camera = camera
         self.qrSource = qrSource
         identities = IdentitiesController(store: store, camera: camera)
+        publicServers = PublicServersController(store: store)
+        appTheme = AppThemeController(store: store)
+        streams = StreamsController(store: store, network: network, video: streamVideo)
+        self.cameraShare = cameraShare.map { CameraShareController(store: store, camera: $0, permission: camera) }
         chatImages = BridgeImageLoader(chats: chatStore, log: AppLog.write)
         local = AppUiState(setupDone: setupStore.firstStartDone)
         if let sessionEnded {
@@ -143,6 +164,7 @@ final class AppModel {
         }
         messages.showMessagesTab = { [weak self] in self?.showTab(.messages) }
         messages.dismissConnectedSheet = { [weak self] in self?.dismissSheet() }
+        more.switchTalkMode = { [weak self] in self?.switchTalkMode($0) }
         let levels = store.inputLevels()
         Task { [inputLevel] in
             for await percent in levels {
@@ -169,6 +191,8 @@ final class AppModel {
     }
 
     private func apply(_ state: SessionState) {
+        // Before the screens get the state, so they are drawn in its colours from the start.
+        appTheme.follow(state)
         let serversChanged = state.servers != session.servers
         let previousPhase = session.phase
         let whisperEnded = state.whispersEnded != session.whispersEnded
@@ -182,6 +206,11 @@ final class AppModel {
             // The whisper bar goes away with the person or channel it is for.
             closeWhisper()
         }
+        if state.showsServer && local.moreOpen {
+            // A connection (from a link, say) brings its own More tab; the end of it leads back
+            // to the server list, not to the More screen left behind.
+            local.moreOpen = false
+        }
         if whisperEnded {
             // The engine ended the whisper by itself and already talks to the channel again,
             // so there is nothing to stop: only the bar goes away.
@@ -193,14 +222,27 @@ final class AppModel {
     }
 
     /// Tells the chat which chat to show (the one of the user's channel) and whether its
-    /// screen is the one on top. Called whenever the connection, the tab or the voice view
-    /// changes.
+    /// screen is the one on top. Called whenever the connection, the tab, the voice view or the
+    /// layout changes.
     func syncChat() {
         chat.open(currentChannelChat(session))
-        chat.setShown(session.showsServer && connectedLocal.tab == .chat && !connectedLocal.voiceOpen)
+        chat.setShown(session.showsServer && channelChatShown && !connectedLocal.voiceOpen)
         let open = session.showsServer ? messages.local.open?.chat : nil
         conversation.open(open)
         conversation.setShown(open != nil && connectedLocal.tab == .messages && !connectedLocal.voiceOpen)
+    }
+
+    /// The channel chat is on screen: its tab, or the right column of Channels in two columns.
+    var channelChatShown: Bool {
+        showsChannelChat(tab: connectedLocal.tab, twoColumns: twoColumns)
+    }
+
+    /// The app's root measured its window again (rotation, resize, Split View). In two columns
+    /// the channel chat is on screen beside the channels, so it counts as read there.
+    func setTwoColumns(_ twoColumns: Bool) {
+        guard twoColumns != self.twoColumns else { return }
+        self.twoColumns = twoColumns
+        syncChat()
     }
 
     /// The chat controller of the tab on screen; the chat's sheets and pictures go to it.
@@ -217,6 +259,17 @@ final class AppModel {
     /// The Messages tab and the blocking screens as a value. Only their own views read it.
     var messagesUiState: MessagesUiState? {
         messages.uiState(session: session, notificationsGranted: notificationState.granted)
+    }
+
+    /// The More tab as a value, or the server list's More screen while that is open; nil
+    /// otherwise. Only their own views read it.
+    var moreUiState: MoreUiState? {
+        more.uiState(
+            session: session,
+            serverName: local.activeServerName(session) ?? "",
+            output: outputNotice.state,
+            fromServerList: local.moreOpen
+        )
     }
 
     /// The open private conversation as a value, or nil while there is none to show.
@@ -241,9 +294,9 @@ final class AppModel {
     /// Brings a tab in front of whatever is open: a sheet and the full voice view go away.
     func showTab(_ tab: ConnectedTab) {
         connectedLocal.voiceOpen = false
-        connectedLocal.personSession = nil
-        connectedLocal.volumeDraft = nil
+        closePerson()
         connectedLocal.menuChannelId = nil
+        more.closeSheet()
         connectedLocal.tab = tab
         syncChat()
     }
@@ -291,7 +344,7 @@ final class AppModel {
 
     /// The number on the Chat tab.
     var chatBadge: Int {
-        chatTabBadge(unread: chat.unread, session: session, chatTabOpen: connectedLocal.tab == .chat)
+        chatTabBadge(unread: chat.unread, session: session, chatTabOpen: channelChatShown)
     }
 
     /// After a server on a local or private address could not be reached: asks the system
@@ -364,7 +417,7 @@ final class AppModel {
 
     func openEditServer(_ serverId: Int64) {
         guard let server = server(serverId) else { return }
-        local.form = .edit(server)
+        local.form = .edit(server, themeId: store.state.themes?.serverThemes[serverId])
     }
 
     func changeForm(_ change: (inout ServerFormState) -> Void) {
@@ -395,7 +448,16 @@ final class AppModel {
             } else {
                 saved = await store.addServer(input)
             }
+            // The server's theme is its own setting, saved once the server itself is.
+            var themed: Outcome<Void>
             switch saved {
+            case .ok: themed = .ok(())
+            case .failed(let error): themed = .failed(error)
+            }
+            if case .ok = themed, let serverId = form.serverId, form.themeChanged {
+                themed = await store.setServerTheme(serverId, form.themeId)
+            }
+            switch themed {
             case .ok:
                 closeForm()
             case .failed(let error):
@@ -405,6 +467,40 @@ final class AppModel {
                 }
             }
         }
+    }
+
+    // MARK: More without a connection
+
+    /// The settings icon of the server list: the More screen with what works without a server.
+    func openMore() {
+        local.editing = false
+        local.moreOpen = true
+    }
+
+    func closeMore() {
+        more.back()
+        local.moreOpen = false
+    }
+
+    // MARK: Public servers
+
+    /// Opening the browser is what loads the public list: nothing is requested before (FR-5.9).
+    func openPublicServers() {
+        local.editing = false
+        local.browsingPublic = true
+        publicServers.open()
+    }
+
+    func closePublicServers() {
+        publicServers.close()
+        local.browsingPublic = false
+    }
+
+    /// "Connect" on a listed server that is in the server list: the normal flow takes over on
+    /// the server list, where its questions and errors are.
+    func connectFromPublicServers(_ serverId: Int64) {
+        closePublicServers()
+        connect(serverId)
     }
 
     func requestRemove(_ serverId: Int64) {

@@ -23,6 +23,8 @@ struct ConnectedSheetHost: View {
             AudioOutputSheet(rows: rows, onSelect: actions.selectOutput, onDismiss: actions.dismissSheet)
         case .person(let person):
             PersonSheet(person: person, actions: actions, model: model)
+        case .moderation(let sheet):
+            ModerationSheetHost(sheet: sheet, actions: actions.moderation, onBack: actions.dismissSheet)
         case .channelMenu(let id, let name, let expanded, let canJoin):
             ChannelMenuSheet(id: id, name: name, expanded: expanded, canJoin: canJoin, actions: actions)
         }
@@ -55,7 +57,9 @@ private struct ChannelPasswordSheet: View {
     }
 }
 
-/// Mockup `06-person-sheet`: the head, the two settings that apply to the user only, and whisper.
+/// Mockup `06-person-sheet`: the head, the two settings that apply to the user only, private
+/// message and whisper, and the moderation entries the server allows. The card with the chat
+/// request and blocking has no mockup; it sits between whisper and moderation.
 private struct PersonSheet: View {
     let person: PersonSheetState
     let actions: ConnectedActions
@@ -128,8 +132,8 @@ private struct PersonSheet: View {
                 )
                 .accessibilityIdentifier("person-whisper")
             }
-            // The card with the chat request and blocking has no mockup.
             PersonMessagingRows(session: person.session, model: model)
+            ModerationSection(rows: person.moderation, actions: actions.moderation)
         }
     }
 }

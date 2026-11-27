@@ -20,6 +20,7 @@ struct MumcordTalkButton: View {
     @Environment(\.mumcordTheme) private var theme
     // Back to false also when the system cancels the touch (a call, a gesture of the system).
     @GestureState private var pressed = false
+    @State private var hold = HoldReport()
 
     var body: some View {
         let colors = theme.colors
@@ -58,7 +59,13 @@ struct MumcordTalkButton: View {
             }
         )
         .onChange(of: pressed) { _, isPressed in
-            onPressedChange(isPressed)
+            if let change = hold.pressed(isPressed) { onPressedChange(change) }
+        }
+        // A button taken off the screen while held (the layout switches between one column and
+        // two, the voice view or a stream takes the bar's place) never sees the finger go up;
+        // without this the voice would go on being sent.
+        .onDisappear {
+            if let change = hold.disappeared() { onPressedChange(change) }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
@@ -67,5 +74,22 @@ struct MumcordTalkButton: View {
         .accessibilityAction {
             onPressedChange(!active)
         }
+    }
+}
+
+/// What a hold button told its caller, so that it lets go when it leaves the screen while held.
+struct HoldReport {
+    private(set) var down = false
+
+    /// The finger went down or up: the change to report, or nil when there is none.
+    mutating func pressed(_ isPressed: Bool) -> Bool? {
+        guard isPressed != down else { return nil }
+        down = isPressed
+        return isPressed
+    }
+
+    /// The button left the screen: a release to report while it was held.
+    mutating func disappeared() -> Bool? {
+        pressed(false)
     }
 }

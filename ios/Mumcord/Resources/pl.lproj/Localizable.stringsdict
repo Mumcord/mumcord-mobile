@@ -1,0 +1,548 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Written by scripts/translations.py from Mumcord b258e927e1af (ui/src/locales/pl), i18n/mobile/pl.json and ios/Mumcord/Resources/en.lproj/Localizable.strings. Do not edit by hand. -->
+<plist version="1.0">
+<dict>
+    <key>servers_online</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%3$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld online · %2$ld ms</string>
+            <key>few</key>
+            <string>%1$ld online · %2$ld ms</string>
+            <key>many</key>
+            <string>%1$ld online · %2$ld ms</string>
+            <key>other</key>
+            <string>%1$ld online · %2$ld ms</string>
+        </dict>
+    </dict>
+    <key>public_count_all</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld server</string>
+            <key>few</key>
+            <string>%1$ld servers</string>
+            <key>many</key>
+            <string>%1$ld servers</string>
+            <key>other</key>
+            <string>%1$ld servers</string>
+        </dict>
+    </dict>
+    <key>public_count_shown</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%3$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld of %2$ld server</string>
+            <key>few</key>
+            <string>%1$ld of %2$ld servers</string>
+            <key>many</key>
+            <string>%1$ld of %2$ld servers</string>
+            <key>other</key>
+            <string>%1$ld of %2$ld servers</string>
+        </dict>
+    </dict>
+    <key>public_ping_description</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%4$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld of %2$ld person online, %3$ld ms</string>
+            <key>few</key>
+            <string>%1$ld of %2$ld people online, %3$ld ms</string>
+            <key>many</key>
+            <string>%1$ld of %2$ld people online, %3$ld ms</string>
+            <key>other</key>
+            <string>%1$ld of %2$ld people online, %3$ld ms</string>
+        </dict>
+    </dict>
+    <key>channels_online</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld online</string>
+            <key>few</key>
+            <string>%1$ld online</string>
+            <key>many</key>
+            <string>%1$ld online</string>
+            <key>other</key>
+            <string>%1$ld online</string>
+        </dict>
+    </dict>
+    <key>channels_people_count</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld osoba</string>
+            <key>few</key>
+            <string>%1$ld osoby</string>
+            <key>many</key>
+            <string>%1$ld osób</string>
+            <key>other</key>
+            <string>%1$ld osoby</string>
+        </dict>
+    </dict>
+    <key>talking_announcement_more</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%3$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$@ and %2$ld other person are talking</string>
+            <key>few</key>
+            <string>%1$@ and %2$ld other people are talking</string>
+            <key>many</key>
+            <string>%1$@ and %2$ld other people are talking</string>
+            <key>other</key>
+            <string>%1$@ and %2$ld other people are talking</string>
+        </dict>
+    </dict>
+    <key>chat_subtitle</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%3$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld person · %2$@</string>
+            <key>few</key>
+            <string>%1$ld people · %2$@</string>
+            <key>many</key>
+            <string>%1$ld people · %2$@</string>
+            <key>other</key>
+            <string>%1$ld people · %2$@</string>
+        </dict>
+    </dict>
+    <key>chat_new_messages</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld new message</string>
+            <key>few</key>
+            <string>%1$ld new messages</string>
+            <key>many</key>
+            <string>%1$ld new messages</string>
+            <key>other</key>
+            <string>%1$ld new messages</string>
+        </dict>
+    </dict>
+    <key>chat_tab_unread</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>Chat, %1$ld unread message</string>
+            <key>few</key>
+            <string>Chat, %1$ld unread messages</string>
+            <key>many</key>
+            <string>Chat, %1$ld unread messages</string>
+            <key>other</key>
+            <string>Chat, %1$ld unread messages</string>
+        </dict>
+    </dict>
+    <key>chat_characters_left</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld character left</string>
+            <key>few</key>
+            <string>%1$ld characters left</string>
+            <key>many</key>
+            <string>%1$ld characters left</string>
+            <key>other</key>
+            <string>%1$ld characters left</string>
+        </dict>
+    </dict>
+    <key>chat_characters_over</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld character too long</string>
+            <key>few</key>
+            <string>%1$ld characters too long</string>
+            <key>many</key>
+            <string>%1$ld characters too long</string>
+            <key>other</key>
+            <string>%1$ld characters too long</string>
+        </dict>
+    </dict>
+    <key>messages_row_unread</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld nieprzeczytana wiadomość</string>
+            <key>few</key>
+            <string>%1$ld nieprzeczytane wiadomości</string>
+            <key>many</key>
+            <string>%1$ld nieprzeczytanych wiadomości</string>
+            <key>other</key>
+            <string>%1$ld nieprzeczytanej wiadomości</string>
+        </dict>
+    </dict>
+    <key>messages_tab_unread</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>Messages, %1$ld unread message</string>
+            <key>few</key>
+            <string>Messages, %1$ld unread messages</string>
+            <key>many</key>
+            <string>Messages, %1$ld unread messages</string>
+            <key>other</key>
+            <string>Messages, %1$ld unread messages</string>
+        </dict>
+    </dict>
+    <key>requests_more_messages</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld message</string>
+            <key>few</key>
+            <string>%1$ld messages</string>
+            <key>many</key>
+            <string>%1$ld messages</string>
+            <key>other</key>
+            <string>%1$ld messages</string>
+        </dict>
+    </dict>
+    <key>more_activity_new</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>Activity, %1$ld new entry</string>
+            <key>few</key>
+            <string>Activity, %1$ld new entries</string>
+            <key>many</key>
+            <string>Activity, %1$ld new entries</string>
+            <key>other</key>
+            <string>Activity, %1$ld new entries</string>
+        </dict>
+    </dict>
+    <key>settings_history_days</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld dzień</string>
+            <key>few</key>
+            <string>%1$ld dni</string>
+            <key>many</key>
+            <string>%1$ld dni</string>
+            <key>other</key>
+            <string>%1$ld dnia</string>
+        </dict>
+    </dict>
+    <key>identities_used_on</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>Used on %1$ld server</string>
+            <key>few</key>
+            <string>Used on %1$ld servers</string>
+            <key>many</key>
+            <string>Used on %1$ld servers</string>
+            <key>other</key>
+            <string>Used on %1$ld servers</string>
+        </dict>
+    </dict>
+    <key>identity_delete_servers</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%3$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld server uses this identity. It will use the default identity %2$@ afterwards. Its registered name and permissions stay with the old certificate.</string>
+            <key>few</key>
+            <string>%1$ld servers use this identity. They will use the default identity %2$@ afterwards. Their registered names and permissions stay with the old certificate.</string>
+            <key>many</key>
+            <string>%1$ld servers use this identity. They will use the default identity %2$@ afterwards. Their registered names and permissions stay with the old certificate.</string>
+            <key>other</key>
+            <string>%1$ld servers use this identity. They will use the default identity %2$@ afterwards. Their registered names and permissions stay with the old certificate.</string>
+        </dict>
+    </dict>
+    <key>scan_code_description</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>Code shown on desktop, %1$ld digit</string>
+            <key>few</key>
+            <string>Code shown on desktop, %1$ld digits</string>
+            <key>many</key>
+            <string>Code shown on desktop, %1$ld digits</string>
+            <key>other</key>
+            <string>Code shown on desktop, %1$ld digits</string>
+        </dict>
+    </dict>
+    <key>scan_wrong_code</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>Wrong code. %1$ld try left.</string>
+            <key>few</key>
+            <string>Wrong code. %1$ld tries left.</string>
+            <key>many</key>
+            <string>Wrong code. %1$ld tries left.</string>
+            <key>other</key>
+            <string>Wrong code. %1$ld tries left.</string>
+        </dict>
+    </dict>
+    <key>scan_receiving_identities</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld identity</string>
+            <key>few</key>
+            <string>%1$ld identities</string>
+            <key>many</key>
+            <string>%1$ld identities</string>
+            <key>other</key>
+            <string>%1$ld identities</string>
+        </dict>
+    </dict>
+    <key>scan_receiving_servers</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$ld server</string>
+            <key>few</key>
+            <string>%1$ld servers</string>
+            <key>many</key>
+            <string>%1$ld servers</string>
+            <key>other</key>
+            <string>%1$ld servers</string>
+        </dict>
+    </dict>
+    <key>stream_watching</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$d watching</string>
+            <key>few</key>
+            <string>%1$d watching</string>
+            <key>many</key>
+            <string>%1$d watching</string>
+            <key>other</key>
+            <string>%1$d watching</string>
+        </dict>
+    </dict>
+    <key>stream_viewers</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$d widz</string>
+            <key>few</key>
+            <string>%1$d widzowie</string>
+            <key>many</key>
+            <string>%1$d widzów</string>
+            <key>other</key>
+            <string>%1$d widza</string>
+        </dict>
+    </dict>
+    <key>camera_on_watching</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%2$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>Camera on · %1$d watching</string>
+            <key>few</key>
+            <string>Camera on · %1$d watching</string>
+            <key>many</key>
+            <string>Camera on · %1$d watching</string>
+            <key>other</key>
+            <string>Camera on · %1$d watching</string>
+        </dict>
+    </dict>
+    <key>profile_comment_count_description</key>
+    <dict>
+        <key>NSStringLocalizedFormatKey</key>
+        <string>%3$#@count@</string>
+        <key>count</key>
+        <dict>
+            <key>NSStringFormatSpecTypeKey</key>
+            <string>NSStringPluralRuleType</string>
+            <key>NSStringFormatValueTypeKey</key>
+            <string>ld</string>
+            <key>one</key>
+            <string>%1$@ of %2$@ character</string>
+            <key>few</key>
+            <string>%1$@ of %2$@ characters</string>
+            <key>many</key>
+            <string>%1$@ of %2$@ characters</string>
+            <key>other</key>
+            <string>%1$@ of %2$@ characters</string>
+        </dict>
+    </dict>
+</dict>
+</plist>

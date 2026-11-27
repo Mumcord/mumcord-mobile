@@ -174,4 +174,31 @@ final class AppModelConnectedTests: XCTestCase {
         await assertEventually { model.uiState.connected == nil && model.connectedLocal == ConnectedLocal() }
         XCTAssertEqual(model.uiState.screen, .serverList)
     }
+
+    func testATappedNotificationOpensItsChatInFrontOfWhateverIsOpen() async throws {
+        let model = await makeConnected()
+        model.openVoice()
+        model.openChat(.channel(channelId: Mockup.lobby))
+        XCTAssertEqual(try shell(model).tab, .chat)
+        XCTAssertNotEqual(try shell(model).voice?.open, true, "the full voice view went away")
+        XCTAssertNil(model.messages.local.open, "a mention is no conversation")
+
+        let anna = ChatId.person(certHash: "hash-anna")
+        model.openPerson(Mockup.ben)
+        model.openChat(anna)
+        XCTAssertEqual(try shell(model).tab, .messages)
+        XCTAssertNil(try shell(model).sheet, "the person sheet went away")
+        XCTAssertEqual(model.messages.local.open?.chat, anna)
+        XCTAssertEqual(model.conversation.local.chat, anna, "the conversation's chat follows")
+    }
+
+    func testATappedNotificationDoesNothingWithoutAConnection() async {
+        let model = await makeConnected()
+        model.disconnect()
+        await assertEventually { model.uiState.connected == nil }
+
+        model.openChat(.person(certHash: "hash-anna"))
+        XCTAssertNil(model.messages.local.open)
+        XCTAssertEqual(model.connectedLocal, ConnectedLocal())
+    }
 }

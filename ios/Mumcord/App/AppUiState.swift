@@ -10,6 +10,11 @@ enum AppScreen: Equatable {
     case talkModeChoice
     case serverList
     case serverForm
+    /// The public server browser (FR-5.9).
+    case publicServers
+    /// The More screen without a connection, opened with the server list's settings icon: only
+    /// what works without a server (identities, themes, settings).
+    case more
     case channels
     case identities
     case scan
@@ -51,6 +56,10 @@ struct AppUiState: Equatable {
     var editing = false
     /// The open add or edit form, or nil.
     var form: ServerFormState?
+    /// The public server browser is open (FR-5.9).
+    var browsingPublic = false
+    /// The More screen of the server list is open.
+    var moreOpen = false
     var overlay: Overlay?
     /// The server whose address is being looked at before its connection starts.
     var checkingServerId: Int64?
@@ -74,6 +83,8 @@ struct AppUiState: Equatable {
         if identities.open { return .identities }
         if connected != nil { return .channels }
         if form != nil { return .serverForm }
+        if browsingPublic { return .publicServers }
+        if moreOpen { return .more }
         return .serverList
     }
 
